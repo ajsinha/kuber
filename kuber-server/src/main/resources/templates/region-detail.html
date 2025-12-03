@@ -180,6 +180,9 @@
                     </div>
                     <div class="card-body">
                         <div class="d-grid gap-2">
+                            <a th:href="@{/api/export/region/{name}(name=${region.name})}" class="btn btn-success">
+                                <i class="fas fa-download me-1"></i> Export as CSV
+                            </a>
                             <a th:href="@{/cache/insert(region=${region.name})}" class="btn btn-outline-primary">
                                 <i class="fas fa-plus me-1"></i> Insert Entry
                             </a>

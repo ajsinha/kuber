@@ -9,11 +9,13 @@
         <module name="kuber-client-java" />
         <module name="kuber-server" />
         <module name="kuber-core" />
+        <module name="kuber" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="kuber" options="-parameters -parameters" />
       <module name="kuber-cache" options="-parameters -parameters" />
       <module name="kuber-client-java" options="-parameters -parameters" />
       <module name="kuber-core" options="-parameters -parameters" />

@@ -33,7 +33,7 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <form th:action="@{/cache/query}" method="post">
+                        <form th:action="@{/cache/query}" method="post" id="queryForm">
                             <div class="mb-3">
                                 <label for="region" class="form-label">Region</label>
                                 <select id="region" name="region" class="form-select">
@@ -110,10 +110,18 @@
             <div class="col-lg-8">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3">
-                        <h5 class="mb-0">
-                            <i class="fas fa-list me-2 text-success"></i>
-                            Results
-                        </h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-list me-2 text-success"></i>
+                                Results
+                            </h5>
+                            <!-- Export Button -->
+                            <div th:if="${resultType != null && resultType != 'string' && resultType != 'json'}">
+                                <a id="exportBtn" class="btn btn-success btn-sm" href="#" onclick="exportResults(); return false;">
+                                    <i class="fas fa-download me-1"></i> Export CSV
+                                </a>
+                            </div>
+                        </div>
                     </div>
                     <div class="card-body">
                         <!-- String Result -->
@@ -138,35 +146,103 @@
                             </div>
                         </div>
                         
-                        <!-- Keys Result -->
+                        <!-- Keys Result (glob pattern) -->
                         <div th:if="${resultType == 'keys'}">
                             <div th:if="${results != null && !results.isEmpty()}">
-                                <div class="mb-2 text-muted">
-                                    Found <span th:text="${results.size()}">0</span> keys
+                                <div class="mb-3 text-muted">
+                                    Found <span th:text="${#lists.size(results)}">0</span> keys
                                 </div>
-                                <div class="list-group list-group-flush">
-                                    <a th:each="key : ${results}" 
-                                       th:href="@{/cache/entry(region=${queryRegion},key=${key})}"
-                                       class="list-group-item list-group-item-action">
-                                        <i class="fas fa-key me-2 text-muted"></i>
-                                        <span th:text="${key}">key</span>
-                                    </a>
+                                <!-- Table Controls -->
+                                <div class="row align-items-center mb-3">
+                                    <div class="col-auto">
+                                        <div class="d-flex align-items-center">
+                                            <label class="me-2 text-muted small">Show:</label>
+                                            <select id="keysRowsPerPage" class="form-select form-select-sm" style="width: auto;" onchange="updateKeysTable()">
+                                                <option value="10">10</option>
+                                                <option value="25" selected>25</option>
+                                                <option value="50">50</option>
+                                                <option value="100">100</option>
+                                                <option value="all">All</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="input-group input-group-sm" style="max-width: 250px;">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" id="keysSearch" class="form-control" 
+                                                   placeholder="Filter..." oninput="updateKeysTable()">
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <span id="keysTableInfo" class="text-muted small"></span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Key</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="keysTableBody">
+                                            <tr th:each="key : ${results}" class="keys-data-row" th:data-key="${key}">
+                                                <td><code th:text="${key}">key</code></td>
+                                                <td>
+                                                    <a th:href="@{/cache/entry(region=${queryRegion},key=${key})}" 
+                                                       class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Pagination -->
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <div id="keysPaginationInfo" class="text-muted small"></div>
+                                    <nav><ul class="pagination pagination-sm mb-0" id="keysPagination"></ul></nav>
                                 </div>
                             </div>
                             <div th:if="${results == null || results.isEmpty()}" class="text-muted text-center py-4">
-                                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                <i class="fas fa-search fa-2x mb-2 d-block"></i>
                                 No keys found matching pattern
                             </div>
                         </div>
                         
-                        <!-- KSEARCH Result (regex key search with values) -->
+                        <!-- KSEARCH Result (regex with values) -->
                         <div th:if="${resultType == 'ksearch'}">
                             <div th:if="${results != null && !results.isEmpty()}">
-                                <div class="mb-2 text-muted">
-                                    Found <span th:text="${results.size()}">0</span> matching entries
+                                <div class="mb-3 text-muted">
+                                    Found <span th:text="${#lists.size(results)}">0</span> matching keys with values
+                                </div>
+                                <!-- Table Controls -->
+                                <div class="row align-items-center mb-3">
+                                    <div class="col-auto">
+                                        <div class="d-flex align-items-center">
+                                            <label class="me-2 text-muted small">Show:</label>
+                                            <select id="ksearchRowsPerPage" class="form-select form-select-sm" style="width: auto;" onchange="updateKsearchTable()">
+                                                <option value="10">10</option>
+                                                <option value="25" selected>25</option>
+                                                <option value="50">50</option>
+                                                <option value="100">100</option>
+                                                <option value="all">All</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="input-group input-group-sm" style="max-width: 250px;">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" id="ksearchSearch" class="form-control" 
+                                                   placeholder="Filter..." oninput="updateKsearchTable()">
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <span id="ksearchTableInfo" class="text-muted small"></span>
+                                    </div>
                                 </div>
                                 <div class="table-responsive">
-                                    <table class="table table-hover">
+                                    <table class="table table-hover table-sm">
                                         <thead class="table-light">
                                             <tr>
                                                 <th>Key</th>
@@ -176,8 +252,12 @@
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
-                                            <tr th:each="entry : ${results}">
+                                        <tbody id="ksearchTableBody">
+                                            <tr th:each="entry : ${results}" class="ksearch-data-row" 
+                                                th:data-key="${entry['key']}"
+                                                th:data-value="${entry['value']}"
+                                                th:data-type="${entry['type']}"
+                                                th:data-ttl="${entry['ttl']}">
                                                 <td>
                                                     <code th:text="${entry['key']}">key</code>
                                                 </td>
@@ -203,6 +283,11 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <!-- Pagination -->
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <div id="ksearchPaginationInfo" class="text-muted small"></div>
+                                    <nav><ul class="pagination pagination-sm mb-0" id="ksearchPagination"></ul></nav>
+                                </div>
                             </div>
                             <div th:if="${results == null || results.isEmpty()}" class="text-muted text-center py-4">
                                 <i class="fas fa-search fa-2x mb-2 d-block"></i>
@@ -213,20 +298,52 @@
                         <!-- Hash Result -->
                         <div th:if="${resultType == 'hash'}">
                             <div th:if="${result != null && !result.isEmpty()}">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Field</th>
-                                            <th>Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr th:each="entry : ${result}">
-                                            <td><code th:text="${entry.key}">field</code></td>
-                                            <td th:text="${entry.value}">value</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <!-- Table Controls -->
+                                <div class="row align-items-center mb-3">
+                                    <div class="col-auto">
+                                        <div class="d-flex align-items-center">
+                                            <label class="me-2 text-muted small">Show:</label>
+                                            <select id="hashRowsPerPage" class="form-select form-select-sm" style="width: auto;" onchange="updateHashTable()">
+                                                <option value="10">10</option>
+                                                <option value="25" selected>25</option>
+                                                <option value="50">50</option>
+                                                <option value="all">All</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="input-group input-group-sm" style="max-width: 250px;">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" id="hashSearch" class="form-control" 
+                                                   placeholder="Filter..." oninput="updateHashTable()">
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <span id="hashTableInfo" class="text-muted small"></span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Field</th>
+                                                <th>Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="hashTableBody">
+                                            <tr th:each="entry : ${result}" class="hash-data-row"
+                                                th:data-field="${entry.key}" th:data-value="${entry.value}">
+                                                <td><code th:text="${entry.key}">field</code></td>
+                                                <td th:text="${entry.value}">value</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Pagination -->
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <div id="hashPaginationInfo" class="text-muted small"></div>
+                                    <nav><ul class="pagination pagination-sm mb-0" id="hashPagination"></ul></nav>
+                                </div>
                             </div>
                             <div th:if="${result == null || result.isEmpty()}" class="text-muted text-center py-4">
                                 <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
@@ -234,14 +351,39 @@
                             </div>
                         </div>
                         
-                        <!-- Search Result -->
+                        <!-- JSON Search Result -->
                         <div th:if="${resultType == 'search'}">
                             <div th:if="${results != null && !results.isEmpty()}">
-                                <div class="mb-2 text-muted">
-                                    Found <span th:text="${results.size()}">0</span> matching entries
+                                <div class="mb-3 text-muted">
+                                    Found <span th:text="${#lists.size(results)}">0</span> matching entries
+                                </div>
+                                <!-- Table Controls -->
+                                <div class="row align-items-center mb-3">
+                                    <div class="col-auto">
+                                        <div class="d-flex align-items-center">
+                                            <label class="me-2 text-muted small">Show:</label>
+                                            <select id="jsearchRowsPerPage" class="form-select form-select-sm" style="width: auto;" onchange="updateJsearchTable()">
+                                                <option value="10">10</option>
+                                                <option value="25" selected>25</option>
+                                                <option value="50">50</option>
+                                                <option value="all">All</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="input-group input-group-sm" style="max-width: 250px;">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" id="jsearchSearch" class="form-control" 
+                                                   placeholder="Filter..." oninput="updateJsearchTable()">
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <span id="jsearchTableInfo" class="text-muted small"></span>
+                                    </div>
                                 </div>
                                 <div class="accordion" id="searchResults">
-                                    <div th:each="entry, stat : ${results}" class="accordion-item">
+                                    <div th:each="entry, stat : ${results}" class="accordion-item jsearch-data-row"
+                                         th:data-key="${entry.key}" th:data-value="${entry.stringValue}">
                                         <h2 class="accordion-header">
                                             <button class="accordion-button collapsed" type="button" 
                                                     data-bs-toggle="collapse" 
@@ -257,6 +399,11 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                                <!-- Pagination -->
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <div id="jsearchPaginationInfo" class="text-muted small"></div>
+                                    <nav><ul class="pagination pagination-sm mb-0" id="jsearchPagination"></ul></nav>
                                 </div>
                             </div>
                             <div th:if="${results == null || results.isEmpty()}" class="text-muted text-center py-4">
@@ -286,13 +433,19 @@
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
-<script>
+<script th:inline="javascript">
+    // Store query params for export
+    const queryRegion = /*[[${queryRegion}]]*/ 'default';
+    const queryType = /*[[${queryType}]]*/ null;
+    const queryKey = /*[[${queryKey}]]*/ null;
+    const jsonQuery = /*[[${jsonQuery}]]*/ null;
+    
     function toggleQueryFields() {
-        const queryType = document.getElementById('queryType').value;
+        const type = document.getElementById('queryType').value;
         const keyField = document.getElementById('keyField');
         const jsonQueryField = document.getElementById('jsonQueryField');
         
-        if (queryType === 'jsearch') {
+        if (type === 'jsearch') {
             keyField.style.display = 'none';
             jsonQueryField.style.display = 'block';
         } else {
@@ -301,7 +454,153 @@
         }
     }
     
-    document.addEventListener('DOMContentLoaded', toggleQueryFields);
+    function exportResults() {
+        let url = '/api/export/query?region=' + encodeURIComponent(queryRegion) + 
+                  '&queryType=' + encodeURIComponent(queryType);
+        if (queryKey) url += '&key=' + encodeURIComponent(queryKey);
+        if (jsonQuery) url += '&jsonQuery=' + encodeURIComponent(jsonQuery);
+        window.location.href = url;
+    }
+    
+    // Generic table pagination helper
+    function createTableHelper(prefix, rowClass) {
+        const state = {
+            allRows: [],
+            filteredRows: [],
+            currentPage: 1
+        };
+        
+        function init() {
+            document.querySelectorAll('.' + rowClass).forEach(row => {
+                state.allRows.push({
+                    element: row.cloneNode(true),
+                    searchText: row.textContent.toLowerCase()
+                });
+            });
+            state.filteredRows = [...state.allRows];
+            render();
+        }
+        
+        function getRowsPerPage() {
+            const select = document.getElementById(prefix + 'RowsPerPage');
+            return select && select.value === 'all' ? state.filteredRows.length || 1 : parseInt(select?.value || 25);
+        }
+        
+        function update() {
+            const searchInput = document.getElementById(prefix + 'Search');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            
+            if (searchTerm) {
+                state.filteredRows = state.allRows.filter(row => row.searchText.includes(searchTerm));
+            } else {
+                state.filteredRows = [...state.allRows];
+            }
+            
+            state.currentPage = 1;
+            render();
+        }
+        
+        function render() {
+            const tbody = document.getElementById(prefix + 'TableBody');
+            const accordion = document.getElementById('searchResults');
+            const container = tbody || accordion;
+            if (!container) return;
+            
+            const rowsPerPage = getRowsPerPage();
+            const totalRows = state.filteredRows.length;
+            const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+            
+            if (state.currentPage > totalPages) state.currentPage = totalPages;
+            if (state.currentPage < 1) state.currentPage = 1;
+            
+            const start = (state.currentPage - 1) * rowsPerPage;
+            const end = Math.min(start + rowsPerPage, totalRows);
+            const pageRows = state.filteredRows.slice(start, end);
+            
+            container.innerHTML = '';
+            pageRows.forEach(row => {
+                container.appendChild(row.element.cloneNode(true));
+            });
+            
+            // Update info
+            const infoEl = document.getElementById(prefix + 'TableInfo');
+            if (infoEl) {
+                infoEl.textContent = totalRows > 0 ? 
+                    `Showing ${start + 1} to ${end} of ${totalRows}` : 'No results';
+            }
+            
+            const pageInfoEl = document.getElementById(prefix + 'PaginationInfo');
+            if (pageInfoEl) {
+                pageInfoEl.textContent = totalPages > 1 ? `Page ${state.currentPage} of ${totalPages}` : '';
+            }
+            
+            renderPagination(prefix, totalPages, state);
+        }
+        
+        function goToPage(page) {
+            state.currentPage = page;
+            render();
+        }
+        
+        // Expose functions
+        window['update' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Table'] = update;
+        window['goTo' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Page'] = goToPage;
+        
+        return { init, update, render, goToPage, state };
+    }
+    
+    function renderPagination(prefix, totalPages, state) {
+        const pagination = document.getElementById(prefix + 'Pagination');
+        if (!pagination) return;
+        pagination.innerHTML = '';
+        
+        if (totalPages <= 1) return;
+        
+        const goToFn = 'goTo' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Page';
+        
+        // Previous
+        const prev = document.createElement('li');
+        prev.className = `page-item ${state.currentPage === 1 ? 'disabled' : ''}`;
+        prev.innerHTML = `<a class="page-link" href="#" onclick="${goToFn}(${state.currentPage - 1}); return false;">&laquo;</a>`;
+        pagination.appendChild(prev);
+        
+        // Pages
+        let startPage = Math.max(1, state.currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === state.currentPage ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#" onclick="${goToFn}(${i}); return false;">${i}</a>`;
+            pagination.appendChild(li);
+        }
+        
+        // Next
+        const next = document.createElement('li');
+        next.className = `page-item ${state.currentPage === totalPages ? 'disabled' : ''}`;
+        next.innerHTML = `<a class="page-link" href="#" onclick="${goToFn}(${state.currentPage + 1}); return false;">&raquo;</a>`;
+        pagination.appendChild(next);
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleQueryFields();
+        
+        // Initialize table helpers based on result type
+        if (document.querySelector('.keys-data-row')) {
+            createTableHelper('keys', 'keys-data-row').init();
+        }
+        if (document.querySelector('.ksearch-data-row')) {
+            createTableHelper('ksearch', 'ksearch-data-row').init();
+        }
+        if (document.querySelector('.hash-data-row')) {
+            createTableHelper('hash', 'hash-data-row').init();
+        }
+        if (document.querySelector('.jsearch-data-row')) {
+            createTableHelper('jsearch', 'jsearch-data-row').init();
+        }
+    });
 </script>
 
 </body>

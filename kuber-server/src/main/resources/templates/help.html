@@ -5,821 +5,1962 @@
   ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{layout :: head('Help & Documentation')}"></head>
+<head th:replace="~{layout :: head('Help')}"></head>
 <body class="d-flex flex-column min-vh-100">
 
 <nav th:replace="~{layout :: navbar}"></nav>
 
 <main class="flex-fill">
     <div class="container-fluid py-4">
-        <div class="row mb-4">
-            <div class="col">
-                <h2 class="mb-0">
-                    <i class="fas fa-book me-2"></i>
-                    Help & Documentation
-                </h2>
-                <p class="text-muted mt-2">Comprehensive guide for using Kuber Distributed Cache</p>
-            </div>
-        </div>
-        
         <div class="row">
-            <!-- Navigation Sidebar -->
-            <div class="col-lg-3 mb-4">
-                <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
-                    <div class="card-body">
-                        <h6 class="card-title text-uppercase text-muted small mb-3">Contents</h6>
-                        <nav class="nav flex-column">
-                            <a class="nav-link px-0 py-1" href="#overview">Overview</a>
-                            <a class="nav-link px-0 py-1" href="#ui-guide">Web UI Guide</a>
-                            <a class="nav-link px-0 py-1" href="#rest-api">REST API</a>
-                            <a class="nav-link px-0 py-1" href="#redis-protocol">Redis Protocol</a>
-                            <a class="nav-link px-0 py-1" href="#regions">Regions</a>
-                            <a class="nav-link px-0 py-1" href="#string-ops">String Operations</a>
-                            <a class="nav-link px-0 py-1" href="#json-ops">JSON Operations</a>
-                            <a class="nav-link px-0 py-1" href="#hash-ops">Hash Operations</a>
-                            <a class="nav-link px-0 py-1" href="#key-ops">Key Operations</a>
-                            <a class="nav-link px-0 py-1" href="#search-ops">Search Operations</a>
-                            <a class="nav-link px-0 py-1" href="#ttl-ops">TTL Operations</a>
-                            <a class="nav-link px-0 py-1" href="#configuration">Configuration</a>
-                        </nav>
-                    </div>
+            <!-- Sidebar Navigation -->
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar" style="position: sticky; top: 70px; height: calc(100vh - 100px); overflow-y: auto;">
+                <div class="position-sticky pt-3">
+                    <h6 class="sidebar-heading px-3 mt-1 mb-2 text-muted"><i class="fas fa-list me-2"></i>Contents</h6>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#overview"><i class="fas fa-home me-2"></i>Overview</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#quickstart"><i class="fas fa-rocket me-2"></i>Quick Start</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#web-ui"><i class="fas fa-desktop me-2"></i>Web UI Guide</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#rest-api"><i class="fas fa-plug me-2"></i>REST API</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#redis-protocol"><i class="fas fa-terminal me-2"></i>Redis Protocol</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#python-client"><i class="fab fa-python me-2"></i>Python Client</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#java-client"><i class="fab fa-java me-2"></i>Java Client</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#regions"><i class="fas fa-layer-group me-2"></i>Regions</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#string-ops"><i class="fas fa-font me-2"></i>String Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#json-ops"><i class="fas fa-code me-2"></i>JSON Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#hash-ops"><i class="fas fa-hashtag me-2"></i>Hash Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#key-ops"><i class="fas fa-key me-2"></i>Key Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#search-ops"><i class="fas fa-search me-2"></i>Search Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#ttl-ops"><i class="fas fa-clock me-2"></i>TTL Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#batch-ops"><i class="fas fa-layer-group me-2"></i>Batch Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#config"><i class="fas fa-cog me-2"></i>Configuration</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#replication"><i class="fas fa-sync me-2"></i>Replication</a></li>
+                    </ul>
                 </div>
-            </div>
-            
+            </nav>
+
             <!-- Main Content -->
-            <div class="col-lg-9">
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 
                 <!-- Overview Section -->
-                <section id="overview" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-primary text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-info-circle me-2"></i>Overview</h4>
-                    </div>
-                    <div class="card-body">
-                        <p>Kuber is a high-performance distributed cache system that combines the speed of in-memory caching with the durability of MongoDB persistence. It provides:</p>
-                        <ul>
-                            <li><strong>Redis Protocol Compatibility</strong> - Use existing Redis clients</li>
-                            <li><strong>REST API</strong> - Modern HTTP-based access</li>
-                            <li><strong>Web UI</strong> - Visual management interface</li>
-                            <li><strong>Regions</strong> - Logical partitioning of cache data</li>
-                            <li><strong>JSON Support</strong> - Store and query JSON documents</li>
-                            <li><strong>TTL Support</strong> - Automatic expiration of entries</li>
-                            <li><strong>Replication</strong> - Primary/Secondary setup via ZooKeeper</li>
+                <section id="overview" class="py-4 border-bottom">
+                    <h1 class="display-5 mb-4"><i class="fas fa-book me-3 text-primary"></i>Kuber Help Documentation</h1>
+                    <div class="alert alert-primary">
+                        <h5 class="alert-heading"><i class="fas fa-database me-2"></i>Welcome to Kuber Distributed Cache</h5>
+                        <p class="mb-2">Kuber is a high-performance, Redis-compatible distributed caching system with:</p>
+                        <ul class="mb-0">
+                            <li><strong>MongoDB Persistence</strong> - Durable storage that survives restarts</li>
+                            <li><strong>JSON Document Support</strong> - Store and query complex JSON with JSONPath</li>
+                            <li><strong>Region Partitioning</strong> - Logical namespaces for multi-tenant applications</li>
+                            <li><strong>Redis Compatibility</strong> - Use existing Redis clients and tools</li>
+                            <li><strong>High Performance</strong> - Sub-millisecond operations with Caffeine cache</li>
+                            <li><strong>Replication</strong> - Primary/Secondary architecture with ZooKeeper coordination</li>
                         </ul>
-                        
-                        <div class="alert alert-info">
-                            <i class="fas fa-lightbulb me-2"></i>
-                            <strong>Quick Start:</strong> Connect via Redis client on port <code>6380</code>, use the Web UI at <code>http://localhost:8080</code>, or call the REST API.
+                    </div>
+                    
+                    <div class="row g-4 mt-3">
+                        <div class="col-md-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-desktop fa-3x text-primary mb-3"></i>
+                                    <h5>Web UI</h5>
+                                    <p class="text-muted small">Browse, query, and manage cache entries through this web interface</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-plug fa-3x text-success mb-3"></i>
+                                    <h5>REST API</h5>
+                                    <p class="text-muted small">HTTP API on port 8080 with JSON responses</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-terminal fa-3x text-danger mb-3"></i>
+                                    <h5>Redis Protocol</h5>
+                                    <p class="text-muted small">Native Redis protocol on port 6379</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
-                
-                <!-- Web UI Guide -->
-                <section id="ui-guide" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-success text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-desktop me-2"></i>Web UI Guide</h4>
+
+                <!-- Quick Start Section -->
+                <section id="quickstart" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-rocket me-2 text-warning"></i>Quick Start</h2>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-dark text-white">
+                            <i class="fas fa-terminal me-2"></i>Start Kuber Server
+                        </div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Start MongoDB (required)
+mongod --dbpath /data/db
+
+# Start Kuber Server
+java -jar kuber-server-1.0.6-SNAPSHOT.jar
+
+# Or with custom config
+java -jar kuber-server-1.0.6-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <h5>Dashboard</h5>
-                        <p>The dashboard provides an overview of your cache status including total entries, regions, and connection statistics.</p>
-                        
-                        <h5 class="mt-4">Cache Browser</h5>
-                        <p>Navigate to <strong>Cache</strong> to browse and manage cache entries:</p>
-                        <ul>
-                            <li>Select a region from the dropdown</li>
-                            <li>View all keys in the region</li>
-                            <li>Click on a key to view/edit its value</li>
-                            <li>Use the "Insert Entry" button to add new entries</li>
-                        </ul>
-                        
-                        <h5 class="mt-4">Query Interface</h5>
-                        <p>The Query page allows you to execute various cache operations:</p>
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Query Type</th>
-                                    <th>Description</th>
-                                    <th>Example</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><code>GET</code></td>
-                                    <td>Retrieve a string value</td>
-                                    <td>Key: <code>user:1001</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>JGET</code></td>
-                                    <td>Retrieve a JSON value</td>
-                                    <td>Key: <code>product:5001</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>KEYS</code></td>
-                                    <td>List keys (glob pattern)</td>
-                                    <td>Pattern: <code>user:*</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>KSEARCH</code></td>
-                                    <td>Search keys by regex with values</td>
-                                    <td>Pattern: <code>user:\d+</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>HGETALL</code></td>
-                                    <td>Get all hash fields</td>
-                                    <td>Key: <code>session:abc123</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>JSEARCH</code></td>
-                                    <td>Search JSON documents</td>
-                                    <td>Query: <code>$.status=active</code></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        
-                        <h5 class="mt-4">Region Management</h5>
-                        <p>Navigate to <strong>Regions</strong> to:</p>
-                        <ul>
-                            <li>View all regions and their statistics</li>
-                            <li>Create new regions</li>
-                            <li>Delete or purge regions</li>
-                            <li>View detailed statistics for each region</li>
-                        </ul>
-                        
-                        <h5 class="mt-4">Inserting Entries via UI</h5>
-                        <ol>
-                            <li>Go to <strong>Cache → Insert Entry</strong></li>
-                            <li>Select the target region</li>
-                            <li>Enter a unique key (e.g., <code>user:1001</code>)</li>
-                            <li>Choose value type: String or JSON</li>
-                            <li>Enter the value</li>
-                            <li>Optionally set TTL in seconds (-1 for no expiration)</li>
-                            <li>Click "Save Entry"</li>
-                        </ol>
+                    
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <i class="fas fa-terminal me-2"></i>Using redis-cli
+                                </div>
+                                <div class="card-body">
+<pre class="bg-light p-3 rounded small mb-0"><code>$ redis-cli -p 6379
+127.0.0.1:6379> AUTH admin admin123
+OK
+127.0.0.1:6379> SET user:1 "John"
+OK
+127.0.0.1:6379> GET user:1
+"John"</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <i class="fas fa-plug me-2"></i>Using curl
+                                </div>
+                                <div class="card-body">
+<pre class="bg-light p-3 rounded small mb-0"><code># Set a value
+curl -X PUT \
+  -u admin:admin123 \
+  -H "Content-Type: text/plain" \
+  -d "John" \
+  "http://localhost:8080/api/cache/default/user:1"
+
+# Get a value
+curl -u admin:admin123 \
+  "http://localhost:8080/api/cache/default/user:1"</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-info text-white">
+                                    <i class="fas fa-desktop me-2"></i>Using Web UI
+                                </div>
+                                <div class="card-body">
+                                    <ol class="small mb-0">
+                                        <li>Open <code>http://localhost:8080</code></li>
+                                        <li>Login with <code>admin/admin123</code></li>
+                                        <li>Navigate to <strong>Cache</strong> page</li>
+                                        <li>Click <strong>Insert Entry</strong></li>
+                                        <li>Enter key, value, and save</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
-                
-                <!-- REST API -->
-                <section id="rest-api" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-info text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-plug me-2"></i>REST API</h4>
+
+                <!-- Web UI Guide Section -->
+                <section id="web-ui" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-desktop me-2 text-primary"></i>Web UI Guide</h2>
+                    
+                    <div class="accordion" id="webUIAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#uiDashboard">
+                                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                                </button>
+                            </h2>
+                            <div id="uiDashboard" class="accordion-collapse collapse show" data-bs-parent="#webUIAccordion">
+                                <div class="accordion-body">
+                                    <p>The dashboard provides an overview of your Kuber instance:</p>
+                                    <ul>
+                                        <li><strong>Server Status</strong> - Node ID, replication mode (PRIMARY/SECONDARY/STANDALONE)</li>
+                                        <li><strong>Connection Stats</strong> - Active Redis connections, server port</li>
+                                        <li><strong>Cache Stats</strong> - Total entries, max memory entries, persistence mode</li>
+                                        <li><strong>Regions Overview</strong> - List of all regions with entry counts and hit ratios</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#uiCache">
+                                    <i class="fas fa-box me-2"></i>Cache Browser
+                                </button>
+                            </h2>
+                            <div id="uiCache" class="accordion-collapse collapse" data-bs-parent="#webUIAccordion">
+                                <div class="accordion-body">
+                                    <p>Browse and manage cache entries:</p>
+                                    <ul>
+                                        <li><strong>Region Selector</strong> - Switch between cache regions</li>
+                                        <li><strong>Keys Table</strong> - List of all keys with pagination and search</li>
+                                        <li><strong>Export CSV</strong> - Download all entries as CSV file</li>
+                                        <li><strong>Insert Entry</strong> - Add new string or JSON entries</li>
+                                        <li><strong>View Entry</strong> - See value, type, TTL, and edit</li>
+                                        <li><strong>Delete Entry</strong> - Remove entries with confirmation</li>
+                                    </ul>
+                                    <div class="alert alert-info small">
+                                        <i class="fas fa-lightbulb me-2"></i>Use the search box to filter keys. Pagination controls let you navigate large result sets.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#uiQuery">
+                                    <i class="fas fa-search me-2"></i>Query Interface
+                                </button>
+                            </h2>
+                            <div id="uiQuery" class="accordion-collapse collapse" data-bs-parent="#webUIAccordion">
+                                <div class="accordion-body">
+                                    <p>Execute advanced queries:</p>
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr><th>Query Type</th><th>Description</th><th>Example</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td><code>GET</code></td><td>Get string value by key</td><td><code>user:1001</code></td></tr>
+                                            <tr><td><code>JGET</code></td><td>Get JSON value (pretty printed)</td><td><code>config:app</code></td></tr>
+                                            <tr><td><code>KEYS</code></td><td>List keys matching glob pattern</td><td><code>user:*</code>, <code>session:?</code></td></tr>
+                                            <tr><td><code>KSEARCH</code></td><td>Search keys by regex (with values)</td><td><code>user:\d+</code></td></tr>
+                                            <tr><td><code>HGETALL</code></td><td>Get all hash fields</td><td><code>user:1001:profile</code></td></tr>
+                                            <tr><td><code>JSEARCH</code></td><td>Search JSON documents</td><td><code>$.status=active</code></td></tr>
+                                        </tbody>
+                                    </table>
+                                    <p>Results can be exported as CSV using the Export button.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#uiRegions">
+                                    <i class="fas fa-layer-group me-2"></i>Region Management
+                                </button>
+                            </h2>
+                            <div id="uiRegions" class="accordion-collapse collapse" data-bs-parent="#webUIAccordion">
+                                <div class="accordion-body">
+                                    <p>Manage cache regions:</p>
+                                    <ul>
+                                        <li><strong>View Regions</strong> - Cards showing entry count, hit ratio, creation date</li>
+                                        <li><strong>Create Region</strong> - Add new region with name and description</li>
+                                        <li><strong>Region Details</strong> - Statistics, operations per second, memory usage</li>
+                                        <li><strong>Export Region</strong> - Download all entries as CSV</li>
+                                        <li><strong>Purge Region</strong> - Delete all entries (Admin only)</li>
+                                        <li><strong>Delete Region</strong> - Remove entire region (Admin only)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p>Base URL: <code>http://localhost:8080/api</code></p>
-                        
-                        <h5>Authentication</h5>
-                        <p>Use HTTP Basic Authentication with credentials from <code>users.json</code>.</p>
-                        <pre class="bg-dark text-light p-3 rounded"><code>curl -u admin:admin123 http://localhost:8080/api/info</code></pre>
-                        
-                        <h5 class="mt-4">Server Information</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get server info
+                </section>
+
+                <!-- REST API Section -->
+                <section id="rest-api" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-plug me-2 text-success"></i>REST API Reference</h2>
+                    
+                    <div class="alert alert-secondary">
+                        <strong>Base URL:</strong> <code>http://localhost:8080/api</code><br>
+                        <strong>Authentication:</strong> HTTP Basic Auth (e.g., <code>admin:admin123</code>)<br>
+                        <strong>Content-Type:</strong> <code>application/json</code> or <code>text/plain</code>
+                    </div>
+                    
+                    <!-- Server Info APIs -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-server me-2"></i>Server Information</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/info</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Get server information
 curl -u admin:admin123 http://localhost:8080/api/info
 
-# Health check
-curl -u admin:admin123 http://localhost:8080/api/health</code></pre>
-                        
-                        <h5 class="mt-4">Region Operations</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># List all regions
+# Response:
+{
+  "server": "kuber",
+  "version": "1.0.6",
+  "uptime_in_seconds": 3600,
+  "connected_clients": 5,
+  "total_regions": 3,
+  "total_keys": 1500,
+  "replication_mode": "PRIMARY"
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/health</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Health check endpoint
+curl http://localhost:8080/api/health
+
+# Response:
+{"status":"UP"}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Region APIs -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-layer-group me-2"></i>Region Operations</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/regions</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># List all regions
 curl -u admin:admin123 http://localhost:8080/api/regions
 
-# Get region details
-curl -u admin:admin123 http://localhost:8080/api/regions/default
-
-# Create a new region
-curl -u admin:admin123 -X POST -H "Content-Type: application/json" \
-  -d '{"name":"users","description":"User cache"}' \
+# Response:
+[
+  {"name": "default", "entryCount": 100, "hitRatio": 0.95},
+  {"name": "sessions", "entryCount": 50, "hitRatio": 0.88}
+]</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">POST</span><code>/api/regions</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Create a new region
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "users", "description": "User data cache"}' \
   http://localhost:8080/api/regions
 
-# Delete a region
-curl -u admin:admin123 -X DELETE http://localhost:8080/api/regions/users
+# Response:
+{"name": "users", "description": "User data cache", "entryCount": 0}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-warning text-dark me-2">DELETE</span><code>/api/regions/{name}/purge</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Purge all entries from a region (keeps region)
+curl -X DELETE -u admin:admin123 \
+  http://localhost:8080/api/regions/users/purge
 
-# Purge all entries in a region
-curl -u admin:admin123 -X POST http://localhost:8080/api/regions/default/purge
+# Response:
+{"message": "Region 'users' purged successfully", "deletedCount": 150}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Cache Entry APIs -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-database me-2"></i>Cache Entry Operations</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/cache/{region}/{key}</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Get a value
+curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001
 
-# Get region statistics
-curl -u admin:admin123 http://localhost:8080/api/regions/default/stats</code></pre>
-                        
-                        <h5 class="mt-4">Key/Value Operations</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get a value
-curl -u admin:admin123 http://localhost:8080/api/cache/default/mykey
+# Response (string value):
+John Doe
 
-# Set a string value
-curl -u admin:admin123 -X PUT -H "Content-Type: application/json" \
-  -d '{"value":"Hello World"}' \
-  http://localhost:8080/api/cache/default/mykey
+# Get with metadata
+curl -u admin:admin123 "http://localhost:8080/api/cache/default/user:1001?metadata=true"
+
+# Response:
+{"key": "user:1001", "value": "John Doe", "type": "string", "ttl": 3600}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">PUT</span><code>/api/cache/{region}/{key}</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Set a string value
+curl -X PUT -u admin:admin123 \
+  -H "Content-Type: text/plain" \
+  -d "John Doe" \
+  "http://localhost:8080/api/cache/default/user:1001"
 
 # Set with TTL (60 seconds)
-curl -u admin:admin123 -X PUT -H "Content-Type: application/json" \
-  -d '{"value":"Temporary","ttl":60}' \
-  http://localhost:8080/api/cache/default/tempkey
-
-# Set a JSON value
-curl -u admin:admin123 -X PUT -H "Content-Type: application/json" \
-  -d '{"json":{"name":"John","age":30,"active":true}}' \
-  http://localhost:8080/api/cache/default/user:1001
-
-# Delete a key
-curl -u admin:admin123 -X DELETE http://localhost:8080/api/cache/default/mykey
-
-# List keys (glob pattern)
-curl -u admin:admin123 "http://localhost:8080/api/cache/default/keys?pattern=user:*"
-
-# Search keys by regex (returns key-value pairs)
-curl -u admin:admin123 "http://localhost:8080/api/cache/default/ksearch?pattern=user:\d%2B&limit=100"</code></pre>
-                        
-                        <h5 class="mt-4">Batch Operations</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Multi-get
-curl -u admin:admin123 -X POST -H "Content-Type: application/json" \
-  -d '["key1","key2","key3"]' \
-  http://localhost:8080/api/cache/default/mget
-
-# Multi-set
-curl -u admin:admin123 -X POST -H "Content-Type: application/json" \
-  -d '{"key1":"value1","key2":"value2","key3":"value3"}' \
-  http://localhost:8080/api/cache/default/mset</code></pre>
-                        
-                        <h5 class="mt-4">JSON Operations</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get JSON value
-curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001/json
-
-# Get JSON at specific path
-curl -u admin:admin123 "http://localhost:8080/api/cache/default/user:1001/json?path=$.name"
+curl -X PUT -u admin:admin123 \
+  -H "Content-Type: text/plain" \
+  -d "session-data" \
+  "http://localhost:8080/api/cache/sessions/sess:abc123?ttl=60"
 
 # Set JSON value
-curl -u admin:admin123 -X PUT -H "Content-Type: application/json" \
-  -d '{"name":"Jane","email":"jane@example.com"}' \
-  http://localhost:8080/api/cache/default/user:1002/json
-
-# Search JSON documents
-curl -u admin:admin123 -X POST -H "Content-Type: application/json" \
-  -d '{"query":"$.age>25"}' \
-  http://localhost:8080/api/cache/default/search</code></pre>
-                        
-                        <h5 class="mt-4">Hash Operations</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get all hash fields
-curl -u admin:admin123 http://localhost:8080/api/cache/default/session:abc/hash
-
-# Get specific hash field
-curl -u admin:admin123 http://localhost:8080/api/cache/default/session:abc/hash/userId
-
-# Set hash field
-curl -u admin:admin123 -X PUT -H "Content-Type: application/json" \
-  -d '{"value":"12345"}' \
-  http://localhost:8080/api/cache/default/session:abc/hash/userId</code></pre>
-                        
-                        <h5 class="mt-4">TTL Operations</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Set expiration
-curl -u admin:admin123 -X POST "http://localhost:8080/api/cache/default/mykey/expire?seconds=300"
-
-# Remove expiration (persist)
-curl -u admin:admin123 -X DELETE http://localhost:8080/api/cache/default/mykey/expire</code></pre>
-                    </div>
-                </section>
-                
-                <!-- Redis Protocol -->
-                <section id="redis-protocol" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-danger text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-terminal me-2"></i>Redis Protocol</h4>
-                    </div>
-                    <div class="card-body">
-                        <p>Connect using any Redis client on port <code>6380</code>:</p>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Using redis-cli
-redis-cli -p 6380
-
-# With authentication (if configured)
-redis-cli -p 6380 -a yourpassword</code></pre>
-                        
-                        <h5 class="mt-4">Basic Commands</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Connection
-PING                        # Returns PONG
-AUTH password               # Authenticate
-QUIT                        # Close connection
-
-# String operations
-SET mykey "Hello World"     # Set a value
-GET mykey                   # Get a value
-SETNX mykey "value"         # Set if not exists
-SETEX mykey 60 "value"      # Set with TTL
-MGET key1 key2 key3         # Get multiple
-MSET k1 v1 k2 v2            # Set multiple
-INCR counter                # Increment
-DECR counter                # Decrement
-APPEND mykey " More"        # Append to string
-STRLEN mykey                # Get string length</code></pre>
-                        
-                        <h5 class="mt-4">Key Commands</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code>KEYS user:*                 # List keys (glob pattern)
-EXISTS mykey                # Check if key exists
-DEL key1 key2               # Delete keys
-TYPE mykey                  # Get value type
-RENAME oldkey newkey        # Rename a key
-TTL mykey                   # Get TTL in seconds
-EXPIRE mykey 300            # Set TTL
-PERSIST mykey               # Remove TTL</code></pre>
-                        
-                        <h5 class="mt-4">Hash Commands</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code>HSET session:abc userId 12345    # Set hash field
-HGET session:abc userId          # Get hash field
-HMSET session:abc f1 v1 f2 v2    # Set multiple fields
-HMGET session:abc f1 f2          # Get multiple fields
-HGETALL session:abc              # Get all fields
-HDEL session:abc field1          # Delete field
-HEXISTS session:abc field1       # Check if field exists
-HKEYS session:abc                # List all field names
-HVALS session:abc                # List all values
-HLEN session:abc                 # Count fields</code></pre>
-                        
-                        <h5 class="mt-4">Kuber Extension Commands</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Region management
-REGIONS                     # List all regions
-RCREATE products "Product cache"  # Create region
-RDROP products              # Delete region
-RPURGE products             # Purge all entries
-RINFO products              # Region info
-RSELECT products            # Switch to region
-
-# JSON operations
-JSET user:1001 '{"name":"John","age":30}'  # Set JSON
-JGET user:1001                              # Get JSON
-JGET user:1001 $.name                       # Get JSON path
-JSEARCH $.age>25                            # Search JSON
-JDEL user:1001 $.email                      # Delete JSON path
-
-# Key search (regex)
-KSEARCH user:\d+            # Search keys by regex
-KSEARCH ^session_.* LIMIT 50  # With limit
-
-# Server commands
-INFO                        # Server info
-DBSIZE                      # Entry count
-FLUSHDB                     # Clear current region
-FLUSHALL                    # Clear all regions
-TIME                        # Server time</code></pre>
-                    </div>
-                </section>
-                
-                <!-- Regions -->
-                <section id="regions" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-warning text-dark py-3">
-                        <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Regions</h4>
-                    </div>
-                    <div class="card-body">
-                        <p>Regions provide logical partitioning of your cache data. Each region has its own namespace for keys.</p>
-                        
-                        <h5>Default Region</h5>
-                        <p>A <code>default</code> region is automatically created on startup. All operations without explicit region selection use this region.</p>
-                        
-                        <h5 class="mt-4">Creating Regions</h5>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <h6>Via UI</h6>
-                                <ol>
-                                    <li>Go to Regions page</li>
-                                    <li>Click "Create Region"</li>
-                                    <li>Enter name and description</li>
-                                    <li>Click "Create"</li>
-                                </ol>
-                            </div>
-                            <div class="col-md-4">
-                                <h6>Via REST API</h6>
-                                <pre class="bg-dark text-light p-2 rounded small"><code>POST /api/regions
-{"name":"users"}</code></pre>
-                            </div>
-                            <div class="col-md-4">
-                                <h6>Via Redis Protocol</h6>
-                                <pre class="bg-dark text-light p-2 rounded small"><code>RCREATE users "User cache"</code></pre>
-                            </div>
+curl -X PUT -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John", "age": 30, "email": "john@example.com"}' \
+  "http://localhost:8080/api/cache/default/user:1001"</code></pre>
                         </div>
-                        
-                        <h5 class="mt-4">Selecting Regions</h5>
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr><th>Interface</th><th>Method</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr><td>Web UI</td><td>Use region dropdown on Cache/Query pages</td></tr>
-                                <tr><td>REST API</td><td>Include region in URL path: <code>/api/cache/{region}/...</code></td></tr>
-                                <tr><td>Redis Protocol</td><td>Use <code>RSELECT regionname</code> command</td></tr>
-                            </tbody>
-                        </table>
                     </div>
-                </section>
-                
-                <!-- String Operations -->
-                <section id="string-ops" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-secondary text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-font me-2"></i>String Operations</h4>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-warning text-dark me-2">DELETE</span><code>/api/cache/{region}/{key}</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Delete a key
+curl -X DELETE -u admin:admin123 \
+  http://localhost:8080/api/cache/default/user:1001
+
+# Response:
+{"deleted": true}</code></pre>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr><th>Operation</th><th>Redis Command</th><th>REST API</th><th>Description</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Set</td>
-                                    <td><code>SET key value</code></td>
-                                    <td><code>PUT /api/cache/{region}/{key}</code></td>
-                                    <td>Set a string value</td>
-                                </tr>
-                                <tr>
-                                    <td>Get</td>
-                                    <td><code>GET key</code></td>
-                                    <td><code>GET /api/cache/{region}/{key}</code></td>
-                                    <td>Get a string value</td>
-                                </tr>
-                                <tr>
-                                    <td>Set if not exists</td>
-                                    <td><code>SETNX key value</code></td>
-                                    <td>-</td>
-                                    <td>Set only if key doesn't exist</td>
-                                </tr>
-                                <tr>
-                                    <td>Set with TTL</td>
-                                    <td><code>SETEX key 60 value</code></td>
-                                    <td><code>PUT /api/cache/{region}/{key}</code> with <code>{"value":"...","ttl":60}</code></td>
-                                    <td>Set with expiration</td>
-                                </tr>
-                                <tr>
-                                    <td>Increment</td>
-                                    <td><code>INCR key</code></td>
-                                    <td>-</td>
-                                    <td>Increment numeric value</td>
-                                </tr>
-                                <tr>
-                                    <td>Decrement</td>
-                                    <td><code>DECR key</code></td>
-                                    <td>-</td>
-                                    <td>Decrement numeric value</td>
-                                </tr>
-                                <tr>
-                                    <td>Append</td>
-                                    <td><code>APPEND key suffix</code></td>
-                                    <td>-</td>
-                                    <td>Append to existing string</td>
-                                </tr>
-                                <tr>
-                                    <td>String Length</td>
-                                    <td><code>STRLEN key</code></td>
-                                    <td>-</td>
-                                    <td>Get string length</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        
-                        <h5 class="mt-4">Examples</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Redis CLI
-SET greeting "Hello, World!"
-GET greeting
-INCR page_views
-SETEX session:token 3600 "abc123"
+                    
+                    <!-- Key Search APIs -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-search me-2"></i>Search Operations</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/cache/{region}/keys</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># List keys (glob pattern)
+curl -u admin:admin123 "http://localhost:8080/api/cache/default/keys?pattern=user:*"
 
-# REST API
-curl -X PUT -d '{"value":"Hello"}' http://localhost:8080/api/cache/default/greeting
-curl http://localhost:8080/api/cache/default/greeting</code></pre>
+# Response:
+["user:1001", "user:1002", "user:1003"]
+
+# List keys with limit
+curl -u admin:admin123 "http://localhost:8080/api/cache/default/keys?pattern=*&limit=100"</code></pre>
+                        </div>
                     </div>
-                </section>
-                
-                <!-- JSON Operations -->
-                <section id="json-ops" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-dark text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-code me-2"></i>JSON Operations</h4>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/cache/{region}/ksearch</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Search keys by regex (returns key-value pairs)
+curl -u admin:admin123 "http://localhost:8080/api/cache/default/ksearch?regex=user:\d%2B&limit=50"
+
+# Response:
+[
+  {"key": "user:1001", "value": "John Doe", "type": "string", "ttl": -1},
+  {"key": "user:1002", "value": "Jane Smith", "type": "string", "ttl": -1}
+]</code></pre>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p>Kuber supports storing and querying JSON documents with JSONPath expressions.</p>
-                        
-                        <h5>Storing JSON</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Via Redis protocol
-JSET user:1001 '{"name":"John Doe","age":30,"email":"john@example.com","roles":["admin","user"]}'
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">POST</span><code>/api/cache/{region}/jsearch</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Search JSON documents
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"query": "$.status=active,$.age>25"}' \
+  http://localhost:8080/api/cache/users/jsearch
 
-# Via REST API
-curl -X PUT -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","age":30,"email":"john@example.com","roles":["admin","user"]}' \
-  http://localhost:8080/api/cache/default/user:1001/json
-
-# Via UI: Cache → Insert Entry → Select "JSON" type</code></pre>
-                        
-                        <h5 class="mt-4">Retrieving JSON</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get entire document
-JGET user:1001
-curl http://localhost:8080/api/cache/default/user:1001/json
-
-# Get specific path
-JGET user:1001 $.name
-curl "http://localhost:8080/api/cache/default/user:1001/json?path=$.name"
-
-# Get nested value
-JGET user:1001 $.roles[0]</code></pre>
-                        
-                        <h5 class="mt-4">Searching JSON Documents</h5>
-                        <p>Search across all JSON documents in a region:</p>
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr><th>Operator</th><th>Example</th><th>Description</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr><td><code>=</code></td><td><code>$.status=active</code></td><td>Equals</td></tr>
-                                <tr><td><code>!=</code></td><td><code>$.status!=inactive</code></td><td>Not equals</td></tr>
-                                <tr><td><code>&gt;</code></td><td><code>$.age>25</code></td><td>Greater than</td></tr>
-                                <tr><td><code>&lt;</code></td><td><code>$.price<100</code></td><td>Less than</td></tr>
-                                <tr><td><code>&gt;=</code></td><td><code>$.score>=90</code></td><td>Greater or equal</td></tr>
-                                <tr><td><code>&lt;=</code></td><td><code>$.rating<=5</code></td><td>Less or equal</td></tr>
-                                <tr><td><code>~=</code></td><td><code>$.name~=John.*</code></td><td>Regex match</td></tr>
-                                <tr><td><code>contains</code></td><td><code>$.tags contains premium</code></td><td>Array contains</td></tr>
-                            </tbody>
-                        </table>
-                        
-                        <h5 class="mt-4">Complex Queries</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Multiple conditions (AND)
-JSEARCH $.status=active,$.age>18
-
-# REST API
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"query":"$.category=electronics,$.price<500"}' \
-  http://localhost:8080/api/cache/default/search</code></pre>
+# Response:
+[
+  {"key": "user:1001", "value": {"name": "John", "status": "active", "age": 30}},
+  {"key": "user:1003", "value": {"name": "Bob", "status": "active", "age": 28}}
+]</code></pre>
+                        </div>
                     </div>
-                </section>
-                
-                <!-- Hash Operations -->
-                <section id="hash-ops" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-purple text-white py-3" style="background-color: #6f42c1;">
-                        <h4 class="mb-0"><i class="fas fa-hashtag me-2"></i>Hash Operations</h4>
+                    
+                    <!-- Batch Operations -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-layer-group me-2"></i>Batch Operations</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">POST</span><code>/api/cache/{region}/mget</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Get multiple keys at once
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '["user:1001", "user:1002", "user:1003"]' \
+  http://localhost:8080/api/cache/default/mget
+
+# Response:
+{
+  "user:1001": "John Doe",
+  "user:1002": "Jane Smith",
+  "user:1003": null
+}</code></pre>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p>Hash data structures store field-value pairs under a single key, ideal for representing objects.</p>
-                        
-                        <h5>Use Cases</h5>
-                        <ul>
-                            <li>User sessions with multiple attributes</li>
-                            <li>Object properties that need individual field access</li>
-                            <li>Counters grouped by category</li>
-                        </ul>
-                        
-                        <h5 class="mt-4">Commands</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Set fields
-HSET user:1001 name "John" age "30" email "john@example.com"
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">POST</span><code>/api/cache/{region}/mset</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Set multiple keys at once
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"user:1001": "John Doe", "user:1002": "Jane Smith", "user:1003": "Bob Wilson"}' \
+  http://localhost:8080/api/cache/default/mset
 
-# Get single field
-HGET user:1001 name
+# Response:
+{"success": true, "count": 3}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Hash APIs -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-hashtag me-2"></i>Hash Operations</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/cache/{region}/hash/{key}</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Get all hash fields
+curl -u admin:admin123 http://localhost:8080/api/cache/default/hash/user:1001:profile
 
-# Get multiple fields
-HMGET user:1001 name email
-
-# Get all fields
-HGETALL user:1001
-
-# Check field exists
-HEXISTS user:1001 phone
-
-# Delete fields
-HDEL user:1001 email
-
-# Increment numeric field
-HINCRBY user:1001 login_count 1
-
-# List field names
-HKEYS user:1001
-
-# List values
-HVALS user:1001
-
-# Count fields
-HLEN user:1001</code></pre>
-                        
-                        <h5 class="mt-4">REST API Examples</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get all hash fields
-curl http://localhost:8080/api/cache/default/user:1001/hash
+# Response:
+{"name": "John", "email": "john@example.com", "age": "30"}
 
 # Get specific field
-curl http://localhost:8080/api/cache/default/user:1001/hash/name
+curl -u admin:admin123 "http://localhost:8080/api/cache/default/hash/user:1001:profile/name"
 
-# Set field
-curl -X PUT -d '{"value":"john@new.com"}' \
-  http://localhost:8080/api/cache/default/user:1001/hash/email</code></pre>
+# Response:
+John</code></pre>
+                        </div>
                     </div>
-                </section>
-                
-                <!-- Key Operations -->
-                <section id="key-ops" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header text-white py-3" style="background-color: #20c997;">
-                        <h4 class="mb-0"><i class="fas fa-key me-2"></i>Key Operations</h4>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">PUT</span><code>/api/cache/{region}/hash/{key}</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Set hash fields
+curl -X PUT -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John", "email": "john@example.com", "age": "30"}' \
+  http://localhost:8080/api/cache/default/hash/user:1001:profile
+
+# Set single field
+curl -X PUT -u admin:admin123 \
+  -H "Content-Type: text/plain" \
+  -d "31" \
+  "http://localhost:8080/api/cache/default/hash/user:1001:profile/age"</code></pre>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <h5>Key Patterns</h5>
-                        <p>Use glob patterns with the <code>KEYS</code> command:</p>
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr><th>Pattern</th><th>Matches</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr><td><code>*</code></td><td>All keys</td></tr>
-                                <tr><td><code>user:*</code></td><td>Keys starting with "user:"</td></tr>
-                                <tr><td><code>*:active</code></td><td>Keys ending with ":active"</td></tr>
-                                <tr><td><code>user:?</code></td><td>user:1, user:2, etc. (single char)</td></tr>
-                                <tr><td><code>user:[123]</code></td><td>user:1, user:2, or user:3</td></tr>
-                            </tbody>
-                        </table>
-                        
-                        <h5 class="mt-4">Key Management</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># List keys
-KEYS *                  # All keys
-KEYS user:*             # User keys
+                    
+                    <!-- Export APIs -->
+                    <h4 class="mt-4 mb-3"><i class="fas fa-download me-2"></i>Export Operations</h4>
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/export/region/{region}</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Export entire region as CSV
+curl -u admin:admin123 -o region_export.csv \
+  http://localhost:8080/api/export/region/default
 
-# Check existence
-EXISTS user:1001
-EXISTS key1 key2 key3   # Returns count of existing
-
-# Delete keys
-DEL user:1001
-DEL key1 key2 key3      # Delete multiple
-
-# Get type
-TYPE user:1001          # Returns: string, json, hash, etc.
-
-# Rename
-RENAME oldkey newkey</code></pre>
+# CSV format: key,value,type,ttl</code></pre>
+                        </div>
                     </div>
-                </section>
-                
-                <!-- Search Operations -->
-                <section id="search-ops" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header text-white py-3" style="background-color: #fd7e14;">
-                        <h4 class="mb-0"><i class="fas fa-search me-2"></i>Search Operations</h4>
-                    </div>
-                    <div class="card-body">
-                        <h5>KEYS vs KSEARCH</h5>
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr><th>Feature</th><th>KEYS</th><th>KSEARCH</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr><td>Pattern Type</td><td>Glob (<code>*</code>, <code>?</code>)</td><td>Java Regex</td></tr>
-                                <tr><td>Returns</td><td>Key names only</td><td>Key-value pairs with metadata</td></tr>
-                                <tr><td>Format</td><td>Array of strings</td><td>Array of JSON objects</td></tr>
-                            </tbody>
-                        </table>
-                        
-                        <h5 class="mt-4">KSEARCH Examples</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Redis Protocol
-KSEARCH user:\d+                    # Match user:123, user:456
-KSEARCH ^session_.*_2024$           # Session keys for 2024
-KSEARCH order:[A-Z]{3}\d{4}         # Order IDs like order:ABC1234
-KSEARCH .* LIMIT 50                 # All keys, limit 50
-
-# Response format:
-# [{"key":"user:123","value":"...","type":"string","ttl":-1}, ...]
-
-# REST API
-curl "http://localhost:8080/api/cache/default/ksearch?pattern=user:\d%2B&limit=100"
-
-# Web UI: Query → Select "KSEARCH" → Enter regex pattern</code></pre>
-                        
-                        <h5 class="mt-4">JSEARCH Examples</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Find active users over 18
-JSEARCH $.status=active,$.age>18
-
-# Find products under $100 in electronics
-JSEARCH $.category=electronics,$.price<100
-
-# Find names matching pattern
-JSEARCH $.name~=^John.*
-
-# Find items with specific tag
-JSEARCH $.tags contains premium</code></pre>
-                    </div>
-                </section>
-                
-                <!-- TTL Operations -->
-                <section id="ttl-ops" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header text-white py-3" style="background-color: #e83e8c;">
-                        <h4 class="mb-0"><i class="fas fa-clock me-2"></i>TTL Operations</h4>
-                    </div>
-                    <div class="card-body">
-                        <p>Time-To-Live (TTL) allows automatic expiration of cache entries.</p>
-                        
-                        <h5>Setting TTL</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Set with TTL during creation
-SETEX mykey 3600 "value"          # Expires in 1 hour
-SET mykey "value" EX 300          # Expires in 5 minutes
-
-# Set TTL on existing key
-EXPIRE mykey 600                  # Set 10 minute TTL
-
-# REST API
-curl -X PUT -d '{"value":"temp","ttl":300}' \
-  http://localhost:8080/api/cache/default/mykey
-
-curl -X POST "http://localhost:8080/api/cache/default/mykey/expire?seconds=300"</code></pre>
-                        
-                        <h5 class="mt-4">Checking TTL</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Get remaining TTL
-TTL mykey                        # Returns seconds, -1 if no TTL, -2 if not exists
-
-# View in UI: Cache → Click on key → TTL shown in details</code></pre>
-                        
-                        <h5 class="mt-4">Removing TTL</h5>
-                        <pre class="bg-dark text-light p-3 rounded"><code># Make key persistent
-PERSIST mykey
-
-# REST API
-curl -X DELETE http://localhost:8080/api/cache/default/mykey/expire</code></pre>
-                        
-                        <div class="alert alert-warning mt-4">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Note:</strong> TTL cleanup runs every 60 seconds by default. Expired entries may still appear briefly until cleanup runs. Configure with <code>kuber.cache.ttl-cleanup-interval-seconds</code>.
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-success me-2">GET</span><code>/api/export/ksearch</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Export key search results as CSV
+curl -u admin:admin123 -o search_results.csv \
+  "http://localhost:8080/api/export/ksearch?region=default&regex=user:\d%2B&limit=1000"</code></pre>
                         </div>
                     </div>
                 </section>
-                
-                <!-- Configuration -->
-                <section id="configuration" class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-dark text-white py-3">
-                        <h4 class="mb-0"><i class="fas fa-cogs me-2"></i>Configuration</h4>
+
+                <!-- Redis Protocol Section -->
+                <section id="redis-protocol" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-terminal me-2 text-danger"></i>Redis Protocol Reference</h2>
+                    
+                    <div class="alert alert-secondary">
+                        <strong>Port:</strong> <code>6379</code> (configurable)<br>
+                        <strong>Authentication:</strong> <code>AUTH password</code> or <code>AUTH username password</code><br>
+                        <strong>Client:</strong> Any Redis client (redis-cli, Jedis, redis-py, etc.)
                     </div>
-                    <div class="card-body">
-                        <p>Configure Kuber via <code>application.properties</code>:</p>
-                        
-                        <h5>Network Settings</h5>
-                        <pre class="bg-light p-3 rounded"><code># Web server port
-server.port=8080
+                    
+                    <h4 class="mt-4 mb-3">Connection Commands</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>$ redis-cli -p 6379
 
-# Redis protocol port
-kuber.network.port=6380
-kuber.network.bind-address=0.0.0.0
-kuber.network.max-connections=1000
-kuber.network.timeout-seconds=300</code></pre>
-                        
-                        <h5 class="mt-4">Cache Settings</h5>
-                        <pre class="bg-light p-3 rounded"><code># Maximum entries in memory per region
-kuber.cache.max-memory-entries=100000
+# Authenticate (password only)
+127.0.0.1:6379> AUTH admin123
+OK
 
-# Sync writes to MongoDB (true) or async (false)
-kuber.cache.persistent-mode=true
+# Authenticate (username + password)
+127.0.0.1:6379> AUTH admin admin123
+OK
 
-# TTL cleanup interval
-kuber.cache.ttl-cleanup-interval-seconds=60
+# Ping server
+127.0.0.1:6379> PING
+PONG
 
-# Default TTL for entries (-1 = no expiration)
-kuber.cache.default-ttl-seconds=-1
+# Quit
+127.0.0.1:6379> QUIT
+OK</code></pre>
 
-# Enable statistics collection
-kuber.cache.statistics-enabled=true</code></pre>
-                        
-                        <h5 class="mt-4">MongoDB Settings</h5>
-                        <pre class="bg-light p-3 rounded"><code>kuber.mongodb.uri=mongodb://localhost:27017
-kuber.mongodb.database=kuber
-kuber.mongodb.connection-pool-size=10</code></pre>
-                        
-                        <h5 class="mt-4">Security Settings</h5>
-                        <pre class="bg-light p-3 rounded"><code># User credentials file
-kuber.security.users-file=users.json
+                    <h4 class="mt-4 mb-3">String Commands</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># SET - Store a string value
+127.0.0.1:6379> SET user:1001 "John Doe"
+OK
 
-# Session timeout
-kuber.security.session-timeout-seconds=3600
+# SET with expiration (EX = seconds, PX = milliseconds)
+127.0.0.1:6379> SET session:abc123 "data" EX 3600
+OK
 
-# Redis AUTH password (optional)
-kuber.security.redis-password=</code></pre>
-                        
-                        <h5 class="mt-4">ZooKeeper (Replication)</h5>
-                        <pre class="bg-light p-3 rounded"><code># Enable ZooKeeper-based replication
-kuber.zookeeper.enabled=false
-kuber.zookeeper.connect-string=localhost:2181
-kuber.zookeeper.base-path=/kuber</code></pre>
-                    </div>
+# SETEX - SET with expiration in one command
+127.0.0.1:6379> SETEX temp:key 60 "expires in 60 seconds"
+OK
+
+# SETNX - SET only if key doesn't exist
+127.0.0.1:6379> SETNX user:1001 "Won't overwrite"
+(integer) 0
+
+# GET - Retrieve a value
+127.0.0.1:6379> GET user:1001
+"John Doe"
+
+# GETSET - Set new value and return old
+127.0.0.1:6379> GETSET counter "100"
+"99"
+
+# INCR / DECR - Increment/Decrement integer values
+127.0.0.1:6379> SET counter 10
+OK
+127.0.0.1:6379> INCR counter
+(integer) 11
+127.0.0.1:6379> DECR counter
+(integer) 10
+127.0.0.1:6379> INCRBY counter 5
+(integer) 15
+127.0.0.1:6379> DECRBY counter 3
+(integer) 12
+
+# APPEND - Append to existing string
+127.0.0.1:6379> APPEND user:1001 " (Admin)"
+(integer) 17
+127.0.0.1:6379> GET user:1001
+"John Doe (Admin)"
+
+# STRLEN - Get string length
+127.0.0.1:6379> STRLEN user:1001
+(integer) 17</code></pre>
+
+                    <h4 class="mt-4 mb-3">Key Commands</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># KEYS - Find keys matching pattern (glob)
+127.0.0.1:6379> KEYS user:*
+1) "user:1001"
+2) "user:1002"
+3) "user:1003"
+
+127.0.0.1:6379> KEYS *:active
+1) "session:active"
+2) "config:active"
+
+# EXISTS - Check if key exists
+127.0.0.1:6379> EXISTS user:1001
+(integer) 1
+
+# DEL - Delete keys
+127.0.0.1:6379> DEL user:1001 user:1002
+(integer) 2
+
+# TYPE - Get key type
+127.0.0.1:6379> TYPE user:1001
+string
+127.0.0.1:6379> TYPE user:profile
+hash
+127.0.0.1:6379> TYPE config:app
+json
+
+# RENAME - Rename a key
+127.0.0.1:6379> RENAME old:key new:key
+OK</code></pre>
+
+                    <h4 class="mt-4 mb-3">TTL Commands</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># TTL - Get remaining time to live (seconds)
+127.0.0.1:6379> TTL session:abc123
+(integer) 3540
+
+# Returns -1 if no TTL, -2 if key doesn't exist
+127.0.0.1:6379> TTL permanent:key
+(integer) -1
+
+# EXPIRE - Set TTL on existing key
+127.0.0.1:6379> EXPIRE user:1001 3600
+(integer) 1
+
+# PERSIST - Remove TTL (make permanent)
+127.0.0.1:6379> PERSIST user:1001
+(integer) 1</code></pre>
+
+                    <h4 class="mt-4 mb-3">Hash Commands</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># HSET - Set hash field
+127.0.0.1:6379> HSET user:1001:profile name "John"
+(integer) 1
+127.0.0.1:6379> HSET user:1001:profile email "john@example.com" age "30"
+(integer) 2
+
+# HSETNX - Set field only if not exists
+127.0.0.1:6379> HSETNX user:1001:profile name "Won't change"
+(integer) 0
+
+# HGET - Get hash field
+127.0.0.1:6379> HGET user:1001:profile name
+"John"
+
+# HMGET - Get multiple fields
+127.0.0.1:6379> HMGET user:1001:profile name email age
+1) "John"
+2) "john@example.com"
+3) "30"
+
+# HGETALL - Get all fields and values
+127.0.0.1:6379> HGETALL user:1001:profile
+1) "name"
+2) "John"
+3) "email"
+4) "john@example.com"
+5) "age"
+6) "30"
+
+# HKEYS / HVALS - Get all keys or values
+127.0.0.1:6379> HKEYS user:1001:profile
+1) "name"
+2) "email"
+3) "age"
+
+# HEXISTS - Check if field exists
+127.0.0.1:6379> HEXISTS user:1001:profile name
+(integer) 1
+
+# HLEN - Get number of fields
+127.0.0.1:6379> HLEN user:1001:profile
+(integer) 3
+
+# HDEL - Delete field
+127.0.0.1:6379> HDEL user:1001:profile age
+(integer) 1</code></pre>
+
+                    <h4 class="mt-4 mb-3">Kuber Extension Commands</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># REGIONS - List all regions
+127.0.0.1:6379> REGIONS
+1) "default"
+2) "sessions"
+3) "users"
+
+# RCREATE - Create new region
+127.0.0.1:6379> RCREATE products
+OK
+
+# RSELECT - Switch to region (affects subsequent commands)
+127.0.0.1:6379> RSELECT users
+OK
+
+# RINFO - Get region information
+127.0.0.1:6379> RINFO default
+1) "name"
+2) "default"
+3) "entryCount"
+4) (integer) 150
+5) "hitRatio"
+6) "0.95"
+
+# RPURGE - Delete all entries in region
+127.0.0.1:6379> RPURGE temp_data
+OK
+
+# RDROP - Delete region entirely
+127.0.0.1:6379> RDROP old_region
+OK
+
+# KSEARCH - Regex key search (returns key:value pairs)
+127.0.0.1:6379> KSEARCH user:\d+
+1) 1) "user:1001"
+   2) "John Doe"
+   3) "string"
+   4) (integer) -1
+2) 1) "user:1002"
+   2) "Jane Smith"
+   3) "string"
+   4) (integer) -1
+
+# JSET - Store JSON document
+127.0.0.1:6379> JSET config:app $ '{"debug": true, "version": "1.0"}'
+OK
+
+# JGET - Get JSON (or path within JSON)
+127.0.0.1:6379> JGET config:app $
+{"debug":true,"version":"1.0"}
+127.0.0.1:6379> JGET config:app $.version
+"1.0"
+
+# JSEARCH - Search JSON documents
+127.0.0.1:6379> JSEARCH $.status=active
+1) 1) "user:1001"
+   2) "{\"name\":\"John\",\"status\":\"active\"}"
+
+# Server commands
+127.0.0.1:6379> INFO
+# Server info...
+
+127.0.0.1:6379> DBSIZE
+(integer) 150
+
+127.0.0.1:6379> TIME
+1) "1234567890"
+2) "123456"
+
+127.0.0.1:6379> FLUSHDB
+OK
+
+127.0.0.1:6379> FLUSHALL
+OK</code></pre>
                 </section>
-                
-                <!-- Copyright Footer -->
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-body text-center text-muted">
-                        <p class="mb-1">
-                            <strong>Kuber Distributed Cache</strong> - Version 1.0.5
-                        </p>
-                        <p class="mb-1">
-                            Copyright © 2025-2030, All Rights Reserved
-                        </p>
-                        <p class="mb-0">
-                            Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a>
-                        </p>
-                        <p class="mt-2 small">
-                            <em>Patent Pending</em>
-                        </p>
+
+                <!-- Python Client Section -->
+                <section id="python-client" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fab fa-python me-2 text-info"></i>Python Client Examples</h2>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Kuber is fully compatible with standard Redis clients. Use <code>redis-py</code> or the included <code>kuber-client-python</code> package.
                     </div>
-                </div>
-                
-            </div>
+                    
+                    <h4 class="mt-4 mb-3">Installation</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># Using standard redis-py
+pip install redis
+
+# Or using Kuber's Python client
+pip install kuber-client</code></pre>
+
+                    <h4 class="mt-4 mb-3">Basic Connection and Operations</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+# Connect to Kuber
+client = redis.Redis(
+    host='localhost',
+    port=6379,
+    password='admin123',  # Or use username='admin', password='admin123'
+    decode_responses=True  # Return strings instead of bytes
+)
+
+# Test connection
+print(client.ping())  # True
+
+# Basic string operations
+client.set('user:1001', 'John Doe')
+client.set('user:1002', 'Jane Smith')
+
+name = client.get('user:1001')
+print(f"User: {name}")  # User: John Doe
+
+# Set with expiration (TTL)
+client.setex('session:abc123', 3600, 'session-data')  # Expires in 1 hour
+client.set('temp:key', 'value', ex=60)  # Alternative syntax
+
+# Check TTL
+ttl = client.ttl('session:abc123')
+print(f"TTL: {ttl} seconds")
+
+# Increment/Decrement
+client.set('counter', 0)
+client.incr('counter')  # 1
+client.incrby('counter', 10)  # 11
+client.decr('counter')  # 10
+
+# Check existence and delete
+if client.exists('user:1001'):
+    print("User exists")
+    
+client.delete('user:1001', 'user:1002')  # Delete multiple keys</code></pre>
+
+                    <h4 class="mt-4 mb-3">Key Pattern Matching</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+client = redis.Redis(host='localhost', port=6379, password='admin123', decode_responses=True)
+
+# Create some test data
+for i in range(1, 101):
+    client.set(f'user:{i}', f'User {i}')
+    client.set(f'order:{i}', f'Order {i}')
+
+# Find keys matching pattern (glob syntax)
+user_keys = client.keys('user:*')
+print(f"Found {len(user_keys)} user keys")
+
+# Find keys with single character wildcard
+keys = client.keys('user:?')  # user:1 through user:9
+
+# Find specific patterns
+active_keys = client.keys('*:active')
+order_keys = client.keys('order:[1-9]*')  # Orders 1-99
+
+# SCAN for large datasets (recommended over KEYS)
+cursor = 0
+all_keys = []
+while True:
+    cursor, keys = client.scan(cursor, match='user:*', count=100)
+    all_keys.extend(keys)
+    if cursor == 0:
+        break
+print(f"Scanned {len(all_keys)} keys")</code></pre>
+
+                    <h4 class="mt-4 mb-3">Hash Operations</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+client = redis.Redis(host='localhost', port=6379, password='admin123', decode_responses=True)
+
+# Store user profile as hash
+client.hset('user:1001:profile', mapping={
+    'name': 'John Doe',
+    'email': 'john@example.com',
+    'age': '30',
+    'city': 'New York'
+})
+
+# Get single field
+name = client.hget('user:1001:profile', 'name')
+print(f"Name: {name}")
+
+# Get multiple fields
+fields = client.hmget('user:1001:profile', ['name', 'email', 'age'])
+print(f"Fields: {fields}")  # ['John Doe', 'john@example.com', '30']
+
+# Get all fields
+profile = client.hgetall('user:1001:profile')
+print(f"Profile: {profile}")
+# {'name': 'John Doe', 'email': 'john@example.com', 'age': '30', 'city': 'New York'}
+
+# Update single field
+client.hset('user:1001:profile', 'age', '31')
+
+# Check if field exists
+if client.hexists('user:1001:profile', 'phone'):
+    print("Has phone")
+else:
+    client.hset('user:1001:profile', 'phone', '+1-555-1234')
+
+# Get field count
+field_count = client.hlen('user:1001:profile')
+print(f"Fields: {field_count}")
+
+# Delete field
+client.hdel('user:1001:profile', 'phone')
+
+# Get all keys or values
+keys = client.hkeys('user:1001:profile')
+values = client.hvals('user:1001:profile')</code></pre>
+
+                    <h4 class="mt-4 mb-3">JSON Document Operations</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis
+import json
+
+client = redis.Redis(host='localhost', port=6379, password='admin123', decode_responses=True)
+
+# Store JSON using JSET command
+user_data = {
+    "name": "John Doe",
+    "age": 30,
+    "email": "john@example.com",
+    "address": {
+        "city": "New York",
+        "zip": "10001"
+    },
+    "tags": ["developer", "python", "redis"]
+}
+
+# Using execute_command for Kuber extensions
+client.execute_command('JSET', 'user:1001', '$', json.dumps(user_data))
+
+# Get entire JSON document
+result = client.execute_command('JGET', 'user:1001', '$')
+data = json.loads(result)
+print(f"User: {data['name']}")
+
+# Get specific path
+name = client.execute_command('JGET', 'user:1001', '$.name')
+city = client.execute_command('JGET', 'user:1001', '$.address.city')
+print(f"Name: {name}, City: {city}")
+
+# Search JSON documents
+# First, create some test documents
+for i in range(1, 11):
+    doc = {
+        "name": f"User {i}",
+        "status": "active" if i % 2 == 0 else "inactive",
+        "score": i * 10
+    }
+    client.execute_command('JSET', f'player:{i}', '$', json.dumps(doc))
+
+# Search for active users
+results = client.execute_command('JSEARCH', '$.status=active')
+print(f"Active users: {results}")
+
+# Search with multiple conditions
+results = client.execute_command('JSEARCH', '$.status=active,$.score>50')
+print(f"Active users with score > 50: {results}")</code></pre>
+
+                    <h4 class="mt-4 mb-3">Batch Operations</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+client = redis.Redis(host='localhost', port=6379, password='admin123', decode_responses=True)
+
+# MSET - Set multiple keys at once
+client.mset({
+    'key1': 'value1',
+    'key2': 'value2',
+    'key3': 'value3'
+})
+
+# MGET - Get multiple keys at once
+values = client.mget(['key1', 'key2', 'key3', 'nonexistent'])
+print(values)  # ['value1', 'value2', 'value3', None]
+
+# Pipeline for atomic operations
+pipe = client.pipeline()
+pipe.set('counter', 0)
+pipe.incr('counter')
+pipe.incr('counter')
+pipe.incr('counter')
+pipe.get('counter')
+results = pipe.execute()
+print(f"Pipeline results: {results}")  # [True, 1, 2, 3, '3']
+
+# Transaction with MULTI/EXEC
+pipe = client.pipeline(transaction=True)
+pipe.set('balance:1001', 1000)
+pipe.decrby('balance:1001', 100)
+pipe.incrby('balance:1002', 100)
+pipe.execute()</code></pre>
+
+                    <h4 class="mt-4 mb-3">Region Management</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+client = redis.Redis(host='localhost', port=6379, password='admin123', decode_responses=True)
+
+# List all regions
+regions = client.execute_command('REGIONS')
+print(f"Regions: {regions}")
+
+# Create new region
+client.execute_command('RCREATE', 'analytics')
+
+# Get region info
+info = client.execute_command('RINFO', 'default')
+print(f"Region info: {info}")
+
+# Select region (all subsequent commands use this region)
+client.execute_command('RSELECT', 'analytics')
+client.set('pageviews', 1000)
+
+# Switch back to default
+client.execute_command('RSELECT', 'default')
+
+# Purge region (delete all entries but keep region)
+client.execute_command('RPURGE', 'analytics')
+
+# Delete region entirely
+client.execute_command('RDROP', 'analytics')</code></pre>
+
+                    <h4 class="mt-4 mb-3">Using Kuber Python Client Package</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient
+
+# Create client with region support
+client = KuberClient(
+    host='localhost',
+    port=6379,
+    password='admin123',
+    default_region='default'
+)
+
+# Basic operations
+client.set('key', 'value')
+client.set('key', 'value', region='other_region')  # Specify region
+
+# JSON operations with helper methods
+client.json_set('user:1001', {'name': 'John', 'age': 30})
+user = client.json_get('user:1001')
+name = client.json_get('user:1001', '$.name')
+
+# Search operations
+results = client.json_search('$.status=active')
+keys = client.ksearch(r'user:\d+')  # Regex search
+
+# Region management
+client.create_region('sessions', description='Session storage')
+regions = client.list_regions()
+client.select_region('sessions')
+
+# Connection pool for production
+from kuber import KuberConnectionPool
+
+pool = KuberConnectionPool(
+    host='localhost',
+    port=6379,
+    password='admin123',
+    max_connections=10
+)
+
+with pool.get_client() as client:
+    client.set('key', 'value')</code></pre>
+
+                    <h4 class="mt-4 mb-3">REST API with Python requests</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import requests
+from requests.auth import HTTPBasicAuth
+import json
+
+BASE_URL = 'http://localhost:8080/api'
+auth = HTTPBasicAuth('admin', 'admin123')
+
+# Get value
+response = requests.get(f'{BASE_URL}/cache/default/user:1001', auth=auth)
+print(response.text)
+
+# Set value
+response = requests.put(
+    f'{BASE_URL}/cache/default/user:1001',
+    auth=auth,
+    headers={'Content-Type': 'text/plain'},
+    data='John Doe'
+)
+
+# Set JSON value
+user_data = {'name': 'John', 'age': 30}
+response = requests.put(
+    f'{BASE_URL}/cache/default/user:1001',
+    auth=auth,
+    headers={'Content-Type': 'application/json'},
+    json=user_data
+)
+
+# Search keys
+response = requests.get(
+    f'{BASE_URL}/cache/default/keys',
+    auth=auth,
+    params={'pattern': 'user:*'}
+)
+keys = response.json()
+
+# KSEARCH with regex
+response = requests.get(
+    f'{BASE_URL}/cache/default/ksearch',
+    auth=auth,
+    params={'regex': r'user:\d+', 'limit': 100}
+)
+results = response.json()
+
+# JSON search
+response = requests.post(
+    f'{BASE_URL}/cache/default/jsearch',
+    auth=auth,
+    json={'query': '$.status=active,$.age>25'}
+)
+results = response.json()
+
+# Export region as CSV
+response = requests.get(
+    f'{BASE_URL}/export/region/default',
+    auth=auth
+)
+with open('export.csv', 'w') as f:
+    f.write(response.text)
+
+# Batch operations
+# MGET
+response = requests.post(
+    f'{BASE_URL}/cache/default/mget',
+    auth=auth,
+    json=['user:1001', 'user:1002', 'user:1003']
+)
+values = response.json()
+
+# MSET
+response = requests.post(
+    f'{BASE_URL}/cache/default/mset',
+    auth=auth,
+    json={'user:1001': 'John', 'user:1002': 'Jane'}
+)</code></pre>
+                </section>
+
+                <!-- Java Client Section -->
+                <section id="java-client" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fab fa-java me-2 text-danger"></i>Java Client Examples</h2>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Kuber is compatible with standard Java Redis clients like Jedis and Lettuce. You can also use the included <code>kuber-client-java</code> library for enhanced functionality.
+                    </div>
+                    
+                    <h4 class="mt-4 mb-3">Maven Dependencies</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>&lt;!-- Using Jedis --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;redis.clients&lt;/groupId&gt;
+    &lt;artifactId&gt;jedis&lt;/artifactId&gt;
+    &lt;version&gt;5.1.0&lt;/version&gt;
+&lt;/dependency&gt;
+
+&lt;!-- Using Lettuce --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;io.lettuce&lt;/groupId&gt;
+    &lt;artifactId&gt;lettuce-core&lt;/artifactId&gt;
+    &lt;version&gt;6.3.0.RELEASE&lt;/version&gt;
+&lt;/dependency&gt;
+
+&lt;!-- Using Kuber Java Client --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;com.kuber&lt;/groupId&gt;
+    &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
+    &lt;version&gt;1.0.6&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+                    <h4 class="mt-4 mb-3">Basic Jedis Example</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+
+public class KuberJedisExample {
+    public static void main(String[] args) {
+        // Simple connection
+        try (Jedis jedis = new Jedis("localhost", 6379)) {
+            jedis.auth("admin123");
+            
+            // Test connection
+            System.out.println("PING: " + jedis.ping());  // PONG
+            
+            // String operations
+            jedis.set("user:1001", "John Doe");
+            String name = jedis.get("user:1001");
+            System.out.println("User: " + name);
+            
+            // Set with expiration
+            jedis.setex("session:abc123", 3600, "session-data");
+            
+            // Check TTL
+            long ttl = jedis.ttl("session:abc123");
+            System.out.println("TTL: " + ttl + " seconds");
+            
+            // Increment
+            jedis.set("counter", "0");
+            jedis.incr("counter");
+            jedis.incrBy("counter", 10);
+            System.out.println("Counter: " + jedis.get("counter"));
+            
+            // Key operations
+            Set&lt;String&gt; keys = jedis.keys("user:*");
+            System.out.println("User keys: " + keys);
+            
+            // Delete
+            jedis.del("user:1001");
+        }
+    }
+}
+
+// Connection pool for production
+public class KuberConnectionPool {
+    private static JedisPool pool;
+    
+    static {
+        JedisPoolConfig config = new JedisPoolConfig();
+        config.setMaxTotal(128);
+        config.setMaxIdle(64);
+        config.setMinIdle(16);
+        config.setTestOnBorrow(true);
+        config.setTestOnReturn(true);
+        
+        pool = new JedisPool(config, "localhost", 6379, 2000, "admin123");
+    }
+    
+    public static Jedis getConnection() {
+        return pool.getResource();
+    }
+    
+    public static void close() {
+        pool.close();
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Hash Operations with Jedis</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+import java.util.Map;
+import java.util.HashMap;
+
+public class KuberHashExample {
+    public static void main(String[] args) {
+        try (Jedis jedis = new Jedis("localhost", 6379)) {
+            jedis.auth("admin123");
+            
+            // Store user profile as hash
+            Map&lt;String, String&gt; profile = new HashMap&lt;&gt;();
+            profile.put("name", "John Doe");
+            profile.put("email", "john@example.com");
+            profile.put("age", "30");
+            profile.put("city", "New York");
+            
+            jedis.hset("user:1001:profile", profile);
+            
+            // Get single field
+            String name = jedis.hget("user:1001:profile", "name");
+            System.out.println("Name: " + name);
+            
+            // Get multiple fields
+            List&lt;String&gt; fields = jedis.hmget("user:1001:profile", "name", "email", "age");
+            System.out.println("Fields: " + fields);
+            
+            // Get all fields
+            Map&lt;String, String&gt; allFields = jedis.hgetAll("user:1001:profile");
+            System.out.println("Profile: " + allFields);
+            
+            // Update field
+            jedis.hset("user:1001:profile", "age", "31");
+            
+            // Check existence
+            boolean hasPhone = jedis.hexists("user:1001:profile", "phone");
+            System.out.println("Has phone: " + hasPhone);
+            
+            // Field count
+            long count = jedis.hlen("user:1001:profile");
+            System.out.println("Field count: " + count);
+            
+            // Get all keys/values
+            Set&lt;String&gt; hkeys = jedis.hkeys("user:1001:profile");
+            List&lt;String&gt; hvals = jedis.hvals("user:1001:profile");
+            
+            // Delete field
+            jedis.hdel("user:1001:profile", "city");
+        }
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">JSON Operations (Kuber Extensions)</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+
+public class KuberJsonExample {
+    private static final ObjectMapper mapper = new ObjectMapper();
+    
+    public static void main(String[] args) throws Exception {
+        try (Jedis jedis = new Jedis("localhost", 6379)) {
+            jedis.auth("admin123");
+            
+            // Create JSON document
+            Map&lt;String, Object&gt; user = new HashMap&lt;&gt;();
+            user.put("name", "John Doe");
+            user.put("age", 30);
+            user.put("status", "active");
+            user.put("tags", Arrays.asList("developer", "java"));
+            
+            Map&lt;String, String&gt; address = new HashMap&lt;&gt;();
+            address.put("city", "New York");
+            address.put("zip", "10001");
+            user.put("address", address);
+            
+            String json = mapper.writeValueAsString(user);
+            
+            // Store JSON using JSET command
+            jedis.sendCommand(() -&gt; "JSET".getBytes(), 
+                "user:1001".getBytes(), 
+                "$".getBytes(), 
+                json.getBytes());
+            
+            // Get entire JSON document
+            Object result = jedis.sendCommand(() -&gt; "JGET".getBytes(), 
+                "user:1001".getBytes(), 
+                "$".getBytes());
+            String jsonResult = new String((byte[]) result);
+            JsonNode node = mapper.readTree(jsonResult);
+            System.out.println("User: " + node.get("name").asText());
+            
+            // Get specific path
+            Object nameResult = jedis.sendCommand(() -&gt; "JGET".getBytes(), 
+                "user:1001".getBytes(), 
+                "$.name".getBytes());
+            System.out.println("Name: " + new String((byte[]) nameResult));
+            
+            // Search JSON documents
+            Object searchResult = jedis.sendCommand(() -&gt; "JSEARCH".getBytes(),
+                "$.status=active".getBytes());
+            System.out.println("Search results: " + searchResult);
+        }
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Region Management (Kuber Extensions)</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+import java.util.List;
+
+public class KuberRegionExample {
+    public static void main(String[] args) {
+        try (Jedis jedis = new Jedis("localhost", 6379)) {
+            jedis.auth("admin123");
+            
+            // List all regions
+            Object regions = jedis.sendCommand(() -&gt; "REGIONS".getBytes());
+            System.out.println("Regions: " + regions);
+            
+            // Create new region
+            jedis.sendCommand(() -&gt; "RCREATE".getBytes(), "analytics".getBytes());
+            System.out.println("Created region: analytics");
+            
+            // Get region info
+            Object info = jedis.sendCommand(() -&gt; "RINFO".getBytes(), "default".getBytes());
+            System.out.println("Region info: " + info);
+            
+            // Select region
+            jedis.sendCommand(() -&gt; "RSELECT".getBytes(), "analytics".getBytes());
+            jedis.set("pageviews", "1000");  // Stored in analytics region
+            
+            // Switch back
+            jedis.sendCommand(() -&gt; "RSELECT".getBytes(), "default".getBytes());
+            
+            // KSEARCH - regex key search
+            Object ksearchResult = jedis.sendCommand(() -&gt; "KSEARCH".getBytes(),
+                "user:\\d+".getBytes());
+            System.out.println("KSEARCH results: " + ksearchResult);
+            
+            // Purge region
+            jedis.sendCommand(() -&gt; "RPURGE".getBytes(), "analytics".getBytes());
+            
+            // Drop region
+            jedis.sendCommand(() -&gt; "RDROP".getBytes(), "analytics".getBytes());
+        }
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Pipeline and Transactions</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.Transaction;
+import redis.clients.jedis.Response;
+
+public class KuberPipelineExample {
+    public static void main(String[] args) {
+        try (Jedis jedis = new Jedis("localhost", 6379)) {
+            jedis.auth("admin123");
+            
+            // Pipeline - multiple commands in one round trip
+            Pipeline pipeline = jedis.pipelined();
+            pipeline.set("key1", "value1");
+            pipeline.set("key2", "value2");
+            pipeline.set("key3", "value3");
+            Response&lt;String&gt; r1 = pipeline.get("key1");
+            Response&lt;String&gt; r2 = pipeline.get("key2");
+            pipeline.sync();
+            
+            System.out.println("Key1: " + r1.get());
+            System.out.println("Key2: " + r2.get());
+            
+            // Transaction - atomic execution
+            Transaction tx = jedis.multi();
+            tx.set("balance:1001", "1000");
+            tx.decrBy("balance:1001", 100);
+            tx.incrBy("balance:1002", 100);
+            tx.exec();
+            
+            System.out.println("Balance 1001: " + jedis.get("balance:1001"));
+            System.out.println("Balance 1002: " + jedis.get("balance:1002"));
+        }
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">REST API with Java HttpClient</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.util.Base64;
+
+public class KuberRestApiExample {
+    private static final String BASE_URL = "http://localhost:8080/api";
+    private static final HttpClient client = HttpClient.newHttpClient();
+    private static final String AUTH = Base64.getEncoder()
+        .encodeToString("admin:admin123".getBytes());
+    
+    public static void main(String[] args) throws Exception {
+        // GET value
+        HttpRequest getRequest = HttpRequest.newBuilder()
+            .uri(URI.create(BASE_URL + "/cache/default/user:1001"))
+            .header("Authorization", "Basic " + AUTH)
+            .GET()
+            .build();
+        
+        HttpResponse&lt;String&gt; response = client.send(getRequest, 
+            HttpResponse.BodyHandlers.ofString());
+        System.out.println("GET response: " + response.body());
+        
+        // PUT value
+        HttpRequest putRequest = HttpRequest.newBuilder()
+            .uri(URI.create(BASE_URL + "/cache/default/user:1001"))
+            .header("Authorization", "Basic " + AUTH)
+            .header("Content-Type", "text/plain")
+            .PUT(HttpRequest.BodyPublishers.ofString("John Doe"))
+            .build();
+        
+        response = client.send(putRequest, HttpResponse.BodyHandlers.ofString());
+        System.out.println("PUT response: " + response.statusCode());
+        
+        // PUT JSON value
+        String jsonBody = "{\"name\":\"John\",\"age\":30}";
+        HttpRequest jsonRequest = HttpRequest.newBuilder()
+            .uri(URI.create(BASE_URL + "/cache/default/user:1001"))
+            .header("Authorization", "Basic " + AUTH)
+            .header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+        
+        response = client.send(jsonRequest, HttpResponse.BodyHandlers.ofString());
+        System.out.println("JSON PUT response: " + response.statusCode());
+        
+        // Search keys
+        HttpRequest searchRequest = HttpRequest.newBuilder()
+            .uri(URI.create(BASE_URL + "/cache/default/keys?pattern=user:*"))
+            .header("Authorization", "Basic " + AUTH)
+            .GET()
+            .build();
+        
+        response = client.send(searchRequest, HttpResponse.BodyHandlers.ofString());
+        System.out.println("Keys: " + response.body());
+        
+        // Export region as CSV
+        HttpRequest exportRequest = HttpRequest.newBuilder()
+            .uri(URI.create(BASE_URL + "/export/region/default"))
+            .header("Authorization", "Basic " + AUTH)
+            .GET()
+            .build();
+        
+        response = client.send(exportRequest, HttpResponse.BodyHandlers.ofString());
+        Files.writeString(Path.of("export.csv"), response.body());
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Using Kuber Java Client Library</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import com.kuber.client.KuberClient;
+import com.kuber.client.KuberClientConfig;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+import java.util.Map;
+
+public class KuberClientExample {
+    public static void main(String[] args) {
+        // Create client configuration
+        KuberClientConfig config = KuberClientConfig.builder()
+            .host("localhost")
+            .port(6379)
+            .password("admin123")
+            .defaultRegion("default")
+            .connectionTimeout(5000)
+            .socketTimeout(5000)
+            .maxConnections(10)
+            .build();
+        
+        try (KuberClient client = new KuberClient(config)) {
+            // Basic operations
+            client.set("user:1001", "John Doe");
+            String value = client.get("user:1001");
+            
+            // With TTL
+            client.set("session:abc", "data", 3600);  // 1 hour TTL
+            
+            // JSON operations
+            Map&lt;String, Object&gt; user = Map.of(
+                "name", "John Doe",
+                "age", 30,
+                "status", "active"
+            );
+            client.jsonSet("user:1001", user);
+            
+            JsonNode json = client.jsonGet("user:1001");
+            String name = client.jsonGet("user:1001", "$.name").asText();
+            
+            // Search JSON
+            List&lt;JsonNode&gt; results = client.jsonSearch("$.status=active");
+            
+            // Region operations
+            client.createRegion("sessions", "Session storage");
+            List&lt;String&gt; regions = client.listRegions();
+            client.selectRegion("sessions");
+            
+            // Hash operations
+            client.hset("profile:1001", Map.of(
+                "name", "John",
+                "email", "john@example.com"
+            ));
+            Map&lt;String, String&gt; profile = client.hgetall("profile:1001");
+            
+            // Key search
+            List&lt;String&gt; keys = client.keys("user:*");
+            List&lt;Map&lt;String, Object&gt;&gt; searchResults = client.ksearch("user:\\d+");
+            
+            // Batch operations
+            client.mset(Map.of(
+                "key1", "value1",
+                "key2", "value2"
+            ));
+            Map&lt;String, String&gt; values = client.mget("key1", "key2", "key3");
+        }
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Spring Boot Integration</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>// application.properties
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.redis.password=admin123
+
+// Configuration class
+@Configuration
+public class RedisConfig {
+    
+    @Bean
+    public RedisConnectionFactory redisConnectionFactory() {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName("localhost");
+        config.setPort(6379);
+        config.setPassword(RedisPassword.of("admin123"));
+        return new LettuceConnectionFactory(config);
+    }
+    
+    @Bean
+    public RedisTemplate&lt;String, Object&gt; redisTemplate(RedisConnectionFactory factory) {
+        RedisTemplate&lt;String, Object&gt; template = new RedisTemplate&lt;&gt;();
+        template.setConnectionFactory(factory);
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        return template;
+    }
+    
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory factory) {
+        return new StringRedisTemplate(factory);
+    }
+}
+
+// Service class
+@Service
+public class CacheService {
+    
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+    
+    public void set(String key, String value) {
+        redisTemplate.opsForValue().set(key, value);
+    }
+    
+    public void setWithTtl(String key, String value, Duration ttl) {
+        redisTemplate.opsForValue().set(key, value, ttl);
+    }
+    
+    public String get(String key) {
+        return redisTemplate.opsForValue().get(key);
+    }
+    
+    public void setHash(String key, Map&lt;String, String&gt; fields) {
+        redisTemplate.opsForHash().putAll(key, fields);
+    }
+    
+    public Map&lt;Object, Object&gt; getHash(String key) {
+        return redisTemplate.opsForHash().entries(key);
+    }
+    
+    public Set&lt;String&gt; findKeys(String pattern) {
+        return redisTemplate.keys(pattern);
+    }
+}</code></pre>
+                </section>
+
+                <!-- Continue with remaining sections... -->
+                <!-- Regions Section -->
+                <section id="regions" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-layer-group me-2 text-info"></i>Region Management</h2>
+                    
+                    <p>Regions provide logical partitioning of cache data, enabling multi-tenant applications and organized data management.</p>
+                    
+                    <h4 class="mt-4 mb-3">Key Concepts</h4>
+                    <ul>
+                        <li><strong>default</strong> - Built-in region, cannot be deleted</li>
+                        <li><strong>Isolation</strong> - Keys in different regions are completely separate</li>
+                        <li><strong>Statistics</strong> - Each region tracks its own hit ratio and entry count</li>
+                        <li><strong>Persistence</strong> - Each region maps to a MongoDB collection</li>
+                    </ul>
+                    
+                    <h4 class="mt-4 mb-3">Region Selection Methods</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Interface</th><th>Method</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Web UI</td><td>Region dropdown selector</td><td>Select from dropdown menu</td></tr>
+                            <tr><td>REST API</td><td>URL path parameter</td><td><code>/api/cache/{region}/{key}</code></td></tr>
+                            <tr><td>Redis Protocol</td><td>RSELECT command</td><td><code>RSELECT myregion</code></td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- String Operations Section -->
+                <section id="string-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-font me-2 text-success"></i>String Operations</h2>
+                    
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Command</th><th>Description</th><th>Redis CLI</th><th>REST API</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>SET</td><td>Store string value</td><td><code>SET key value</code></td><td><code>PUT /api/cache/{region}/{key}</code></td></tr>
+                            <tr><td>GET</td><td>Retrieve value</td><td><code>GET key</code></td><td><code>GET /api/cache/{region}/{key}</code></td></tr>
+                            <tr><td>SETNX</td><td>Set if not exists</td><td><code>SETNX key value</code></td><td><code>PUT ...?nx=true</code></td></tr>
+                            <tr><td>SETEX</td><td>Set with expiration</td><td><code>SETEX key 60 value</code></td><td><code>PUT ...?ttl=60</code></td></tr>
+                            <tr><td>INCR</td><td>Increment integer</td><td><code>INCR counter</code></td><td><code>POST /api/cache/{region}/{key}/incr</code></td></tr>
+                            <tr><td>DECR</td><td>Decrement integer</td><td><code>DECR counter</code></td><td><code>POST /api/cache/{region}/{key}/decr</code></td></tr>
+                            <tr><td>APPEND</td><td>Append to string</td><td><code>APPEND key value</code></td><td>N/A</td></tr>
+                            <tr><td>STRLEN</td><td>Get string length</td><td><code>STRLEN key</code></td><td>N/A</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- JSON Operations Section -->
+                <section id="json-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-code me-2 text-warning"></i>JSON Operations</h2>
+                    
+                    <p>Kuber supports storing and querying JSON documents using JSONPath expressions.</p>
+                    
+                    <h4 class="mt-4 mb-3">JSEARCH Query Operators</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Operator</th><th>Description</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>=</code></td><td>Equals</td><td><code>$.status=active</code></td></tr>
+                            <tr><td><code>!=</code></td><td>Not equals</td><td><code>$.status!=inactive</code></td></tr>
+                            <tr><td><code>&gt;</code></td><td>Greater than</td><td><code>$.price>100</code></td></tr>
+                            <tr><td><code>&lt;</code></td><td>Less than</td><td><code>$.age<30</code></td></tr>
+                            <tr><td><code>&gt;=</code></td><td>Greater or equal</td><td><code>$.score>=90</code></td></tr>
+                            <tr><td><code>&lt;=</code></td><td>Less or equal</td><td><code>$.quantity<=10</code></td></tr>
+                            <tr><td><code>~=</code></td><td>Regex match</td><td><code>$.name~=John.*</code></td></tr>
+                            <tr><td><code>contains</code></td><td>Contains substring</td><td><code>$.description contains sale</code></td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4 mb-3">Complex Query Examples</h4>
+<pre class="bg-light p-3 rounded"><code># Multiple conditions (AND)
+$.status=active,$.age>25,$.verified=true
+
+# Nested object query
+$.address.city=New York
+
+# Array element access
+$.tags[0]=featured</code></pre>
+                </section>
+
+                <!-- Hash Operations Section -->
+                <section id="hash-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-hashtag me-2 text-danger"></i>Hash Operations</h2>
+                    
+                    <p>Hashes are ideal for storing objects with multiple fields, like user profiles or session data.</p>
+                    
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>HSET</td><td>Set hash field(s)</td><td><code>HSET user:1 name John email john@ex.com</code></td></tr>
+                            <tr><td>HGET</td><td>Get single field</td><td><code>HGET user:1 name</code></td></tr>
+                            <tr><td>HMGET</td><td>Get multiple fields</td><td><code>HMGET user:1 name email</code></td></tr>
+                            <tr><td>HGETALL</td><td>Get all fields</td><td><code>HGETALL user:1</code></td></tr>
+                            <tr><td>HDEL</td><td>Delete field</td><td><code>HDEL user:1 email</code></td></tr>
+                            <tr><td>HEXISTS</td><td>Check field exists</td><td><code>HEXISTS user:1 name</code></td></tr>
+                            <tr><td>HKEYS</td><td>Get all field names</td><td><code>HKEYS user:1</code></td></tr>
+                            <tr><td>HVALS</td><td>Get all values</td><td><code>HVALS user:1</code></td></tr>
+                            <tr><td>HLEN</td><td>Get field count</td><td><code>HLEN user:1</code></td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- Key Operations Section -->
+                <section id="key-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-key me-2 text-primary"></i>Key Operations</h2>
+                    
+                    <h4 class="mt-4 mb-3">Glob Pattern Syntax (KEYS command)</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Pattern</th><th>Description</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>*</code></td><td>Match any characters</td><td><code>user:*</code> matches <code>user:1</code>, <code>user:abc</code></td></tr>
+                            <tr><td><code>?</code></td><td>Match single character</td><td><code>user:?</code> matches <code>user:1</code> but not <code>user:10</code></td></tr>
+                            <tr><td><code>[abc]</code></td><td>Match any char in set</td><td><code>user:[123]</code> matches <code>user:1</code>, <code>user:2</code>, <code>user:3</code></td></tr>
+                            <tr><td><code>[a-z]</code></td><td>Match char range</td><td><code>type:[a-z]</code> matches <code>type:a</code> through <code>type:z</code></td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- Search Operations Section -->
+                <section id="search-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-search me-2 text-info"></i>Search Operations</h2>
+                    
+                    <h4 class="mt-4 mb-3">KEYS vs KSEARCH</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Feature</th><th>KEYS</th><th>KSEARCH</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Pattern Type</td><td>Glob patterns</td><td>Regular expressions</td></tr>
+                            <tr><td>Returns</td><td>Key names only</td><td>Key-value pairs with metadata</td></tr>
+                            <tr><td>Complexity</td><td>Simple wildcards</td><td>Full regex power</td></tr>
+                            <tr><td>Example</td><td><code>user:*</code></td><td><code>user:\d{4}</code></td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4 mb-3">KSEARCH Regex Examples</h4>
+<pre class="bg-light p-3 rounded"><code># Match user IDs (digits only)
+KSEARCH user:\d+
+
+# Match sessions from 2024
+KSEARCH ^session_.*_2024$
+
+# Match order codes (3 letters + 4 digits)
+KSEARCH order:[A-Z]{3}\d{4}
+
+# Match emails
+KSEARCH ^email_.*@.*\.com$</code></pre>
+                </section>
+
+                <!-- TTL Operations Section -->
+                <section id="ttl-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-clock me-2 text-secondary"></i>TTL Operations</h2>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Note:</strong> TTL cleanup runs every 60 seconds by default. Expired entries may still appear briefly until the next cleanup cycle.
+                    </div>
+                    
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Operation</th><th>Command</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Set with TTL</td><td><code>SETEX key 60 value</code></td><td>Create key that expires in 60 seconds</td></tr>
+                            <tr><td>Set TTL on existing</td><td><code>EXPIRE key 3600</code></td><td>Set 1 hour TTL on existing key</td></tr>
+                            <tr><td>Check TTL</td><td><code>TTL key</code></td><td>Returns seconds remaining (-1 = no TTL, -2 = not found)</td></tr>
+                            <tr><td>Remove TTL</td><td><code>PERSIST key</code></td><td>Make key permanent</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- Batch Operations Section -->
+                <section id="batch-ops" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-layer-group me-2 text-primary"></i>Batch Operations</h2>
+                    
+                    <p>Batch operations allow multiple commands in a single request for better performance.</p>
+                    
+                    <h4 class="mt-4 mb-3">MGET - Get Multiple Keys</h4>
+<pre class="bg-light p-3 rounded"><code># Redis CLI
+MGET user:1001 user:1002 user:1003
+
+# REST API
+POST /api/cache/default/mget
+Content-Type: application/json
+["user:1001", "user:1002", "user:1003"]</code></pre>
+
+                    <h4 class="mt-4 mb-3">MSET - Set Multiple Keys</h4>
+<pre class="bg-light p-3 rounded"><code># Redis CLI
+MSET user:1001 "John" user:1002 "Jane" user:1003 "Bob"
+
+# REST API
+POST /api/cache/default/mset
+Content-Type: application/json
+{"user:1001": "John", "user:1002": "Jane", "user:1003": "Bob"}</code></pre>
+                </section>
+
+                <!-- Configuration Section -->
+                <section id="config" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-cog me-2 text-secondary"></i>Configuration Reference</h2>
+                    
+                    <h4 class="mt-4 mb-3">Network Settings</h4>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.network.port</code></td><td>6379</td><td>Redis protocol port</td></tr>
+                            <tr><td><code>kuber.network.bind-address</code></td><td>0.0.0.0</td><td>Bind address</td></tr>
+                            <tr><td><code>kuber.network.max-connections</code></td><td>10000</td><td>Max concurrent connections</td></tr>
+                            <tr><td><code>kuber.network.timeout-seconds</code></td><td>0</td><td>Client timeout (0 = disabled)</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4 mb-3">Cache Settings</h4>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.cache.max-memory-entries</code></td><td>100000</td><td>Max entries per region in memory</td></tr>
+                            <tr><td><code>kuber.cache.persistent-mode</code></td><td>true</td><td>Enable MongoDB persistence</td></tr>
+                            <tr><td><code>kuber.cache.ttl-cleanup-interval-seconds</code></td><td>60</td><td>TTL cleanup interval</td></tr>
+                            <tr><td><code>kuber.cache.default-ttl</code></td><td>-1</td><td>Default TTL (-1 = no expiry)</td></tr>
+                            <tr><td><code>kuber.cache.statistics-enabled</code></td><td>true</td><td>Enable hit/miss statistics</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4 mb-3">MongoDB Settings</h4>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.mongodb.uri</code></td><td>mongodb://localhost:27017</td><td>MongoDB connection URI</td></tr>
+                            <tr><td><code>kuber.mongodb.database</code></td><td>kuber</td><td>Database name</td></tr>
+                            <tr><td><code>kuber.mongodb.connection-pool-size</code></td><td>50</td><td>Connection pool size</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- Replication Section -->
+                <section id="replication" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-sync me-2 text-success"></i>Replication</h2>
+                    
+                    <p>Kuber supports Primary/Secondary replication using ZooKeeper for coordination.</p>
+                    
+                    <h4 class="mt-4 mb-3">Configuration</h4>
+<pre class="bg-light p-3 rounded"><code># Enable replication
+kuber.replication.enabled=true
+kuber.replication.zookeeper.connect-string=localhost:2181
+kuber.replication.zookeeper.base-path=/kuber
+kuber.replication.zookeeper.session-timeout-ms=30000</code></pre>
+
+                    <h4 class="mt-4 mb-3">Behavior</h4>
+                    <ul>
+                        <li><strong>PRIMARY</strong> - Accepts reads and writes, replicates to secondaries</li>
+                        <li><strong>SECONDARY</strong> - Read-only, receives replicated data</li>
+                        <li><strong>Automatic Failover</strong> - Secondary becomes primary if primary fails</li>
+                    </ul>
+                </section>
+
+                <!-- Footer -->
+                <footer class="py-4 mt-4 border-top">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-database me-2"></i>Kuber Distributed Cache</h6>
+                            <p class="text-muted small mb-0">Version 1.0.6</p>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <p class="text-muted small mb-0">
+                                Copyright &copy; 2025-2030, All Rights Reserved<br>
+                                Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                                <span class="badge bg-warning text-dark">Patent Pending</span>
+                            </p>
+                        </div>
+                    </div>
+                </footer>
+            </main>
         </div>
     </div>
 </main>
 
-<footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
 <script>
     // Smooth scrolling for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
+        anchor.addEventListener('click', function(e) {
             e.preventDefault();
             const target = document.querySelector(this.getAttribute('href'));
             if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const offset = 80; // Account for sticky navbar
+                const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - offset;
+                window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+            }
+        });
+    });
+    
+    // Highlight current section in sidebar
+    window.addEventListener('scroll', () => {
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.sidebar .nav-link');
+        
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop - 100;
+            if (window.pageYOffset >= sectionTop) {
+                current = section.getAttribute('id');
+            }
+        });
+        
+        navLinks.forEach(link => {
+            link.classList.remove('active', 'fw-bold');
+            if (link.getAttribute('href') === '#' + current) {
+                link.classList.add('active', 'fw-bold');
             }
         });
     });
