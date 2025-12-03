@@ -107,6 +107,18 @@ public class ApiController {
         return ResponseEntity.ok(cacheService.keys(region, pattern));
     }
     
+    /**
+     * Search keys by regex pattern and return key-value pairs.
+     * Different from /keys which uses glob pattern and returns only keys.
+     */
+    @GetMapping("/cache/{region}/ksearch")
+    public ResponseEntity<List<Map<String, Object>>> searchKeysByRegex(
+            @PathVariable String region,
+            @RequestParam String pattern,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return ResponseEntity.ok(cacheService.searchKeysByRegex(region, pattern, limit));
+    }
+    
     @GetMapping("/cache/{region}/{key}")
     public ResponseEntity<Map<String, Object>> getValue(@PathVariable String region,
                                                         @PathVariable String key) {

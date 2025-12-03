@@ -1,0 +1,306 @@
+{
+  "groups": [
+    {
+      "name": "kuber",
+      "type": "com.kuber.server.config.KuberProperties",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.cache",
+      "type": "com.kuber.server.config.KuberProperties$Cache",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.mongo",
+      "type": "com.kuber.server.config.KuberProperties$Mongo",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.network",
+      "type": "com.kuber.server.config.KuberProperties$Network",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.replication",
+      "type": "com.kuber.server.config.KuberProperties$Replication",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.security",
+      "type": "com.kuber.server.config.KuberProperties$Security",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.zookeeper",
+      "type": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "kuber.cache.default-ttl-seconds",
+      "type": "java.lang.Long",
+      "description": "Default TTL in seconds (-1 for no expiration)",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": -1
+    },
+    {
+      "name": "kuber.cache.enable-statistics",
+      "type": "java.lang.Boolean",
+      "description": "Enable statistics collection",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": true
+    },
+    {
+      "name": "kuber.cache.eviction-policy",
+      "type": "java.lang.String",
+      "description": "Eviction policy: LRU, LFU, FIFO",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": "LRU"
+    },
+    {
+      "name": "kuber.cache.max-memory-entries",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of entries to keep in memory",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": 100000
+    },
+    {
+      "name": "kuber.cache.persistence-batch-size",
+      "type": "java.lang.Integer",
+      "description": "Batch size for async persistence",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": 100
+    },
+    {
+      "name": "kuber.cache.persistence-interval-ms",
+      "type": "java.lang.Integer",
+      "description": "Interval for async persistence in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": 1000
+    },
+    {
+      "name": "kuber.cache.persistent-mode",
+      "type": "java.lang.Boolean",
+      "description": "Whether to use persistent mode (sync writes to MongoDB)",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": false
+    },
+    {
+      "name": "kuber.cache.ttl-cleanup-interval-seconds",
+      "type": "java.lang.Integer",
+      "description": "TTL cleanup interval in seconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Cache",
+      "defaultValue": 60
+    },
+    {
+      "name": "kuber.mongo.connection-pool-size",
+      "type": "java.lang.Integer",
+      "description": "Connection pool size",
+      "sourceType": "com.kuber.server.config.KuberProperties$Mongo",
+      "defaultValue": 50
+    },
+    {
+      "name": "kuber.mongo.connection-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Connection timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Mongo",
+      "defaultValue": 10000
+    },
+    {
+      "name": "kuber.mongo.database",
+      "type": "java.lang.String",
+      "description": "Database name",
+      "sourceType": "com.kuber.server.config.KuberProperties$Mongo",
+      "defaultValue": "kuber"
+    },
+    {
+      "name": "kuber.mongo.socket-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Socket timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Mongo",
+      "defaultValue": 30000
+    },
+    {
+      "name": "kuber.mongo.uri",
+      "type": "java.lang.String",
+      "description": "MongoDB connection URI",
+      "sourceType": "com.kuber.server.config.KuberProperties$Mongo",
+      "defaultValue": "mongodb:\/\/localhost:27017"
+    },
+    {
+      "name": "kuber.mongo.write-concern-acknowledged",
+      "type": "java.lang.Boolean",
+      "description": "Enable write concern acknowledgment",
+      "sourceType": "com.kuber.server.config.KuberProperties$Mongo",
+      "defaultValue": true
+    },
+    {
+      "name": "kuber.network.bind-address",
+      "type": "java.lang.String",
+      "description": "Bind address",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": "0.0.0.0"
+    },
+    {
+      "name": "kuber.network.connection-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Connection timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 30000
+    },
+    {
+      "name": "kuber.network.decoder-max-line-length",
+      "type": "java.lang.Integer",
+      "description": "Maximum line length for text decoder",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 1048576
+    },
+    {
+      "name": "kuber.network.io-processor-count",
+      "type": "java.lang.Integer",
+      "description": "IO processor count (0 = auto-detect)",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 0
+    },
+    {
+      "name": "kuber.network.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of concurrent connections",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 10000
+    },
+    {
+      "name": "kuber.network.port",
+      "type": "java.lang.Integer",
+      "description": "Redis protocol port",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 6380
+    },
+    {
+      "name": "kuber.network.read-buffer-size",
+      "type": "java.lang.Integer",
+      "description": "Read buffer size",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 65536
+    },
+    {
+      "name": "kuber.network.read-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Read timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 30000
+    },
+    {
+      "name": "kuber.network.write-buffer-size",
+      "type": "java.lang.Integer",
+      "description": "Write buffer size",
+      "sourceType": "com.kuber.server.config.KuberProperties$Network",
+      "defaultValue": 65536
+    },
+    {
+      "name": "kuber.node-id",
+      "type": "java.lang.String",
+      "description": "Unique node identifier",
+      "sourceType": "com.kuber.server.config.KuberProperties"
+    },
+    {
+      "name": "kuber.replication.heartbeat-interval-ms",
+      "type": "java.lang.Integer",
+      "description": "Heartbeat interval in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Replication",
+      "defaultValue": 5000
+    },
+    {
+      "name": "kuber.replication.primary-check-interval-ms",
+      "type": "java.lang.Integer",
+      "description": "Primary check interval in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Replication",
+      "defaultValue": 10000
+    },
+    {
+      "name": "kuber.replication.sync-batch-size",
+      "type": "java.lang.Integer",
+      "description": "Batch size for sync operations",
+      "sourceType": "com.kuber.server.config.KuberProperties$Replication",
+      "defaultValue": 1000
+    },
+    {
+      "name": "kuber.replication.sync-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Sync timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Replication",
+      "defaultValue": 60000
+    },
+    {
+      "name": "kuber.security.redis-password",
+      "type": "java.lang.String",
+      "description": "Password for Redis AUTH command (empty = no auth)",
+      "sourceType": "com.kuber.server.config.KuberProperties$Security"
+    },
+    {
+      "name": "kuber.security.session-timeout-minutes",
+      "type": "java.lang.Integer",
+      "description": "Session timeout in minutes",
+      "sourceType": "com.kuber.server.config.KuberProperties$Security",
+      "defaultValue": 30
+    },
+    {
+      "name": "kuber.security.users-file",
+      "type": "java.lang.String",
+      "description": "Path to users.json file for authentication",
+      "sourceType": "com.kuber.server.config.KuberProperties$Security",
+      "defaultValue": "classpath:users.json"
+    },
+    {
+      "name": "kuber.zookeeper.base-path",
+      "type": "java.lang.String",
+      "description": "Base path for Kuber nodes",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": "\/kuber"
+    },
+    {
+      "name": "kuber.zookeeper.connect-string",
+      "type": "java.lang.String",
+      "description": "ZooKeeper connection string",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": "localhost:2181"
+    },
+    {
+      "name": "kuber.zookeeper.connection-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Connection timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": 15000
+    },
+    {
+      "name": "kuber.zookeeper.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether ZooKeeper is enabled",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": false
+    },
+    {
+      "name": "kuber.zookeeper.retry-base-sleep-ms",
+      "type": "java.lang.Integer",
+      "description": "Retry policy - initial sleep time",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": 1000
+    },
+    {
+      "name": "kuber.zookeeper.retry-max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Retry policy - max retries",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": 3
+    },
+    {
+      "name": "kuber.zookeeper.session-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Session timeout in milliseconds",
+      "sourceType": "com.kuber.server.config.KuberProperties$Zookeeper",
+      "defaultValue": 30000
+    }
+  ],
+  "hints": []
+}

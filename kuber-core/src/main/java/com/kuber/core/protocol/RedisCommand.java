@@ -183,6 +183,8 @@ public class RedisCommand implements Serializable {
         STATUS,     // Node status
         REPLINFO,   // Replication info
         
+        KSEARCH,    // Search keys by regex and return key-value pairs
+        
         SUBSCRIBE_EVENT,    // Subscribe to events
         UNSUBSCRIBE_EVENT,  // Unsubscribe from events
         
@@ -214,7 +216,7 @@ public class RedisCommand implements Serializable {
                  PING, ECHO, INFO, DBSIZE, TTL, PTTL, TYPE, EXISTS, KEYS,
                  SCAN, HSCAN, SSCAN, ZSCAN, TIME, CONFIG, CLIENT, COMMAND,
                  MEMORY, SLOWLOG, JGET, JQUERY, JSEARCH, REGIONS, RINFO,
-                 STATUS, REPLINFO, STRLEN, GETRANGE, LPOS, DEBUG:
+                 STATUS, REPLINFO, STRLEN, GETRANGE, LPOS, DEBUG, KSEARCH:
                 return false;
             default:
                 return true;

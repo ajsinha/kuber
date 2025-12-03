@@ -344,6 +344,10 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
             case JDEL:
                 return handleJDel(region, args);
             
+            // Key search command (Kuber extension)
+            case KSEARCH:
+                return handleKSearch(region, args);
+            
             // Region commands (Kuber extension)
             case REGIONS:
                 return handleRegions();
@@ -752,6 +756,44 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
         
         boolean result = cacheService.jsonDelete(region, key, path);
         return RedisResponse.integer(result ? 1 : 0);
+    }
+    
+    /**
+     * Handle KSEARCH command - search keys by regex and return key-value pairs as JSON array.
+     * Syntax: KSEARCH pattern [LIMIT count]
+     * Returns array of JSON objects: [{"key":"...", "value":"...", "type":"...", "ttl":...}, ...]
+     */
+    private RedisResponse handleKSearch(String region, List<String> args) {
+        if (args.isEmpty()) {
+            return RedisResponse.error("wrong number of arguments for 'ksearch' command");
+        }
+        
+        String pattern = args.get(0);
+        int limit = 1000;
+        
+        // Parse optional LIMIT
+        for (int i = 1; i < args.size() - 1; i++) {
+            if ("LIMIT".equalsIgnoreCase(args.get(i))) {
+                try {
+                    limit = Integer.parseInt(args.get(i + 1));
+                } catch (NumberFormatException e) {
+                    return RedisResponse.error("invalid limit value");
+                }
+            }
+        }
+        
+        try {
+            List<Map<String, Object>> results = cacheService.searchKeysByRegex(region, pattern, limit);
+            
+            // Convert to array of JSON strings
+            List<RedisResponse> items = results.stream()
+                    .map(r -> RedisResponse.bulkString(JsonUtils.toJson(r)))
+                    .collect(Collectors.toList());
+            
+            return RedisResponse.array(items);
+        } catch (Exception e) {
+            return RedisResponse.error("ERR " + e.getMessage());
+        }
     }
     
     // Region commands

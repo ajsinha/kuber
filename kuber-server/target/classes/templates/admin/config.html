@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Configuration')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
+                <li class="breadcrumb-item active">Configuration</li>
+            </ol>
+        </nav>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <h2 class="mb-0">
+                    <i class="fas fa-sliders-h me-2"></i>
+                    Server Configuration
+                </h2>
+                <p class="text-muted mb-0">Current runtime configuration (read-only)</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-lg-6">
+                <!-- Network Configuration -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-network-wired me-2 text-primary"></i>
+                            Network
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Redis Port</span>
+                                <code th:text="${properties.network.port}">6380</code>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Bind Address</span>
+                                <code th:text="${properties.network.bindAddress}">0.0.0.0</code>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Max Connections</span>
+                                <span th:text="${properties.network.maxConnections}">10000</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Connection Timeout</span>
+                                <span th:text="${properties.network.connectionTimeoutMs} + ' ms'">30000 ms</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Cache Configuration -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-memory me-2 text-success"></i>
+                            Cache
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Max Memory Entries</span>
+                                <span th:text="${#numbers.formatInteger(properties.cache.maxMemoryEntries, 1, 'COMMA')}">100,000</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Persistent Mode</span>
+                                <span th:if="${properties.cache.persistentMode}" class="badge bg-success">Enabled</span>
+                                <span th:unless="${properties.cache.persistentMode}" class="badge bg-secondary">Disabled</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Eviction Policy</span>
+                                <span th:text="${properties.cache.evictionPolicy}">LRU</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Default TTL</span>
+                                <span th:text="${properties.cache.defaultTtlSeconds == -1 ? 'No expiration' : properties.cache.defaultTtlSeconds + ' seconds'}">No expiration</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Statistics</span>
+                                <span th:if="${properties.cache.enableStatistics}" class="badge bg-success">Enabled</span>
+                                <span th:unless="${properties.cache.enableStatistics}" class="badge bg-secondary">Disabled</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <!-- MongoDB Configuration -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2 text-warning"></i>
+                            MongoDB
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Connection URI</span>
+                                <code class="text-truncate" style="max-width: 200px;" th:text="${properties.mongo.uri}">mongodb://localhost:27017</code>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Database</span>
+                                <code th:text="${properties.mongo.database}">kuber</code>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Connection Pool Size</span>
+                                <span th:text="${properties.mongo.connectionPoolSize}">50</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- ZooKeeper Configuration -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sitemap me-2 text-info"></i>
+                            ZooKeeper (Replication)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Enabled</span>
+                                <span th:if="${properties.zookeeper.enabled}" class="badge bg-success">Yes</span>
+                                <span th:unless="${properties.zookeeper.enabled}" class="badge bg-secondary">No</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Connect String</span>
+                                <code th:text="${properties.zookeeper.connectString}">localhost:2181</code>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Base Path</span>
+                                <code th:text="${properties.zookeeper.basePath}">/kuber</code>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Security Configuration -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt me-2 text-danger"></i>
+                            Security
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Users File</span>
+                                <code th:text="${properties.security.usersFile}">users.json</code>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Session Timeout</span>
+                                <span th:text="${properties.security.sessionTimeoutMinutes} + ' minutes'">30 minutes</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Redis AUTH</span>
+                                <span th:if="${properties.security.redisPassword != null and !properties.security.redisPassword.isEmpty()}" class="badge bg-success">Enabled</span>
+                                <span th:unless="${properties.security.redisPassword != null and !properties.security.redisPassword.isEmpty()}" class="badge bg-secondary">Disabled</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

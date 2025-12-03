@@ -123,8 +123,14 @@ public class CacheService {
                 .maximumSize(properties.getCache().getMaxMemoryEntries())
                 .expireAfterWrite(24, TimeUnit.HOURS)
                 .removalListener((key, value, cause) -> {
-                    if (cause == RemovalCause.SIZE) {
+                    if (cause == RemovalCause.SIZE || cause == RemovalCause.EXPIRED) {
+                        // Decrement entry count when evicted due to size limit or Caffeine's TTL
+                        CacheRegion region = regions.get(regionName);
+                        if (region != null) {
+                            region.decrementEntryCount();
+                        }
                         recordStatistic(regionName, KuberConstants.STAT_EVICTED);
+                        log.debug("Entry '{}' evicted from region '{}' due to {}", key, regionName, cause);
                     }
                 })
                 .recordStats()
@@ -492,6 +498,73 @@ public class CacheService {
                 .collect(Collectors.toSet());
     }
     
+    /**
+     * Search keys by regex pattern and return matching key-value pairs.
+     * This is different from keys() which uses glob pattern and returns only keys.
+     * 
+     * @param region the cache region
+     * @param regexPattern a Java regex pattern to match keys
+     * @return list of maps containing key, value, type, and ttl for each match
+     */
+    public List<Map<String, Object>> searchKeysByRegex(String region, String regexPattern) {
+        return searchKeysByRegex(region, regexPattern, 1000);
+    }
+    
+    /**
+     * Search keys by regex pattern with limit.
+     * 
+     * @param region the cache region
+     * @param regexPattern a Java regex pattern to match keys
+     * @param limit maximum number of results
+     * @return list of maps containing key, value, type, and ttl for each match
+     */
+    public List<Map<String, Object>> searchKeysByRegex(String region, String regexPattern, int limit) {
+        ensureRegionExists(region);
+        
+        Pattern pattern;
+        try {
+            pattern = Pattern.compile(regexPattern);
+        } catch (Exception e) {
+            throw new KuberException(KuberException.ErrorCode.INVALID_ARGUMENT, 
+                    "Invalid regex pattern: " + e.getMessage());
+        }
+        
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        List<Map<String, Object>> results = new ArrayList<>();
+        
+        for (Map.Entry<String, CacheEntry> entry : cache.asMap().entrySet()) {
+            if (results.size() >= limit) {
+                break;
+            }
+            
+            String key = entry.getKey();
+            if (pattern.matcher(key).matches()) {
+                CacheEntry cacheEntry = entry.getValue();
+                
+                // Skip expired entries
+                if (cacheEntry.isExpired()) {
+                    continue;
+                }
+                
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("key", key);
+                result.put("value", cacheEntry.getStringValue());
+                result.put("type", cacheEntry.getValueType().name().toLowerCase());
+                result.put("ttl", cacheEntry.getRemainingTtl());
+                
+                // Include JSON value if applicable
+                if (cacheEntry.getValueType() == CacheEntry.ValueType.JSON && cacheEntry.getJsonValue() != null) {
+                    result.put("jsonValue", cacheEntry.getJsonValue());
+                }
+                
+                results.add(result);
+                recordStatistic(region, KuberConstants.STAT_HITS);
+            }
+        }
+        
+        return results;
+    }
+    
     public boolean rename(String region, String oldKey, String newKey) {
         checkWriteAccess();
         
@@ -672,6 +745,20 @@ public class CacheService {
         if (entry != null) {
             if (entry.isExpired()) {
                 cache.invalidate(key);
+                
+                // Decrement region entry count
+                CacheRegion regionObj = regions.get(region);
+                if (regionObj != null) {
+                    regionObj.decrementEntryCount();
+                }
+                
+                // Delete from MongoDB
+                try {
+                    mongoRepository.deleteEntry(region, key);
+                } catch (Exception e) {
+                    log.warn("Failed to delete expired entry '{}' from MongoDB: {}", key, e.getMessage());
+                }
+                
                 recordStatistic(region, KuberConstants.STAT_EXPIRED);
                 return null;
             }
@@ -823,8 +910,9 @@ public class CacheService {
     @Scheduled(fixedRateString = "${kuber.cache.ttl-cleanup-interval-seconds:60}000")
     public void cleanupExpiredEntries() {
         for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
-            String region = entry.getKey();
+            String regionName = entry.getKey();
             Cache<String, CacheEntry> cache = entry.getValue();
+            CacheRegion region = regions.get(regionName);
             
             List<String> expiredKeys = new ArrayList<>();
             cache.asMap().forEach((key, cacheEntry) -> {
@@ -835,12 +923,25 @@ public class CacheService {
             
             for (String key : expiredKeys) {
                 cache.invalidate(key);
-                recordStatistic(region, KuberConstants.STAT_EXPIRED);
+                
+                // Decrement the region entry count
+                if (region != null) {
+                    region.decrementEntryCount();
+                }
+                
+                // Delete from MongoDB
+                try {
+                    mongoRepository.deleteEntry(regionName, key);
+                } catch (Exception e) {
+                    log.warn("Failed to delete expired entry '{}' from MongoDB: {}", key, e.getMessage());
+                }
+                
+                recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
             }
             
             if (!expiredKeys.isEmpty()) {
-                log.debug("Cleaned up {} expired entries from region '{}'", 
-                        expiredKeys.size(), region);
+                log.info("Cleaned up {} expired entries from region '{}', new count: {}", 
+                        expiredKeys.size(), regionName, region != null ? region.getEntryCount() : "N/A");
             }
         }
     }

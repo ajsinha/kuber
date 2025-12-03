@@ -78,4 +78,26 @@ public class HomeController {
     public String login() {
         return "login";
     }
+    
+    @GetMapping("/help")
+    public String help(Model model) {
+        model.addAttribute("currentPage", "help");
+        
+        // Replication status for navbar
+        boolean isPrimary = replicationManager == null || replicationManager.isPrimary();
+        model.addAttribute("isPrimary", isPrimary);
+        
+        return "help";
+    }
+    
+    @GetMapping("/about")
+    public String about(Model model) {
+        model.addAttribute("currentPage", "about");
+        
+        // Replication status for navbar
+        boolean isPrimary = replicationManager == null || replicationManager.isPrimary();
+        model.addAttribute("isPrimary", isPrimary);
+        
+        return "about";
+    }
 }

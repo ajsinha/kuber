@@ -95,6 +95,12 @@ public class CacheController {
                 Set<String> keys = cacheService.keys(region, key != null ? key : "*");
                 model.addAttribute("results", keys);
                 model.addAttribute("resultType", "keys");
+            } else if ("ksearch".equals(queryType)) {
+                // Regex key search returning key-value pairs
+                List<Map<String, Object>> results = cacheService.searchKeysByRegex(
+                        region, key != null ? key : ".*", 100);
+                model.addAttribute("results", results);
+                model.addAttribute("resultType", "ksearch");
             } else if ("hgetall".equals(queryType)) {
                 Map<String, String> hash = cacheService.hgetall(region, key);
                 model.addAttribute("result", hash);

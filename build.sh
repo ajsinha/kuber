@@ -8,7 +8,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.0.3"
+VERSION="1.0.5"
 
 echo "=============================================="
 echo "  Kuber Distributed Cache - Build Script"
@@ -62,12 +62,12 @@ create_dist() {
     mkdir -p "$DIST_DIR/$DIST_NAME"
     
     # Copy server JAR
-    cp "$SCRIPT_DIR/kuber-server/target/kuber-server-1.0.3-SNAPSHOT.jar" \
+    cp "$SCRIPT_DIR/kuber-server/target/kuber-server-1.0.4-SNAPSHOT.jar" \
        "$DIST_DIR/$DIST_NAME/kuber-server.jar" 2>/dev/null || echo "Server JAR not found"
     
     # Copy client JARs
     mkdir -p "$DIST_DIR/$DIST_NAME/clients/java"
-    cp "$SCRIPT_DIR/kuber-client-java/target/kuber-client-java-1.0.3-SNAPSHOT.jar" \
+    cp "$SCRIPT_DIR/kuber-client-java/target/kuber-client-java-1.0.4-SNAPSHOT.jar" \
        "$DIST_DIR/$DIST_NAME/clients/java/" 2>/dev/null || echo "Java client JAR not found"
     
     # Copy Python client

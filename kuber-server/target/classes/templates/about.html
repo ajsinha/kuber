@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('About Kuber')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container py-5">
+        <!-- Hero Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto text-center">
+                <div class="mb-4">
+                    <i class="fas fa-database fa-4x text-primary"></i>
+                </div>
+                <h1 class="display-4 fw-bold mb-3">Kuber Distributed Cache</h1>
+                <p class="lead text-muted">
+                    A high-performance, Redis-compatible distributed caching solution with MongoDB persistence, 
+                    JSON document support, and enterprise-grade features.
+                </p>
+                <div class="mt-4">
+                    <span class="badge bg-primary fs-6 me-2">Version 1.0.5</span>
+                    <span class="badge bg-success fs-6 me-2">Production Ready</span>
+                    <span class="badge bg-info fs-6">Patent Pending</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Features Grid -->
+        <div class="row g-4 mb-5">
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 d-inline-block mb-3">
+                            <i class="fas fa-bolt fa-2x text-primary"></i>
+                        </div>
+                        <h5 class="card-title">High Performance</h5>
+                        <p class="card-text text-muted">
+                            In-memory caching powered by Caffeine with sub-millisecond response times. 
+                            Handles millions of operations per second.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 d-inline-block mb-3">
+                            <i class="fas fa-server fa-2x text-success"></i>
+                        </div>
+                        <h5 class="card-title">Redis Compatible</h5>
+                        <p class="card-text text-muted">
+                            Use your existing Redis clients and tools. Supports standard Redis protocol 
+                            commands plus powerful extensions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 d-inline-block mb-3">
+                            <i class="fas fa-database fa-2x text-warning"></i>
+                        </div>
+                        <h5 class="card-title">MongoDB Persistence</h5>
+                        <p class="card-text text-muted">
+                            Durable storage with MongoDB backend. Data survives restarts with 
+                            configurable sync modes for your consistency needs.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3 d-inline-block mb-3">
+                            <i class="fas fa-code fa-2x text-info"></i>
+                        </div>
+                        <h5 class="card-title">JSON Document Support</h5>
+                        <p class="card-text text-muted">
+                            Store, query, and manipulate JSON documents with JSONPath expressions. 
+                            Perfect for modern applications.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 d-inline-block mb-3">
+                            <i class="fas fa-layer-group fa-2x text-danger"></i>
+                        </div>
+                        <h5 class="card-title">Region Partitioning</h5>
+                        <p class="card-text text-muted">
+                            Organize cache data into logical regions with independent namespaces. 
+                            Isolate data for different applications or tenants.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="rounded-circle bg-secondary bg-opacity-10 p-3 d-inline-block mb-3">
+                            <i class="fas fa-sync-alt fa-2x text-secondary"></i>
+                        </div>
+                        <h5 class="card-title">Replication Support</h5>
+                        <p class="card-text text-muted">
+                            Primary/Secondary replication via ZooKeeper for high availability. 
+                            Automatic failover and data synchronization.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Architecture Section -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="mb-0"><i class="fas fa-sitemap me-2"></i>Architecture</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h5>System Components</h5>
+                                <ul class="list-unstyled">
+                                    <li class="mb-3">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Cache Service</strong> - Core caching engine with Caffeine
+                                    </li>
+                                    <li class="mb-3">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Redis Protocol Server</strong> - Apache MINA-based protocol handler
+                                    </li>
+                                    <li class="mb-3">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>REST API</strong> - Spring Boot REST endpoints
+                                    </li>
+                                    <li class="mb-3">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Web UI</strong> - Thymeleaf + Bootstrap management console
+                                    </li>
+                                    <li class="mb-3">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Persistence Layer</strong> - MongoDB repository
+                                    </li>
+                                    <li class="mb-3">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Replication Manager</strong> - ZooKeeper coordination
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-lg-6">
+                                <h5>Technology Stack</h5>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Runtime</strong></td>
+                                            <td>Java 17+, Spring Boot 3.x</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>In-Memory Cache</strong></td>
+                                            <td>Caffeine (Google)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Protocol Server</strong></td>
+                                            <td>Apache MINA 2.x</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Persistence</strong></td>
+                                            <td>MongoDB 4.x+</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Coordination</strong></td>
+                                            <td>Apache ZooKeeper (optional)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Security</strong></td>
+                                            <td>Spring Security 6.x</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>JSON Processing</strong></td>
+                                            <td>Jackson, JsonPath</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Web UI</strong></td>
+                                            <td>Thymeleaf, Bootstrap 5</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Supported Operations -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white py-3">
+                        <h4 class="mb-0"><i class="fas fa-list-check me-2"></i>Supported Operations</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-primary"><i class="fas fa-font me-2"></i>String Operations</h6>
+                                <ul class="small mb-0">
+                                    <li>GET, SET, SETNX, SETEX</li>
+                                    <li>MGET, MSET</li>
+                                    <li>INCR, DECR, INCRBY, DECRBY</li>
+                                    <li>APPEND, STRLEN, GETSET</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-success"><i class="fas fa-key me-2"></i>Key Operations</h6>
+                                <ul class="small mb-0">
+                                    <li>KEYS, DEL, EXISTS</li>
+                                    <li>TYPE, RENAME</li>
+                                    <li>EXPIRE, TTL, PERSIST</li>
+                                    <li>KSEARCH (regex search)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-info"><i class="fas fa-hashtag me-2"></i>Hash Operations</h6>
+                                <ul class="small mb-0">
+                                    <li>HGET, HSET, HSETNX</li>
+                                    <li>HMGET, HMSET</li>
+                                    <li>HGETALL, HKEYS, HVALS</li>
+                                    <li>HDEL, HEXISTS, HLEN</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-warning"><i class="fas fa-code me-2"></i>JSON Operations</h6>
+                                <ul class="small mb-0">
+                                    <li>JSET, JGET</li>
+                                    <li>JSEARCH (query documents)</li>
+                                    <li>JDEL (delete path)</li>
+                                    <li>JSONPath expressions</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-danger"><i class="fas fa-layer-group me-2"></i>Region Operations</h6>
+                                <ul class="small mb-0">
+                                    <li>REGIONS (list all)</li>
+                                    <li>RCREATE, RDROP</li>
+                                    <li>RPURGE, RINFO</li>
+                                    <li>RSELECT (switch region)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-secondary"><i class="fas fa-server me-2"></i>Server Operations</h6>
+                                <ul class="small mb-0">
+                                    <li>PING, INFO, DBSIZE</li>
+                                    <li>FLUSHDB, FLUSHALL</li>
+                                    <li>AUTH, QUIT</li>
+                                    <li>TIME</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Version History -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-secondary text-white py-3">
+                        <h4 class="mb-0"><i class="fas fa-history me-2"></i>Version History</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="timeline">
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-primary me-2">v1.0.5</span>
+                                    <span class="text-muted small">Current</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Added comprehensive Help documentation page</li>
+                                    <li>Added About page with feature overview</li>
+                                    <li>Updated navigation with Help and About links</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.0.4</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Added KSEARCH command for regex-based key search</li>
+                                    <li>Fixed entry count not decrementing on TTL expiration</li>
+                                    <li>Added REST API endpoint for regex key search</li>
+                                    <li>Updated Web UI query interface with KSEARCH support</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.0.3</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Fixed region persistence issues</li>
+                                    <li>Fixed MongoDB Date to Instant conversion errors</li>
+                                    <li>Fixed Thymeleaf HashMap property access</li>
+                                    <li>Added admin stats and config pages</li>
+                                    <li>Implemented graceful shutdown with data persistence</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.0.2</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Fixed circular dependency issues</li>
+                                    <li>Migrated YAML to properties configuration</li>
+                                    <li>Implemented JSON-based authentication</li>
+                                    <li>Fixed Thymeleaf 3.1+ template compatibility</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.0.1</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Initial public release</li>
+                                    <li>Core cache functionality</li>
+                                    <li>Redis protocol support</li>
+                                    <li>MongoDB persistence</li>
+                                    <li>Web UI management console</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- License & Contact -->
+        <div class="row mb-5">
+            <div class="col-lg-6 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="mb-0"><i class="fas fa-file-contract me-2"></i>License</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">
+                            This software is proprietary and confidential. Unauthorized copying, 
+                            distribution, modification, or use is strictly prohibited without 
+                            explicit written permission from the copyright holder.
+                        </p>
+                        <div class="alert alert-warning mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Patent Pending:</strong> Certain architectural patterns and 
+                            implementations described in this software may be subject to patent applications.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="mb-0"><i class="fas fa-envelope me-2"></i>Contact</h4>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-3">
+                                <i class="fas fa-user fa-fw text-primary me-2"></i>
+                                <strong>Author:</strong> Ashutosh Sinha
+                            </li>
+                            <li class="mb-3">
+                                <i class="fas fa-envelope fa-fw text-primary me-2"></i>
+                                <strong>Email:</strong> 
+                                <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a>
+                            </li>
+                            <li class="mb-3">
+                                <i class="fas fa-calendar fa-fw text-primary me-2"></i>
+                                <strong>Copyright:</strong> © 2025-2030, All Rights Reserved
+                            </li>
+                            <li class="mb-0">
+                                <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
+                                <strong>Version:</strong> 1.0.5
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Copyright Footer -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center py-4">
+                        <p class="mb-2">
+                            <i class="fas fa-database fa-2x text-primary mb-3 d-block"></i>
+                        </p>
+                        <h5 class="mb-1">Kuber Distributed Cache</h5>
+                        <p class="text-muted mb-2">High-Performance Caching for Modern Applications</p>
+                        <p class="small text-muted mb-0">
+                            Copyright © 2025-2030, All Rights Reserved | Ashutosh Sinha | 
+                            <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a>
+                        </p>
+                        <p class="small text-muted mt-1 mb-0">
+                            <em>Patent Pending</em>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>
