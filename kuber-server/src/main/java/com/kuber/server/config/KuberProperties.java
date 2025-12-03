@@ -1,0 +1,295 @@
+/*
+ * Copyright © 2025-2030, All Rights Reserved
+ * Ashutosh Sinha | Email: ajsinha@gmail.com
+ *
+ * Legal Notice: This module and the associated software architecture are proprietary
+ * and confidential. Unauthorized copying, distribution, modification, or use is
+ * strictly prohibited without explicit written permission from the copyright holder.
+ *
+ * Patent Pending: Certain architectural patterns and implementations described in
+ * this module may be subject to patent applications.
+ */
+package com.kuber.server.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+/**
+ * Configuration properties for Kuber distributed cache.
+ */
+@Data
+@Configuration
+@ConfigurationProperties(prefix = "kuber")
+@Validated
+public class KuberProperties {
+    
+    /**
+     * Unique node identifier
+     */
+    private String nodeId = java.util.UUID.randomUUID().toString().substring(0, 8);
+    
+    /**
+     * Network configuration
+     */
+    private Network network = new Network();
+    
+    /**
+     * Cache configuration
+     */
+    private Cache cache = new Cache();
+    
+    /**
+     * MongoDB configuration
+     */
+    private Mongo mongo = new Mongo();
+    
+    /**
+     * ZooKeeper configuration
+     */
+    private Zookeeper zookeeper = new Zookeeper();
+    
+    /**
+     * Replication configuration
+     */
+    private Replication replication = new Replication();
+    
+    /**
+     * Security configuration
+     */
+    private Security security = new Security();
+    
+    @Data
+    public static class Network {
+        /**
+         * Redis protocol port
+         */
+        @Min(1)
+        private int port = 6380;
+        
+        /**
+         * Bind address
+         */
+        private String bindAddress = "0.0.0.0";
+        
+        /**
+         * Maximum line length for text decoder
+         */
+        @Min(1024)
+        private int decoderMaxLineLength = 1048576; // 1MB
+        
+        /**
+         * Connection timeout in milliseconds
+         */
+        @Min(1000)
+        private int connectionTimeoutMs = 30000;
+        
+        /**
+         * Read timeout in milliseconds
+         */
+        @Min(1000)
+        private int readTimeoutMs = 30000;
+        
+        /**
+         * Write buffer size
+         */
+        @Min(1024)
+        private int writeBufferSize = 65536;
+        
+        /**
+         * Read buffer size
+         */
+        @Min(1024)
+        private int readBufferSize = 65536;
+        
+        /**
+         * Maximum number of concurrent connections
+         */
+        @Min(1)
+        private int maxConnections = 10000;
+        
+        /**
+         * IO processor count (0 = auto-detect)
+         */
+        @Min(0)
+        private int ioProcessorCount = 0;
+    }
+    
+    @Data
+    public static class Cache {
+        /**
+         * Maximum number of entries to keep in memory
+         */
+        @Min(1000)
+        private int maxMemoryEntries = 100000;
+        
+        /**
+         * Whether to use persistent mode (sync writes to MongoDB)
+         */
+        private boolean persistentMode = false;
+        
+        /**
+         * Batch size for async persistence
+         */
+        @Min(1)
+        private int persistenceBatchSize = 100;
+        
+        /**
+         * Interval for async persistence in milliseconds
+         */
+        @Min(100)
+        private int persistenceIntervalMs = 1000;
+        
+        /**
+         * Default TTL in seconds (-1 for no expiration)
+         */
+        private long defaultTtlSeconds = -1;
+        
+        /**
+         * Eviction policy: LRU, LFU, FIFO
+         */
+        private String evictionPolicy = "LRU";
+        
+        /**
+         * TTL cleanup interval in seconds
+         */
+        @Min(1)
+        private int ttlCleanupIntervalSeconds = 60;
+        
+        /**
+         * Enable statistics collection
+         */
+        private boolean enableStatistics = true;
+    }
+    
+    @Data
+    public static class Mongo {
+        /**
+         * MongoDB connection URI
+         */
+        @NotBlank
+        private String uri = "mongodb://localhost:27017";
+        
+        /**
+         * Database name
+         */
+        @NotBlank
+        private String database = "kuber";
+        
+        /**
+         * Connection pool size
+         */
+        @Min(1)
+        private int connectionPoolSize = 50;
+        
+        /**
+         * Connection timeout in milliseconds
+         */
+        @Min(1000)
+        private int connectionTimeoutMs = 10000;
+        
+        /**
+         * Socket timeout in milliseconds
+         */
+        @Min(1000)
+        private int socketTimeoutMs = 30000;
+        
+        /**
+         * Enable write concern acknowledgment
+         */
+        private boolean writeConcernAcknowledged = true;
+    }
+    
+    @Data
+    public static class Zookeeper {
+        /**
+         * Whether ZooKeeper is enabled
+         */
+        private boolean enabled = false;
+        
+        /**
+         * ZooKeeper connection string
+         */
+        private String connectString = "localhost:2181";
+        
+        /**
+         * Session timeout in milliseconds
+         */
+        @Min(1000)
+        private int sessionTimeoutMs = 30000;
+        
+        /**
+         * Connection timeout in milliseconds
+         */
+        @Min(1000)
+        private int connectionTimeoutMs = 15000;
+        
+        /**
+         * Base path for Kuber nodes
+         */
+        private String basePath = "/kuber";
+        
+        /**
+         * Retry policy - initial sleep time
+         */
+        @Min(100)
+        private int retryBaseSleepMs = 1000;
+        
+        /**
+         * Retry policy - max retries
+         */
+        @Min(1)
+        private int retryMaxAttempts = 3;
+    }
+    
+    @Data
+    public static class Replication {
+        /**
+         * Batch size for sync operations
+         */
+        @Min(1)
+        private int syncBatchSize = 1000;
+        
+        /**
+         * Sync timeout in milliseconds
+         */
+        @Min(1000)
+        private int syncTimeoutMs = 60000;
+        
+        /**
+         * Heartbeat interval in milliseconds
+         */
+        @Min(1000)
+        private int heartbeatIntervalMs = 5000;
+        
+        /**
+         * Primary check interval in milliseconds
+         */
+        @Min(1000)
+        private int primaryCheckIntervalMs = 10000;
+    }
+    
+    @Data
+    public static class Security {
+        /**
+         * Path to users.json file for authentication
+         */
+        private String usersFile = "classpath:users.json";
+        
+        /**
+         * Session timeout in minutes
+         */
+        @Min(1)
+        private int sessionTimeoutMinutes = 30;
+        
+        /**
+         * Password for Redis AUTH command (empty = no auth)
+         */
+        private String redisPassword = null;
+    }
+}

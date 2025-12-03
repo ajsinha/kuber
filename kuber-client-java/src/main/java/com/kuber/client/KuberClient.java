@@ -1,0 +1,619 @@
+/*
+ * Copyright © 2025-2030, All Rights Reserved
+ * Ashutosh Sinha | Email: ajsinha@gmail.com
+ *
+ * Legal Notice: This module and the associated software architecture are proprietary
+ * and confidential. Unauthorized copying, distribution, modification, or use is
+ * strictly prohibited without explicit written permission from the copyright holder.
+ *
+ * Patent Pending: Certain architectural patterns and implementations described in
+ * this module may be subject to patent applications.
+ */
+package com.kuber.client;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.*;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Java client for Kuber Distributed Cache.
+ * Supports Redis protocol with Kuber extensions for regions and JSON queries.
+ * 
+ * <pre>
+ * // Usage example:
+ * try (KuberClient client = new KuberClient("localhost", 6380)) {
+ *     // String operations
+ *     client.set("user:1001", "John Doe");
+ *     String name = client.get("user:1001");
+ *     
+ *     // JSON operations
+ *     client.jsonSet("user:1002", "{\"name\": \"Jane\", \"age\": 30}");
+ *     JsonNode user = client.jsonGet("user:1002");
+ *     
+ *     // Region operations
+ *     client.selectRegion("sessions");
+ *     client.set("session:abc", "data", Duration.ofMinutes(30));
+ * }
+ * </pre>
+ */
+@Slf4j
+public class KuberClient implements AutoCloseable {
+    
+    private static final String DEFAULT_REGION = "default";
+    private static final int DEFAULT_PORT = 6380;
+    private static final int DEFAULT_TIMEOUT = 30000;
+    
+    private final String host;
+    private final int port;
+    private final int timeout;
+    
+    private Socket socket;
+    private BufferedWriter writer;
+    private BufferedReader reader;
+    
+    @Getter
+    private String currentRegion = DEFAULT_REGION;
+    
+    private final ObjectMapper objectMapper;
+    
+    /**
+     * Create a new Kuber client connected to localhost:6380
+     */
+    public KuberClient() throws IOException {
+        this("localhost", DEFAULT_PORT);
+    }
+    
+    /**
+     * Create a new Kuber client
+     */
+    public KuberClient(String host, int port) throws IOException {
+        this(host, port, DEFAULT_TIMEOUT);
+    }
+    
+    /**
+     * Create a new Kuber client with custom timeout
+     */
+    public KuberClient(String host, int port, int timeoutMs) throws IOException {
+        this.host = host;
+        this.port = port;
+        this.timeout = timeoutMs;
+        
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.registerModule(new JavaTimeModule());
+        
+        connect();
+    }
+    
+    private void connect() throws IOException {
+        log.debug("Connecting to Kuber at {}:{}", host, port);
+        
+        socket = new Socket(host, port);
+        socket.setSoTimeout(timeout);
+        
+        writer = new BufferedWriter(
+                new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+        reader = new BufferedReader(
+                new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+        
+        log.info("Connected to Kuber at {}:{}", host, port);
+    }
+    
+    /**
+     * Authenticate with password
+     */
+    public boolean auth(String password) throws IOException {
+        return "OK".equals(sendCommand("AUTH", password));
+    }
+    
+    /**
+     * Ping the server
+     */
+    public String ping() throws IOException {
+        return sendCommand("PING");
+    }
+    
+    // ==================== Region Operations ====================
+    
+    /**
+     * Select a region (creates if not exists)
+     */
+    public void selectRegion(String region) throws IOException {
+        sendCommand("RSELECT", region);
+        this.currentRegion = region;
+    }
+    
+    /**
+     * List all regions
+     */
+    public List<String> listRegions() throws IOException {
+        return sendCommandForList("REGIONS");
+    }
+    
+    /**
+     * Create a new region
+     */
+    public void createRegion(String name, String description) throws IOException {
+        sendCommand("RCREATE", name, description);
+    }
+    
+    /**
+     * Delete a region
+     */
+    public void deleteRegion(String name) throws IOException {
+        sendCommand("RDROP", name);
+    }
+    
+    /**
+     * Purge all entries in a region
+     */
+    public void purgeRegion(String name) throws IOException {
+        sendCommand("RPURGE", name);
+    }
+    
+    // ==================== String Operations ====================
+    
+    /**
+     * Get a value by key
+     */
+    public String get(String key) throws IOException {
+        return sendCommand("GET", key);
+    }
+    
+    /**
+     * Set a value
+     */
+    public void set(String key, String value) throws IOException {
+        sendCommand("SET", key, value);
+    }
+    
+    /**
+     * Set a value with TTL
+     */
+    public void set(String key, String value, Duration ttl) throws IOException {
+        sendCommand("SET", key, value, "EX", String.valueOf(ttl.getSeconds()));
+    }
+    
+    /**
+     * Set if not exists
+     */
+    public boolean setNx(String key, String value) throws IOException {
+        return "1".equals(sendCommand("SETNX", key, value));
+    }
+    
+    /**
+     * Set with expiration
+     */
+    public void setEx(String key, String value, long seconds) throws IOException {
+        sendCommand("SETEX", key, String.valueOf(seconds), value);
+    }
+    
+    /**
+     * Get multiple values
+     */
+    public List<String> mget(String... keys) throws IOException {
+        String[] args = new String[keys.length + 1];
+        args[0] = "MGET";
+        System.arraycopy(keys, 0, args, 1, keys.length);
+        return sendCommandForList(args);
+    }
+    
+    /**
+     * Set multiple values
+     */
+    public void mset(Map<String, String> entries) throws IOException {
+        String[] args = new String[entries.size() * 2 + 1];
+        args[0] = "MSET";
+        int i = 1;
+        for (Map.Entry<String, String> entry : entries.entrySet()) {
+            args[i++] = entry.getKey();
+            args[i++] = entry.getValue();
+        }
+        sendCommand(args);
+    }
+    
+    /**
+     * Increment a value
+     */
+    public long incr(String key) throws IOException {
+        return Long.parseLong(sendCommand("INCR", key));
+    }
+    
+    /**
+     * Increment by amount
+     */
+    public long incrBy(String key, long amount) throws IOException {
+        return Long.parseLong(sendCommand("INCRBY", key, String.valueOf(amount)));
+    }
+    
+    /**
+     * Decrement a value
+     */
+    public long decr(String key) throws IOException {
+        return Long.parseLong(sendCommand("DECR", key));
+    }
+    
+    /**
+     * Decrement by amount
+     */
+    public long decrBy(String key, long amount) throws IOException {
+        return Long.parseLong(sendCommand("DECRBY", key, String.valueOf(amount)));
+    }
+    
+    /**
+     * Append to a value
+     */
+    public int append(String key, String value) throws IOException {
+        return Integer.parseInt(sendCommand("APPEND", key, value));
+    }
+    
+    /**
+     * Get string length
+     */
+    public int strlen(String key) throws IOException {
+        return Integer.parseInt(sendCommand("STRLEN", key));
+    }
+    
+    // ==================== Key Operations ====================
+    
+    /**
+     * Delete keys
+     */
+    public long del(String... keys) throws IOException {
+        String[] args = new String[keys.length + 1];
+        args[0] = "DEL";
+        System.arraycopy(keys, 0, args, 1, keys.length);
+        return Long.parseLong(sendCommand(args));
+    }
+    
+    /**
+     * Check if key exists
+     */
+    public boolean exists(String key) throws IOException {
+        return "1".equals(sendCommand("EXISTS", key));
+    }
+    
+    /**
+     * Set expiration on a key
+     */
+    public boolean expire(String key, long seconds) throws IOException {
+        return "1".equals(sendCommand("EXPIRE", key, String.valueOf(seconds)));
+    }
+    
+    /**
+     * Get TTL of a key
+     */
+    public long ttl(String key) throws IOException {
+        return Long.parseLong(sendCommand("TTL", key));
+    }
+    
+    /**
+     * Remove expiration from a key
+     */
+    public boolean persist(String key) throws IOException {
+        return "1".equals(sendCommand("PERSIST", key));
+    }
+    
+    /**
+     * Get the type of a key
+     */
+    public String type(String key) throws IOException {
+        return sendCommand("TYPE", key);
+    }
+    
+    /**
+     * Find keys matching pattern
+     */
+    public Set<String> keys(String pattern) throws IOException {
+        return new HashSet<>(sendCommandForList("KEYS", pattern));
+    }
+    
+    /**
+     * Rename a key
+     */
+    public void rename(String oldKey, String newKey) throws IOException {
+        sendCommand("RENAME", oldKey, newKey);
+    }
+    
+    // ==================== Hash Operations ====================
+    
+    /**
+     * Get a hash field
+     */
+    public String hget(String key, String field) throws IOException {
+        return sendCommand("HGET", key, field);
+    }
+    
+    /**
+     * Set a hash field
+     */
+    public void hset(String key, String field, String value) throws IOException {
+        sendCommand("HSET", key, field, value);
+    }
+    
+    /**
+     * Get all hash fields and values
+     */
+    public Map<String, String> hgetall(String key) throws IOException {
+        List<String> list = sendCommandForList("HGETALL", key);
+        Map<String, String> result = new LinkedHashMap<>();
+        for (int i = 0; i < list.size(); i += 2) {
+            result.put(list.get(i), list.get(i + 1));
+        }
+        return result;
+    }
+    
+    /**
+     * Delete hash fields
+     */
+    public boolean hdel(String key, String... fields) throws IOException {
+        String[] args = new String[fields.length + 2];
+        args[0] = "HDEL";
+        args[1] = key;
+        System.arraycopy(fields, 0, args, 2, fields.length);
+        return "1".equals(sendCommand(args));
+    }
+    
+    /**
+     * Check if hash field exists
+     */
+    public boolean hexists(String key, String field) throws IOException {
+        return "1".equals(sendCommand("HEXISTS", key, field));
+    }
+    
+    /**
+     * Get all hash fields
+     */
+    public Set<String> hkeys(String key) throws IOException {
+        return new HashSet<>(sendCommandForList("HKEYS", key));
+    }
+    
+    /**
+     * Get all hash values
+     */
+    public List<String> hvals(String key) throws IOException {
+        return sendCommandForList("HVALS", key);
+    }
+    
+    /**
+     * Get hash length
+     */
+    public int hlen(String key) throws IOException {
+        return Integer.parseInt(sendCommand("HLEN", key));
+    }
+    
+    // ==================== JSON Operations ====================
+    
+    /**
+     * Set a JSON value
+     */
+    public void jsonSet(String key, String json) throws IOException {
+        sendCommand("JSET", key, json);
+    }
+    
+    /**
+     * Set a JSON value with TTL
+     */
+    public void jsonSet(String key, String json, Duration ttl) throws IOException {
+        sendCommand("JSET", key, json, "$", String.valueOf(ttl.getSeconds()));
+    }
+    
+    /**
+     * Set a JSON value from object
+     */
+    public void jsonSet(String key, Object value) throws IOException {
+        String json = objectMapper.writeValueAsString(value);
+        jsonSet(key, json);
+    }
+    
+    /**
+     * Get a JSON value
+     */
+    public JsonNode jsonGet(String key) throws IOException {
+        return jsonGet(key, "$");
+    }
+    
+    /**
+     * Get a JSON value at path
+     */
+    public JsonNode jsonGet(String key, String path) throws IOException {
+        String result = sendCommand("JGET", key, path);
+        if (result == null || result.isEmpty()) {
+            return null;
+        }
+        return objectMapper.readTree(result);
+    }
+    
+    /**
+     * Get JSON as typed object
+     */
+    public <T> T jsonGet(String key, Class<T> type) throws IOException {
+        JsonNode json = jsonGet(key);
+        if (json == null) {
+            return null;
+        }
+        return objectMapper.treeToValue(json, type);
+    }
+    
+    /**
+     * Delete JSON path
+     */
+    public boolean jsonDelete(String key, String path) throws IOException {
+        return "1".equals(sendCommand("JDEL", key, path));
+    }
+    
+    /**
+     * Search JSON documents
+     */
+    public List<JsonNode> jsonSearch(String query) throws IOException {
+        List<String> results = sendCommandForList("JSEARCH", query);
+        List<JsonNode> nodes = new ArrayList<>();
+        for (String result : results) {
+            // Result format: "key:json"
+            int colonPos = result.indexOf(':');
+            if (colonPos > 0) {
+                String json = result.substring(colonPos + 1);
+                nodes.add(objectMapper.readTree(json));
+            }
+        }
+        return nodes;
+    }
+    
+    // ==================== Server Operations ====================
+    
+    /**
+     * Get server info
+     */
+    public String info() throws IOException {
+        return sendCommand("INFO");
+    }
+    
+    /**
+     * Get database size
+     */
+    public long dbSize() throws IOException {
+        return Long.parseLong(sendCommand("DBSIZE"));
+    }
+    
+    /**
+     * Flush current region
+     */
+    public void flushDb() throws IOException {
+        sendCommand("FLUSHDB");
+    }
+    
+    /**
+     * Get server status
+     */
+    public String status() throws IOException {
+        return sendCommand("STATUS");
+    }
+    
+    /**
+     * Get replication info
+     */
+    public String replInfo() throws IOException {
+        return sendCommand("REPLINFO");
+    }
+    
+    // ==================== Command Execution ====================
+    
+    private synchronized String sendCommand(String... args) throws IOException {
+        StringBuilder cmd = new StringBuilder();
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) cmd.append(' ');
+            String arg = args[i];
+            if (arg.contains(" ") || arg.contains("\"") || arg.contains("\n")) {
+                cmd.append('"').append(arg.replace("\\", "\\\\")
+                        .replace("\"", "\\\"")
+                        .replace("\n", "\\n")
+                        .replace("\t", "\\t")).append('"');
+            } else {
+                cmd.append(arg);
+            }
+        }
+        
+        log.trace("Sending: {}", cmd);
+        writer.write(cmd.toString());
+        writer.newLine();
+        writer.flush();
+        
+        return readResponse();
+    }
+    
+    private List<String> sendCommandForList(String... args) throws IOException {
+        String response = sendCommand(args);
+        if (response == null || response.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // Parse array response
+        return parseArrayResponse(response);
+    }
+    
+    private String readResponse() throws IOException {
+        String line = reader.readLine();
+        if (line == null) {
+            throw new IOException("Connection closed by server");
+        }
+        
+        log.trace("Received: {}", line);
+        
+        if (line.startsWith("+")) {
+            return line.substring(1);
+        } else if (line.startsWith("-")) {
+            throw new KuberException(line.substring(1));
+        } else if (line.startsWith(":")) {
+            return line.substring(1);
+        } else if (line.startsWith("$")) {
+            int len = Integer.parseInt(line.substring(1));
+            if (len == -1) {
+                return null;
+            }
+            char[] buf = new char[len];
+            int read = 0;
+            while (read < len) {
+                int n = reader.read(buf, read, len - read);
+                if (n == -1) throw new IOException("Unexpected EOF");
+                read += n;
+            }
+            reader.readLine(); // consume CRLF
+            return new String(buf);
+        } else if (line.startsWith("*")) {
+            int count = Integer.parseInt(line.substring(1));
+            if (count == -1) {
+                return null;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < count; i++) {
+                if (i > 0) sb.append('\n');
+                sb.append(readResponse());
+            }
+            return sb.toString();
+        }
+        
+        return line;
+    }
+    
+    private List<String> parseArrayResponse(String response) {
+        if (response == null || response.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.asList(response.split("\n"));
+    }
+    
+    @Override
+    public void close() throws IOException {
+        log.debug("Closing connection to Kuber");
+        
+        try {
+            if (writer != null) {
+                sendCommand("QUIT");
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        
+        if (writer != null) writer.close();
+        if (reader != null) reader.close();
+        if (socket != null) socket.close();
+        
+        log.info("Connection closed");
+    }
+    
+    /**
+     * Kuber exception for server errors
+     */
+    public static class KuberException extends RuntimeException {
+        public KuberException(String message) {
+            super(message);
+        }
+    }
+}

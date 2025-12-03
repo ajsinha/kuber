@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Kuber Cache</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.1/css/all.min.css}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            max-width: 400px;
+            width: 100%;
+        }
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        .login-header i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .login-body {
+            padding: 2rem;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 0.75rem;
+            font-weight: 600;
+        }
+        .btn-login:hover {
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="login-header">
+        <i class="fas fa-database"></i>
+        <h2 class="mb-0">Kuber Cache</h2>
+        <small>High-Performance Distributed Cache</small>
+    </div>
+    
+    <div class="login-body">
+        <!-- Error message -->
+        <div th:if="${param.error}" class="alert alert-danger" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            Invalid username or password
+        </div>
+        
+        <!-- Logout message -->
+        <div th:if="${param.logout}" class="alert alert-info" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            You have been logged out successfully
+        </div>
+        
+        <form th:action="@{/login}" method="post">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-user"></i>
+                    </span>
+                    <input type="text" class="form-control" id="username" name="username" 
+                           placeholder="Enter username" required autofocus>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label for="password" class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-lock"></i>
+                    </span>
+                    <input type="password" class="form-control" id="password" name="password" 
+                           placeholder="Enter password" required>
+                </div>
+            </div>
+            
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="remember" name="remember-me">
+                <label class="form-check-label" for="remember">Remember me</label>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-login w-100">
+                <i class="fas fa-sign-in-alt me-2"></i> Sign In
+            </button>
+        </form>
+        
+        <hr class="my-4">
+        
+        <div class="text-center text-muted small">
+            <p class="mb-1">Default credentials (from users.json):</p>
+            <code>admin / admin123</code><br>
+            <code>operator / operator123</code><br>
+            <code>user / user123</code>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

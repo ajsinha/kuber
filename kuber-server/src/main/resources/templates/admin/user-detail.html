@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('User Details')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/admin/users}">Users</a></li>
+                <li class="breadcrumb-item active" th:text="${user.userId}">User</li>
+            </ol>
+        </nav>
+        
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user me-2 text-primary"></i>
+                            User Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th class="text-muted" style="width: 150px;">User ID</th>
+                                <td><strong th:text="${user.userId}">admin</strong></td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Full Name</th>
+                                <td th:text="${user.fullName}">Administrator</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Password</th>
+                                <td>
+                                    <code>••••••••</code>
+                                    <small class="text-muted ms-2">(stored in users.json)</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Roles</th>
+                                <td>
+                                    <span th:each="role : ${user.roles}" 
+                                          th:class="'badge me-1 ' + (${role == 'ADMIN'} ? 'bg-danger' : (${role == 'OPERATOR'} ? 'bg-warning text-dark' : 'bg-secondary'))"
+                                          th:text="${role}">ROLE</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="card-footer bg-white border-0">
+                        <a th:href="@{/admin/users}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Users
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt me-2 text-success"></i>
+                            Role Permissions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span><strong>ADMIN</strong> - Full system access</span>
+                                <span th:if="${#lists.contains(user.roles, 'ADMIN')}" class="badge bg-success">Granted</span>
+                                <span th:unless="${#lists.contains(user.roles, 'ADMIN')}" class="badge bg-light text-dark">Not granted</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span><strong>OPERATOR</strong> - Manage regions and cache</span>
+                                <span th:if="${#lists.contains(user.roles, 'OPERATOR')}" class="badge bg-success">Granted</span>
+                                <span th:unless="${#lists.contains(user.roles, 'OPERATOR')}" class="badge bg-light text-dark">Not granted</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span><strong>USER</strong> - Read/write cache entries</span>
+                                <span th:if="${#lists.contains(user.roles, 'USER')}" class="badge bg-success">Granted</span>
+                                <span th:unless="${#lists.contains(user.roles, 'USER')}" class="badge bg-light text-dark">Not granted</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span><strong>READONLY</strong> - Read-only access</span>
+                                <span th:if="${#lists.contains(user.roles, 'READONLY')}" class="badge bg-success">Granted</span>
+                                <span th:unless="${#lists.contains(user.roles, 'READONLY')}" class="badge bg-light text-dark">Not granted</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

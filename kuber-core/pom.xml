@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~
+  ~ Legal Notice: This module and the associated software architecture are proprietary
+  ~ and confidential. Unauthorized copying, distribution, modification, or use is
+  ~ strictly prohibited without explicit written permission from the copyright holder.
+  ~
+  ~ Patent Pending: Certain architectural patterns and implementations described in
+  ~ this module may be subject to patent applications.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.kuber</groupId>
+        <artifactId>kuber-parent</artifactId>
+        <version>1.0.3</version>
+    </parent>
+
+    <artifactId>kuber-core</artifactId>
+    <packaging>jar</packaging>
+    <name>Kuber Core</name>
+    <description>Core models and protocols for Kuber distributed cache</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>
