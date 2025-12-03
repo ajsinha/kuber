@@ -17,7 +17,7 @@
 
     <groupId>com.kuber</groupId>
     <artifactId>kuber-parent</artifactId>
-    <version>1.0.6</version>
+    <version>1.0.7</version>
     <packaging>pom</packaging>
 
     <name>Kuber Distributed Cache</name>
@@ -49,6 +49,7 @@
         <guava.version>33.1.0-jre</guava.version>
         <caffeine.version>3.1.8</caffeine.version>
         <lombok.version>1.18.32</lombok.version>
+        <commons-csv.version>1.10.0</commons-csv.version>
     </properties>
 
     <dependencyManagement>
@@ -119,6 +120,13 @@
                 <groupId>com.github.ben-manes.caffeine</groupId>
                 <artifactId>caffeine</artifactId>
                 <version>${caffeine.version}</version>
+            </dependency>
+
+            <!-- Apache Commons CSV -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-csv</artifactId>
+                <version>${commons-csv.version}</version>
             </dependency>
 
             <!-- Lombok -->

@@ -33,6 +33,7 @@
                         <li class="nav-item"><a class="nav-link py-1 small" href="#search-ops"><i class="fas fa-search me-2"></i>Search Operations</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#ttl-ops"><i class="fas fa-clock me-2"></i>TTL Operations</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#batch-ops"><i class="fas fa-layer-group me-2"></i>Batch Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#autoload"><i class="fas fa-upload me-2"></i>Autoload</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#config"><i class="fas fa-cog me-2"></i>Configuration</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#replication"><i class="fas fa-sync me-2"></i>Replication</a></li>
                     </ul>
@@ -55,6 +56,7 @@
                             <li><strong>Redis Compatibility</strong> - Use existing Redis clients and tools</li>
                             <li><strong>High Performance</strong> - Sub-millisecond operations with Caffeine cache</li>
                             <li><strong>Replication</strong> - Primary/Secondary architecture with ZooKeeper coordination</li>
+                            <li><strong>Autoload</strong> - Bulk data import from CSV and JSON files</li>
                         </ul>
                     </div>
                     
@@ -102,10 +104,10 @@
 mongod --dbpath /data/db
 
 # Start Kuber Server
-java -jar kuber-server-1.0.6-SNAPSHOT.jar
+java -jar kuber-server-1.0.7-SNAPSHOT.jar
 
 # Or with custom config
-java -jar kuber-server-1.0.6-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
+java -jar kuber-server-1.0.7-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
                         </div>
                     </div>
                     
@@ -283,7 +285,7 @@ curl -u admin:admin123 http://localhost:8080/api/info
 # Response:
 {
   "server": "kuber",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "uptime_in_seconds": 3600,
   "connected_clients": 5,
   "total_regions": 3,
@@ -1181,7 +1183,7 @@ response = requests.post(
 &lt;dependency&gt;
     &lt;groupId&gt;com.kuber&lt;/groupId&gt;
     &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
-    &lt;version&gt;1.0.6&lt;/version&gt;
+    &lt;version&gt;1.0.7&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
                     <h4 class="mt-4 mb-3">Basic Jedis Example</h4>
@@ -1842,6 +1844,207 @@ Content-Type: application/json
 {"user:1001": "John", "user:1002": "Jane", "user:1003": "Bob"}</code></pre>
                 </section>
 
+                <!-- Autoload Section -->
+                <section id="autoload" class="py-4 border-bottom">
+                    <h2 class="mb-4"><i class="fas fa-upload me-2 text-success"></i>Autoload - Bulk Data Import</h2>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Autoload enables automatic bulk data import from CSV and JSON files. Simply drop files in the inbox folder and Kuber will load them into the cache.
+                    </div>
+                    
+                    <h4 class="mt-4 mb-3">How It Works</h4>
+                    <p>The autoload service watches a configurable directory (default: <code>./autoload</code>) with two subfolders:</p>
+                    <ul>
+                        <li><strong>inbox/</strong> - Place your data files here along with metadata files</li>
+                        <li><strong>outbox/</strong> - Processed files are moved here with timestamps and status</li>
+                    </ul>
+                    
+                    <p>The watcher runs every 60 seconds (configurable) and processes files that have both:</p>
+                    <ol>
+                        <li>A data file (<code>.csv</code> or <code>.json</code>)</li>
+                        <li>A corresponding metadata file (<code>.csv.metadata</code> or <code>.json.metadata</code>)</li>
+                    </ol>
+                    
+                    <h4 class="mt-4 mb-3">Metadata File Format</h4>
+                    <p>Each data file must have a metadata file with the same name plus <code>.metadata</code> extension:</p>
+                    
+<pre class="bg-dark text-light p-3 rounded"><code># Example: users.csv.metadata
+region:users
+ttl:3600
+key_field:user_id
+delimiter:,
+
+# Fields:
+# region     - Target region (default: "default")
+# ttl        - Time-to-live in seconds (default: -1 = no expiration)
+# key_field  - Column/field name to use as cache key (REQUIRED)
+# delimiter  - CSV delimiter character (default: ",")
+</code></pre>
+
+                    <h4 class="mt-4 mb-3">CSV File Format</h4>
+                    <p>CSV files must have a header row. Each row is converted to a JSON document using the header fields as keys.</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>users.csv</strong></p>
+<pre class="bg-light p-3 rounded"><code>user_id,name,email,age,status
+1001,John Doe,john@example.com,30,active
+1002,Jane Smith,jane@example.com,25,active
+1003,Bob Wilson,bob@example.com,35,inactive</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>users.csv.metadata</strong></p>
+<pre class="bg-light p-3 rounded"><code>region:users
+ttl:3600
+key_field:user_id</code></pre>
+                        </div>
+                    </div>
+                    
+                    <p class="mt-3">Result: Three JSON entries are created in the "users" region with keys "1001", "1002", "1003":</p>
+<pre class="bg-dark text-light p-3 rounded"><code># Key: 1001
+{"user_id": 1001, "name": "John Doe", "email": "john@example.com", "age": 30, "status": "active"}
+
+# Key: 1002
+{"user_id": 1002, "name": "Jane Smith", "email": "jane@example.com", "age": 25, "status": "active"}</code></pre>
+
+                    <h4 class="mt-4 mb-3">JSON File Format (JSONL)</h4>
+                    <p>JSON files should have one complete JSON object per line (JSON Lines format):</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>products.json</strong></p>
+<pre class="bg-light p-3 rounded"><code>{"sku":"PROD001","name":"Widget","price":29.99}
+{"sku":"PROD002","name":"Gadget","price":49.99}
+{"sku":"PROD003","name":"Gizmo","price":19.99}</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>products.json.metadata</strong></p>
+<pre class="bg-light p-3 rounded"><code>region:products
+ttl:-1
+key_field:sku</code></pre>
+                        </div>
+                    </div>
+
+                    <h4 class="mt-4 mb-3">Configuration</h4>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.autoload.enabled</code></td><td>true</td><td>Enable/disable autoload service</td></tr>
+                            <tr><td><code>kuber.autoload.directory</code></td><td>./autoload</td><td>Base directory (contains inbox/outbox)</td></tr>
+                            <tr><td><code>kuber.autoload.scan-interval-seconds</code></td><td>60</td><td>How often to check for new files</td></tr>
+                            <tr><td><code>kuber.autoload.max-records-per-file</code></td><td>0</td><td>Max records per file (0 = unlimited)</td></tr>
+                            <tr><td><code>kuber.autoload.create-directories</code></td><td>true</td><td>Auto-create inbox/outbox folders</td></tr>
+                            <tr><td><code>kuber.autoload.file-encoding</code></td><td>UTF-8</td><td>File encoding</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h4 class="mt-4 mb-3">REST API</h4>
+<pre class="bg-dark text-light p-3 rounded"><code># Get autoload status
+curl -u admin:admin123 http://localhost:8080/api/autoload/status
+
+# Response:
+{
+  "enabled": true,
+  "inboxPath": "./autoload/inbox",
+  "outboxPath": "./autoload/outbox",
+  "scanIntervalSeconds": 60,
+  "totalFilesProcessed": 15,
+  "totalRecordsLoaded": 5000,
+  "totalErrors": 0
+}
+
+# Trigger immediate scan (Admin only)
+curl -X POST -u admin:admin123 http://localhost:8080/api/autoload/trigger</code></pre>
+
+                    <h4 class="mt-4 mb-3">Processed File Naming</h4>
+                    <p>After processing, files are moved to outbox with timestamp and status:</p>
+<pre class="bg-light p-3 rounded"><code># Success
+20250101_120000_SUCCESS_users.csv
+20250101_120000_SUCCESS_users.csv.metadata
+
+# Error - no key field in metadata
+20250101_120000_ERROR_NO_KEY_FIELD_data.csv
+20250101_120000_ERROR_NO_KEY_FIELD_data.csv.metadata
+
+# Error - processing exception
+20250101_120000_ERROR_IOException_data.json</code></pre>
+
+                    <h4 class="mt-4 mb-3">Python Autoload Example</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import csv
+import os
+
+# Create sample data file
+csv_file = './autoload/inbox/users.csv'
+metadata_file = './autoload/inbox/users.csv.metadata'
+
+# Write CSV data
+with open(csv_file, 'w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(['user_id', 'name', 'email', 'active'])
+    for i in range(1, 101):
+        writer.writerow([f'user_{i}', f'User {i}', f'user{i}@example.com', i % 2 == 0])
+
+# Write metadata
+with open(metadata_file, 'w') as f:
+    f.write('region:users\n')
+    f.write('ttl:7200\n')
+    f.write('key_field:user_id\n')
+
+print("Files created. Kuber will process them on next scan cycle.")</code></pre>
+
+                    <h4 class="mt-4 mb-3">Java Autoload Example</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import java.io.*;
+import java.nio.file.*;
+
+public class AutoloadExample {
+    public static void main(String[] args) throws IOException {
+        Path inbox = Paths.get("./autoload/inbox");
+        Files.createDirectories(inbox);
+        
+        // Create JSON data file
+        try (BufferedWriter writer = Files.newBufferedWriter(inbox.resolve("orders.json"))) {
+            for (int i = 1; i <= 100; i++) {
+                String json = String.format(
+                    "{\"order_id\":\"ORD%04d\",\"customer\":\"Customer %d\",\"total\":%.2f}",
+                    i, i, Math.random() * 1000
+                );
+                writer.write(json);
+                writer.newLine();
+            }
+        }
+        
+        // Create metadata file
+        try (BufferedWriter writer = Files.newBufferedWriter(inbox.resolve("orders.json.metadata"))) {
+            writer.write("region:orders\n");
+            writer.write("ttl:86400\n");
+            writer.write("key_field:order_id\n");
+        }
+        
+        System.out.println("Files created. Kuber will process them on next scan cycle.");
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Replication Support</h4>
+                    <div class="alert alert-success">
+                        <i class="fas fa-sync me-2"></i>
+                        <strong>Automatic Replication:</strong> Data loaded via autoload is automatically replicated to secondary nodes when replication is enabled. The autoload service uses the standard <code>CacheService.jsonSet()</code> method which triggers replication.
+                    </div>
+
+                    <h4 class="mt-4 mb-3">Best Practices</h4>
+                    <ul>
+                        <li><strong>Always test with small files first</strong> - Verify your metadata format before processing large files</li>
+                        <li><strong>Use meaningful key fields</strong> - Choose a field with unique values (IDs, SKUs, etc.)</li>
+                        <li><strong>Set appropriate TTLs</strong> - Use -1 for permanent data, positive values for temporary data</li>
+                        <li><strong>Monitor the outbox</strong> - Check for ERROR files and investigate failures</li>
+                        <li><strong>Use CSV for simple data</strong> - CSV is faster to parse than JSON</li>
+                        <li><strong>Use JSONL for complex structures</strong> - When you have nested objects or arrays</li>
+                        <li><strong>Consider file sizes</strong> - Large files may take time; use max-records-per-file to limit</li>
+                    </ul>
+                </section>
+
                 <!-- Configuration Section -->
                 <section id="config" class="py-4 border-bottom">
                     <h2 class="mb-4"><i class="fas fa-cog me-2 text-secondary"></i>Configuration Reference</h2>
@@ -1884,6 +2087,21 @@ Content-Type: application/json
                             <tr><td><code>kuber.mongodb.connection-pool-size</code></td><td>50</td><td>Connection pool size</td></tr>
                         </tbody>
                     </table>
+                    
+                    <h4 class="mt-4 mb-3">Autoload Settings</h4>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.autoload.enabled</code></td><td>true</td><td>Enable/disable autoload service</td></tr>
+                            <tr><td><code>kuber.autoload.directory</code></td><td>./autoload</td><td>Base directory (contains inbox/outbox)</td></tr>
+                            <tr><td><code>kuber.autoload.scan-interval-seconds</code></td><td>60</td><td>How often to check for new files</td></tr>
+                            <tr><td><code>kuber.autoload.max-records-per-file</code></td><td>0</td><td>Max records per file (0 = unlimited)</td></tr>
+                            <tr><td><code>kuber.autoload.create-directories</code></td><td>true</td><td>Auto-create inbox/outbox folders</td></tr>
+                            <tr><td><code>kuber.autoload.file-encoding</code></td><td>UTF-8</td><td>File encoding for reading files</td></tr>
+                        </tbody>
+                    </table>
                 </section>
 
                 <!-- Replication Section -->
@@ -1912,7 +2130,7 @@ kuber.replication.zookeeper.session-timeout-ms=30000</code></pre>
                     <div class="row">
                         <div class="col-md-6">
                             <h6><i class="fas fa-database me-2"></i>Kuber Distributed Cache</h6>
-                            <p class="text-muted small mb-0">Version 1.0.6</p>
+                            <p class="text-muted small mb-0">Version 1.0.7</p>
                         </div>
                         <div class="col-md-6 text-end">
                             <p class="text-muted small mb-0">

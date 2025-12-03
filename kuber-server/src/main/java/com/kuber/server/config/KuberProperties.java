@@ -64,6 +64,11 @@ public class KuberProperties {
      */
     private Security security = new Security();
     
+    /**
+     * Autoload configuration
+     */
+    private Autoload autoload = new Autoload();
+    
     @Data
     public static class Network {
         /**
@@ -291,5 +296,40 @@ public class KuberProperties {
          * Password for Redis AUTH command (empty = no auth)
          */
         private String redisPassword = null;
+    }
+    
+    @Data
+    public static class Autoload {
+        /**
+         * Whether autoload is enabled
+         */
+        private boolean enabled = true;
+        
+        /**
+         * Base directory for autoload (contains inbox and outbox subfolders)
+         */
+        private String directory = "./autoload";
+        
+        /**
+         * Scan interval in seconds
+         */
+        @Min(10)
+        private int scanIntervalSeconds = 60;
+        
+        /**
+         * Maximum records to process per file (0 = unlimited)
+         */
+        @Min(0)
+        private int maxRecordsPerFile = 0;
+        
+        /**
+         * Whether to create directories if they don't exist
+         */
+        private boolean createDirectories = true;
+        
+        /**
+         * File encoding
+         */
+        private String fileEncoding = "UTF-8";
     }
 }

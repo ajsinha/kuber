@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.0.5
+Version 1.0.7
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -18,8 +18,10 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **MongoDB Persistence**: Durable storage with configurable sync modes
 - **Primary/Secondary Replication**: Automatic failover via ZooKeeper
+- **Autoload**: Bulk data import from CSV and JSON files
 - **Web Management UI**: Browser-based administration interface
 - **REST API**: Programmatic access for all operations
+- **CSV Export**: Export cache data to CSV files
 
 ## Features
 
@@ -40,6 +42,8 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 |---------|-------------|
 | MongoDB Backend | Persistent storage with configurable sync |
 | ZooKeeper Replication | Automatic primary/secondary failover |
+| Autoload | Bulk CSV/JSON import with metadata |
+| CSV Export | Export regions and query results |
 | Web UI | Bootstrap-based management dashboard |
 | REST API | Full HTTP/JSON API for all operations |
 | Authentication | User management with role-based access |
@@ -317,6 +321,106 @@ Kuber supports primary/secondary replication using ZooKeeper for leader election
 3. **Automatic failover** - if primary fails, a secondary is promoted
 
 4. **Read scaling** - secondary nodes handle read requests
+
+## Autoload - Bulk Data Import
+
+Kuber can automatically load data from CSV and JSON files placed in a watched directory.
+
+### Setup
+
+The autoload service watches a configurable directory (default: `./autoload`) with two subfolders:
+- `inbox/` - Place data files here with metadata files
+- `outbox/` - Processed files are moved here
+
+### Configuration
+
+```yaml
+kuber:
+  autoload:
+    enabled: true
+    directory: ./autoload
+    scan-interval-seconds: 60
+    max-records-per-file: 0  # 0 = unlimited
+    create-directories: true
+    file-encoding: UTF-8
+```
+
+### Metadata File Format
+
+Each data file requires a metadata file with the same name plus `.metadata`:
+
+```properties
+# users.csv.metadata
+region:users
+ttl:3600
+key_field:user_id
+delimiter:,
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| region | No | default | Target cache region |
+| ttl | No | -1 | Time-to-live in seconds (-1 = no expiration) |
+| key_field | **Yes** | - | Column/field name to use as cache key |
+| delimiter | No | , | CSV delimiter character |
+
+### CSV File Example
+
+**users.csv**
+```csv
+user_id,name,email,age,active
+1001,John Doe,john@example.com,30,true
+1002,Jane Smith,jane@example.com,25,true
+1003,Bob Wilson,bob@example.com,35,false
+```
+
+**users.csv.metadata**
+```properties
+region:users
+ttl:7200
+key_field:user_id
+```
+
+Result: Three JSON entries created in "users" region with keys "1001", "1002", "1003".
+
+### JSON File Example (JSONL)
+
+**products.json** (one JSON object per line)
+```json
+{"sku":"PROD001","name":"Widget","price":29.99}
+{"sku":"PROD002","name":"Gadget","price":49.99}
+{"sku":"PROD003","name":"Gizmo","price":19.99}
+```
+
+**products.json.metadata**
+```properties
+region:products
+ttl:-1
+key_field:sku
+```
+
+### REST API
+
+```bash
+# Get autoload status
+curl -u admin:admin123 http://localhost:8080/api/autoload/status
+
+# Trigger immediate scan (Admin only)
+curl -X POST -u admin:admin123 http://localhost:8080/api/autoload/trigger
+```
+
+### Processed Files
+
+After processing, files are moved to outbox with timestamp and status:
+```
+20250101_120000_SUCCESS_users.csv
+20250101_120000_SUCCESS_users.csv.metadata
+20250101_120000_ERROR_NO_KEY_FIELD_data.csv
+```
+
+### Replication
+
+Data loaded via autoload is automatically replicated to secondary nodes when replication is enabled.
 
 ## Security
 
