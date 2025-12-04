@@ -422,6 +422,95 @@ class KuberRestClient:
         result = self._request('POST', f'/api/v1/json/{r}/search', {'query': query})
         return result.get('results', []) if result else []
     
+    # ==================== Generic Search API ====================
+    
+    def generic_search(self, region: str = None, 
+                       key: str = None,
+                       keypattern: str = None,
+                       search_type: str = None,
+                       values: List[Dict[str, Any]] = None,
+                       fields: List[str] = None,
+                       limit: int = None) -> List[Dict[str, Any]]:
+        """
+        Perform generic search using the unified search API.
+        
+        Supports multiple search modes:
+        1. Simple key lookup: key="ABC"
+        2. Key pattern (regex): keypattern="ABC.*"
+        3. JSON attribute search: search_type="json", values=[{"k1": "abc"}, {"k2": "def"}]
+        
+        JSON attribute conditions support:
+        - Equality: {"fieldName": "value"}
+        - Regex: {"fieldName": "pattern", "type": "regex"}
+        - IN operator: {"fieldName": ["value1", "value2"]}
+        
+        Args:
+            region: Region to search in (uses current region if not specified)
+            key: Exact key to lookup
+            keypattern: Regex pattern to match keys
+            search_type: Set to "json" for JSON attribute search
+            values: List of attribute conditions for JSON search
+            fields: Optional list of fields to return (supports nested paths like "address.city")
+            limit: Maximum results (default: 1000)
+            
+        Returns:
+            List of matching key-value pairs
+            
+        Example:
+            # Simple key lookup
+            results = client.generic_search(region="test", key="ABC")
+            
+            # Key pattern search
+            results = client.generic_search(region="test", keypattern="user:.*")
+            
+            # JSON search with equality
+            results = client.generic_search(
+                region="test",
+                search_type="json",
+                values=[{"status": "active"}, {"age": "30"}]
+            )
+            
+            # JSON search with regex
+            results = client.generic_search(
+                region="test",
+                search_type="json",
+                values=[{"name": "John.*", "type": "regex"}]
+            )
+            
+            # JSON search with IN operator
+            results = client.generic_search(
+                region="test",
+                search_type="json",
+                values=[{"status": ["active", "pending"]}]
+            )
+            
+            # Search with field projection
+            results = client.generic_search(
+                region="users",
+                keypattern="user:.*",
+                fields=["name", "email", "address.city"]
+            )
+        """
+        r = region or self.current_region
+        
+        request_body = {"region": r}
+        
+        if key:
+            request_body["key"] = key
+        if keypattern:
+            request_body["keypattern"] = keypattern
+        if search_type:
+            request_body["type"] = search_type
+        if values:
+            request_body["values"] = values
+        if fields:
+            request_body["fields"] = fields
+        if limit:
+            request_body["limit"] = limit
+        
+        result = self._request('POST', '/api/genericsearch', request_body)
+        return result if isinstance(result, list) else []
+    
     # ==================== Bulk Operations ====================
     
     def bulk_import(self, entries: List[Dict[str, Any]], region: Optional[str] = None) -> Dict[str, Any]:

@@ -1,6 +1,6 @@
 # Kuber Client Usage Guide
 
-**Version 1.1.0**
+**Version 1.1.3**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -19,8 +19,9 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 6. [Java Client - REST API](#6-java-client---rest-api)
 7. [Common Operations](#7-common-operations)
 8. [JSON Operations](#8-json-operations)
-9. [Region Management](#9-region-management)
-10. [Error Handling](#10-error-handling)
+9. [Generic Search API](#9-generic-search-api)
+10. [Region Management](#10-region-management)
+11. [Error Handling](#11-error-handling)
 
 ---
 
@@ -894,13 +895,202 @@ results = client.jsonSearch("$.category=Electronics", "products");
 
 ---
 
-## 9. Region Management
+## 9. Generic Search API
 
-### 9.1 Working with Regions
+The Generic Search API provides a unified, flexible search endpoint that supports multiple search modes with optional field projection.
+
+### 9.1 Search Modes
+
+| Mode | Parameter | Description |
+|------|-----------|-------------|
+| Key Lookup | `key` | Exact key lookup |
+| Key Pattern | `keypattern` | Regex pattern matching on keys |
+| JSON Search | `type="json"` + `values` | Search by JSON attribute conditions |
+
+### 9.2 Field Projection
+
+All search modes support optional field projection to return only specific fields from JSON/Map objects.
+
+**Supports nested paths**: `address.city`, `user.profile.name`
+
+### 9.3 Python Examples
+
+**Python Redis Client:**
+```python
+# Simple key lookup
+results = client.generic_search(key="user:1001")
+
+# Key pattern search
+results = client.generic_search(keypattern="user:.*")
+
+# Key pattern with field projection
+results = client.generic_search(
+    keypattern="user:.*",
+    fields=["name", "email", "address.city"]
+)
+
+# JSON attribute search
+results = client.generic_search(
+    search_type="json",
+    values=[{"status": "active"}, {"age": "30"}]
+)
+
+# JSON search with regex
+results = client.generic_search(
+    search_type="json",
+    values=[{"name": "John.*", "type": "regex"}]
+)
+
+# JSON search with IN operator
+results = client.generic_search(
+    search_type="json",
+    values=[{"status": ["active", "pending"]}]
+)
+
+# Combined: JSON search with field projection
+results = client.generic_search(
+    region="users",
+    search_type="json",
+    values=[{"status": "active"}],
+    fields=["name", "email"],
+    limit=100
+)
+```
+
+**Python REST Client:**
+```python
+# All the same methods work for REST client
+results = client.generic_search(
+    region="users",
+    keypattern="user:.*",
+    fields=["name", "email", "address.city"],
+    limit=50
+)
+```
+
+### 9.4 Java Examples
+
+**Java Redis Client:**
+```java
+// Simple key lookup
+List<Map<String, Object>> results = client.genericSearchByKey("user:1001");
+
+// Key lookup with field projection
+results = client.genericSearchByKey("user:1001", Arrays.asList("name", "email"));
+
+// Key pattern search
+results = client.genericSearchByPattern("user:.*");
+
+// Key pattern with field projection and limit
+results = client.genericSearchByPattern(
+    "user:.*",
+    Arrays.asList("name", "email", "address.city"),
+    100
+);
+
+// JSON attribute search
+List<Map<String, Object>> conditions = Arrays.asList(
+    Map.of("status", "active"),
+    Map.of("age", "30")
+);
+results = client.genericSearchByJson(conditions);
+
+// JSON search with field projection
+results = client.genericSearchByJson(
+    conditions,
+    Arrays.asList("name", "email"),
+    100
+);
+
+// Using GenericSearchRequest for full control
+KuberClient.GenericSearchRequest request = new KuberClient.GenericSearchRequest();
+request.setKeyPattern("user:.*");
+request.setFields(Arrays.asList("name", "email", "address.city"));
+request.setLimit(50);
+results = client.genericSearch(request);
+```
+
+**Java REST Client:**
+```java
+// Using the GenericSearchRequest
+KuberRestClient.GenericSearchRequest request = new KuberRestClient.GenericSearchRequest();
+request.setRegion("users");
+request.setKeyPattern("user:.*");
+request.setFields(Arrays.asList("name", "email"));
+request.setLimit(100);
+List<JsonNode> results = client.genericSearch(request);
+
+// Convenience methods
+results = client.genericSearchByKey("user:1001");
+results = client.genericSearchByPattern("user:.*", Arrays.asList("name"), 50, "users");
+```
+
+### 9.5 Response Format
+
+All search modes return results in a consistent format:
+
+```json
+[
+  {
+    "key": "user:1001",
+    "value": {"name": "John", "email": "john@example.com", "address": {"city": "NYC"}}
+  },
+  {
+    "key": "user:1002", 
+    "value": {"name": "Jane", "email": "jane@example.com", "address": {"city": "LA"}}
+  }
+]
+```
+
+With field projection (`fields=["name", "address.city"]`):
+```json
+[
+  {
+    "key": "user:1001",
+    "value": {"name": "John", "address": {"city": "NYC"}}
+  },
+  {
+    "key": "user:1002",
+    "value": {"name": "Jane", "address": {"city": "LA"}}
+  }
+]
+```
+
+---
+
+## 10. Region Management
+
+### 10.0 Auto-Creation of Regions
+
+**Regions are automatically created when you store data to a non-existent region.** You don't need to explicitly create a region before using it.
+
+```python
+# Python - region 'orders' is auto-created on first use
+client.set('order:1001', order_data, region='orders')
+
+# Python - region 'analytics' is auto-created
+client.json_set('event:1', event_data, region='analytics')
+```
+
+```java
+// Java - region 'products' is auto-created on first use
+client.selectRegion("products");
+client.set("item:1001", "Widget");
+
+// Java REST - region 'sessions' is auto-created
+client.setJson("session:abc", sessionData, "sessions");
+```
+
+This means you can immediately start storing data without any setup:
+- Just use any region name and it will be created automatically
+- Auto-created regions have the description "Auto-created region"
+- The `default` region always exists and cannot be deleted
+
+### 10.1 Working with Regions
 
 **Python:**
 ```python
-# Create regions
+# Create regions explicitly (optional - regions are auto-created)
 client.create_region('products', 'Product catalog')
 client.create_region('orders', 'Customer orders')
 client.create_region('sessions', 'User sessions')
@@ -926,7 +1116,7 @@ client.delete_region('temp_region')
 
 **Java:**
 ```java
-// Create regions
+// Create regions explicitly (optional - regions are auto-created)
 client.createRegion("products", "Product catalog");
 client.createRegion("orders", "Customer orders");
 
@@ -948,7 +1138,7 @@ client.purgeRegion("sessions");
 client.deleteRegion("temp_region");
 ```
 
-### 9.2 Cross-Region Operations
+### 10.2 Cross-Region Operations
 
 **Python (REST client):**
 ```python
@@ -981,7 +1171,7 @@ JsonNode product = client.jsonGet("prod:1", "$", "products");
 
 ---
 
-## 10. Error Handling
+## 11. Error Handling
 
 ### 10.1 Python Error Handling
 

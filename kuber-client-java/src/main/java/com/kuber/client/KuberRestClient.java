@@ -748,6 +748,175 @@ public class KuberRestClient implements AutoCloseable {
         return results;
     }
     
+    // ==================== Generic Search API ====================
+    
+    /**
+     * Perform generic search using the unified search API.
+     * This is a convenience method that supports multiple search modes.
+     * 
+     * @param request The search request containing search parameters
+     * @return List of matching results as JsonNode objects
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearch(GenericSearchRequest request) throws IOException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("region", request.getRegion() != null ? request.getRegion() : currentRegion);
+        
+        if (request.getKey() != null) {
+            body.put("key", request.getKey());
+        }
+        if (request.getKeyPattern() != null) {
+            body.put("keypattern", request.getKeyPattern());
+        }
+        if (request.getType() != null) {
+            body.put("type", request.getType());
+        }
+        if (request.getValues() != null) {
+            body.put("values", request.getValues());
+        }
+        if (request.getFields() != null) {
+            body.put("fields", request.getFields());
+        }
+        if (request.getLimit() != null) {
+            body.put("limit", request.getLimit());
+        }
+        
+        JsonNode result = request("POST", "/api/genericsearch", body);
+        
+        List<JsonNode> results = new ArrayList<>();
+        if (result != null && result.isArray()) {
+            for (JsonNode node : result) {
+                results.add(node);
+            }
+        }
+        return results;
+    }
+    
+    /**
+     * Perform a simple key lookup.
+     * 
+     * @param key The exact key to lookup
+     * @return List containing the single result if found, empty list otherwise
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearchByKey(String key) throws IOException {
+        return genericSearchByKey(key, null, null);
+    }
+    
+    /**
+     * Perform a simple key lookup with optional field projection.
+     * 
+     * @param key The exact key to lookup
+     * @param fields Optional list of fields to return
+     * @param region Optional region (uses current region if null)
+     * @return List containing the single result if found, empty list otherwise
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearchByKey(String key, List<String> fields, String region) throws IOException {
+        GenericSearchRequest request = new GenericSearchRequest();
+        request.setRegion(region != null ? region : currentRegion);
+        request.setKey(key);
+        request.setFields(fields);
+        return genericSearch(request);
+    }
+    
+    /**
+     * Perform a key pattern (regex) search.
+     * 
+     * @param keyPattern Regex pattern to match keys
+     * @return List of matching results
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearchByPattern(String keyPattern) throws IOException {
+        return genericSearchByPattern(keyPattern, null, null, null);
+    }
+    
+    /**
+     * Perform a key pattern (regex) search with optional parameters.
+     * 
+     * @param keyPattern Regex pattern to match keys
+     * @param fields Optional list of fields to return
+     * @param limit Optional maximum results
+     * @param region Optional region (uses current region if null)
+     * @return List of matching results
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearchByPattern(String keyPattern, List<String> fields, 
+                                                  Integer limit, String region) throws IOException {
+        GenericSearchRequest request = new GenericSearchRequest();
+        request.setRegion(region != null ? region : currentRegion);
+        request.setKeyPattern(keyPattern);
+        request.setFields(fields);
+        request.setLimit(limit);
+        return genericSearch(request);
+    }
+    
+    /**
+     * Perform a JSON attribute search.
+     * 
+     * @param values List of attribute conditions
+     * @return List of matching results
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearchByJson(List<Map<String, Object>> values) throws IOException {
+        return genericSearchByJson(values, null, null, null);
+    }
+    
+    /**
+     * Perform a JSON attribute search with optional parameters.
+     * 
+     * @param values List of attribute conditions
+     * @param fields Optional list of fields to return
+     * @param limit Optional maximum results
+     * @param region Optional region (uses current region if null)
+     * @return List of matching results
+     * @throws IOException If the request fails
+     */
+    public List<JsonNode> genericSearchByJson(List<Map<String, Object>> values, List<String> fields,
+                                               Integer limit, String region) throws IOException {
+        GenericSearchRequest request = new GenericSearchRequest();
+        request.setRegion(region != null ? region : currentRegion);
+        request.setType("json");
+        request.setValues(values);
+        request.setFields(fields);
+        request.setLimit(limit);
+        return genericSearch(request);
+    }
+    
+    /**
+     * Request DTO for generic search API.
+     */
+    public static class GenericSearchRequest {
+        private String region;
+        private String key;
+        private String keyPattern;
+        private String type;
+        private List<Map<String, Object>> values;
+        private List<String> fields;
+        private Integer limit;
+        
+        public String getRegion() { return region; }
+        public void setRegion(String region) { this.region = region; }
+        
+        public String getKey() { return key; }
+        public void setKey(String key) { this.key = key; }
+        
+        public String getKeyPattern() { return keyPattern; }
+        public void setKeyPattern(String keyPattern) { this.keyPattern = keyPattern; }
+        
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        
+        public List<Map<String, Object>> getValues() { return values; }
+        public void setValues(List<Map<String, Object>> values) { this.values = values; }
+        
+        public List<String> getFields() { return fields; }
+        public void setFields(List<String> fields) { this.fields = fields; }
+        
+        public Integer getLimit() { return limit; }
+        public void setLimit(Integer limit) { this.limit = limit; }
+    }
+    
     // ==================== Bulk Operations ====================
     
     /**

@@ -31,6 +31,7 @@
                         <li class="nav-item"><a class="nav-link py-1 small" href="#hash-ops"><i class="fas fa-hashtag me-2"></i>Hash Operations</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#key-ops"><i class="fas fa-key me-2"></i>Key Operations</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#search-ops"><i class="fas fa-search me-2"></i>Search Operations</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 small" href="#generic-search"><i class="fas fa-search-plus me-2"></i>Generic Search API</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#ttl-ops"><i class="fas fa-clock me-2"></i>TTL Operations</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#batch-ops"><i class="fas fa-layer-group me-2"></i>Batch Operations</a></li>
                         <li class="nav-item"><a class="nav-link py-1 small" href="#autoload"><i class="fas fa-upload me-2"></i>Autoload</a></li>
@@ -45,14 +46,14 @@
                 
                 <!-- Overview Section -->
                 <section id="overview" class="py-4 border-bottom">
-                    <h1 class="display-5 mb-4"><i class="fas fa-book me-3 text-primary"></i>Kuber Help Documentation</h1>
+                    <h1 class="display-5 mb-4"><i class="fas fa-book me-3 text-primary"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Help Documentation</h1>
                     <div class="alert alert-primary">
-                        <h5 class="alert-heading"><i class="fas fa-database me-2"></i>Welcome to Kuber Distributed Cache</h5>
-                        <p class="mb-2">Kuber is a high-performance, Redis-compatible distributed caching system with:</p>
+                        <h5 class="alert-heading"><i class="fas fa-database me-2"></i>Welcome to <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h5>
+                        <p class="mb-2"><span th:text="${appName} ?: 'Kuber'">Kuber</span> is a high-performance, Redis-compatible distributed caching system with:</p>
                         <ul class="mb-0">
                             <li><strong>Multi-Backend Persistence</strong> - Choose from MongoDB, PostgreSQL, SQLite, RocksDB, or in-memory storage</li>
                             <li><strong>JSON Document Support</strong> - Store and query complex JSON with JSONPath</li>
-                            <li><strong>Region Partitioning</strong> - Logical namespaces for multi-tenant applications</li>
+                            <li><strong>Region Partitioning</strong> - Logical namespaces with auto-creation on first use</li>
                             <li><strong>Redis Compatibility</strong> - Use existing Redis clients and tools</li>
                             <li><strong>High Performance</strong> - Sub-millisecond operations with Caffeine cache</li>
                             <li><strong>Replication</strong> - Primary/Secondary architecture with ZooKeeper coordination</li>
@@ -101,19 +102,19 @@
                         </div>
                         <div class="card-body">
 <pre class="bg-light p-3 rounded mb-0"><code># Start Kuber Server (uses embedded persistence by default)
-java -jar kuber-server-1.1.0-SNAPSHOT.jar
+java -jar kuber-server-1.1.3-SNAPSHOT.jar
 
 # Or with specific persistence backend
-java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=sqlite
-java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=rocksdb
-java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=memory
+java -jar kuber-server-1.1.3-SNAPSHOT.jar --kuber.persistence.type=sqlite
+java -jar kuber-server-1.1.3-SNAPSHOT.jar --kuber.persistence.type=rocksdb
+java -jar kuber-server-1.1.3-SNAPSHOT.jar --kuber.persistence.type=memory
 
 # For MongoDB persistence (requires MongoDB server)
 mongod --dbpath /data/db
-java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=mongodb
+java -jar kuber-server-1.1.3-SNAPSHOT.jar --kuber.persistence.type=mongodb
 
 # With custom ports
-java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
+java -jar kuber-server-1.1.3-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
                         </div>
                     </div>
                     
@@ -291,7 +292,7 @@ curl -u admin:admin123 http://localhost:8080/api/info
 # Response:
 {
   "server": "kuber",
-  "version": "1.1.0",
+  "version": "1.1.3",
   "uptime_in_seconds": 3600,
   "connected_clients": 5,
   "total_regions": 3,
@@ -454,6 +455,109 @@ curl -X POST -u admin:admin123 \
 ]</code></pre>
                         </div>
                     </div>
+                    
+                    <!-- Generic Search API -->
+                    <section id="generic-search">
+                    <h4 class="mt-4 mb-3"><i class="fas fa-search-plus me-2"></i>Generic Search API</h4>
+                    <p>A flexible search endpoint that supports multiple search modes in a single API with optional field projection.</p>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header"><span class="badge bg-primary me-2">POST</span><code>/api/genericsearch</code></div>
+                        <div class="card-body">
+<pre class="bg-light p-3 rounded mb-0"><code># Mode 1: Simple key lookup
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"region": "test", "key": "ABC"}' \
+  http://localhost:8080/api/genericsearch
+
+# Mode 2: Key pattern search (regex)
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{"region": "test", "keypattern": "ABC.*"}' \
+  http://localhost:8080/api/genericsearch
+
+# Mode 3: JSON attribute search (equality)
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "region": "test",
+    "type": "json",
+    "values": [
+      {"k1": "abc"},
+      {"k2": "def"}
+    ]
+  }' \
+  http://localhost:8080/api/genericsearch
+
+# Mode 4: JSON attribute search with regex
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "region": "test",
+    "type": "json",
+    "values": [
+      {"k1": "abc.*", "type": "regex"},
+      {"k2": "def"}
+    ]
+  }' \
+  http://localhost:8080/api/genericsearch
+
+# Mode 5: JSON attribute search with IN operator
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "region": "test",
+    "type": "json",
+    "values": [
+      {"k1": ["abc", "def"]},
+      {"k2": "ghi"}
+    ]
+  }' \
+  http://localhost:8080/api/genericsearch
+
+# Mode 6: Search with field projection (return only specific fields)
+curl -X POST -u admin:admin123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "region": "users",
+    "keypattern": "user:.*",
+    "fields": ["name", "email", "address.city"]
+  }' \
+  http://localhost:8080/api/genericsearch
+
+# Response without field projection:
+[
+  {"key": "user:1", "value": {"name": "John", "email": "john@example.com", "age": 30, "address": {"city": "NYC", "zip": "10001"}}},
+  {"key": "user:2", "value": {"name": "Jane", "email": "jane@example.com", "age": 25, "address": {"city": "LA", "zip": "90001"}}}
+]
+
+# Response with field projection (fields: ["name", "email", "address.city"]):
+[
+  {"key": "user:1", "value": {"name": "John", "email": "john@example.com", "address": {"city": "NYC"}}},
+  {"key": "user:2", "value": {"name": "Jane", "email": "jane@example.com", "address": {"city": "LA"}}}
+]</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="fas fa-info-circle me-2"></i>Generic Search Request Parameters</h6>
+                        <table class="table table-sm table-bordered mb-0 mt-2">
+                            <thead class="table-light">
+                                <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>region</code></td><td>string</td><td>Required. The region to search in.</td></tr>
+                                <tr><td><code>key</code></td><td>string</td><td>Exact key lookup (returns single result if found).</td></tr>
+                                <tr><td><code>keypattern</code></td><td>string</td><td>Regex pattern to match keys.</td></tr>
+                                <tr><td><code>type</code></td><td>string</td><td>Set to "json" for JSON attribute search.</td></tr>
+                                <tr><td><code>values</code></td><td>array</td><td>List of attribute conditions (for JSON search).</td></tr>
+                                <tr><td><code>fields</code></td><td>array</td><td>Optional. List of fields to return (supports nested paths like "address.city").</td></tr>
+                                <tr><td><code>limit</code></td><td>integer</td><td>Maximum results (default: 1000).</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    </section>
                     
                     <!-- Batch Operations -->
                     <h4 class="mt-4 mb-3"><i class="fas fa-layer-group me-2"></i>Batch Operations</h4>
@@ -1041,6 +1145,61 @@ client.execute_command('RPURGE', 'analytics')
 # Delete region entirely
 client.execute_command('RDROP', 'analytics')</code></pre>
 
+                    <h4 class="mt-4 mb-3">Generic Search API (Python Redis Client)</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>from kuber_redis_standalone import KuberRedisClient
+
+# Connect with required authentication
+client = KuberRedisClient('localhost', 6380, username='admin', password='admin123')
+
+# Mode 1: Simple key lookup
+results = client.generic_search(key='user:1001')
+
+# Mode 2: Key pattern search (regex)
+results = client.generic_search(keypattern='user:.*')
+
+# Mode 3: Key pattern with field projection (return only specific fields)
+results = client.generic_search(
+    keypattern='user:.*',
+    fields=['name', 'email', 'address.city'],  # Supports nested paths
+    limit=100
+)
+
+# Mode 4: JSON attribute search (equality)
+results = client.generic_search(
+    search_type='json',
+    values=[{'status': 'active'}, {'age': '30'}]
+)
+
+# Mode 5: JSON attribute search with regex
+results = client.generic_search(
+    search_type='json',
+    values=[{'name': 'John.*', 'type': 'regex'}]
+)
+
+# Mode 6: JSON attribute search with IN operator
+results = client.generic_search(
+    search_type='json',
+    values=[{'status': ['active', 'pending']}]
+)
+
+# Mode 7: JSON search with field projection
+results = client.generic_search(
+    region='users',
+    search_type='json',
+    values=[{'status': 'active'}],
+    fields=['name', 'email'],
+    limit=50
+)
+
+# Response format:
+# [
+#   {'key': 'user:1', 'value': {'name': 'John', 'email': 'john@example.com'}},
+#   {'key': 'user:2', 'value': {'name': 'Jane', 'email': 'jane@example.com'}}
+# ]
+
+# Also available: ksearch for key pattern search (returns full value objects)
+results = client.ksearch(r'user:\d+', limit=100)  # Returns list of dicts with key, value, type, ttl</code></pre>
+
                     <h4 class="mt-4 mb-3">Using Kuber Python Client Package</h4>
 <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient
 
@@ -1159,6 +1318,75 @@ response = requests.post(
     auth=auth,
     json={'user:1001': 'John', 'user:1002': 'Jane'}
 )</code></pre>
+
+                    <h4 class="mt-4 mb-3">Generic Search API (Python REST Client)</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>from kuber_rest_standalone import KuberRestClient
+
+# Connect with required authentication
+client = KuberRestClient('localhost', 8080, username='admin', password='admin123')
+
+# Mode 1: Simple key lookup
+results = client.generic_search(region='default', key='user:1001')
+
+# Mode 2: Key pattern search (regex)
+results = client.generic_search(region='default', keypattern='user:.*')
+
+# Mode 3: Key pattern with field projection
+results = client.generic_search(
+    region='users',
+    keypattern='user:.*',
+    fields=['name', 'email', 'address.city'],
+    limit=100
+)
+
+# Mode 4: JSON attribute search
+results = client.generic_search(
+    region='users',
+    search_type='json',
+    values=[{'status': 'active'}, {'department': 'Engineering'}]
+)
+
+# Mode 5: JSON search with regex matching
+results = client.generic_search(
+    region='users',
+    search_type='json',
+    values=[{'email': '.*@example.com', 'type': 'regex'}]
+)
+
+# Mode 6: JSON search with IN operator
+results = client.generic_search(
+    region='orders',
+    search_type='json',
+    values=[{'status': ['pending', 'processing', 'shipped']}]
+)
+
+# Mode 7: Combined search with field projection
+results = client.generic_search(
+    region='products',
+    search_type='json',
+    values=[{'category': 'Electronics'}, {'in_stock': 'true'}],
+    fields=['name', 'price', 'inventory.quantity'],
+    limit=50
+)
+
+# Using raw requests library for generic search
+import requests
+from requests.auth import HTTPBasicAuth
+
+auth = HTTPBasicAuth('admin', 'admin123')
+BASE_URL = 'http://localhost:8080/api'
+
+# Generic search via REST API directly
+response = requests.post(
+    f'{BASE_URL}/genericsearch',
+    auth=auth,
+    json={
+        'region': 'users',
+        'keypattern': 'user:.*',
+        'fields': ['name', 'email']
+    }
+)
+results = response.json()  # Returns list of {key, value} objects</code></pre>
                 </section>
 
                 <!-- Java Client Section -->
@@ -1189,7 +1417,7 @@ response = requests.post(
 &lt;dependency&gt;
     &lt;groupId&gt;com.kuber&lt;/groupId&gt;
     &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
-    &lt;version&gt;1.1.0&lt;/version&gt;
+    &lt;version&gt;1.1.3&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
                     <h4 class="mt-4 mb-3">Basic Jedis Example</h4>
@@ -1580,6 +1808,148 @@ public class KuberClientExample {
     }
 }</code></pre>
 
+                    <h4 class="mt-4 mb-3">Generic Search API (Java Redis Client)</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import com.kuber.client.KuberClient;
+import com.kuber.client.KuberClient.GenericSearchRequest;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.*;
+
+public class GenericSearchExample {
+    public static void main(String[] args) throws Exception {
+        // Connect with required authentication
+        try (KuberClient client = new KuberClient("localhost", 6380, "admin", "admin123")) {
+            
+            // Mode 1: Simple key lookup
+            List&lt;Map&lt;String, Object&gt;&gt; results = client.genericSearchByKey("user:1001");
+            
+            // Mode 2: Key lookup with field projection
+            results = client.genericSearchByKey(
+                "user:1001",
+                Arrays.asList("name", "email", "address.city")
+            );
+            
+            // Mode 3: Key pattern search (regex)
+            results = client.genericSearchByPattern("user:.*");
+            
+            // Mode 4: Key pattern with field projection and limit
+            results = client.genericSearchByPattern(
+                "user:.*",
+                Arrays.asList("name", "email"),
+                100  // limit
+            );
+            
+            // Mode 5: JSON attribute search
+            List&lt;Map&lt;String, Object&gt;&gt; conditions = Arrays.asList(
+                Map.of("status", "active"),
+                Map.of("department", "Engineering")
+            );
+            results = client.genericSearchByJson(conditions);
+            
+            // Mode 6: JSON search with field projection
+            results = client.genericSearchByJson(
+                conditions,
+                Arrays.asList("name", "email", "salary"),  // fields
+                50  // limit
+            );
+            
+            // Mode 7: Using GenericSearchRequest for full control
+            GenericSearchRequest request = new GenericSearchRequest();
+            request.setKeyPattern("order:.*");
+            request.setFields(Arrays.asList("orderId", "customer.name", "total"));
+            request.setLimit(100);
+            results = client.genericSearch(request);
+            
+            // Mode 8: JSON search with regex condition
+            List&lt;Map&lt;String, Object&gt;&gt; regexConditions = Arrays.asList(
+                Map.of("email", ".*@example.com", "type", "regex")
+            );
+            results = client.genericSearchByJson(regexConditions);
+            
+            // Mode 9: JSON search with IN operator
+            List&lt;Map&lt;String, Object&gt;&gt; inConditions = Arrays.asList(
+                Map.of("status", Arrays.asList("pending", "processing", "shipped"))
+            );
+            results = client.genericSearchByJson(inConditions);
+            
+            // Process results
+            for (Map&lt;String, Object&gt; item : results) {
+                String key = (String) item.get("key");
+                Object value = item.get("value");
+                System.out.println(key + " = " + value);
+            }
+        }
+    }
+}</code></pre>
+
+                    <h4 class="mt-4 mb-3">Generic Search API (Java REST Client)</h4>
+<pre class="bg-dark text-light p-3 rounded"><code>import com.kuber.client.KuberRestClient;
+import com.kuber.client.KuberRestClient.GenericSearchRequest;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.*;
+
+public class GenericSearchRestExample {
+    public static void main(String[] args) throws Exception {
+        // Connect with required authentication
+        try (KuberRestClient client = new KuberRestClient("localhost", 8080, "admin", "admin123")) {
+            
+            // Mode 1: Simple key lookup
+            List&lt;JsonNode&gt; results = client.genericSearchByKey("user:1001");
+            
+            // Mode 2: Key lookup with field projection
+            results = client.genericSearchByKey(
+                "user:1001",
+                Arrays.asList("name", "email"),
+                "users"  // region
+            );
+            
+            // Mode 3: Key pattern search
+            results = client.genericSearchByPattern("user:.*");
+            
+            // Mode 4: Key pattern with all options
+            results = client.genericSearchByPattern(
+                "product:.*",
+                Arrays.asList("name", "price", "category"),  // fields
+                50,     // limit
+                "products"  // region
+            );
+            
+            // Mode 5: JSON attribute search
+            List&lt;Map&lt;String, Object&gt;&gt; conditions = Arrays.asList(
+                Map.of("status", "active"),
+                Map.of("type", "premium")
+            );
+            results = client.genericSearchByJson(conditions);
+            
+            // Mode 6: JSON search with field projection
+            results = client.genericSearchByJson(
+                conditions,
+                Arrays.asList("name", "email"),
+                100,
+                "users"
+            );
+            
+            // Mode 7: Using GenericSearchRequest for complete control
+            GenericSearchRequest request = new GenericSearchRequest();
+            request.setRegion("orders");
+            request.setType("json");
+            request.setValues(Arrays.asList(
+                Map.of("status", Arrays.asList("pending", "shipped")),  // IN operator
+                Map.of("customer.country", "US")  // nested field
+            ));
+            request.setFields(Arrays.asList("orderId", "total", "customer.name"));
+            request.setLimit(100);
+            results = client.genericSearch(request);
+            
+            // Process results
+            for (JsonNode item : results) {
+                String key = item.get("key").asText();
+                JsonNode value = item.get("value");
+                System.out.println(key + " = " + value);
+            }
+        }
+    }
+}</code></pre>
+
                     <h4 class="mt-4 mb-3">Spring Boot Integration</h4>
 <pre class="bg-dark text-light p-3 rounded"><code>// application.properties
 spring.redis.host=localhost
@@ -1654,13 +2024,36 @@ public class CacheService {
                     
                     <p>Regions provide logical partitioning of cache data, enabling multi-tenant applications and organized data management.</p>
                     
+                    <div class="alert alert-success">
+                        <i class="fas fa-magic me-2"></i>
+                        <strong>Auto-Creation:</strong> Regions are automatically created when you store data to a non-existent region. 
+                        You don't need to explicitly create a region before using it - just start storing data and the region will be created on-the-fly.
+                    </div>
+                    
                     <h4 class="mt-4 mb-3">Key Concepts</h4>
                     <ul>
                         <li><strong>default</strong> - Built-in region, cannot be deleted</li>
+                        <li><strong>Auto-Creation</strong> - Regions are automatically created when data is stored to a new region name</li>
                         <li><strong>Isolation</strong> - Keys in different regions are completely separate</li>
                         <li><strong>Statistics</strong> - Each region tracks its own hit ratio and entry count</li>
                         <li><strong>Persistence</strong> - Each region maps to a separate data store (collection, table, or column family depending on backend)</li>
                     </ul>
+                    
+                    <h4 class="mt-4 mb-3">Auto-Creation Examples</h4>
+<pre class="bg-light p-3 rounded"><code># Redis Protocol - region 'orders' is auto-created
+RSELECT orders
+SET order:1001 "pending"
+
+# REST API - region 'products' is auto-created  
+PUT /api/cache/products/item:1001
+{"name": "Widget", "price": 29.99}
+
+# Python - region 'sessions' is auto-created
+client.set('session:abc', 'data', region='sessions')
+
+# Java - region 'analytics' is auto-created
+client.selectRegion("analytics");
+client.set("pageview:1", "1000");</code></pre>
                     
                     <h4 class="mt-4 mb-3">Region Selection Methods</h4>
                     <table class="table table-bordered">
@@ -2294,7 +2687,7 @@ kuber.replication.zookeeper.session-timeout-ms=30000</code></pre>
                     <div class="row">
                         <div class="col-md-6">
                             <h6><i class="fas fa-database me-2"></i>Kuber Distributed Cache</h6>
-                            <p class="text-muted small mb-0">Version 1.1.0</p>
+                            <p class="text-muted small mb-0">Version 1.1.3</p>
                         </div>
                         <div class="col-md-6 text-end">
                             <p class="text-muted small mb-0">

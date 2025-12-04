@@ -339,6 +339,44 @@ public class KuberClient implements AutoCloseable {
     }
     
     /**
+     * Search keys by regex pattern and return key-value pairs.
+     * Unlike keys() which uses glob patterns, this uses Java regex patterns.
+     * 
+     * @param regexPattern Java regex pattern (e.g., "user:\\d+", "order:.*")
+     * @return List of results with key, value, type, ttl
+     */
+    public List<Map<String, Object>> ksearch(String regexPattern) throws IOException {
+        return ksearch(regexPattern, 1000);
+    }
+    
+    /**
+     * Search keys by regex pattern with limit.
+     * 
+     * @param regexPattern Java regex pattern
+     * @param limit Maximum number of results
+     * @return List of results with key, value, type, ttl
+     */
+    public List<Map<String, Object>> ksearch(String regexPattern, int limit) throws IOException {
+        List<String> results = sendCommandForList("KSEARCH", regexPattern, "LIMIT", String.valueOf(limit));
+        List<Map<String, Object>> parsed = new ArrayList<>();
+        
+        for (String result : results) {
+            try {
+                JsonNode node = objectMapper.readTree(result);
+                Map<String, Object> item = new HashMap<>();
+                if (node.has("key")) item.put("key", node.get("key").asText());
+                if (node.has("value")) item.put("value", node.get("value"));
+                if (node.has("type")) item.put("type", node.get("type").asText());
+                if (node.has("ttl")) item.put("ttl", node.get("ttl").asLong());
+                parsed.add(item);
+            } catch (Exception e) {
+                // Skip invalid JSON
+            }
+        }
+        return parsed;
+    }
+    
+    /**
      * Rename a key
      */
     public void rename(String oldKey, String newKey) throws IOException {
@@ -513,6 +551,275 @@ public class KuberClient implements AutoCloseable {
             }
         }
         return nodes;
+    }
+    
+    // ==================== Generic Search (Convenience Methods) ====================
+    
+    /**
+     * Perform generic search with flexible options.
+     * 
+     * @param request The search request containing search parameters
+     * @return List of search results with key and value
+     * @throws IOException If search fails
+     */
+    public List<Map<String, Object>> genericSearch(GenericSearchRequest request) throws IOException {
+        List<Map<String, Object>> results = new ArrayList<>();
+        
+        if (request.getKey() != null) {
+            // Mode 1: Simple key lookup
+            String value = get(request.getKey());
+            if (value != null) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("key", request.getKey());
+                try {
+                    JsonNode jsonValue = objectMapper.readTree(value);
+                    if (request.getFields() != null && !request.getFields().isEmpty()) {
+                        item.put("value", projectFields(jsonValue, request.getFields()));
+                    } else {
+                        item.put("value", jsonValue);
+                    }
+                } catch (Exception e) {
+                    item.put("value", value);
+                }
+                results.add(item);
+            }
+        } else if (request.getKeyPattern() != null) {
+            // Mode 2: Key pattern (regex) search
+            // ksearch returns List<Map<String, Object>> with key, value, type, ttl
+            int limit = request.getLimit() != null ? request.getLimit() : 1000;
+            List<Map<String, Object>> searchResults = ksearch(request.getKeyPattern(), limit);
+            for (Map<String, Object> searchItem : searchResults) {
+                String key = (String) searchItem.get("key");
+                Object value = searchItem.get("value");
+                if (key != null && value != null) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("key", key);
+                    try {
+                        JsonNode jsonValue;
+                        if (value instanceof JsonNode) {
+                            jsonValue = (JsonNode) value;
+                        } else if (value instanceof String) {
+                            jsonValue = objectMapper.readTree((String) value);
+                        } else {
+                            jsonValue = objectMapper.valueToTree(value);
+                        }
+                        if (request.getFields() != null && !request.getFields().isEmpty()) {
+                            item.put("value", projectFields(jsonValue, request.getFields()));
+                        } else {
+                            item.put("value", jsonValue);
+                        }
+                    } catch (Exception e) {
+                        item.put("value", value);
+                    }
+                    results.add(item);
+                }
+            }
+        } else if ("json".equalsIgnoreCase(request.getType()) && request.getValues() != null) {
+            // Mode 3: JSON attribute search
+            StringBuilder query = new StringBuilder();
+            for (Map<String, Object> condition : request.getValues()) {
+                String condType = "equals";
+                if (condition.containsKey("type")) {
+                    condType = String.valueOf(condition.get("type"));
+                }
+                for (Map.Entry<String, Object> entry : condition.entrySet()) {
+                    if ("type".equals(entry.getKey())) continue;
+                    if (query.length() > 0) query.append(",");
+                    if (entry.getValue() instanceof List) {
+                        // IN operator
+                        List<?> values = (List<?>) entry.getValue();
+                        for (Object v : values) {
+                            query.append("$.").append(entry.getKey()).append("=").append(v);
+                        }
+                    } else if ("regex".equalsIgnoreCase(condType)) {
+                        query.append("$.").append(entry.getKey()).append(" LIKE ").append(entry.getValue());
+                    } else {
+                        query.append("$.").append(entry.getKey()).append("=").append(entry.getValue());
+                    }
+                }
+            }
+            List<JsonNode> searchResults = jsonSearch(query.toString());
+            int limit = request.getLimit() != null ? request.getLimit() : 1000;
+            for (JsonNode node : searchResults) {
+                if (results.size() >= limit) break;
+                Map<String, Object> item = new HashMap<>();
+                if (node.has("key")) {
+                    item.put("key", node.get("key").asText());
+                }
+                if (node.has("value")) {
+                    JsonNode value = node.get("value");
+                    if (request.getFields() != null && !request.getFields().isEmpty()) {
+                        item.put("value", projectFields(value, request.getFields()));
+                    } else {
+                        item.put("value", value);
+                    }
+                } else {
+                    if (request.getFields() != null && !request.getFields().isEmpty()) {
+                        item.put("value", projectFields(node, request.getFields()));
+                    } else {
+                        item.put("value", node);
+                    }
+                }
+                results.add(item);
+            }
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Perform a simple key lookup.
+     */
+    public List<Map<String, Object>> genericSearchByKey(String key) throws IOException {
+        return genericSearchByKey(key, null);
+    }
+    
+    /**
+     * Perform a simple key lookup with optional field projection.
+     */
+    public List<Map<String, Object>> genericSearchByKey(String key, List<String> fields) throws IOException {
+        GenericSearchRequest request = new GenericSearchRequest();
+        request.setKey(key);
+        request.setFields(fields);
+        return genericSearch(request);
+    }
+    
+    /**
+     * Perform a key pattern (regex) search.
+     */
+    public List<Map<String, Object>> genericSearchByPattern(String keyPattern) throws IOException {
+        return genericSearchByPattern(keyPattern, null, null);
+    }
+    
+    /**
+     * Perform a key pattern (regex) search with optional parameters.
+     */
+    public List<Map<String, Object>> genericSearchByPattern(String keyPattern, List<String> fields, Integer limit) 
+            throws IOException {
+        GenericSearchRequest request = new GenericSearchRequest();
+        request.setKeyPattern(keyPattern);
+        request.setFields(fields);
+        request.setLimit(limit);
+        return genericSearch(request);
+    }
+    
+    /**
+     * Perform a JSON attribute search.
+     */
+    public List<Map<String, Object>> genericSearchByJson(List<Map<String, Object>> values) throws IOException {
+        return genericSearchByJson(values, null, null);
+    }
+    
+    /**
+     * Perform a JSON attribute search with optional parameters.
+     */
+    public List<Map<String, Object>> genericSearchByJson(List<Map<String, Object>> values, 
+                                                          List<String> fields, Integer limit) throws IOException {
+        GenericSearchRequest request = new GenericSearchRequest();
+        request.setType("json");
+        request.setValues(values);
+        request.setFields(fields);
+        request.setLimit(limit);
+        return genericSearch(request);
+    }
+    
+    /**
+     * Project specified fields from a JsonNode.
+     */
+    private Map<String, Object> projectFields(JsonNode json, List<String> fields) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (String fieldPath : fields) {
+            JsonNode fieldValue = getJsonField(json, fieldPath);
+            if (fieldValue != null && !fieldValue.isNull() && !fieldValue.isMissingNode()) {
+                setNestedField(result, fieldPath, jsonNodeToObject(fieldValue));
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Get a field value from JSON, supporting nested paths.
+     */
+    private JsonNode getJsonField(JsonNode json, String fieldPath) {
+        if (fieldPath.contains(".")) {
+            String[] parts = fieldPath.split("\\.");
+            JsonNode current = json;
+            for (String part : parts) {
+                if (current == null || !current.has(part)) {
+                    return null;
+                }
+                current = current.get(part);
+            }
+            return current;
+        }
+        return json.get(fieldPath);
+    }
+    
+    /**
+     * Set a nested field value in a result map.
+     */
+    @SuppressWarnings("unchecked")
+    private void setNestedField(Map<String, Object> result, String fieldPath, Object value) {
+        if (fieldPath.contains(".")) {
+            String[] parts = fieldPath.split("\\.", 2);
+            Map<String, Object> nested = (Map<String, Object>) result.computeIfAbsent(
+                parts[0], k -> new LinkedHashMap<>());
+            setNestedField(nested, parts[1], value);
+        } else {
+            result.put(fieldPath, value);
+        }
+    }
+    
+    /**
+     * Convert JsonNode to appropriate Java object.
+     */
+    private Object jsonNodeToObject(JsonNode node) {
+        if (node.isTextual()) return node.asText();
+        if (node.isInt()) return node.asInt();
+        if (node.isLong()) return node.asLong();
+        if (node.isDouble()) return node.asDouble();
+        if (node.isBoolean()) return node.asBoolean();
+        if (node.isArray()) {
+            List<Object> list = new ArrayList<>();
+            node.forEach(item -> list.add(jsonNodeToObject(item)));
+            return list;
+        }
+        if (node.isObject()) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            node.fields().forEachRemaining(e -> map.put(e.getKey(), jsonNodeToObject(e.getValue())));
+            return map;
+        }
+        return node.asText();
+    }
+    
+    /**
+     * Request DTO for generic search API.
+     */
+    public static class GenericSearchRequest {
+        private String key;
+        private String keyPattern;
+        private String type;
+        private List<Map<String, Object>> values;
+        private List<String> fields;
+        private Integer limit;
+        
+        public String getKey() { return key; }
+        public void setKey(String key) { this.key = key; }
+        
+        public String getKeyPattern() { return keyPattern; }
+        public void setKeyPattern(String keyPattern) { this.keyPattern = keyPattern; }
+        
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        
+        public List<Map<String, Object>> getValues() { return values; }
+        public void setValues(List<Map<String, Object>> values) { this.values = values; }
+        
+        public List<String> getFields() { return fields; }
+        public void setFields(List<String> fields) { this.fields = fields; }
+        
+        public Integer getLimit() { return limit; }
+        public void setLimit(Integer limit) { this.limit = limit; }
     }
     
     // ==================== Server Operations ====================

@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.1.0**
+**Version 1.1.3**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -213,10 +213,17 @@ Regions provide logical isolation for cache entries:
 
 | Feature | Description |
 |---------|-------------|
+| **Auto-Creation** | Regions are automatically created when data is stored to a non-existent region |
 | **Namespace Isolation** | Keys are scoped within regions |
 | **Independent TTL** | Each region can have default TTL settings |
 | **Separate Statistics** | Per-region hit/miss tracking |
 | **Access Control** | Future: Region-level permissions |
+
+**Auto-Creation Behavior:**
+- When data is stored to a region that doesn't exist, the region is automatically created
+- Auto-created regions have the description "Auto-created region"
+- No manual region creation is required before storing data
+- The `default` region always exists and cannot be deleted
 
 ### 3.3 JSON Service
 
@@ -419,6 +426,11 @@ JSON Operations:
   PUT    /json/{region}/{key}       - Set JSON document
   DELETE /json/{region}/{key}       - Delete JSON document
   POST   /json/{region}/search      - Search JSON documents
+
+Generic Search API:
+  POST   /genericsearch             - Unified search with field projection
+                                     - Supports: key lookup, regex pattern, JSON attribute search
+                                     - Optional: fields parameter for field projection
 
 Bulk Operations:
   POST   /cache/{region}/import     - Bulk import

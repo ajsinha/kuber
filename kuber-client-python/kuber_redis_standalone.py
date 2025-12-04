@@ -315,6 +315,34 @@ class KuberRedisClient:
         result = self._send_command('KEYS', pattern)
         return result if result else []
     
+    def ksearch(self, regex_pattern: str, limit: int = 1000) -> List[Dict[str, Any]]:
+        """
+        Search keys by regex pattern and return key-value pairs.
+        
+        Unlike keys() which uses glob patterns, this uses Java regex patterns.
+        Returns list of dicts with 'key', 'value', 'type', 'ttl'.
+        
+        Args:
+            regex_pattern: Java regex pattern (e.g., "user:\\d+", "order:.*")
+            limit: Maximum number of results (default: 1000)
+            
+        Returns:
+            List of dicts: [{"key": "...", "value": "...", "type": "...", "ttl": ...}, ...]
+        """
+        results = self._send_command('KSEARCH', regex_pattern, 'LIMIT', str(limit))
+        
+        if not results:
+            return []
+        
+        parsed = []
+        for result in results:
+            if isinstance(result, str):
+                try:
+                    parsed.append(json.loads(result))
+                except json.JSONDecodeError:
+                    pass
+        return parsed
+    
     def scan(self, cursor: int = 0, match: str = '*', count: int = 10) -> Tuple[int, List[str]]:
         """
         Incrementally iterate keys.
@@ -508,6 +536,169 @@ class KuberRedisClient:
         finally:
             if region and region != original_region:
                 self.select_region(original_region)
+    
+    # ==================== Generic Search (Convenience Method) ====================
+    
+    def generic_search(self, region: str = None, 
+                       key: str = None,
+                       keypattern: str = None,
+                       search_type: str = None,
+                       values: List[Dict[str, Any]] = None,
+                       fields: List[str] = None,
+                       limit: int = 1000) -> List[Dict[str, Any]]:
+        """
+        Perform generic search with flexible options.
+        
+        This is a convenience method that combines various search operations.
+        
+        Supports multiple search modes:
+        1. Simple key lookup: key="ABC"
+        2. Key pattern (regex): keypattern="ABC.*"
+        3. JSON attribute search: search_type="json", values=[{"k1": "abc"}]
+        
+        JSON attribute conditions support:
+        - Equality: {"fieldName": "value"}
+        - Regex: {"fieldName": "pattern", "type": "regex"}
+        - IN operator: {"fieldName": ["value1", "value2"]}
+        
+        Args:
+            region: Region to search in (uses current region if not specified)
+            key: Exact key to lookup
+            keypattern: Regex pattern to match keys
+            search_type: Set to "json" for JSON attribute search
+            values: List of attribute conditions for JSON search
+            fields: Optional list of fields to return (supports nested paths like "address.city")
+            limit: Maximum results (default: 1000)
+            
+        Returns:
+            List of matching key-value pairs
+            
+        Example:
+            # Simple key lookup
+            results = client.generic_search(key="user:1001")
+            
+            # Key pattern search
+            results = client.generic_search(keypattern="user:.*")
+            
+            # JSON search with equality
+            results = client.generic_search(
+                search_type="json",
+                values=[{"status": "active"}]
+            )
+            
+            # Search with field projection
+            results = client.generic_search(
+                keypattern="user:.*",
+                fields=["name", "email", "address.city"]
+            )
+        """
+        r = region or self.current_region
+        results = []
+        
+        original_region = self.current_region
+        if r != original_region:
+            self.select_region(r)
+        
+        try:
+            if key:
+                # Mode 1: Simple key lookup
+                value = self.get(key)
+                if value:
+                    result_value = value
+                    try:
+                        result_value = json.loads(value)
+                        if fields:
+                            result_value = self._project_fields(result_value, fields)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    results.append({'key': key, 'value': result_value})
+                    
+            elif keypattern:
+                # Mode 2: Key pattern (regex) search
+                # ksearch returns list of dicts with key, value, type, ttl
+                search_results = self.ksearch(keypattern, limit)
+                for item in search_results:
+                    key = item.get('key')
+                    value = item.get('value')
+                    if key and value is not None:
+                        result_value = value
+                        # value might already be parsed or a string
+                        if isinstance(value, str):
+                            try:
+                                result_value = json.loads(value)
+                            except (json.JSONDecodeError, TypeError):
+                                result_value = value
+                        if fields and isinstance(result_value, dict):
+                            result_value = self._project_fields(result_value, fields)
+                        results.append({'key': key, 'value': result_value})
+                        
+            elif search_type == 'json' and values:
+                # Mode 3: JSON attribute search
+                # Build query from values
+                query_parts = []
+                for condition in values:
+                    cond_type = condition.get('type', 'equals')
+                    for field_name, field_value in condition.items():
+                        if field_name == 'type':
+                            continue
+                        if isinstance(field_value, list):
+                            # IN operator - search for each value
+                            for v in field_value:
+                                query_parts.append(f'$.{field_name}={v}')
+                        elif cond_type == 'regex':
+                            query_parts.append(f'$.{field_name} LIKE {field_value}')
+                        else:
+                            query_parts.append(f'$.{field_name}={field_value}')
+                
+                if query_parts:
+                    query = ','.join(query_parts)
+                    search_results = self.json_search(query)
+                    for item in search_results[:limit]:
+                        if fields:
+                            item['value'] = self._project_fields(item['value'], fields)
+                        results.append(item)
+            
+            return results
+            
+        finally:
+            if r != original_region:
+                self.select_region(original_region)
+    
+    def _project_fields(self, data: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
+        """
+        Project (filter) fields from a dictionary.
+        Supports nested paths with dot notation.
+        """
+        if not isinstance(data, dict):
+            return data
+        
+        result = {}
+        for field_path in fields:
+            value = self._get_nested_field(data, field_path)
+            if value is not None:
+                self._set_nested_field(result, field_path, value)
+        return result
+    
+    def _get_nested_field(self, data: Dict[str, Any], field_path: str) -> Any:
+        """Get a nested field value using dot notation."""
+        parts = field_path.split('.')
+        current = data
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return None
+        return current
+    
+    def _set_nested_field(self, result: Dict[str, Any], field_path: str, value: Any):
+        """Set a nested field value using dot notation."""
+        parts = field_path.split('.')
+        current = result
+        for i, part in enumerate(parts[:-1]):
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
     
     # ==================== Server Operations ====================
     
