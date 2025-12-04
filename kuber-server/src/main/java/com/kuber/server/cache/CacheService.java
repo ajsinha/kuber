@@ -53,6 +53,7 @@ public class CacheService {
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
     private final EventPublisher eventPublisher;
+    private final CacheMetricsService metricsService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -68,10 +69,12 @@ public class CacheService {
     
     public CacheService(KuberProperties properties, 
                         PersistenceStore persistenceStore,
-                        EventPublisher eventPublisher) {
+                        EventPublisher eventPublisher,
+                        CacheMetricsService metricsService) {
         this.properties = properties;
         this.persistenceStore = persistenceStore;
         this.eventPublisher = eventPublisher;
+        this.metricsService = metricsService;
     }
     
     @PostConstruct
@@ -555,6 +558,7 @@ public class CacheService {
             }
             
             recordStatistic(region, KuberConstants.STAT_DELETES);
+            metricsService.recordDelete(region);
             eventPublisher.publish(CacheEvent.entryDeleted(region, key, properties.getNodeId()));
             
             return true;
@@ -905,15 +909,18 @@ public class CacheService {
                 }
                 
                 recordStatistic(region, KuberConstants.STAT_EXPIRED);
+                metricsService.recordGet(region, false);
                 return null;
             }
             
             entry.recordAccess();
             regions.get(region).recordHit();
             recordStatistic(region, KuberConstants.STAT_HITS);
+            metricsService.recordGet(region, true);
         } else {
             regions.get(region).recordMiss();
             recordStatistic(region, KuberConstants.STAT_MISSES);
+            metricsService.recordGet(region, false);
         }
         
         return entry;
@@ -933,6 +940,7 @@ public class CacheService {
         }
         
         recordStatistic(region, KuberConstants.STAT_SETS);
+        metricsService.recordSet(region);
         
         // Persist to persistence store
         if (properties.getCache().isPersistentMode()) {
@@ -1048,6 +1056,149 @@ public class CacheService {
         
         Cache<String, CacheEntry> cache = regionCaches.get(region);
         return cache != null ? cache.estimatedSize() : 0;
+    }
+    
+    /**
+     * Get the metrics service for monitoring.
+     */
+    public CacheMetricsService getMetricsService() {
+        return metricsService;
+    }
+    
+    /**
+     * Get in-memory entry count for a region.
+     */
+    public long getMemoryEntryCount(String region) {
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        return cache != null ? cache.estimatedSize() : 0;
+    }
+    
+    /**
+     * Get persistence store entry count for a region.
+     */
+    public long getPersistenceEntryCount(String region) {
+        return persistenceStore.countEntries(region);
+    }
+    
+    /**
+     * Get detailed region statistics including memory vs persistence.
+     */
+    public Map<String, Object> getDetailedRegionStats(String region) {
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("region", region);
+        
+        CacheRegion regionObj = regions.get(region);
+        if (regionObj != null) {
+            stats.put("entryCount", regionObj.getEntryCount());
+            stats.put("hitRatio", String.format("%.2f", regionObj.getHitRatio()));
+        }
+        
+        stats.put("memoryEntries", getMemoryEntryCount(region));
+        stats.put("persistenceEntries", getPersistenceEntryCount(region));
+        
+        return stats;
+    }
+    
+    /**
+     * Get all region statistics for monitoring dashboard.
+     */
+    public List<Map<String, Object>> getAllRegionStats() {
+        List<Map<String, Object>> allStats = new ArrayList<>();
+        for (String regionName : regions.keySet()) {
+            allStats.add(getDetailedRegionStats(regionName));
+        }
+        return allStats;
+    }
+    
+    // ==================== Memory Management Eviction ====================
+    
+    /**
+     * Evict entries from memory to persistence store.
+     * Used by MemoryWatcherService to reduce heap usage under memory pressure.
+     * Entries are persisted before being removed from memory to prevent data loss.
+     * 
+     * @param count Maximum number of entries to evict
+     * @return Actual number of entries evicted
+     */
+    public int evictEntriesToPersistence(int count) {
+        int totalEvicted = 0;
+        
+        // Iterate through regions and evict entries
+        for (Map.Entry<String, Cache<String, CacheEntry>> regionEntry : regionCaches.entrySet()) {
+            if (totalEvicted >= count) {
+                break;
+            }
+            
+            String regionName = regionEntry.getKey();
+            Cache<String, CacheEntry> cache = regionEntry.getValue();
+            CacheRegion region = regions.get(regionName);
+            
+            // Get entries to evict (Caffeine's asMap() returns in no particular order,
+            // but the cache is configured with LRU so entries accessed less recently
+            // will be candidates for eviction)
+            int regionEvictCount = Math.min(count - totalEvicted, (int) cache.estimatedSize());
+            if (regionEvictCount <= 0) {
+                continue;
+            }
+            
+            List<String> keysToEvict = new ArrayList<>();
+            List<CacheEntry> entriesToPersist = new ArrayList<>();
+            
+            // Collect entries to evict
+            for (Map.Entry<String, CacheEntry> entry : cache.asMap().entrySet()) {
+                if (keysToEvict.size() >= regionEvictCount) {
+                    break;
+                }
+                
+                CacheEntry cacheEntry = entry.getValue();
+                
+                // Skip expired entries (they will be cleaned up by TTL cleanup)
+                if (cacheEntry.isExpired()) {
+                    continue;
+                }
+                
+                keysToEvict.add(entry.getKey());
+                entriesToPersist.add(cacheEntry);
+            }
+            
+            // Persist entries before evicting
+            for (CacheEntry entry : entriesToPersist) {
+                try {
+                    persistenceStore.saveEntry(entry);
+                } catch (Exception e) {
+                    log.warn("Failed to persist entry '{}' during eviction: {}", 
+                            entry.getKey(), e.getMessage());
+                }
+            }
+            
+            // Evict from memory
+            for (String key : keysToEvict) {
+                cache.invalidate(key);
+                totalEvicted++;
+                
+                // Note: We don't decrement region entry count because the entry
+                // still exists in persistence. The entry count reflects total entries,
+                // not just in-memory entries.
+                
+                recordStatistic(regionName, "evictions");
+            }
+            
+            if (!keysToEvict.isEmpty()) {
+                log.debug("Evicted {} entries from region '{}' to persistence", 
+                        keysToEvict.size(), regionName);
+            }
+        }
+        
+        return totalEvicted;
+    }
+    
+    /**
+     * Get total number of entries across all regions in memory.
+     */
+    public long getTotalMemoryEntries() {
+        return regionCaches.values().stream()
+                .mapToLong(Cache::estimatedSize)
+                .sum();
     }
     
     // ==================== TTL Cleanup ====================

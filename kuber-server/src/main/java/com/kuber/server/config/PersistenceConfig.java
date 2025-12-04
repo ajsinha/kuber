@@ -46,8 +46,8 @@ public class PersistenceConfig {
             case "rocksdb", "rocks" -> createRocksDbPersistenceStore();
             case "memory", "mem" -> createMemoryPersistenceStore();
             default -> {
-                log.warn("Unknown persistence type '{}', defaulting to MongoDB", type);
-                yield createMongoPersistenceStore();
+                log.warn("Unknown persistence type '{}', defaulting to RocksDB", type);
+                yield createRocksDbPersistenceStore();
             }
         };
         
@@ -63,7 +63,8 @@ public class PersistenceConfig {
     private PersistenceStore createMongoPersistenceStore() {
         if (mongoDatabase == null) {
             log.error("MongoDB is not configured but mongodb persistence type is selected");
-            throw new IllegalStateException("MongoDB database is not available");
+            log.warn("Falling back to RocksDB persistence store");
+            return createRocksDbPersistenceStore();
         }
         return new MongoPersistenceStore(mongoDatabase, properties);
     }

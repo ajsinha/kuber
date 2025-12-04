@@ -81,6 +81,145 @@
             </div>
         </div>
         
+        <!-- System, Memory & Watcher Row -->
+        <div class="row g-4 mb-4">
+            <!-- Host & JVM Info Card -->
+            <div class="col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-microchip me-2 text-info"></i>
+                            System &amp; JVM
+                        </h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshSystemInfo()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="systemInfo">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Memory Info Card -->
+            <div class="col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-memory me-2 text-success"></i>
+                            Heap Memory
+                        </h5>
+                        <button class="btn btn-sm btn-warning" onclick="triggerGC()" id="gcButton">
+                            <i class="fas fa-broom me-1"></i>GC
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="memoryInfo">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Memory Watcher Card -->
+            <div class="col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt me-2 text-danger"></i>
+                            Memory Watcher
+                        </h5>
+                        <button class="btn btn-sm btn-danger" onclick="forceEviction()" id="evictButton">
+                            <i class="fas fa-eject me-1"></i>Evict
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="memoryWatcherInfo">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Autoload Card -->
+            <div class="col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-import me-2 text-purple" style="color: #6f42c1;"></i>
+                            Autoload
+                        </h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="triggerAutoloadScan()" id="scanButton">
+                            <i class="fas fa-search me-1"></i>Scan
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="autoloadInfo">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div class="row g-4 mb-4">
+            <!-- Cache Activity Line Chart -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2 text-primary"></i>
+                            Cache Activity (Last 30 Minutes)
+                        </h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshActivityChart()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="activityChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Region Population Bar Chart -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2 text-warning"></i>
+                            Region Population
+                        </h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshRegionChart()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="regionChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Server Info Row -->
         <div class="row g-4">
             <!-- Server Info -->
             <div class="col-lg-4">
@@ -161,14 +300,401 @@
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+    let activityChart = null;
+    let regionChart = null;
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshSystemInfo();
+        refreshMemoryInfo();
+        refreshMemoryWatcherInfo();
+        refreshAutoloadInfo();
+        initActivityChart();
+        initRegionChart();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(function() {
+            refreshSystemInfo();
+            refreshMemoryInfo();
+            refreshMemoryWatcherInfo();
+            refreshAutoloadInfo();
+        }, 10000);
+        
+        // Refresh charts every 30 seconds
+        setInterval(function() {
+            refreshActivityChart();
+            refreshRegionChart();
+        }, 30000);
+    });
+    
+    // System Info
+    function refreshSystemInfo() {
+        fetch('/api/monitoring/system')
+            .then(response => response.json())
+            .then(data => {
+                let html = '<ul class="list-group list-group-flush small">';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Hostname</span>' +
+                    '<span class="fw-bold">' + data.hostname + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">OS</span>' +
+                    '<span>' + data.osName + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">CPUs</span>' +
+                    '<span>' + data.availableProcessors + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Java</span>' +
+                    '<span>' + data.javaVersion + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Uptime</span>' +
+                    '<span class="text-success">' + data.uptimeFormatted + '</span></li>';
+                html += '</ul>';
+                document.getElementById('systemInfo').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('systemInfo').innerHTML = 
+                    '<div class="alert alert-danger small mb-0">Failed to load</div>';
+            });
+    }
+    
+    // Memory Info
+    function refreshMemoryInfo() {
+        fetch('/api/monitoring/memory')
+            .then(response => response.json())
+            .then(data => {
+                const heap = data.heap;
+                const usagePercent = heap.usagePercent.toFixed(1);
+                const progressClass = usagePercent > 80 ? 'bg-danger' : (usagePercent > 60 ? 'bg-warning' : 'bg-success');
+                
+                let html = '<div class="mb-2">' +
+                    '<div class="d-flex justify-content-between mb-1 small">' +
+                    '<span>Heap</span>' +
+                    '<span class="fw-bold">' + usagePercent + '%</span>' +
+                    '</div>' +
+                    '<div class="progress" style="height: 12px;">' +
+                    '<div class="progress-bar ' + progressClass + '" role="progressbar" ' +
+                    'style="width: ' + usagePercent + '%" >' +
+                    '</div></div></div>' +
+                    '<ul class="list-group list-group-flush small">' +
+                    '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Used</span><span>' + heap.usedMB + ' MB</span></li>' +
+                    '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Max</span><span>' + heap.maxMB + ' MB</span></li>' +
+                    '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Free</span><span class="text-success">' + data.freeMemoryMB + ' MB</span></li>' +
+                    '</ul>';
+                document.getElementById('memoryInfo').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('memoryInfo').innerHTML = 
+                    '<div class="alert alert-danger small mb-0">Failed to load</div>';
+            });
+    }
+    
+    // Memory Watcher Info
+    function refreshMemoryWatcherInfo() {
+        fetch('/api/monitoring/memory-watcher')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.enabled) {
+                    document.getElementById('memoryWatcherInfo').innerHTML = 
+                        '<div class="text-center py-2 text-muted small">' +
+                        '<i class="fas fa-pause-circle fa-2x mb-2 d-block"></i>Disabled</div>';
+                    document.getElementById('evictButton').disabled = true;
+                    return;
+                }
+                
+                const config = data.config || {};
+                const totals = data.totals || {};
+                const lastEviction = data.lastEviction || {};
+                
+                const statusClass = data.evictionInProgress ? 'text-warning' : 'text-success';
+                const statusIcon = data.evictionInProgress ? 'fa-spinner fa-spin' : 'fa-check-circle';
+                
+                let html = '<div class="small">';
+                html += '<div class="d-flex justify-content-between mb-1">' +
+                    '<span><i class="fas ' + statusIcon + ' ' + statusClass + ' me-1"></i>' + 
+                    (data.evictionInProgress ? 'Evicting' : 'Active') + '</span>' +
+                    '<span class="badge bg-secondary">' + (config.checkIntervalMs / 1000) + 's</span></div>';
+                
+                html += '<div class="d-flex justify-content-between mb-2">' +
+                    '<small class="text-danger">High: ' + config.highWatermarkPercent + '%</small>' +
+                    '<small class="text-success">Low: ' + config.lowWatermarkPercent + '%</small></div>';
+                
+                html += '<ul class="list-group list-group-flush">';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">In Memory</span>' +
+                    '<span class="fw-bold">' + (data.totalMemoryEntries || 0).toLocaleString() + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Evicted</span>' +
+                    '<span class="text-danger">' + (totals.evictedEntries || 0).toLocaleString() + '</span></li>';
+                
+                if (lastEviction.entriesEvicted > 0) {
+                    html += '<li class="list-group-item px-0 py-1 small text-muted">' +
+                        'Last: ' + lastEviction.entriesEvicted + ' entries @ ' + formatTime(lastEviction.time) + '</li>';
+                }
+                
+                html += '</ul></div>';
+                
+                document.getElementById('memoryWatcherInfo').innerHTML = html;
+                document.getElementById('evictButton').disabled = data.evictionInProgress;
+            })
+            .catch(err => {
+                document.getElementById('memoryWatcherInfo').innerHTML = 
+                    '<div class="alert alert-danger small mb-0">Failed to load</div>';
+            });
+    }
+    
+    // Autoload Info
+    function refreshAutoloadInfo() {
+        fetch('/api/monitoring/autoload')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.enabled) {
+                    document.getElementById('autoloadInfo').innerHTML = 
+                        '<div class="text-center py-2 text-muted small">' +
+                        '<i class="fas fa-pause-circle fa-2x mb-2 d-block"></i>Disabled</div>';
+                    document.getElementById('scanButton').disabled = true;
+                    return;
+                }
+                
+                const totals = data.totals || {};
+                const lastFile = data.lastFile || {};
+                
+                let html = '<div class="small">';
+                
+                // Status
+                html += '<div class="d-flex justify-content-between mb-1">' +
+                    '<span><i class="fas fa-check-circle text-success me-1"></i>Active</span>' +
+                    '<span class="badge bg-secondary">' + data.scanIntervalSeconds + 's</span></div>';
+                
+                // Inbox status
+                const inboxClass = (data.filesInInbox > 0) ? 'text-warning' : 'text-muted';
+                html += '<div class="mb-2"><small class="' + inboxClass + '">' +
+                    '<i class="fas fa-inbox me-1"></i>' + (data.filesInInbox || 0) + ' files in inbox</small></div>';
+                
+                html += '<ul class="list-group list-group-flush">';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Files Processed</span>' +
+                    '<span>' + (totals.filesProcessed || 0).toLocaleString() + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Records Loaded</span>' +
+                    '<span class="text-success">' + (totals.recordsLoaded || 0).toLocaleString() + '</span></li>';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">Errors</span>' +
+                    '<span class="' + ((totals.errors > 0) ? 'text-danger' : '') + '">' + 
+                    (totals.errors || 0) + '</span></li>';
+                
+                // Last file
+                if (lastFile.name) {
+                    html += '<li class="list-group-item px-0 py-1 small text-muted">' +
+                        'Last: ' + lastFile.name.substring(0, 20) + (lastFile.name.length > 20 ? '...' : '') +
+                        ' (' + lastFile.recordsLoaded + ' records)</li>';
+                }
+                
+                html += '</ul></div>';
+                
+                document.getElementById('autoloadInfo').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('autoloadInfo').innerHTML = 
+                    '<div class="alert alert-danger small mb-0">Failed to load</div>';
+            });
+    }
+    
+    function formatTime(isoString) {
+        if (!isoString) return 'N/A';
+        const date = new Date(isoString);
+        return date.toLocaleTimeString();
+    }
+    
+    // Trigger GC
+    function triggerGC() {
+        const btn = document.getElementById('gcButton');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        fetch('/api/monitoring/gc', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-broom me-1"></i>GC';
+                refreshMemoryInfo();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-broom me-1"></i>GC';
+            });
+    }
+    
+    // Force Eviction
+    function forceEviction() {
+        if (!confirm('Force eviction will move cache entries from memory to persistence. Continue?')) {
+            return;
+        }
+        
+        const btn = document.getElementById('evictButton');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        fetch('/api/monitoring/memory-watcher/evict', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-eject me-1"></i>Evict';
+                if (data.success) {
+                    alert('Eviction Complete!\n' + data.message);
+                } else {
+                    alert('Eviction failed: ' + data.message);
+                }
+                refreshMemoryInfo();
+                refreshMemoryWatcherInfo();
+                refreshRegionChart();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-eject me-1"></i>Evict';
+                alert('Failed to trigger eviction');
+            });
+    }
+    
+    // Trigger Autoload Scan
+    function triggerAutoloadScan() {
+        const btn = document.getElementById('scanButton');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        fetch('/api/monitoring/autoload/scan', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search me-1"></i>Scan';
+                // Refresh after a short delay to allow scan to complete
+                setTimeout(refreshAutoloadInfo, 1000);
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search me-1"></i>Scan';
+            });
+    }
+    
+    // Activity Chart
+    function initActivityChart() {
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        activityChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Operations/min' } },
+                    x: { title: { display: true, text: 'Time' } }
+                }
+            }
+        });
+        refreshActivityChart();
+    }
+    
+    function refreshActivityChart() {
+        fetch('/api/monitoring/metrics/activity?minutes=30')
+            .then(response => response.json())
+            .then(data => {
+                const regions = data.regions;
+                const regionNames = Object.keys(regions);
+                
+                if (regionNames.length === 0) {
+                    activityChart.data.labels = [];
+                    activityChart.data.datasets = [];
+                    activityChart.update();
+                    return;
+                }
+                
+                let labels = [];
+                for (const region of regionNames) {
+                    const metrics = regions[region];
+                    if (metrics && metrics.length > 0) {
+                        labels = metrics.map(m => {
+                            const date = new Date(m.timestamp);
+                            return date.getHours().toString().padStart(2, '0') + ':' + 
+                                   date.getMinutes().toString().padStart(2, '0');
+                        });
+                        break;
+                    }
+                }
+                
+                const colors = [
+                    'rgb(54, 162, 235)', 'rgb(255, 99, 132)', 'rgb(75, 192, 192)',
+                    'rgb(255, 159, 64)', 'rgb(153, 102, 255)', 'rgb(255, 205, 86)'
+                ];
+                
+                const datasets = regionNames.map((region, i) => {
+                    const metrics = regions[region] || [];
+                    return {
+                        label: region,
+                        data: metrics.map(m => m.gets + m.sets + m.deletes),
+                        borderColor: colors[i % colors.length],
+                        backgroundColor: colors[i % colors.length].replace('rgb', 'rgba').replace(')', ', 0.1)'),
+                        tension: 0.3,
+                        fill: true
+                    };
+                });
+                
+                activityChart.data.labels = labels;
+                activityChart.data.datasets = datasets;
+                activityChart.update();
+            })
+            .catch(err => console.error('Failed to load activity metrics:', err));
+    }
+    
+    // Region Chart
+    function initRegionChart() {
+        const ctx = document.getElementById('regionChart').getContext('2d');
+        regionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Memory', data: [], backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgb(54, 162, 235)', borderWidth: 1 },
+                    { label: 'Persistence', data: [], backgroundColor: 'rgba(255, 159, 64, 0.7)', borderColor: 'rgb(255, 159, 64)', borderWidth: 1 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Entry Count' } } }
+            }
+        });
+        refreshRegionChart();
+    }
+    
+    function refreshRegionChart() {
+        fetch('/api/monitoring/metrics/regions')
+            .then(response => response.json())
+            .then(data => {
+                const labels = data.map(r => r.region);
+                const memoryData = data.map(r => r.memoryEntries || 0);
+                const persistenceData = data.map(r => r.persistenceEntries || 0);
+                
+                regionChart.data.labels = labels;
+                regionChart.data.datasets[0].data = memoryData;
+                regionChart.data.datasets[1].data = persistenceData;
+                regionChart.update();
+            })
+            .catch(err => console.error('Failed to load region stats:', err));
+    }
+</script>
+
 <style>
-    .hover-lift {
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .hover-lift:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
-    }
+    .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
+    .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important; }
+    #activityChart, #regionChart { min-height: 250px; }
 </style>
 
 </body>

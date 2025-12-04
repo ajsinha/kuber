@@ -29,11 +29,11 @@ import org.springframework.stereotype.Service;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -75,6 +75,20 @@ public class AutoloadService {
     private final AtomicLong totalFilesProcessed = new AtomicLong(0);
     private final AtomicLong totalRecordsLoaded = new AtomicLong(0);
     private final AtomicLong totalErrors = new AtomicLong(0);
+    private final AtomicLong totalScans = new AtomicLong(0);
+    
+    // Activity tracking
+    private volatile Instant lastScanTime = null;
+    private volatile Instant lastFileProcessedTime = null;
+    private volatile String lastFileProcessed = null;
+    private volatile int lastFileRecordsLoaded = 0;
+    private volatile int lastFileErrors = 0;
+    private volatile String lastActivityMessage = "Waiting for first scan...";
+    private volatile int filesInInbox = 0;
+    
+    // Recent activity log (keep last 10 entries)
+    private final Deque<ActivityLogEntry> recentActivity = new ConcurrentLinkedDeque<>();
+    private static final int MAX_RECENT_ACTIVITY = 10;
     
     private static final DateTimeFormatter TIMESTAMP_FORMAT = 
             DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
@@ -158,20 +172,26 @@ public class AutoloadService {
      * Scan inbox and process files.
      */
     public void scanAndProcess() {
+        totalScans.incrementAndGet();
+        lastScanTime = Instant.now();
+        
         try {
             if (!Files.exists(inboxPath)) {
+                lastActivityMessage = "Inbox directory does not exist";
                 log.warn("Inbox directory does not exist: {}", inboxPath);
                 return;
             }
             
             // Find all data files with metadata
             List<Path> dataFiles = new ArrayList<>();
+            int pendingFiles = 0;
             
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(inboxPath)) {
                 for (Path file : stream) {
                     String fileName = file.getFileName().toString().toLowerCase();
                     if ((fileName.endsWith(".csv") || fileName.endsWith(".json")) 
                             && !fileName.endsWith(".metadata")) {
+                        pendingFiles++;
                         // Check if metadata file exists
                         Path metadataPath = file.resolveSibling(file.getFileName() + ".metadata");
                         if (Files.exists(metadataPath)) {
@@ -183,11 +203,15 @@ public class AutoloadService {
                 }
             }
             
+            filesInInbox = pendingFiles;
+            
             if (dataFiles.isEmpty()) {
+                lastActivityMessage = "Scan complete - no files to process";
                 log.debug("No files to process in inbox");
                 return;
             }
             
+            lastActivityMessage = String.format("Processing %d file(s)...", dataFiles.size());
             log.info("Found {} file(s) to process", dataFiles.size());
             
             for (Path dataFile : dataFiles) {
@@ -207,8 +231,10 @@ public class AutoloadService {
         Path metadataPath = dataFile.resolveSibling(dataFile.getFileName() + ".metadata");
         Path attributeMappingPath = dataFile.resolveSibling(dataFile.getFileName() + ".metadata.attributemapping.json");
         String fileName = dataFile.getFileName().toString();
+        Instant startTime = Instant.now();
         
         log.info("Processing file: {}", fileName);
+        lastActivityMessage = "Processing: " + fileName;
         
         try {
             // Parse metadata
@@ -228,6 +254,7 @@ public class AutoloadService {
                 log.error("Missing key_field in metadata for file: {}", fileName);
                 moveToOutbox(dataFile, metadataPath, attributeMappingPath, "ERROR_NO_KEY_FIELD");
                 totalErrors.incrementAndGet();
+                addActivityLogEntry(fileName, metadata.getRegion(), 0, 1, startTime, "ERROR: Missing key_field");
                 return;
             }
             
@@ -249,6 +276,16 @@ public class AutoloadService {
             totalRecordsLoaded.addAndGet(result.getLoaded());
             totalErrors.addAndGet(result.getErrors());
             
+            // Update last file tracking
+            lastFileProcessedTime = Instant.now();
+            lastFileProcessed = fileName;
+            lastFileRecordsLoaded = result.getLoaded();
+            lastFileErrors = result.getErrors();
+            lastActivityMessage = String.format("Loaded %d records from %s", result.getLoaded(), fileName);
+            
+            // Add to activity log
+            addActivityLogEntry(fileName, metadata.getRegion(), result.getLoaded(), result.getErrors(), startTime, "SUCCESS");
+            
         } catch (Exception e) {
             log.error("Failed to process file: {}", fileName, e);
             try {
@@ -257,6 +294,25 @@ public class AutoloadService {
                 log.error("Failed to move file to outbox", ioe);
             }
             totalErrors.incrementAndGet();
+            lastActivityMessage = "Error processing: " + fileName + " - " + e.getMessage();
+            addActivityLogEntry(fileName, "unknown", 0, 1, startTime, "ERROR: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add an entry to the recent activity log.
+     */
+    private void addActivityLogEntry(String fileName, String region, int recordsLoaded, int errors, 
+                                      Instant startTime, String status) {
+        long durationMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
+        ActivityLogEntry entry = new ActivityLogEntry(
+                Instant.now(), fileName, region, recordsLoaded, errors, durationMs, status);
+        
+        recentActivity.addFirst(entry);
+        
+        // Trim to max size
+        while (recentActivity.size() > MAX_RECENT_ACTIVITY) {
+            recentActivity.removeLast();
         }
     }
     
@@ -578,10 +634,55 @@ public class AutoloadService {
         stats.put("inboxPath", inboxPath != null ? inboxPath.toString() : null);
         stats.put("outboxPath", outboxPath != null ? outboxPath.toString() : null);
         stats.put("scanIntervalSeconds", properties.getAutoload().getScanIntervalSeconds());
-        stats.put("totalFilesProcessed", totalFilesProcessed.get());
-        stats.put("totalRecordsLoaded", totalRecordsLoaded.get());
-        stats.put("totalErrors", totalErrors.get());
+        stats.put("filesInInbox", filesInInbox);
+        
+        // Totals
+        Map<String, Object> totals = new LinkedHashMap<>();
+        totals.put("scans", totalScans.get());
+        totals.put("filesProcessed", totalFilesProcessed.get());
+        totals.put("recordsLoaded", totalRecordsLoaded.get());
+        totals.put("errors", totalErrors.get());
+        stats.put("totals", totals);
+        
+        // Last scan
+        Map<String, Object> lastScan = new LinkedHashMap<>();
+        lastScan.put("time", lastScanTime != null ? lastScanTime.toString() : null);
+        stats.put("lastScan", lastScan);
+        
+        // Last file processed
+        Map<String, Object> lastFile = new LinkedHashMap<>();
+        lastFile.put("name", lastFileProcessed);
+        lastFile.put("time", lastFileProcessedTime != null ? lastFileProcessedTime.toString() : null);
+        lastFile.put("recordsLoaded", lastFileRecordsLoaded);
+        lastFile.put("errors", lastFileErrors);
+        stats.put("lastFile", lastFile);
+        
+        // Last activity message
+        stats.put("lastActivityMessage", lastActivityMessage);
+        
+        // Recent activity
+        List<Map<String, Object>> activityList = new ArrayList<>();
+        for (ActivityLogEntry entry : recentActivity) {
+            Map<String, Object> entryMap = new LinkedHashMap<>();
+            entryMap.put("time", entry.time().toString());
+            entryMap.put("fileName", entry.fileName());
+            entryMap.put("region", entry.region());
+            entryMap.put("recordsLoaded", entry.recordsLoaded());
+            entryMap.put("errors", entry.errors());
+            entryMap.put("durationMs", entry.durationMs());
+            entryMap.put("status", entry.status());
+            activityList.add(entryMap);
+        }
+        stats.put("recentActivity", activityList);
+        
         return stats;
+    }
+    
+    /**
+     * Get recent activity log entries.
+     */
+    public List<ActivityLogEntry> getRecentActivity() {
+        return new ArrayList<>(recentActivity);
     }
     
     /**
@@ -592,6 +693,19 @@ public class AutoloadService {
             scheduler.execute(this::scanAndProcess);
         }
     }
+    
+    /**
+     * Activity log entry record.
+     */
+    public record ActivityLogEntry(
+            Instant time,
+            String fileName,
+            String region,
+            int recordsLoaded,
+            int errors,
+            long durationMs,
+            String status
+    ) {}
     
     /**
      * Metadata parsed from .metadata file.

@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -175,6 +176,43 @@ public class KuberProperties {
          * Enable statistics collection
          */
         private boolean enableStatistics = true;
+        
+        // ==================== Memory Management ====================
+        
+        /**
+         * Enable automated memory management watcher.
+         * When enabled, heap usage is monitored and cache entries are
+         * evicted to persistence when memory exceeds the high watermark.
+         */
+        private boolean memoryWatcherEnabled = true;
+        
+        /**
+         * High watermark percentage for heap memory.
+         * When heap usage exceeds this threshold, eviction begins.
+         */
+        @Min(50)
+        @Max(95)
+        private int memoryHighWatermarkPercent = 85;
+        
+        /**
+         * Low watermark percentage for heap memory.
+         * Eviction continues until heap usage drops below this threshold.
+         */
+        @Min(20)
+        @Max(80)
+        private int memoryLowWatermarkPercent = 50;
+        
+        /**
+         * Number of entries to evict per batch during memory pressure.
+         */
+        @Min(100)
+        private int memoryEvictionBatchSize = 1000;
+        
+        /**
+         * Interval in milliseconds for memory watcher checks.
+         */
+        @Min(1000)
+        private int memoryWatcherIntervalMs = 5000;
     }
     
     @Data
@@ -342,9 +380,10 @@ public class KuberProperties {
     public static class Persistence {
         /**
          * Persistence store type: mongodb, sqlite, postgresql, rocksdb, memory
+         * Default: rocksdb (no external dependencies required)
          */
         @NotBlank
-        private String type = "mongodb";
+        private String type = "rocksdb";
         
         /**
          * SQLite configuration
