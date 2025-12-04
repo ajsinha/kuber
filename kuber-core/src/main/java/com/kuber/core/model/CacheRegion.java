@@ -68,10 +68,22 @@ public class CacheRegion implements Serializable {
     private long defaultTtlSeconds = -1;
     
     /**
-     * Current number of entries in this region
+     * Current number of entries in this region (total)
      */
     @Builder.Default
     private long entryCount = 0;
+    
+    /**
+     * Number of entries currently in memory cache
+     */
+    @Builder.Default
+    private long memoryEntryCount = 0;
+    
+    /**
+     * Number of entries in persistence store
+     */
+    @Builder.Default
+    private long persistenceEntryCount = 0;
     
     /**
      * Total size of entries in bytes

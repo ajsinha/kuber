@@ -463,5 +463,16 @@ public class KuberProperties {
          * Path to RocksDB database directory
          */
         private String path = "./data/rocksdb";
+        
+        /**
+         * Enable automatic compaction to reclaim disk space
+         */
+        private boolean compactionEnabled = true;
+        
+        /**
+         * Compaction interval in minutes
+         */
+        @Min(1)
+        private int compactionIntervalMinutes = 30;
     }
 }

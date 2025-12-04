@@ -65,26 +65,26 @@
                         <div class="row g-4">
                             <div class="col-md-3">
                                 <div class="text-center p-3 bg-light rounded">
-                                    <div class="text-muted small mb-1">Entries</div>
+                                    <div class="text-muted small mb-1">Total Entries</div>
                                     <div class="h3 mb-0" th:text="${#numbers.formatInteger(entryCount, 1, 'COMMA')}">0</div>
                                 </div>
                             </div>
                             <div class="col-md-3">
-                                <div class="text-center p-3 bg-light rounded">
-                                    <div class="text-muted small mb-1">Hits</div>
-                                    <div class="h3 mb-0" th:text="${#numbers.formatInteger(stats != null and stats['hits'] != null ? stats['hits'] : 0, 1, 'COMMA')}">0</div>
+                                <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
+                                    <div class="text-muted small mb-1"><i class="fas fa-memory me-1"></i>Memory</div>
+                                    <div class="h3 mb-0 text-primary" th:text="${#numbers.formatInteger(region.memoryEntryCount, 1, 'COMMA')}">0</div>
                                 </div>
                             </div>
                             <div class="col-md-3">
-                                <div class="text-center p-3 bg-light rounded">
-                                    <div class="text-muted small mb-1">Misses</div>
-                                    <div class="h3 mb-0" th:text="${#numbers.formatInteger(stats != null and stats['misses'] != null ? stats['misses'] : 0, 1, 'COMMA')}">0</div>
+                                <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
+                                    <div class="text-muted small mb-1"><i class="fas fa-database me-1"></i>Persistence</div>
+                                    <div class="h3 mb-0 text-warning" th:text="${#numbers.formatInteger(region.persistenceEntryCount, 1, 'COMMA')}">0</div>
                                 </div>
                             </div>
                             <div class="col-md-3">
-                                <div class="text-center p-3 bg-light rounded">
+                                <div class="text-center p-3 bg-success bg-opacity-10 rounded">
                                     <div class="text-muted small mb-1">Hit Ratio</div>
-                                    <div class="h3 mb-0" th:text="${#numbers.formatPercent(region.hitRatio, 1, 1)}">0%</div>
+                                    <div class="h3 mb-0 text-success" th:text="${#numbers.formatPercent(region.hitRatio, 1, 1)}">0%</div>
                                 </div>
                             </div>
                         </div>
@@ -92,19 +92,37 @@
                         <hr>
                         
                         <div class="row g-4">
-                            <div class="col-md-4">
+                            <div class="col-md-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Hits</span>
+                                    <span th:text="${#numbers.formatInteger(stats != null and stats['hits'] != null ? stats['hits'] : 0, 1, 'COMMA')}">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Misses</span>
+                                    <span th:text="${#numbers.formatInteger(stats != null and stats['misses'] != null ? stats['misses'] : 0, 1, 'COMMA')}">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
                                 <div class="d-flex justify-content-between">
                                     <span class="text-muted">Sets</span>
                                     <span th:text="${#numbers.formatInteger(stats != null and stats['sets'] != null ? stats['sets'] : 0, 1, 'COMMA')}">0</span>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Gets</span>
+                                    <span th:text="${#numbers.formatInteger(stats != null and stats['gets'] != null ? stats['gets'] : 0, 1, 'COMMA')}">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
                                 <div class="d-flex justify-content-between">
                                     <span class="text-muted">Deletes</span>
                                     <span th:text="${#numbers.formatInteger(stats != null and stats['deletes'] != null ? stats['deletes'] : 0, 1, 'COMMA')}">0</span>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-2">
                                 <div class="d-flex justify-content-between">
                                     <span class="text-muted">Expired</span>
                                     <span th:text="${#numbers.formatInteger(stats != null and stats['expired'] != null ? stats['expired'] : 0, 1, 'COMMA')}">0</span>
@@ -189,6 +207,61 @@
                             <a th:href="@{/cache/query}" class="btn btn-outline-secondary">
                                 <i class="fas fa-search me-1"></i> Query
                             </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Total Entries</dt>
+                                    <dd class="text-muted">Total key-value pairs stored in this region.</dd>
+                                    <dt>Memory</dt>
+                                    <dd class="text-muted">Entries in fast in-memory cache.</dd>
+                                    <dt>Persistence</dt>
+                                    <dd class="text-muted">Entries in durable storage backend.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Hits</dt>
+                                    <dd class="text-muted">Successful cache lookups that found data.</dd>
+                                    <dt>Misses</dt>
+                                    <dd class="text-muted">Cache lookups where data was not found.</dd>
+                                    <dt>Hit Ratio</dt>
+                                    <dd class="text-muted">Hits ÷ (Hits + Misses). Higher is better.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Sets</dt>
+                                    <dd class="text-muted">Write operations (new or updated entries).</dd>
+                                    <dt>Gets</dt>
+                                    <dd class="text-muted">Read operations (cache lookups).</dd>
+                                    <dt>Deletes</dt>
+                                    <dd class="text-muted">Explicit removal operations.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Expired</dt>
+                                    <dd class="text-muted">Entries removed due to TTL expiration.</dd>
+                                    <dt>Captive</dt>
+                                    <dd class="text-muted">System-protected region that cannot be deleted.</dd>
+                                    <dt>Collection</dt>
+                                    <dd class="text-muted">Internal storage name in persistence backend.</dd>
+                                </dl>
+                            </div>
                         </div>
                     </div>
                 </div>

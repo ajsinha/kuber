@@ -474,6 +474,137 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         return filterKeys(keys, pattern, limit);
     }
     
+    @Override
+    public long deleteExpiredEntries(String region) {
+        String cfName = ENTRIES_PREFIX + region;
+        ColumnFamilyHandle handle = columnFamilyHandles.get(cfName);
+        
+        if (handle == null) {
+            return 0;
+        }
+        
+        List<String> expiredKeys = new ArrayList<>();
+        Instant now = Instant.now();
+        
+        try (RocksIterator iterator = db.newIterator(handle)) {
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                try {
+                    String json = new String(iterator.value(), StandardCharsets.UTF_8);
+                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
+                            new TypeReference<Map<String, Object>>() {});
+                    
+                    Object expiresAt = map.get("expiresAt");
+                    if (expiresAt != null) {
+                        Instant expiry = Instant.ofEpochMilli(((Number) expiresAt).longValue());
+                        if (now.isAfter(expiry)) {
+                            expiredKeys.add(new String(iterator.key(), StandardCharsets.UTF_8));
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to check expiry for entry: {}", e.getMessage());
+                }
+            }
+        }
+        
+        // Delete expired entries
+        for (String key : expiredKeys) {
+            try {
+                db.delete(handle, key.getBytes(StandardCharsets.UTF_8));
+            } catch (RocksDBException e) {
+                log.error("Failed to delete expired entry '{}': {}", key, e.getMessage());
+            }
+        }
+        
+        if (!expiredKeys.isEmpty()) {
+            log.info("Deleted {} expired entries from region '{}' in RocksDB", expiredKeys.size(), region);
+        }
+        
+        return expiredKeys.size();
+    }
+    
+    @Override
+    public long deleteAllExpiredEntries() {
+        long total = 0;
+        for (CacheRegion region : loadAllRegions()) {
+            total += deleteExpiredEntries(region.getName());
+        }
+        return total;
+    }
+    
+    @Override
+    public long countNonExpiredEntries(String region) {
+        String cfName = ENTRIES_PREFIX + region;
+        ColumnFamilyHandle handle = columnFamilyHandles.get(cfName);
+        
+        if (handle == null) {
+            return 0;
+        }
+        
+        long count = 0;
+        Instant now = Instant.now();
+        
+        try (RocksIterator iterator = db.newIterator(handle)) {
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                try {
+                    String json = new String(iterator.value(), StandardCharsets.UTF_8);
+                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
+                            new TypeReference<Map<String, Object>>() {});
+                    
+                    Object expiresAt = map.get("expiresAt");
+                    if (expiresAt == null) {
+                        count++;
+                    } else {
+                        Instant expiry = Instant.ofEpochMilli(((Number) expiresAt).longValue());
+                        if (!now.isAfter(expiry)) {
+                            count++;
+                        }
+                    }
+                } catch (Exception e) {
+                    // Count as non-expired if we can't parse
+                    count++;
+                }
+            }
+        }
+        
+        return count;
+    }
+    
+    @Override
+    public List<String> getNonExpiredKeys(String region, String pattern, int limit) {
+        String cfName = ENTRIES_PREFIX + region;
+        ColumnFamilyHandle handle = columnFamilyHandles.get(cfName);
+        
+        if (handle == null) {
+            return new ArrayList<>();
+        }
+        
+        List<String> keys = new ArrayList<>();
+        Instant now = Instant.now();
+        
+        try (RocksIterator iterator = db.newIterator(handle)) {
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                try {
+                    String json = new String(iterator.value(), StandardCharsets.UTF_8);
+                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
+                            new TypeReference<Map<String, Object>>() {});
+                    
+                    Object expiresAt = map.get("expiresAt");
+                    boolean isValid = (expiresAt == null) || 
+                            !now.isAfter(Instant.ofEpochMilli(((Number) expiresAt).longValue()));
+                    
+                    if (isValid) {
+                        keys.add(new String(iterator.key(), StandardCharsets.UTF_8));
+                    }
+                } catch (Exception e) {
+                    // Include if we can't parse
+                    keys.add(new String(iterator.key(), StandardCharsets.UTF_8));
+                }
+            }
+        }
+        
+        return filterKeys(keys, pattern, limit);
+    }
+    
     private Map<String, Object> entryToMap(CacheEntry entry) {
         java.util.HashMap<String, Object> map = new java.util.HashMap<>();
         map.put("key", entry.getKey());
@@ -529,4 +660,145 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         
         return builder.build();
     }
+    
+    // ==================== Compaction Operations ====================
+    
+    /**
+     * Trigger manual compaction of all column families.
+     * This reclaims disk space by removing deleted/expired entries from SST files.
+     * 
+     * @return CompactionResult with details about the compaction operation
+     */
+    public CompactionResult compact() {
+        if (!available || db == null) {
+            return new CompactionResult(false, "RocksDB not available", 0, 0, 0);
+        }
+        
+        long startTime = System.currentTimeMillis();
+        long sizeBeforeBytes = getDatabaseSizeBytes();
+        int columnFamiliesCompacted = 0;
+        
+        try {
+            log.info("Starting RocksDB compaction...");
+            
+            // Compact default column family
+            if (defaultHandle != null) {
+                db.compactRange(defaultHandle);
+                columnFamiliesCompacted++;
+            }
+            
+            // Compact regions column family
+            if (regionsHandle != null) {
+                db.compactRange(regionsHandle);
+                columnFamiliesCompacted++;
+            }
+            
+            // Compact all entry column families
+            for (Map.Entry<String, ColumnFamilyHandle> entry : columnFamilyHandles.entrySet()) {
+                try {
+                    db.compactRange(entry.getValue());
+                    columnFamiliesCompacted++;
+                    log.debug("Compacted column family: {}", entry.getKey());
+                } catch (RocksDBException e) {
+                    log.warn("Failed to compact column family '{}': {}", entry.getKey(), e.getMessage());
+                }
+            }
+            
+            long duration = System.currentTimeMillis() - startTime;
+            long sizeAfterBytes = getDatabaseSizeBytes();
+            long reclaimedBytes = sizeBeforeBytes - sizeAfterBytes;
+            
+            log.info("RocksDB compaction completed: {} column families, duration={}ms, " +
+                    "size before={}MB, size after={}MB, reclaimed={}MB",
+                    columnFamiliesCompacted, duration,
+                    sizeBeforeBytes / (1024 * 1024),
+                    sizeAfterBytes / (1024 * 1024),
+                    reclaimedBytes / (1024 * 1024));
+            
+            return new CompactionResult(true, "Compaction successful", 
+                    columnFamiliesCompacted, duration, reclaimedBytes);
+            
+        } catch (RocksDBException e) {
+            log.error("RocksDB compaction failed: {}", e.getMessage(), e);
+            return new CompactionResult(false, "Compaction failed: " + e.getMessage(), 
+                    columnFamiliesCompacted, System.currentTimeMillis() - startTime, 0);
+        }
+    }
+    
+    /**
+     * Get the total size of the RocksDB database directory in bytes.
+     */
+    public long getDatabaseSizeBytes() {
+        File dbDir = new File(dbPath);
+        return calculateDirectorySize(dbDir);
+    }
+    
+    private long calculateDirectorySize(File dir) {
+        if (!dir.exists()) {
+            return 0;
+        }
+        
+        long size = 0;
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    size += file.length();
+                } else if (file.isDirectory()) {
+                    size += calculateDirectorySize(file);
+                }
+            }
+        }
+        return size;
+    }
+    
+    /**
+     * Get RocksDB statistics and storage info.
+     */
+    public RocksDbStats getStats() {
+        long sizeBytes = getDatabaseSizeBytes();
+        int regionCount = columnFamilyHandles.size();
+        
+        // Count total entries across all regions
+        long totalEntries = 0;
+        for (CacheRegion region : loadAllRegions()) {
+            totalEntries += countNonExpiredEntries(region.getName());
+        }
+        
+        return new RocksDbStats(
+                dbPath,
+                sizeBytes,
+                sizeBytes / (1024.0 * 1024.0),
+                regionCount,
+                totalEntries,
+                available
+        );
+    }
+    
+    /**
+     * Result of a compaction operation.
+     */
+    public record CompactionResult(
+            boolean success,
+            String message,
+            int columnFamiliesCompacted,
+            long durationMs,
+            long reclaimedBytes
+    ) {
+        public double reclaimedMB() {
+            return reclaimedBytes / (1024.0 * 1024.0);
+        }
+    }
+    
+    /**
+     * RocksDB statistics.
+     */
+    public record RocksDbStats(
+            String path,
+            long sizeBytes,
+            double sizeMB,
+            int regionCount,
+            long totalEntries,
+            boolean available
+    ) {}
 }

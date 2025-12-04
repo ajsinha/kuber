@@ -327,6 +327,53 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Regions</dt>
+                                    <dd class="text-muted">Logical namespaces for organizing cache entries.</dd>
+                                    <dt>Total Keys</dt>
+                                    <dd class="text-muted">Total number of unique key-value pairs stored.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Hit Ratio</dt>
+                                    <dd class="text-muted">Percentage of cache lookups that found data. Higher is better.</dd>
+                                    <dt>Sets/Gets</dt>
+                                    <dd class="text-muted">Count of write and read operations performed.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Persistence Type</dt>
+                                    <dd class="text-muted">Backend storage: RocksDB, MongoDB, SQLite, PostgreSQL, or Memory.</dd>
+                                    <dt>Persistence Mode</dt>
+                                    <dd class="text-muted">Sync writes immediately; Async batches writes for performance.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Replication</dt>
+                                    <dd class="text-muted">Data synchronization mode: Standalone, Leader, or Follower.</dd>
+                                    <dt>Server Uptime</dt>
+                                    <dd class="text-muted">Time since the server was last started.</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 

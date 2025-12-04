@@ -180,6 +180,33 @@
             </div>
         </div>
         
+        <!-- Expiration Service Row -->
+        <div class="row g-4 mb-4">
+            <!-- Expiration Service Card -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock me-2 text-warning"></i>
+                            TTL Expiration
+                        </h5>
+                        <button class="btn btn-sm btn-warning" onclick="triggerExpirationCleanup()" id="expireButton">
+                            <i class="fas fa-broom me-1"></i>Cleanup
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="expirationInfo">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Charts Row -->
         <div class="row g-4 mb-4">
             <!-- Cache Activity Line Chart -->
@@ -294,6 +321,114 @@
                 </div>
             </div>
         </div>
+        
+        <!-- RocksDB Compaction Row -->
+        <div class="row mt-4">
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-compress-arrows-alt me-2 text-info"></i>
+                            RocksDB Compaction
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="refreshCompactionInfo()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="triggerCompaction()" id="compactionBtn">
+                                <i class="fas fa-compress me-1"></i>Compact Now
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="compactionInfo">
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock me-2 text-danger"></i>
+                            TTL Expiration Service
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="refreshExpirationInfo()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="triggerExpiration()" id="expirationBtn">
+                                <i class="fas fa-broom me-1"></i>Clean Now
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="expirationInfo">
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>PID</dt>
+                                    <dd class="text-muted">Process ID - unique identifier for the running server process.</dd>
+                                    <dt>Heap Memory</dt>
+                                    <dd class="text-muted">JVM memory used for dynamic object allocation. Critical for performance monitoring.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>High Watermark</dt>
+                                    <dd class="text-muted">Memory threshold that triggers automatic eviction to prevent OOM.</dd>
+                                    <dt>Low Watermark</dt>
+                                    <dd class="text-muted">Target memory level after eviction completes.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Eviction</dt>
+                                    <dd class="text-muted">Moving entries from memory to persistence to free heap space.</dd>
+                                    <dt>Autoload</dt>
+                                    <dd class="text-muted">Automatic file-based data loading from inbox directory.</dd>
+                                    <dt>Compaction</dt>
+                                    <dd class="text-muted">RocksDB process to merge SST files and reclaim disk space from deleted entries.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Operations/min</dt>
+                                    <dd class="text-muted">Cache activity rate: gets + sets + deletes per minute.</dd>
+                                    <dt>TTL Expiration</dt>
+                                    <dd class="text-muted">Automatic cleanup of expired entries from both memory and persistence.</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -313,6 +448,8 @@
         refreshMemoryInfo();
         refreshMemoryWatcherInfo();
         refreshAutoloadInfo();
+        loadExpirationInfo();
+        refreshCompactionInfo();
         initActivityChart();
         initRegionChart();
         
@@ -322,6 +459,8 @@
             refreshMemoryInfo();
             refreshMemoryWatcherInfo();
             refreshAutoloadInfo();
+            loadExpirationInfo();
+            refreshCompactionInfo();
         }, 10000);
         
         // Refresh charts every 30 seconds
@@ -337,6 +476,9 @@
             .then(response => response.json())
             .then(data => {
                 let html = '<ul class="list-group list-group-flush small">';
+                html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
+                    '<span class="text-muted">PID</span>' +
+                    '<span class="badge bg-dark">' + data.pid + '</span></li>';
                 html += '<li class="list-group-item d-flex justify-content-between px-0 py-1">' +
                     '<span class="text-muted">Hostname</span>' +
                     '<span class="fw-bold">' + data.hostname + '</span></li>';
@@ -579,6 +721,202 @@
             .catch(err => {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-search me-1"></i>Scan';
+            });
+    }
+    
+    // Expiration Service Info
+    function loadExpirationInfo() {
+        fetch('/api/monitoring/expiration')
+            .then(response => response.json())
+            .then(data => {
+                const div = document.getElementById('expirationInfo');
+                if (!data.available) {
+                    div.innerHTML = '<p class="text-muted mb-0">Expiration service not available</p>';
+                    return;
+                }
+                
+                const statusBadge = data.enabled 
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Disabled</span>';
+                
+                const lastRun = data.lastRunTime 
+                    ? new Date(data.lastRunTime).toLocaleTimeString()
+                    : 'Never';
+                
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Status</span>
+                        ${statusBadge}
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Cleaned</span>
+                        <span class="badge bg-warning text-dark">${(data.totalExpiredDeleted || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Last Run</span>
+                        <span class="badge bg-info">${data.lastRunDeleted || 0} deleted</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Last Run Time</span>
+                        <span class="text-muted small">${lastRun}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Interval</span>
+                        <span class="text-muted small">${data.cleanupIntervalSeconds}s</span>
+                    </div>
+                `;
+            })
+            .catch(err => {
+                document.getElementById('expirationInfo').innerHTML = 
+                    '<p class="text-danger mb-0">Failed to load expiration info</p>';
+            });
+    }
+    
+    // Trigger Expiration Cleanup
+    function triggerExpirationCleanup() {
+        const btn = document.getElementById('expireButton');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        fetch('/api/monitoring/expiration/trigger', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-broom me-1"></i>Cleanup';
+                if (data.success) {
+                    alert('Cleaned up ' + data.deleted + ' expired entries from persistence');
+                }
+                loadExpirationInfo();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-broom me-1"></i>Cleanup';
+            });
+    }
+    
+    // Refresh Expiration Info (for new card)
+    function refreshExpirationInfo() {
+        loadExpirationInfo();
+    }
+    
+    // Trigger Expiration (for new card)
+    function triggerExpiration() {
+        const btn = document.getElementById('expirationBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        fetch('/api/monitoring/expiration/trigger', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-broom me-1"></i>Clean Now';
+                if (data.success) {
+                    alert('Cleaned up ' + data.deleted + ' expired entries from persistence');
+                }
+                loadExpirationInfo();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-broom me-1"></i>Clean Now';
+            });
+    }
+    
+    // RocksDB Compaction Info
+    function refreshCompactionInfo() {
+        fetch('/api/monitoring/compaction')
+            .then(response => response.json())
+            .then(data => {
+                const div = document.getElementById('compactionInfo');
+                if (!data.available) {
+                    div.innerHTML = '<p class="text-muted mb-0 text-center py-2"><i class="fas fa-info-circle me-2"></i>' + 
+                        (data.message || 'Compaction service not available') + '</p>';
+                    document.getElementById('compactionBtn').style.display = 'none';
+                    return;
+                }
+                
+                const statusBadge = data.enabled 
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Disabled</span>';
+                
+                const progressBadge = data.compactionInProgress
+                    ? '<span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin me-1"></i>In Progress</span>'
+                    : '<span class="badge bg-light text-dark">Idle</span>';
+                
+                const lastRun = data.lastCompactionTime 
+                    ? new Date(data.lastCompactionTime).toLocaleTimeString()
+                    : 'Never';
+                
+                let storageHtml = '';
+                if (data.storage) {
+                    storageHtml = `
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">DB Size</span>
+                            <span class="badge bg-dark">${data.storage.sizeMB} MB</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">Entries</span>
+                            <span>${(data.storage.totalEntries || 0).toLocaleString()}</span>
+                        </div>
+                    `;
+                }
+                
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Status</span>
+                        ${statusBadge}
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">State</span>
+                        ${progressBadge}
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Interval</span>
+                        <span class="text-muted small">${data.intervalMinutes} min</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Compactions</span>
+                        <span class="badge bg-info">${data.totalCompactions || 0}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Reclaimed</span>
+                        <span class="badge bg-success">${data.totalReclaimedMB || '0.00'} MB</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Last Compaction</span>
+                        <span class="text-muted small">${lastRun}</span>
+                    </div>
+                    ${storageHtml}
+                `;
+            })
+            .catch(err => {
+                document.getElementById('compactionInfo').innerHTML = 
+                    '<p class="text-danger mb-0">Failed to load compaction info</p>';
+            });
+    }
+    
+    // Trigger Manual Compaction
+    function triggerCompaction() {
+        const btn = document.getElementById('compactionBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Compacting...';
+        
+        fetch('/api/monitoring/compaction/trigger', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-compress me-1"></i>Compact Now';
+                if (data.success) {
+                    alert('Compaction completed! Reclaimed ' + data.reclaimedMB + ' MB in ' + data.durationMs + 'ms');
+                } else {
+                    alert('Compaction failed: ' + (data.error || data.message));
+                }
+                refreshCompactionInfo();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-compress me-1"></i>Compact Now';
+                alert('Failed to trigger compaction');
             });
     }
     

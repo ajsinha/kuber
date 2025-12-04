@@ -36,6 +36,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CacheController {
     
+    private static final int DEFAULT_LIMIT = 10000;
+    private static final int MAX_LIMIT = 100000;
+    
     private final CacheService cacheService;
     
     @ModelAttribute
@@ -45,15 +48,33 @@ public class CacheController {
     
     @GetMapping
     public String cachePage(Model model, 
-                           @RequestParam(defaultValue = "default") String region) {
+                           @RequestParam(defaultValue = "default") String region,
+                           @RequestParam(required = false) Integer limit) {
         Collection<CacheRegion> regions = cacheService.getAllRegions();
         model.addAttribute("regions", regions);
         model.addAttribute("currentRegion", region);
         
-        // Get keys for the region (limit to 100)
-        Set<String> keys = cacheService.keys(region, "*");
-        model.addAttribute("keys", keys.stream().limit(100).toList());
-        model.addAttribute("totalKeys", keys.size());
+        // Determine effective limit
+        int effectiveLimit = getEffectiveLimit(limit);
+        model.addAttribute("limit", effectiveLimit);
+        
+        // Get total count first
+        long totalKeys = cacheService.dbSize(region);
+        model.addAttribute("totalKeys", totalKeys);
+        
+        // Get keys with limit + 1 to detect overflow
+        Set<String> keys = cacheService.keys(region, "*", effectiveLimit + 1);
+        
+        // Check if there are more results than limit
+        boolean hasMore = keys.size() > effectiveLimit;
+        model.addAttribute("hasMore", hasMore);
+        model.addAttribute("resultCount", Math.min(keys.size(), effectiveLimit));
+        
+        // Trim to limit if needed
+        if (hasMore) {
+            keys = keys.stream().limit(effectiveLimit).collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        }
+        model.addAttribute("keys", keys);
         
         return "cache";
     }
@@ -62,6 +83,7 @@ public class CacheController {
     public String queryPage(Model model) {
         Collection<CacheRegion> regions = cacheService.getAllRegions();
         model.addAttribute("regions", regions);
+        model.addAttribute("defaultLimit", DEFAULT_LIMIT);
         return "query";
     }
     
@@ -70,13 +92,20 @@ public class CacheController {
                               @RequestParam String region,
                               @RequestParam String queryType,
                               @RequestParam(required = false) String key,
-                              @RequestParam(required = false) String jsonQuery) {
+                              @RequestParam(required = false) String jsonQuery,
+                              @RequestParam(required = false) Integer limit) {
         Collection<CacheRegion> regions = cacheService.getAllRegions();
         model.addAttribute("regions", regions);
         model.addAttribute("queryRegion", region);
         model.addAttribute("queryType", queryType);
         model.addAttribute("queryKey", key);
         model.addAttribute("jsonQuery", jsonQuery);
+        model.addAttribute("defaultLimit", DEFAULT_LIMIT);
+        
+        // Determine effective limit
+        int effectiveLimit = getEffectiveLimit(limit);
+        model.addAttribute("limit", effectiveLimit);
+        model.addAttribute("userLimit", limit);
         
         try {
             if ("get".equals(queryType)) {
@@ -88,17 +117,40 @@ public class CacheController {
                 model.addAttribute("result", json != null ? JsonUtils.toPrettyJson(json) : null);
                 model.addAttribute("resultType", "json");
             } else if ("jsearch".equals(queryType)) {
-                List<CacheEntry> results = cacheService.jsonSearch(region, jsonQuery);
+                // Request limit + 1 to detect overflow
+                List<CacheEntry> results = cacheService.jsonSearch(region, jsonQuery, effectiveLimit + 1);
+                boolean hasMore = results.size() > effectiveLimit;
+                model.addAttribute("hasMore", hasMore);
+                model.addAttribute("resultCount", Math.min(results.size(), effectiveLimit));
+                
+                if (hasMore) {
+                    results = results.subList(0, effectiveLimit);
+                }
                 model.addAttribute("results", results);
                 model.addAttribute("resultType", "search");
             } else if ("keys".equals(queryType)) {
-                Set<String> keys = cacheService.keys(region, key != null ? key : "*");
+                // Request limit + 1 to detect overflow
+                Set<String> keys = cacheService.keys(region, key != null ? key : "*", effectiveLimit + 1);
+                boolean hasMore = keys.size() > effectiveLimit;
+                model.addAttribute("hasMore", hasMore);
+                model.addAttribute("resultCount", Math.min(keys.size(), effectiveLimit));
+                
+                if (hasMore) {
+                    keys = keys.stream().limit(effectiveLimit).collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+                }
                 model.addAttribute("results", keys);
                 model.addAttribute("resultType", "keys");
             } else if ("ksearch".equals(queryType)) {
-                // Regex key search returning key-value pairs
+                // Request limit + 1 to detect overflow
                 List<Map<String, Object>> results = cacheService.searchKeysByRegex(
-                        region, key != null ? key : ".*", 100);
+                        region, key != null ? key : ".*", effectiveLimit + 1);
+                boolean hasMore = results.size() > effectiveLimit;
+                model.addAttribute("hasMore", hasMore);
+                model.addAttribute("resultCount", Math.min(results.size(), effectiveLimit));
+                
+                if (hasMore) {
+                    results = results.subList(0, effectiveLimit);
+                }
                 model.addAttribute("results", results);
                 model.addAttribute("resultType", "ksearch");
             } else if ("hgetall".equals(queryType)) {
@@ -112,6 +164,16 @@ public class CacheController {
         }
         
         return "query";
+    }
+    
+    /**
+     * Get effective limit, respecting default and max bounds.
+     */
+    private int getEffectiveLimit(Integer userLimit) {
+        if (userLimit == null || userLimit <= 0) {
+            return DEFAULT_LIMIT;
+        }
+        return Math.min(userLimit, MAX_LIMIT);
     }
     
     @GetMapping("/entry")

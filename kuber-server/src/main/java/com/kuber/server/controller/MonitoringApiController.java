@@ -32,6 +32,8 @@ import java.time.Instant;
 import java.util.*;
 
 import com.kuber.server.autoload.AutoloadService;
+import com.kuber.server.service.PersistenceExpirationService;
+import com.kuber.server.service.RocksDbCompactionService;
 
 /**
  * REST API controller for monitoring and system information.
@@ -50,7 +52,13 @@ public class MonitoringApiController {
     private MemoryWatcherService memoryWatcherService;
     
     @Autowired(required = false)
+    private PersistenceExpirationService expirationService;
+    
+    @Autowired(required = false)
     private AutoloadService autoloadService;
+    
+    @Autowired(required = false)
+    private RocksDbCompactionService compactionService;
     
     /**
      * Get JVM and system information.
@@ -58,6 +66,9 @@ public class MonitoringApiController {
     @GetMapping("/system")
     public ResponseEntity<Map<String, Object>> getSystemInfo() {
         Map<String, Object> info = new LinkedHashMap<>();
+        
+        // Process ID
+        info.put("pid", ProcessHandle.current().pid());
         
         try {
             // Host info
@@ -365,5 +376,188 @@ public class MonitoringApiController {
         sb.append(seconds).append("s");
         
         return sb.toString();
+    }
+    
+    // ==================== Expiration Service Endpoints ====================
+    
+    @GetMapping("/expiration")
+    public ResponseEntity<Map<String, Object>> getExpirationStatus() {
+        Map<String, Object> status = new LinkedHashMap<>();
+        
+        if (expirationService == null) {
+            status.put("available", false);
+            status.put("message", "Expiration service not available");
+            return ResponseEntity.ok(status);
+        }
+        
+        status.put("available", true);
+        status.put("enabled", expirationService.isEnabled());
+        status.put("totalExpiredDeleted", expirationService.getTotalExpiredDeleted());
+        status.put("lastRunDeleted", expirationService.getLastRunDeleted());
+        status.put("cleanupIntervalSeconds", expirationService.getCleanupIntervalSeconds());
+        
+        if (expirationService.getLastRunTime() != null) {
+            status.put("lastRunTime", expirationService.getLastRunTime().toString());
+            status.put("lastRunDurationMs", expirationService.getLastRunDuration().toMillis());
+        }
+        
+        return ResponseEntity.ok(status);
+    }
+    
+    @PostMapping("/expiration/trigger")
+    public ResponseEntity<Map<String, Object>> triggerExpirationCleanup() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (expirationService == null) {
+            result.put("success", false);
+            result.put("error", "Expiration service not available");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        long deleted = expirationService.triggerCleanup();
+        
+        result.put("success", true);
+        result.put("deleted", deleted);
+        result.put("message", "Cleaned up " + deleted + " expired entries from persistence");
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/expiration/trigger/{region}")
+    public ResponseEntity<Map<String, Object>> triggerRegionExpirationCleanup(@PathVariable String region) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (expirationService == null) {
+            result.put("success", false);
+            result.put("error", "Expiration service not available");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        long deleted = expirationService.cleanupRegion(region);
+        
+        result.put("success", true);
+        result.put("region", region);
+        result.put("deleted", deleted);
+        result.put("message", "Cleaned up " + deleted + " expired entries from region '" + region + "'");
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/expiration/enable")
+    public ResponseEntity<Map<String, Object>> enableExpirationService(@RequestParam boolean enabled) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (expirationService == null) {
+            result.put("success", false);
+            result.put("error", "Expiration service not available");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        expirationService.setEnabled(enabled);
+        
+        result.put("success", true);
+        result.put("enabled", enabled);
+        result.put("message", "Expiration service " + (enabled ? "enabled" : "disabled"));
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    // ==================== RocksDB Compaction Endpoints ====================
+    
+    /**
+     * Get RocksDB compaction service status and statistics.
+     */
+    @GetMapping("/compaction")
+    public ResponseEntity<Map<String, Object>> getCompactionStatus() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (compactionService == null) {
+            result.put("available", false);
+            result.put("message", "RocksDB compaction service not available (not using RocksDB persistence)");
+            return ResponseEntity.ok(result);
+        }
+        
+        RocksDbCompactionService.CompactionServiceStats stats = compactionService.getStats();
+        
+        result.put("available", true);
+        result.put("enabled", stats.enabled());
+        result.put("compactionInProgress", stats.compactionInProgress());
+        result.put("totalCompactions", stats.totalCompactions());
+        result.put("totalReclaimedMB", String.format("%.2f", stats.totalReclaimedMB()));
+        result.put("intervalMinutes", stats.intervalMinutes());
+        
+        if (stats.lastCompactionTime() != null) {
+            result.put("lastCompactionTime", stats.lastCompactionTime().toString());
+            result.put("lastCompactionDurationMs", stats.lastCompactionDuration().toMillis());
+            result.put("lastReclaimedMB", String.format("%.2f", stats.lastReclaimedMB()));
+            result.put("lastCompactionMessage", stats.lastCompactionMessage());
+        }
+        
+        // Include RocksDB storage stats
+        if (stats.rocksDbStats() != null) {
+            Map<String, Object> storageStats = new LinkedHashMap<>();
+            storageStats.put("path", stats.rocksDbStats().path());
+            storageStats.put("sizeMB", String.format("%.2f", stats.rocksDbStats().sizeMB()));
+            storageStats.put("regionCount", stats.rocksDbStats().regionCount());
+            storageStats.put("totalEntries", stats.rocksDbStats().totalEntries());
+            result.put("storage", storageStats);
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Trigger a manual RocksDB compaction.
+     */
+    @PostMapping("/compaction/trigger")
+    public ResponseEntity<Map<String, Object>> triggerCompaction() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (compactionService == null) {
+            result.put("success", false);
+            result.put("error", "RocksDB compaction service not available");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        if (compactionService.isCompactionInProgress()) {
+            result.put("success", false);
+            result.put("error", "Compaction already in progress");
+            return ResponseEntity.ok(result);
+        }
+        
+        log.info("Manual RocksDB compaction triggered by admin");
+        RocksDbCompactionService.CompactionStats stats = compactionService.triggerCompaction();
+        
+        result.put("success", stats.success());
+        result.put("message", stats.message());
+        result.put("durationMs", stats.duration().toMillis());
+        result.put("reclaimedMB", String.format("%.2f", stats.reclaimedMB()));
+        result.put("columnFamiliesCompacted", stats.columnFamiliesCompacted());
+        result.put("totalCompactions", stats.totalCompactions());
+        result.put("totalReclaimedMB", String.format("%.2f", stats.totalReclaimedMB()));
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Enable or disable the RocksDB compaction service.
+     */
+    @PostMapping("/compaction/enable")
+    public ResponseEntity<Map<String, Object>> enableCompactionService(@RequestParam boolean enabled) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (compactionService == null) {
+            result.put("success", false);
+            result.put("error", "RocksDB compaction service not available");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        compactionService.setEnabled(enabled);
+        
+        result.put("success", true);
+        result.put("enabled", enabled);
+        result.put("message", "Compaction service " + (enabled ? "enabled" : "disabled"));
+        
+        return ResponseEntity.ok(result);
     }
 }

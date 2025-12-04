@@ -15,6 +15,7 @@ import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheRegion;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -154,5 +155,72 @@ public class MemoryPersistenceStore extends AbstractPersistenceStore {
         }
         
         return filterKeys(new ArrayList<>(regionEntries.keySet()), pattern, limit);
+    }
+    
+    @Override
+    public long deleteExpiredEntries(String region) {
+        Map<String, CacheEntry> regionEntries = entries.get(region);
+        if (regionEntries == null) {
+            return 0;
+        }
+        
+        List<String> expiredKeys = new ArrayList<>();
+        Instant now = Instant.now();
+        
+        for (Map.Entry<String, CacheEntry> entry : regionEntries.entrySet()) {
+            CacheEntry cacheEntry = entry.getValue();
+            if (cacheEntry.getExpiresAt() != null && now.isAfter(cacheEntry.getExpiresAt())) {
+                expiredKeys.add(entry.getKey());
+            }
+        }
+        
+        for (String key : expiredKeys) {
+            regionEntries.remove(key);
+        }
+        
+        if (!expiredKeys.isEmpty()) {
+            log.info("Deleted {} expired entries from region '{}' in memory", expiredKeys.size(), region);
+        }
+        
+        return expiredKeys.size();
+    }
+    
+    @Override
+    public long deleteAllExpiredEntries() {
+        long total = 0;
+        for (String region : entries.keySet()) {
+            total += deleteExpiredEntries(region);
+        }
+        return total;
+    }
+    
+    @Override
+    public long countNonExpiredEntries(String region) {
+        Map<String, CacheEntry> regionEntries = entries.get(region);
+        if (regionEntries == null) {
+            return 0;
+        }
+        
+        Instant now = Instant.now();
+        return regionEntries.values().stream()
+                .filter(entry -> entry.getExpiresAt() == null || !now.isAfter(entry.getExpiresAt()))
+                .count();
+    }
+    
+    @Override
+    public List<String> getNonExpiredKeys(String region, String pattern, int limit) {
+        Map<String, CacheEntry> regionEntries = entries.get(region);
+        if (regionEntries == null) {
+            return new ArrayList<>();
+        }
+        
+        Instant now = Instant.now();
+        List<String> keys = regionEntries.entrySet().stream()
+                .filter(entry -> entry.getValue().getExpiresAt() == null || 
+                        !now.isAfter(entry.getValue().getExpiresAt()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        
+        return filterKeys(keys, pattern, limit);
     }
 }

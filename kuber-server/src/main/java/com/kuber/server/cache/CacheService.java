@@ -129,14 +129,12 @@ public class CacheService {
                 .maximumSize(properties.getCache().getMaxMemoryEntries())
                 .expireAfterWrite(24, TimeUnit.HOURS)
                 .removalListener((key, value, cause) -> {
+                    // Only track statistics - don't modify entryCount since persistence is the source of truth
+                    // Entries evicted from memory cache are still in persistence store
                     if (cause == RemovalCause.SIZE || cause == RemovalCause.EXPIRED) {
-                        // Decrement entry count when evicted due to size limit or Caffeine's TTL
-                        CacheRegion region = regions.get(regionName);
-                        if (region != null) {
-                            region.decrementEntryCount();
-                        }
                         recordStatistic(regionName, KuberConstants.STAT_EVICTED);
-                        log.debug("Entry '{}' evicted from region '{}' due to {}", key, regionName, cause);
+                        log.debug("Entry '{}' evicted from memory cache in region '{}' due to {} (still in persistence)", 
+                                key, regionName, cause);
                     }
                 })
                 .recordStats()
@@ -267,11 +265,31 @@ public class CacheService {
     }
     
     public Collection<CacheRegion> getAllRegions() {
+        // Enrich regions with dynamically calculated counts
+        // entryCount should reflect persistence (source of truth)
+        for (CacheRegion region : regions.values()) {
+            long memoryCount = getMemoryEntryCount(region.getName());
+            long persistenceCount = getPersistenceEntryCount(region.getName());
+            region.setMemoryEntryCount(memoryCount);
+            region.setPersistenceEntryCount(persistenceCount);
+            // Total entries = persistence count (source of truth)
+            region.setEntryCount(persistenceCount);
+        }
         return Collections.unmodifiableCollection(regions.values());
     }
     
     public CacheRegion getRegion(String name) {
-        return regions.get(name);
+        CacheRegion region = regions.get(name);
+        if (region != null) {
+            // Enrich with current counts
+            long memoryCount = getMemoryEntryCount(name);
+            long persistenceCount = getPersistenceEntryCount(name);
+            region.setMemoryEntryCount(memoryCount);
+            region.setPersistenceEntryCount(persistenceCount);
+            // Total entries = persistence count (source of truth)
+            region.setEntryCount(persistenceCount);
+        }
+        return region;
     }
     
     public boolean regionExists(String name) {
@@ -546,21 +564,26 @@ public class CacheService {
         ensureRegionExists(region);
         
         Cache<String, CacheEntry> cache = regionCaches.get(region);
-        CacheEntry removed = cache.getIfPresent(key);
+        boolean existedInMemory = cache.getIfPresent(key) != null;
         
-        if (removed != null) {
-            cache.invalidate(key);
+        // Always invalidate from memory if present
+        cache.invalidate(key);
+        
+        // Always try to delete from persistence (entry might be in persistence but not memory)
+        boolean deletedFromPersistence = false;
+        try {
             persistenceStore.deleteEntry(region, key);
-            
-            CacheRegion regionObj = regions.get(region);
-            if (regionObj != null) {
-                regionObj.decrementEntryCount();
-            }
-            
+            deletedFromPersistence = true;
+        } catch (Exception e) {
+            log.debug("Entry '{}' not found in persistence for region '{}'", key, region);
+        }
+        
+        // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
+        
+        if (existedInMemory || deletedFromPersistence) {
             recordStatistic(region, KuberConstants.STAT_DELETES);
             metricsService.recordDelete(region);
             eventPublisher.publish(CacheEvent.entryDeleted(region, key, properties.getNodeId()));
-            
             return true;
         }
         
@@ -638,12 +661,55 @@ public class CacheService {
     public Set<String> keys(String region, String pattern) {
         ensureRegionExists(region);
         
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
         Pattern regex = globToRegex(pattern);
+        Set<String> allKeys = new HashSet<>();
         
-        return cache.asMap().keySet().stream()
+        // Get non-expired keys from in-memory cache
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        cache.asMap().entrySet().stream()
+                .filter(e -> !e.getValue().isExpired())
+                .map(Map.Entry::getKey)
                 .filter(key -> regex.matcher(key).matches())
-                .collect(Collectors.toSet());
+                .forEach(allKeys::add);
+        
+        // Get non-expired keys from persistence store
+        List<String> persistenceKeys = persistenceStore.getNonExpiredKeys(region, pattern, Integer.MAX_VALUE);
+        persistenceKeys.stream()
+                .filter(key -> regex.matcher(key).matches())
+                .forEach(allKeys::add);
+        
+        return allKeys;
+    }
+    
+    /**
+     * Get keys with a limit - useful for large datasets.
+     * Combines non-expired keys from both memory and persistence.
+     */
+    public Set<String> keys(String region, String pattern, int limit) {
+        ensureRegionExists(region);
+        
+        Pattern regex = globToRegex(pattern);
+        Set<String> allKeys = new LinkedHashSet<>(); // Maintain insertion order
+        
+        // Get non-expired keys from persistence store first (since it likely has more)
+        List<String> persistenceKeys = persistenceStore.getNonExpiredKeys(region, pattern, limit);
+        persistenceKeys.stream()
+                .filter(key -> regex.matcher(key).matches())
+                .forEach(allKeys::add);
+        
+        // Add non-expired keys from in-memory cache
+        if (allKeys.size() < limit) {
+            Cache<String, CacheEntry> cache = regionCaches.get(region);
+            cache.asMap().entrySet().stream()
+                    .filter(e -> !e.getValue().isExpired())
+                    .map(Map.Entry::getKey)
+                    .filter(key -> regex.matcher(key).matches())
+                    .filter(key -> !allKeys.contains(key))
+                    .limit(limit - allKeys.size())
+                    .forEach(allKeys::add);
+        }
+        
+        return allKeys;
     }
     
     /**
@@ -660,6 +726,7 @@ public class CacheService {
     
     /**
      * Search keys by regex pattern with limit.
+     * Searches both in-memory cache and persistence store.
      * 
      * @param region the cache region
      * @param regexPattern a Java regex pattern to match keys
@@ -677,9 +744,11 @@ public class CacheService {
                     "Invalid regex pattern: " + e.getMessage());
         }
         
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
         List<Map<String, Object>> results = new ArrayList<>();
+        Set<String> processedKeys = new HashSet<>();
         
+        // First search in-memory cache (faster)
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
         for (Map.Entry<String, CacheEntry> entry : cache.asMap().entrySet()) {
             if (results.size() >= limit) {
                 break;
@@ -694,23 +763,56 @@ public class CacheService {
                     continue;
                 }
                 
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("key", key);
-                result.put("value", cacheEntry.getStringValue());
-                result.put("type", cacheEntry.getValueType().name().toLowerCase());
-                result.put("ttl", cacheEntry.getRemainingTtl());
-                
-                // Include JSON value if applicable
-                if (cacheEntry.getValueType() == CacheEntry.ValueType.JSON && cacheEntry.getJsonValue() != null) {
-                    result.put("jsonValue", cacheEntry.getJsonValue());
-                }
-                
-                results.add(result);
+                processedKeys.add(key);
+                results.add(entryToResultMap(cacheEntry));
                 recordStatistic(region, KuberConstants.STAT_HITS);
             }
         }
         
+        // Then search persistence store if we need more results
+        if (results.size() < limit) {
+            // Get non-expired keys from persistence
+            List<String> persistenceKeys = persistenceStore.getNonExpiredKeys(region, "*", limit * 2);
+            
+            for (String key : persistenceKeys) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                
+                // Skip if already processed from memory
+                if (processedKeys.contains(key)) {
+                    continue;
+                }
+                
+                if (pattern.matcher(key).matches()) {
+                    CacheEntry cacheEntry = persistenceStore.get(region, key);
+                    if (cacheEntry != null && !cacheEntry.isExpired()) {
+                        results.add(entryToResultMap(cacheEntry));
+                        recordStatistic(region, KuberConstants.STAT_HITS);
+                    }
+                }
+            }
+        }
+        
         return results;
+    }
+    
+    /**
+     * Convert a CacheEntry to a result map for search results.
+     */
+    private Map<String, Object> entryToResultMap(CacheEntry cacheEntry) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("key", cacheEntry.getKey());
+        result.put("value", cacheEntry.getStringValue());
+        result.put("type", cacheEntry.getValueType().name().toLowerCase());
+        result.put("ttl", cacheEntry.getRemainingTtl());
+        
+        // Include JSON value if applicable
+        if (cacheEntry.getValueType() == CacheEntry.ValueType.JSON && cacheEntry.getJsonValue() != null) {
+            result.put("jsonValue", cacheEntry.getJsonValue());
+        }
+        
+        return result;
     }
     
     public boolean rename(String region, String oldKey, String newKey) {
@@ -804,17 +906,62 @@ public class CacheService {
     }
     
     public List<CacheEntry> jsonSearch(String region, String query) {
+        return jsonSearch(region, query, 1000);
+    }
+    
+    /**
+     * Search JSON entries by query with limit.
+     * Searches both in-memory cache and persistence store.
+     */
+    public List<CacheEntry> jsonSearch(String region, String query, int limit) {
         ensureRegionExists(region);
         
         List<JsonUtils.QueryCondition> conditions = JsonUtils.parseQuery(query);
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        List<CacheEntry> results = new ArrayList<>();
+        Set<String> processedKeys = new HashSet<>();
         
-        return cache.asMap().values().stream()
-                .filter(entry -> entry.getValueType() == CacheEntry.ValueType.JSON)
-                .filter(entry -> entry.getJsonValue() != null)
-                .filter(entry -> !entry.isExpired())
-                .filter(entry -> JsonUtils.matchesAllQueries(entry.getJsonValue(), conditions))
-                .collect(Collectors.toList());
+        // First search in-memory cache
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        for (CacheEntry entry : cache.asMap().values()) {
+            if (results.size() >= limit) {
+                break;
+            }
+            
+            if (entry.getValueType() == CacheEntry.ValueType.JSON 
+                    && entry.getJsonValue() != null 
+                    && !entry.isExpired()
+                    && JsonUtils.matchesAllQueries(entry.getJsonValue(), conditions)) {
+                processedKeys.add(entry.getKey());
+                results.add(entry);
+            }
+        }
+        
+        // Then search persistence store if we need more results
+        if (results.size() < limit) {
+            List<String> persistenceKeys = persistenceStore.getNonExpiredKeys(region, "*", limit * 2);
+            
+            for (String key : persistenceKeys) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                
+                // Skip if already processed from memory
+                if (processedKeys.contains(key)) {
+                    continue;
+                }
+                
+                CacheEntry entry = persistenceStore.get(region, key);
+                if (entry != null 
+                        && entry.getValueType() == CacheEntry.ValueType.JSON 
+                        && entry.getJsonValue() != null 
+                        && !entry.isExpired()
+                        && JsonUtils.matchesAllQueries(entry.getJsonValue(), conditions)) {
+                    results.add(entry);
+                }
+            }
+        }
+        
+        return results;
     }
     
     // ==================== Hash Operations ====================
@@ -895,13 +1042,8 @@ public class CacheService {
             if (entry.isExpired()) {
                 cache.invalidate(key);
                 
-                // Decrement region entry count
-                CacheRegion regionObj = regions.get(region);
-                if (regionObj != null) {
-                    regionObj.decrementEntryCount();
-                }
-                
                 // Delete from persistence store
+                // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
                 try {
                     persistenceStore.deleteEntry(region, key);
                 } catch (Exception e) {
@@ -929,15 +1071,9 @@ public class CacheService {
     private void putEntry(String region, String key, CacheEntry entry) {
         Cache<String, CacheEntry> cache = regionCaches.get(region);
         
-        boolean isNew = cache.getIfPresent(key) == null;
         cache.put(key, entry);
         
-        if (isNew) {
-            CacheRegion regionObj = regions.get(region);
-            if (regionObj != null) {
-                regionObj.incrementEntryCount();
-            }
-        }
+        // Note: entryCount is dynamically calculated from persistence, so no manual increment needed
         
         recordStatistic(region, KuberConstants.STAT_SETS);
         metricsService.recordSet(region);
@@ -1033,29 +1169,38 @@ public class CacheService {
         Map<String, Object> info = new HashMap<>();
         
         info.put("nodeId", properties.getNodeId());
-        info.put("version", "1.0.0");
+        info.put("version", "1.1.8");
         info.put("regionCount", regions.size());
         info.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         info.put("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());
         info.put("persistentMode", properties.getCache().isPersistentMode());
         
-        long totalEntries = regionCaches.values().stream()
+        // Total entries from persistence (source of truth)
+        long totalPersistenceEntries = regions.keySet().stream()
+                .mapToLong(this::getPersistenceEntryCount)
+                .sum();
+        info.put("totalEntries", totalPersistenceEntries);
+        
+        // Also include memory count for reference
+        long totalMemoryEntries = regionCaches.values().stream()
                 .mapToLong(Cache::estimatedSize)
                 .sum();
-        info.put("totalEntries", totalEntries);
+        info.put("memoryEntries", totalMemoryEntries);
+        info.put("persistenceEntries", totalPersistenceEntries);
         
         return info;
     }
     
     public long dbSize(String region) {
         if (region == null || region.isEmpty()) {
-            return regionCaches.values().stream()
-                    .mapToLong(Cache::estimatedSize)
+            // Return total across all regions from persistence
+            return regions.keySet().stream()
+                    .mapToLong(r -> getPersistenceEntryCount(r))
                     .sum();
         }
         
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
-        return cache != null ? cache.estimatedSize() : 0;
+        // Return persistence count for the region (most accurate total)
+        return getPersistenceEntryCount(region);
     }
     
     /**
@@ -1074,10 +1219,10 @@ public class CacheService {
     }
     
     /**
-     * Get persistence store entry count for a region.
+     * Get persistence store entry count for a region (excludes expired entries).
      */
     public long getPersistenceEntryCount(String region) {
-        return persistenceStore.countEntries(region);
+        return persistenceStore.countNonExpiredEntries(region);
     }
     
     /**
@@ -1087,14 +1232,18 @@ public class CacheService {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("region", region);
         
+        long memoryEntries = getMemoryEntryCount(region);
+        long persistenceEntries = getPersistenceEntryCount(region);
+        
         CacheRegion regionObj = regions.get(region);
         if (regionObj != null) {
-            stats.put("entryCount", regionObj.getEntryCount());
             stats.put("hitRatio", String.format("%.2f", regionObj.getHitRatio()));
         }
         
-        stats.put("memoryEntries", getMemoryEntryCount(region));
-        stats.put("persistenceEntries", getPersistenceEntryCount(region));
+        // Use dynamic counts - persistence is the source of truth for total
+        stats.put("entryCount", persistenceEntries);
+        stats.put("memoryEntries", memoryEntries);
+        stats.put("persistenceEntries", persistenceEntries);
         
         return stats;
     }
@@ -1208,7 +1357,6 @@ public class CacheService {
         for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
             String regionName = entry.getKey();
             Cache<String, CacheEntry> cache = entry.getValue();
-            CacheRegion region = regions.get(regionName);
             
             List<String> expiredKeys = new ArrayList<>();
             cache.asMap().forEach((key, cacheEntry) -> {
@@ -1220,12 +1368,8 @@ public class CacheService {
             for (String key : expiredKeys) {
                 cache.invalidate(key);
                 
-                // Decrement the region entry count
-                if (region != null) {
-                    region.decrementEntryCount();
-                }
-                
                 // Delete from persistence store
+                // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
                 try {
                     persistenceStore.deleteEntry(regionName, key);
                 } catch (Exception e) {
@@ -1236,8 +1380,8 @@ public class CacheService {
             }
             
             if (!expiredKeys.isEmpty()) {
-                log.info("Cleaned up {} expired entries from region '{}', new count: {}", 
-                        expiredKeys.size(), regionName, region != null ? region.getEntryCount() : "N/A");
+                log.info("Cleaned up {} expired entries from memory in region '{}'", 
+                        expiredKeys.size(), regionName);
             }
         }
     }

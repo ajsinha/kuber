@@ -37,12 +37,12 @@ import java.util.concurrent.CompletableFuture;
 /**
  * MongoDB repository for persisting cache data.
  * Each region maps to a separate collection.
- * Only activated when kuber.persistence.type=mongodb (default).
+ * Only activated when kuber.persistence.type=mongodb is explicitly set.
  */
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "kuber.persistence.type", havingValue = "mongodb", matchIfMissing = true)
+@ConditionalOnProperty(name = "kuber.persistence.type", havingValue = "mongodb")
 public class MongoRepository {
     
     private final MongoDatabase database;

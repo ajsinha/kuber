@@ -122,6 +122,34 @@ public interface PersistenceStore {
     List<String> getKeys(String region, String pattern, int limit);
     
     /**
+     * Get a single entry by key.
+     */
+    CacheEntry get(String region, String key);
+    
+    /**
+     * Delete expired entries from a region.
+     * @param region Region name
+     * @return Number of entries deleted
+     */
+    long deleteExpiredEntries(String region);
+    
+    /**
+     * Delete all expired entries from all regions.
+     * @return Total number of entries deleted
+     */
+    long deleteAllExpiredEntries();
+    
+    /**
+     * Count non-expired entries in a region.
+     */
+    long countNonExpiredEntries(String region);
+    
+    /**
+     * Get non-expired keys in a region.
+     */
+    List<String> getNonExpiredKeys(String region, String pattern, int limit);
+    
+    /**
      * Persistence store types.
      */
     enum PersistenceType {

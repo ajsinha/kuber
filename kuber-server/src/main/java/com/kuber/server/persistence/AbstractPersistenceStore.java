@@ -12,6 +12,7 @@
 package com.kuber.server.persistence;
 
 import com.kuber.core.model.CacheEntry;
+import com.kuber.core.model.CacheRegion;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
@@ -124,5 +125,88 @@ public abstract class AbstractPersistenceStore implements PersistenceStore {
                 .filter(key -> regex.matcher(key).matches())
                 .limit(limit > 0 ? limit : Long.MAX_VALUE)
                 .toList();
+    }
+    
+    /**
+     * Default implementation of get - delegates to loadEntry.
+     */
+    @Override
+    public CacheEntry get(String region, String key) {
+        return loadEntry(region, key);
+    }
+    
+    /**
+     * Default implementation - subclasses should override for efficiency.
+     */
+    @Override
+    public long deleteExpiredEntries(String region) {
+        List<String> keys = getKeys(region, "*", Integer.MAX_VALUE);
+        long deleted = 0;
+        
+        for (String key : keys) {
+            CacheEntry entry = loadEntry(region, key);
+            if (entry != null && isExpired(entry)) {
+                deleteEntry(region, key);
+                deleted++;
+            }
+        }
+        
+        if (deleted > 0) {
+            log.info("Deleted {} expired entries from region '{}'", deleted, region);
+        }
+        
+        return deleted;
+    }
+    
+    /**
+     * Delete all expired entries from all regions.
+     * Subclasses should implement loadAllRegions to make this work.
+     */
+    @Override
+    public long deleteAllExpiredEntries() {
+        long total = 0;
+        for (CacheRegion region : loadAllRegions()) {
+            total += deleteExpiredEntries(region.getName());
+        }
+        return total;
+    }
+    
+    /**
+     * Count non-expired entries - default implementation.
+     */
+    @Override
+    public long countNonExpiredEntries(String region) {
+        List<String> keys = getKeys(region, "*", Integer.MAX_VALUE);
+        long count = 0;
+        
+        for (String key : keys) {
+            CacheEntry entry = loadEntry(region, key);
+            if (entry != null && !isExpired(entry)) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
+     * Get non-expired keys - default implementation.
+     */
+    @Override
+    public List<String> getNonExpiredKeys(String region, String pattern, int limit) {
+        List<String> allKeys = getKeys(region, pattern, Integer.MAX_VALUE);
+        List<String> nonExpired = new java.util.ArrayList<>();
+        
+        for (String key : allKeys) {
+            if (nonExpired.size() >= limit && limit > 0) {
+                break;
+            }
+            CacheEntry entry = loadEntry(region, key);
+            if (entry != null && !isExpired(entry)) {
+                nonExpired.add(key);
+            }
+        }
+        
+        return nonExpired;
     }
 }

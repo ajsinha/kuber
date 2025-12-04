@@ -53,6 +53,33 @@
                     </div>
                 </div>
             </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <label for="limitInput" class="form-label fw-semibold">
+                            <i class="fas fa-list-ol me-1"></i> Display Limit
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="limitInput" class="form-control" 
+                                   th:value="${limit}" min="1" max="100000" placeholder="10000">
+                            <button class="btn btn-outline-primary" type="button" onclick="applyLimit()">
+                                Apply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Limit Warning Alert -->
+        <div th:if="${hasMore}" class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Results Limited!</strong> 
+            More than <span th:text="${limit}">10000</span> entries exist in this region 
+            (Total: <span th:text="${totalKeys}">0</span>). 
+            Only <span th:text="${resultCount}">10000</span> entries are displayed.
+            Please refine your query or increase the limit to see more results.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         
         <!-- Keys Table -->
@@ -158,6 +185,47 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Key</dt>
+                                    <dd class="text-muted">Unique identifier for a cache entry within a region.</dd>
+                                    <dt>Region</dt>
+                                    <dd class="text-muted">Logical namespace grouping related cache entries.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Entry</dt>
+                                    <dd class="text-muted">A key-value pair stored in the cache with optional TTL.</dd>
+                                    <dt>Export CSV</dt>
+                                    <dd class="text-muted">Download all entries as comma-separated values file.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Insert Entry</dt>
+                                    <dd class="text-muted">Add a new key-value pair to the current region.</dd>
+                                    <dt>Query</dt>
+                                    <dd class="text-muted">Search entries using JSONPath expressions.</dd>
+                                    <dt>Display Limit</dt>
+                                    <dd class="text-muted">Max entries shown (default: 10,000). Increase if results are truncated.</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -185,7 +253,22 @@
     });
     
     function changeRegion(region) {
-        window.location.href = '/cache?region=' + encodeURIComponent(region);
+        const limit = document.getElementById('limitInput').value;
+        let url = '/cache?region=' + encodeURIComponent(region);
+        if (limit && limit != 10000) {
+            url += '&limit=' + limit;
+        }
+        window.location.href = url;
+    }
+    
+    function applyLimit() {
+        const region = document.getElementById('regionSelect').value;
+        const limit = document.getElementById('limitInput').value;
+        let url = '/cache?region=' + encodeURIComponent(region);
+        if (limit) {
+            url += '&limit=' + limit;
+        }
+        window.location.href = url;
     }
     
     function clearSearch() {

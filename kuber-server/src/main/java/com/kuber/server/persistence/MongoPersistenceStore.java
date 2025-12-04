@@ -301,6 +301,68 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
         return filterKeys(keys, pattern, limit);
     }
     
+    @Override
+    public long deleteExpiredEntries(String region) {
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        // Delete where expiresAt is not null and is before now
+        Bson filter = Filters.and(
+                Filters.ne("expiresAt", null),
+                Filters.lt("expiresAt", Instant.now())
+        );
+        
+        long deleted = collection.deleteMany(filter).getDeletedCount();
+        
+        if (deleted > 0) {
+            log.info("Deleted {} expired entries from region '{}' in MongoDB", deleted, region);
+        }
+        
+        return deleted;
+    }
+    
+    @Override
+    public long deleteAllExpiredEntries() {
+        long total = 0;
+        for (CacheRegion region : loadAllRegions()) {
+            total += deleteExpiredEntries(region.getName());
+        }
+        return total;
+    }
+    
+    @Override
+    public long countNonExpiredEntries(String region) {
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        // Count where expiresAt is null OR expiresAt >= now
+        Bson filter = Filters.or(
+                Filters.eq("expiresAt", null),
+                Filters.gte("expiresAt", Instant.now())
+        );
+        
+        return collection.countDocuments(filter);
+    }
+    
+    @Override
+    public List<String> getNonExpiredKeys(String region, String pattern, int limit) {
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        // Filter where expiresAt is null OR expiresAt >= now
+        Bson filter = Filters.or(
+                Filters.eq("expiresAt", null),
+                Filters.gte("expiresAt", Instant.now())
+        );
+        
+        List<String> keys = new ArrayList<>();
+        collection.find(filter)
+                .projection(Projections.include("key"))
+                .forEach(doc -> keys.add(doc.getString("key")));
+        
+        return filterKeys(keys, pattern, limit);
+    }
+    
     private Document entryToDocument(CacheEntry entry) {
         Document doc = new Document()
                 .append("key", entry.getKey())

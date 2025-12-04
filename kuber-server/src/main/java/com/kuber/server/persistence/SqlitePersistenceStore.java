@@ -437,6 +437,88 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
         return filterKeys(keys, pattern, limit);
     }
     
+    @Override
+    public long deleteExpiredEntries(String region) {
+        String sql = "DELETE FROM kuber_entries WHERE region = ? AND expires_at IS NOT NULL AND expires_at < ?";
+        
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, region);
+            stmt.setLong(2, System.currentTimeMillis());
+            
+            int deleted = stmt.executeUpdate();
+            
+            if (deleted > 0) {
+                log.info("Deleted {} expired entries from region '{}' in SQLite", deleted, region);
+            }
+            
+            return deleted;
+        } catch (SQLException e) {
+            log.error("Failed to delete expired entries from region '{}': {}", region, e.getMessage(), e);
+            return 0;
+        }
+    }
+    
+    @Override
+    public long deleteAllExpiredEntries() {
+        String sql = "DELETE FROM kuber_entries WHERE expires_at IS NOT NULL AND expires_at < ?";
+        
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setLong(1, System.currentTimeMillis());
+            
+            int deleted = stmt.executeUpdate();
+            
+            if (deleted > 0) {
+                log.info("Deleted {} expired entries from all regions in SQLite", deleted);
+            }
+            
+            return deleted;
+        } catch (SQLException e) {
+            log.error("Failed to delete expired entries: {}", e.getMessage(), e);
+            return 0;
+        }
+    }
+    
+    @Override
+    public long countNonExpiredEntries(String region) {
+        String sql = "SELECT COUNT(*) FROM kuber_entries WHERE region = ? AND (expires_at IS NULL OR expires_at >= ?)";
+        
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, region);
+            stmt.setLong(2, System.currentTimeMillis());
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to count non-expired entries in region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return 0;
+    }
+    
+    @Override
+    public List<String> getNonExpiredKeys(String region, String pattern, int limit) {
+        List<String> keys = new ArrayList<>();
+        String sql = "SELECT key FROM kuber_entries WHERE region = ? AND (expires_at IS NULL OR expires_at >= ?)";
+        
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, region);
+            stmt.setLong(2, System.currentTimeMillis());
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    keys.add(rs.getString("key"));
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to get non-expired keys from region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return filterKeys(keys, pattern, limit);
+    }
+    
     private CacheEntry resultSetToEntry(ResultSet rs) throws SQLException {
         CacheEntry.CacheEntryBuilder builder = CacheEntry.builder()
                 .region(rs.getString("region"))

@@ -45,13 +45,16 @@ public class CsvExportController {
      * Export all entries in a region as CSV.
      */
     @GetMapping("/region/{region}")
-    public ResponseEntity<byte[]> exportRegion(@PathVariable String region) {
-        log.info("Exporting region '{}' as CSV", region);
+    public ResponseEntity<byte[]> exportRegion(
+            @PathVariable String region,
+            @RequestParam(required = false) Integer limit) {
+        int effectiveLimit = getEffectiveLimit(limit);
+        log.info("Exporting region '{}' as CSV with limit {}", region, effectiveLimit);
         
         StringBuilder csv = new StringBuilder();
         csv.append("key,value,type,ttl\n");
         
-        Set<String> keys = cacheService.keys(region, "*");
+        Set<String> keys = cacheService.keys(region, "*", effectiveLimit);
         
         for (String key : keys) {
             String value = cacheService.get(region, key);
@@ -76,13 +79,15 @@ public class CsvExportController {
     @GetMapping("/keys")
     public ResponseEntity<byte[]> exportKeys(
             @RequestParam(defaultValue = "default") String region,
-            @RequestParam(defaultValue = "*") String pattern) {
-        log.info("Exporting keys matching '{}' from region '{}' as CSV", pattern, region);
+            @RequestParam(defaultValue = "*") String pattern,
+            @RequestParam(required = false) Integer limit) {
+        int effectiveLimit = getEffectiveLimit(limit);
+        log.info("Exporting keys matching '{}' from region '{}' as CSV with limit {}", pattern, region, effectiveLimit);
         
         StringBuilder csv = new StringBuilder();
         csv.append("key,value,type,ttl\n");
         
-        Set<String> keys = cacheService.keys(region, pattern);
+        Set<String> keys = cacheService.keys(region, pattern, effectiveLimit);
         
         for (String key : keys) {
             String value = cacheService.get(region, key);
@@ -108,13 +113,14 @@ public class CsvExportController {
     public ResponseEntity<byte[]> exportKeySearch(
             @RequestParam(defaultValue = "default") String region,
             @RequestParam(defaultValue = ".*") String regex,
-            @RequestParam(defaultValue = "1000") int limit) {
-        log.info("Exporting key search results for regex '{}' from region '{}' as CSV", regex, region);
+            @RequestParam(required = false) Integer limit) {
+        int effectiveLimit = getEffectiveLimit(limit);
+        log.info("Exporting key search results for regex '{}' from region '{}' as CSV with limit {}", regex, region, effectiveLimit);
         
         StringBuilder csv = new StringBuilder();
         csv.append("key,value,type,ttl\n");
         
-        List<Map<String, Object>> results = cacheService.searchKeysByRegex(region, regex, limit);
+        List<Map<String, Object>> results = cacheService.searchKeysByRegex(region, regex, effectiveLimit);
         
         for (Map<String, Object> entry : results) {
             csv.append(escapeCsvField(String.valueOf(entry.get("key")))).append(",");
@@ -135,13 +141,15 @@ public class CsvExportController {
     @GetMapping("/jsearch")
     public ResponseEntity<byte[]> exportJsonSearch(
             @RequestParam(defaultValue = "default") String region,
-            @RequestParam String query) {
-        log.info("Exporting JSON search results for query '{}' from region '{}' as CSV", query, region);
+            @RequestParam String query,
+            @RequestParam(required = false) Integer limit) {
+        int effectiveLimit = getEffectiveLimit(limit);
+        log.info("Exporting JSON search results for query '{}' from region '{}' as CSV with limit {}", query, region, effectiveLimit);
         
         StringBuilder csv = new StringBuilder();
         csv.append("key,value,type,ttl\n");
         
-        List<CacheEntry> results = cacheService.jsonSearch(region, query);
+        List<CacheEntry> results = cacheService.jsonSearch(region, query, effectiveLimit);
         
         for (CacheEntry entry : results) {
             csv.append(escapeCsvField(entry.getKey())).append(",");
@@ -183,6 +191,9 @@ public class CsvExportController {
         return buildCsvResponse(csv.toString(), filename);
     }
     
+    private static final int DEFAULT_EXPORT_LIMIT = 10000;
+    private static final int MAX_EXPORT_LIMIT = 100000;
+    
     /**
      * Export query results based on query type.
      */
@@ -191,10 +202,13 @@ public class CsvExportController {
             @RequestParam(defaultValue = "default") String region,
             @RequestParam String queryType,
             @RequestParam(required = false) String key,
-            @RequestParam(required = false) String jsonQuery) {
+            @RequestParam(required = false) String jsonQuery,
+            @RequestParam(required = false) Integer limit) {
         
-        log.info("Exporting query results: type={}, region={}, key={}, jsonQuery={}", 
-                queryType, region, key, jsonQuery);
+        int effectiveLimit = getEffectiveLimit(limit);
+        
+        log.info("Exporting query results: type={}, region={}, key={}, jsonQuery={}, limit={}", 
+                queryType, region, key, jsonQuery, effectiveLimit);
         
         StringBuilder csv = new StringBuilder();
         String filename;
@@ -202,7 +216,7 @@ public class CsvExportController {
         switch (queryType) {
             case "keys":
                 csv.append("key\n");
-                Set<String> keys = cacheService.keys(region, key != null ? key : "*");
+                Set<String> keys = cacheService.keys(region, key != null ? key : "*", effectiveLimit);
                 for (String k : keys) {
                     csv.append(escapeCsvField(k)).append("\n");
                 }
@@ -213,7 +227,7 @@ public class CsvExportController {
             case "ksearch":
                 csv.append("key,value,type,ttl\n");
                 List<Map<String, Object>> ksearchResults = cacheService.searchKeysByRegex(
-                        region, key != null ? key : ".*", 1000);
+                        region, key != null ? key : ".*", effectiveLimit);
                 for (Map<String, Object> entry : ksearchResults) {
                     csv.append(escapeCsvField(String.valueOf(entry.get("key")))).append(",");
                     csv.append(escapeCsvField(String.valueOf(entry.get("value")))).append(",");
@@ -226,7 +240,7 @@ public class CsvExportController {
                 
             case "jsearch":
                 csv.append("key,value\n");
-                List<CacheEntry> jsearchResults = cacheService.jsonSearch(region, jsonQuery);
+                List<CacheEntry> jsearchResults = cacheService.jsonSearch(region, jsonQuery, effectiveLimit);
                 for (CacheEntry entry : jsearchResults) {
                     csv.append(escapeCsvField(entry.getKey())).append(",");
                     csv.append(escapeCsvField(entry.getStringValue())).append("\n");
@@ -265,6 +279,16 @@ public class CsvExportController {
         }
         
         return buildCsvResponse(csv.toString(), filename);
+    }
+    
+    /**
+     * Get effective limit, respecting default and max bounds.
+     */
+    private int getEffectiveLimit(Integer userLimit) {
+        if (userLimit == null || userLimit <= 0) {
+            return DEFAULT_EXPORT_LIMIT;
+        }
+        return Math.min(userLimit, MAX_EXPORT_LIMIT);
     }
     
     /**

@@ -43,10 +43,10 @@
                     <div class="card-body">
                         <p class="text-muted mb-3" th:text="${region.description} ?: 'No description'">Description</p>
                         
-                        <div class="row g-2 mb-3">
+                        <div class="row g-2 mb-2">
                             <div class="col-6">
                                 <div class="bg-light rounded p-2 text-center">
-                                    <div class="text-muted small">Entries</div>
+                                    <div class="text-muted small">Total Entries</div>
                                     <div class="fw-bold" th:text="${#numbers.formatInteger(region.entryCount, 1, 'COMMA')}">0</div>
                                 </div>
                             </div>
@@ -54,6 +54,21 @@
                                 <div class="bg-light rounded p-2 text-center">
                                     <div class="text-muted small">Hit Ratio</div>
                                     <div class="fw-bold" th:text="${#numbers.formatPercent(region.hitRatio, 1, 1)}">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <div class="bg-primary bg-opacity-10 rounded p-2 text-center">
+                                    <div class="text-muted small"><i class="fas fa-memory me-1"></i>Memory</div>
+                                    <div class="fw-bold text-primary" th:text="${#numbers.formatInteger(region.memoryEntryCount, 1, 'COMMA')}">0</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="bg-warning bg-opacity-10 rounded p-2 text-center">
+                                    <div class="text-muted small"><i class="fas fa-database me-1"></i>Persistence</div>
+                                    <div class="fw-bold text-warning" th:text="${#numbers.formatInteger(region.persistenceEntryCount, 1, 'COMMA')}">0</div>
                                 </div>
                             </div>
                         </div>
@@ -84,6 +99,45 @@
                                th:title="'Download all ' + ${region.entryCount} + ' entries as CSV'">
                                 <i class="fas fa-download me-1"></i> Export CSV
                             </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Region</dt>
+                                    <dd class="text-muted">A logical namespace for grouping related cache entries. Provides isolation between different data sets.</dd>
+                                    <dt>Captive</dt>
+                                    <dd class="text-muted">A system-protected region that cannot be deleted (e.g., "default" region).</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Total Entries</dt>
+                                    <dd class="text-muted">The total number of key-value pairs stored in this region.</dd>
+                                    <dt>Hit Ratio</dt>
+                                    <dd class="text-muted">Percentage of cache lookups that found data (hits) vs total lookups. Higher is better.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Memory</dt>
+                                    <dd class="text-muted">Entries currently held in fast in-memory cache for quick access.</dd>
+                                    <dt>Persistence</dt>
+                                    <dd class="text-muted">Entries stored in the backing persistence store (RocksDB, MongoDB, etc.) for durability.</dd>
+                                </dl>
+                            </div>
                         </div>
                     </div>
                 </div>

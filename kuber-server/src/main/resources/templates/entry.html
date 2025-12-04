@@ -167,6 +167,45 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Key</dt>
+                                    <dd class="text-muted">Unique identifier for this cache entry.</dd>
+                                    <dt>Value</dt>
+                                    <dd class="text-muted">The JSON data stored under this key.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>TTL (Time To Live)</dt>
+                                    <dd class="text-muted">Seconds until entry expires. -1 means no expiration.</dd>
+                                    <dt>Expiration</dt>
+                                    <dd class="text-muted">Timestamp when entry will be automatically removed.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-4">
+                                <dl class="mb-0">
+                                    <dt>Region</dt>
+                                    <dd class="text-muted">Logical namespace where this entry is stored.</dd>
+                                    <dt>Size</dt>
+                                    <dd class="text-muted">Approximate memory footprint of the value data.</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 

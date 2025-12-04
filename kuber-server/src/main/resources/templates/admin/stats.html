@@ -85,6 +85,41 @@
                 Running in standalone mode (replication disabled)
             </div>
         </div>
+        
+        <!-- Glossary Card -->
+        <div class="card border-0 shadow-sm bg-light">
+            <div class="card-body">
+                <h6 class="card-title text-muted mb-3">
+                    <i class="fas fa-question-circle me-2"></i>Glossary
+                </h6>
+                <div class="row small">
+                    <div class="col-md-4">
+                        <dl class="mb-0">
+                            <dt>Hits</dt>
+                            <dd class="text-muted">Cache lookups that found data (successful reads).</dd>
+                            <dt>Misses</dt>
+                            <dd class="text-muted">Cache lookups where data was not found.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <dl class="mb-0">
+                            <dt>Sets</dt>
+                            <dd class="text-muted">Write operations creating or updating entries.</dd>
+                            <dt>Deletes</dt>
+                            <dd class="text-muted">Operations that removed entries from the cache.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <dl class="mb-0">
+                            <dt>Expired</dt>
+                            <dd class="text-muted">Entries automatically removed after TTL expiration.</dd>
+                            <dt>Evicted</dt>
+                            <dd class="text-muted">Entries moved from memory to persistence to free heap.</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 

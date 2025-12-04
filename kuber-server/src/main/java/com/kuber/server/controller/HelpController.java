@@ -38,7 +38,7 @@ public class HelpController {
         "rest-api", "redis-protocol", "generic-search", "autoload",
         "python-client", "java-client",
         "string-ops", "json-ops", "hash-ops", "key-ops", "ttl-ops", "batch-ops",
-        "regions", "search-ops", "replication"
+        "regions", "search-ops", "replication", "glossary"
     );
     
     /**

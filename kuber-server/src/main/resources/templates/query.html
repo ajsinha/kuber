@@ -72,6 +72,16 @@
                                 </small>
                             </div>
                             
+                            <div class="mb-3" id="limitField">
+                                <label for="limit" class="form-label">Limit</label>
+                                <input type="number" id="limit" name="limit" class="form-control"
+                                       th:value="${userLimit}" min="1" max="100000" 
+                                       th:placeholder="${defaultLimit != null ? defaultLimit : 10000}">
+                                <small class="text-muted">
+                                    Max results (default: 10,000, max: 100,000)
+                                </small>
+                            </div>
+                            
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="fas fa-play me-1"></i> Execute
                             </button>
@@ -108,6 +118,16 @@
             
             <!-- Results -->
             <div class="col-lg-8">
+                <!-- Limit Warning Alert -->
+                <div th:if="${hasMore}" class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Results Limited!</strong> 
+                    More than <span th:text="${limit}">10000</span> entries match your query.
+                    Only <span th:text="${resultCount}">10000</span> results are displayed.
+                    Please refine your query or increase the limit to see more results.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3">
                         <div class="d-flex justify-content-between align-items-center">
@@ -150,7 +170,8 @@
                         <div th:if="${resultType == 'keys'}">
                             <div th:if="${results != null && !results.isEmpty()}">
                                 <div class="mb-3 text-muted">
-                                    Found <span th:text="${#lists.size(results)}">0</span> keys
+                                    Found <span th:text="${resultCount != null ? resultCount : #lists.size(results)}">0</span> keys
+                                    <span th:if="${hasMore}" class="text-warning">(limited)</span>
                                 </div>
                                 <!-- Table Controls -->
                                 <div class="row align-items-center mb-3">
@@ -427,6 +448,53 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Glossary Card -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">
+                            <i class="fas fa-question-circle me-2"></i>Glossary
+                        </h6>
+                        <div class="row small">
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>JSONPath Query</dt>
+                                    <dd class="text-muted">Search all entries using JSONPath expressions (e.g., $.name == "John").</dd>
+                                    <dt>Key Pattern</dt>
+                                    <dd class="text-muted">Wildcard pattern matching keys (e.g., user:* matches user:1, user:2).</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Exact Key</dt>
+                                    <dd class="text-muted">Retrieve a specific entry by its exact key name.</dd>
+                                    <dt>Get All Keys</dt>
+                                    <dd class="text-muted">List all keys in the selected region.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>JSONPath</dt>
+                                    <dd class="text-muted">Expression language for querying JSON ($ = root, .field = child, [*] = array).</dd>
+                                    <dt>Limit</dt>
+                                    <dd class="text-muted">Max results to return (default: 10,000, max: 100,000). Warning shown if exceeded.</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl class="mb-0">
+                                    <dt>Execution Time</dt>
+                                    <dd class="text-muted">Time taken to execute the query in milliseconds.</dd>
+                                    <dt>Sample Queries</dt>
+                                    <dd class="text-muted">Click to populate the form with example queries.</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -439,6 +507,7 @@
     const queryType = /*[[${queryType}]]*/ null;
     const queryKey = /*[[${queryKey}]]*/ null;
     const jsonQuery = /*[[${jsonQuery}]]*/ null;
+    const queryLimit = /*[[${limit}]]*/ 10000;
     
     function toggleQueryFields() {
         const type = document.getElementById('queryType').value;
@@ -459,6 +528,7 @@
                   '&queryType=' + encodeURIComponent(queryType);
         if (queryKey) url += '&key=' + encodeURIComponent(queryKey);
         if (jsonQuery) url += '&jsonQuery=' + encodeURIComponent(jsonQuery);
+        if (queryLimit) url += '&limit=' + queryLimit;
         window.location.href = url;
     }
     
