@@ -28,12 +28,14 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * MongoDB configuration for Kuber persistence.
- * Only activated when kuber.persistence.type=mongodb (default).
+ * Only activated when kuber.persistence.type=mongodb explicitly.
+ * When using other persistence types (rocksdb, sqlite, postgresql, memory),
+ * this configuration is completely disabled and no MongoDB connection is attempted.
  */
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "kuber.persistence.type", havingValue = "mongodb", matchIfMissing = true)
+@ConditionalOnProperty(name = "kuber.persistence.type", havingValue = "mongodb")
 public class MongoConfig {
     
     private final KuberProperties properties;

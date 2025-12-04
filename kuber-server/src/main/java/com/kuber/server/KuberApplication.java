@@ -13,6 +13,8 @@ package com.kuber.server;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
+import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -26,10 +28,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * - Automatic replication with primary/secondary failover
  * - Event subscription for cache operations
  * 
+ * MongoDB auto-configuration is excluded because we handle MongoDB initialization
+ * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
+ * 
  * @author Ashutosh Sinha
- * @version 1.0.0
+ * @version 1.1.4
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+    MongoAutoConfiguration.class,
+    MongoDataAutoConfiguration.class
+})
 @EnableAsync
 @EnableScheduling
 public class KuberApplication {
@@ -51,7 +59,7 @@ public class KuberApplication {
         System.out.println("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                       ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   High-Performance Distributed Cache                              ║");
-        System.out.println("║   Version 1.0.0                                                   ║");
+        System.out.println("║   Version 1.1.4                                                   ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   Copyright © 2025-2030 Ashutosh Sinha                            ║");
         System.out.println("║   All Rights Reserved                                             ║");
