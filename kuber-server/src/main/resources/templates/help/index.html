@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Help')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <!-- Header -->
+        <div class="text-center mb-5">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-book me-3 text-primary"></i>
+                <span th:text="${appName} ?: 'Kuber'">Kuber</span> Documentation
+            </h1>
+            <p class="lead text-muted">Complete reference guide for the distributed caching system</p>
+        </div>
+
+        <!-- Quick Start Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-12">
+                <h3 class="mb-3"><i class="fas fa-rocket me-2 text-warning"></i>Getting Started</h3>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/overview" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-home fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title">Overview</h5>
+                            <p class="card-text text-muted small">Introduction to features and capabilities</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/quickstart" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-bolt fa-3x text-warning mb-3"></i>
+                            <h5 class="card-title">Quick Start</h5>
+                            <p class="card-text text-muted small">Get up and running in minutes</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/web-ui" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-desktop fa-3x text-info mb-3"></i>
+                            <h5 class="card-title">Web UI Guide</h5>
+                            <p class="card-text text-muted small">Using the web management interface</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/config" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-cog fa-3x text-secondary mb-3"></i>
+                            <h5 class="card-title">Configuration</h5>
+                            <p class="card-text text-muted small">Server settings and persistence options</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- API Reference Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-12">
+                <h3 class="mb-3"><i class="fas fa-plug me-2 text-success"></i>API Reference</h3>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/rest-api" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-cloud fa-3x text-success mb-3"></i>
+                            <h5 class="card-title">REST API</h5>
+                            <p class="card-text text-muted small">HTTP endpoints and operations</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/redis-protocol" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-terminal fa-3x text-danger mb-3"></i>
+                            <h5 class="card-title">Redis Protocol</h5>
+                            <p class="card-text text-muted small">RESP commands and extensions</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/generic-search" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-search-plus fa-3x mb-3" style="color: #6f42c1;"></i>
+                            <h5 class="card-title">Generic Search API</h5>
+                            <p class="card-text text-muted small">Advanced search with projections</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/autoload" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-upload fa-3x mb-3" style="color: #20c997;"></i>
+                            <h5 class="card-title">Autoload</h5>
+                            <p class="card-text text-muted small">Bulk data import from CSV/JSON</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Client Libraries Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-12">
+                <h3 class="mb-3"><i class="fas fa-code me-2 text-info"></i>Client Libraries</h3>
+            </div>
+            
+            <div class="col-md-6">
+                <a href="/help/python-client" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card" style="background: linear-gradient(135deg, #306998 0%, #FFD43B 100%);">
+                        <div class="card-body text-white py-5">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <i class="fab fa-python fa-5x"></i>
+                                </div>
+                                <div class="col">
+                                    <h4 class="card-title mb-2">Python Client</h4>
+                                    <p class="card-text mb-0 opacity-75">Redis client, REST API with requests, complete examples</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6">
+                <a href="/help/java-client" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card" style="background: linear-gradient(135deg, #f89820 0%, #5382a1 100%);">
+                        <div class="card-body text-white py-5">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <i class="fab fa-java fa-5x"></i>
+                                </div>
+                                <div class="col">
+                                    <h4 class="card-title mb-2">Java Client</h4>
+                                    <p class="card-text mb-0 opacity-75">Jedis, HttpClient REST API, Spring Boot integration</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Data Types Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-12">
+                <h3 class="mb-3"><i class="fas fa-database me-2 text-danger"></i>Data Types &amp; Operations</h3>
+            </div>
+            
+            <div class="col-md-4 col-lg-2">
+                <a href="/help/string-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-3">
+                            <i class="fas fa-font fa-2x text-primary mb-2"></i>
+                            <h6 class="card-title mb-0">Strings</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-4 col-lg-2">
+                <a href="/help/json-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-3">
+                            <i class="fas fa-code fa-2x text-success mb-2"></i>
+                            <h6 class="card-title mb-0">JSON</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-4 col-lg-2">
+                <a href="/help/hash-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-3">
+                            <i class="fas fa-hashtag fa-2x text-danger mb-2"></i>
+                            <h6 class="card-title mb-0">Hashes</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-4 col-lg-2">
+                <a href="/help/key-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-3">
+                            <i class="fas fa-key fa-2x text-warning mb-2"></i>
+                            <h6 class="card-title mb-0">Keys</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-4 col-lg-2">
+                <a href="/help/ttl-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-3">
+                            <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                            <h6 class="card-title mb-0">TTL</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-4 col-lg-2">
+                <a href="/help/batch-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-3">
+                            <i class="fas fa-layer-group fa-2x text-secondary mb-2"></i>
+                            <h6 class="card-title mb-0">Batch</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Advanced Topics Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-12">
+                <h3 class="mb-3"><i class="fas fa-cogs me-2 text-secondary"></i>Advanced Topics</h3>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/regions" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-layer-group fa-3x text-info mb-3"></i>
+                            <h5 class="card-title">Regions</h5>
+                            <p class="card-text text-muted small">Namespace management and attribute mapping</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/search-ops" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-search fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title">Search Operations</h5>
+                            <p class="card-text text-muted small">KEYS vs KSEARCH, regex patterns</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/help/replication" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-sync fa-3x text-success mb-3"></i>
+                            <h5 class="card-title">Replication</h5>
+                            <p class="card-text text-muted small">Primary/Secondary with ZooKeeper</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <a href="/about" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-info-circle fa-3x text-secondary mb-3"></i>
+                            <h5 class="card-title">About</h5>
+                            <p class="card-text text-muted small">Version info and system details</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="py-4 mt-4 border-top">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                    <p class="text-muted small mb-0">Version 1.1.3</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="text-muted small mb-0">
+                        Copyright &copy; 2025-2030, All Rights Reserved<br>
+                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                        <span class="badge bg-warning text-dark">Patent Pending</span>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</main>
+
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+<style>
+.hover-card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+</style>
+
+</body>
+</html>

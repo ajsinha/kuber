@@ -47,7 +47,7 @@ public class SecurityConfig {
                 .ignoringRequestMatchers("/api/**")
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/logout", "/error", "/help", "/about").permitAll()
+                .requestMatchers("/login", "/logout", "/error", "/help/**", "/help", "/about").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/**").authenticated()

@@ -103,6 +103,42 @@ public class ApiController {
         return ResponseEntity.ok(cacheService.getStatistics(name));
     }
     
+    // ==================== Attribute Mapping Operations ====================
+    
+    /**
+     * Get attribute mapping for a region.
+     * Returns the current attribute mapping configuration.
+     */
+    @GetMapping("/regions/{name}/attributemapping")
+    public ResponseEntity<Map<String, String>> getAttributeMapping(@PathVariable String name) {
+        Map<String, String> mapping = cacheService.getAttributeMapping(name);
+        return ResponseEntity.ok(mapping);
+    }
+    
+    /**
+     * Set attribute mapping for a region.
+     * Maps source attribute names to target attribute names for JSON transformation.
+     * When JSON is stored in this region, attributes are renamed according to this mapping.
+     * 
+     * Example request body:
+     * {"firstName": "first_name", "lastName": "last_name", "emailAddress": "email"}
+     */
+    @PutMapping("/regions/{name}/attributemapping")
+    public ResponseEntity<Void> setAttributeMapping(@PathVariable String name,
+                                                     @RequestBody Map<String, String> mapping) {
+        cacheService.setAttributeMapping(name, mapping);
+        return ResponseEntity.ok().build();
+    }
+    
+    /**
+     * Clear attribute mapping for a region.
+     */
+    @DeleteMapping("/regions/{name}/attributemapping")
+    public ResponseEntity<Void> clearAttributeMapping(@PathVariable String name) {
+        cacheService.clearAttributeMapping(name);
+        return ResponseEntity.ok().build();
+    }
+    
     // ==================== Key/Value Operations ====================
     
     @GetMapping("/cache/{region}/keys")

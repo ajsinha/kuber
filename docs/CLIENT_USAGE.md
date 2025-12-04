@@ -21,7 +21,8 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 8. [JSON Operations](#8-json-operations)
 9. [Generic Search API](#9-generic-search-api)
 10. [Region Management](#10-region-management)
-11. [Error Handling](#11-error-handling)
+11. [Attribute Mapping](#11-attribute-mapping)
+12. [Error Handling](#12-error-handling)
 
 ---
 
@@ -1056,6 +1057,48 @@ With field projection (`fields=["name", "address.city"]`):
 ]
 ```
 
+### 9.6 KSEARCH - Direct Key Regex Search
+
+The `ksearch` method provides a simpler alternative to generic_search for regex-based key searches. It returns full key-value objects including metadata.
+
+**Response includes**: `key`, `value`, `type`, `ttl`
+
+**Python Redis Client:**
+```python
+# Search keys matching regex pattern
+results = client.ksearch(r'user:\d+', limit=100)
+for item in results:
+    print(f"Key: {item['key']}, Type: {item['type']}, TTL: {item['ttl']}")
+    print(f"Value: {item['value']}")
+```
+
+**Python REST Client:**
+```python
+# Same interface via REST
+results = client.ksearch(r'user:\d+', region='users', limit=50)
+```
+
+**Java Redis Client:**
+```java
+// Search keys by regex
+List<Map<String, Object>> results = client.ksearch("user:\\d+");
+
+// With limit
+results = client.ksearch("user:\\d+", 100);
+```
+
+**Java REST Client:**
+```java
+// Search via REST API
+List<Map<String, Object>> results = client.ksearch("user:\\d+", "users", 100);
+```
+
+**Redis CLI:**
+```bash
+KSEARCH user:\d+
+KSEARCH user:\d+ LIMIT 50
+```
+
 ---
 
 ## 10. Region Management
@@ -1171,9 +1214,132 @@ JsonNode product = client.jsonGet("prod:1", "$", "products");
 
 ---
 
-## 11. Error Handling
+## 11. Attribute Mapping
 
-### 10.1 Python Error Handling
+Attribute mapping transforms JSON attribute names when data is stored. This is useful for normalizing field names from different data sources.
+
+### 11.1 Region-Level Attribute Mapping
+
+Set attribute mapping for a region - all JSON data stored in that region will have attributes renamed.
+
+**Python Redis Client:**
+```python
+import json
+
+# Set attribute mapping for 'users' region
+mapping = {
+    "firstName": "first_name",
+    "lastName": "last_name", 
+    "emailAddress": "email"
+}
+client._send_command('RSETMAP', 'users', json.dumps(mapping))
+
+# Now when you store JSON, attributes are transformed:
+user_data = {"firstName": "John", "lastName": "Doe", "emailAddress": "john@example.com"}
+client.json_set('user:1001', user_data, region='users')
+# Stored as: {"first_name": "John", "last_name": "Doe", "email": "john@example.com"}
+
+# Get current mapping
+result = client._send_command('RGETMAP', 'users')
+current_mapping = json.loads(result) if result else {}
+
+# Clear mapping
+client._send_command('RCLEARMAP', 'users')
+```
+
+**Python REST Client:**
+```python
+import json
+
+# Set attribute mapping
+mapping = {"firstName": "first_name", "lastName": "last_name"}
+client._request('PUT', '/api/regions/users/attributemapping', mapping)
+
+# Get mapping
+result = client._request('GET', '/api/regions/users/attributemapping')
+
+# Clear mapping
+client._request('DELETE', '/api/regions/users/attributemapping')
+```
+
+**Java Redis Client:**
+```java
+// Set attribute mapping
+String mappingJson = "{\"firstName\":\"first_name\",\"lastName\":\"last_name\"}";
+client.sendCommand("RSETMAP", "users", mappingJson);
+
+// Get mapping
+String result = client.sendCommand("RGETMAP", "users");
+
+// Clear mapping
+client.sendCommand("RCLEARMAP", "users");
+```
+
+**Java REST Client:**
+```java
+// Set attribute mapping
+Map<String, String> mapping = Map.of(
+    "firstName", "first_name",
+    "lastName", "last_name"
+);
+client.setAttributeMapping("users", mapping);
+
+// Get mapping
+Map<String, String> currentMapping = client.getAttributeMapping("users");
+
+// Clear mapping
+client.clearAttributeMapping("users");
+```
+
+### 11.2 Autoload Attribute Mapping
+
+When loading data via the Autoload feature, you can provide an attribute mapping file.
+
+Create a file named `<datafile>.metadata.attributemapping.json`:
+
+**Example files:**
+
+`customers.csv`:
+```csv
+cust_id,firstName,lastName,emailAddr
+C001,John,Doe,john@example.com
+C002,Jane,Smith,jane@example.com
+```
+
+`customers.csv.metadata`:
+```
+region:customers
+key_field:cust_id
+```
+
+`customers.csv.metadata.attributemapping.json`:
+```json
+{
+  "firstName": "first_name",
+  "lastName": "last_name",
+  "emailAddr": "email"
+}
+```
+
+**Result in cache:**
+```json
+{"cust_id": "C001", "first_name": "John", "last_name": "Doe", "email": "john@example.com"}
+```
+
+### 11.3 Attribute Mapping vs. Region Mapping
+
+| Feature | Region Mapping | Autoload Mapping |
+|---------|---------------|------------------|
+| Scope | All JSON stored in region | Only during file import |
+| Configuration | RSETMAP command or REST API | `.metadata.attributemapping.json` file |
+| Persistence | Stored with region config | Used only during import |
+| Use case | Normalize all incoming data | Transform specific data files |
+
+---
+
+## 12. Error Handling
+
+### 12.1 Python Error Handling
 
 ```python
 from kuber_redis_standalone import KuberRedisClient
@@ -1189,7 +1355,7 @@ except Exception as e:
     print(f"Operation failed: {e}")
 ```
 
-### 10.2 Java Error Handling
+### 12.2 Java Error Handling
 
 ```java
 import com.kuber.client.KuberClient;

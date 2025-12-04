@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Search Operations')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active">Search Operations</li>
+            </ol>
+        </nav>
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h1 class="display-5 mb-4"><i class="fas fa-search text-primary me-3"></i>Search Operations</h1>
+
+                <h3>KEYS vs KSEARCH</h3>
+                <table class="table table-striped">
+                    <thead><tr><th>Feature</th><th>KEYS</th><th>KSEARCH</th></tr></thead>
+                    <tbody>
+                        <tr><td>Pattern</td><td>Glob (user:*)</td><td>Regex (user:\d+)</td></tr>
+                        <tr><td>Returns</td><td>Key names only</td><td>Keys + values + metadata</td></tr>
+                        <tr><td>Use case</td><td>Simple patterns</td><td>Complex matching</td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4">KSEARCH Examples</h3>
+                <pre class="bg-dark text-light p-3 rounded"><code>KSEARCH user:\d+           # user:1, user:2, etc
+KSEARCH order:2024-.*      # Orders from 2024
+KSEARCH session:[a-f0-9]+  # Hex session IDs</code></pre>
+                <div class="mt-5 text-center">
+                    <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                </div>
+            </div>
+        </div>
+        <footer class="py-4 mt-5 border-top">
+            <div class="row">
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.1.3</p></div>
+                <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
+            </div>
+        </footer>
+    </div>
+</main>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

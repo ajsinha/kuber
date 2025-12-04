@@ -426,4 +426,99 @@ public final class JsonUtils {
             return value;
         }
     }
+    
+    /**
+     * Apply attribute mapping to a JSON node.
+     * Renames attributes in the JSON according to the provided mapping.
+     * Supports nested attributes using dot notation (e.g., "address.street" -> "addr.str").
+     * 
+     * @param json The JSON node to transform
+     * @param attributeMapping Map of source attribute names to target attribute names
+     * @return New JSON node with renamed attributes
+     */
+    public static JsonNode applyAttributeMapping(JsonNode json, Map<String, String> attributeMapping) {
+        if (json == null || attributeMapping == null || attributeMapping.isEmpty()) {
+            return json;
+        }
+        
+        if (json.isObject()) {
+            ObjectNode result = objectMapper.createObjectNode();
+            Iterator<Map.Entry<String, JsonNode>> fields = json.fields();
+            
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                String fieldName = field.getKey();
+                JsonNode fieldValue = field.getValue();
+                
+                // Check if this field should be renamed
+                String newName = attributeMapping.getOrDefault(fieldName, fieldName);
+                
+                // Recursively apply mapping to nested objects/arrays
+                JsonNode transformedValue = applyAttributeMapping(fieldValue, attributeMapping);
+                result.set(newName, transformedValue);
+            }
+            
+            // Handle nested dot-notation mappings (e.g., "address.city" -> "addr.city")
+            for (Map.Entry<String, String> mapping : attributeMapping.entrySet()) {
+                String sourcePath = mapping.getKey();
+                String targetPath = mapping.getValue();
+                
+                if (sourcePath.contains(".")) {
+                    // This is a nested path mapping
+                    JsonNode sourceValue = getPath(result, sourcePath);
+                    if (sourceValue != null) {
+                        // Delete from source path
+                        deletePath(result, sourcePath);
+                        // Set at target path
+                        setPath(result, targetPath, sourceValue);
+                    }
+                }
+            }
+            
+            return result;
+        } else if (json.isArray()) {
+            ArrayNode result = objectMapper.createArrayNode();
+            for (JsonNode element : json) {
+                result.add(applyAttributeMapping(element, attributeMapping));
+            }
+            return result;
+        }
+        
+        return json;
+    }
+    
+    /**
+     * Apply attribute mapping to a JSON string.
+     * 
+     * @param jsonString The JSON string to transform
+     * @param attributeMapping Map of source attribute names to target attribute names
+     * @return Transformed JSON string
+     */
+    public static String applyAttributeMapping(String jsonString, Map<String, String> attributeMapping) {
+        if (jsonString == null || jsonString.isEmpty() || 
+            attributeMapping == null || attributeMapping.isEmpty()) {
+            return jsonString;
+        }
+        
+        try {
+            JsonNode json = parse(jsonString);
+            JsonNode transformed = applyAttributeMapping(json, attributeMapping);
+            return toJson(transformed);
+        } catch (Exception e) {
+            // If parsing fails, return original string
+            return jsonString;
+        }
+    }
+    
+    /**
+     * Check if a string appears to be valid JSON
+     */
+    public static boolean isValidJson(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+        str = str.trim();
+        return (str.startsWith("{") && str.endsWith("}")) || 
+               (str.startsWith("[") && str.endsWith("]"));
+    }
 }

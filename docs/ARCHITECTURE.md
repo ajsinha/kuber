@@ -217,6 +217,7 @@ Regions provide logical isolation for cache entries:
 | **Namespace Isolation** | Keys are scoped within regions |
 | **Independent TTL** | Each region can have default TTL settings |
 | **Separate Statistics** | Per-region hit/miss tracking |
+| **Attribute Mapping** | JSON attribute transformation on storage |
 | **Access Control** | Future: Region-level permissions |
 
 **Auto-Creation Behavior:**
@@ -224,6 +225,15 @@ Regions provide logical isolation for cache entries:
 - Auto-created regions have the description "Auto-created region"
 - No manual region creation is required before storing data
 - The `default` region always exists and cannot be deleted
+
+**Attribute Mapping:**
+Regions can have optional attribute mapping configuration that transforms JSON attribute names when data is stored:
+- Configure mapping: `RSETMAP region {"firstName":"first_name","lastName":"last_name"}`
+- Get mapping: `RGETMAP region`
+- Clear mapping: `RCLEARMAP region`
+- REST API: `PUT /api/regions/{name}/attributemapping`
+
+Example: If region has mapping `{"firstName":"first_name"}`, storing `{"firstName":"John"}` saves as `{"first_name":"John"}`
 
 ### 3.3 JSON Service
 
@@ -484,7 +494,8 @@ Bulk Operations:
 kuber:
   persistence:
     # Options: mongodb, sqlite, postgresql, rocksdb, memory
-    backend: sqlite
+    # Default: rocksdb (embedded, no external dependencies)
+    backend: rocksdb
     
     # MongoDB settings
     mongodb:
@@ -501,7 +512,7 @@ kuber:
       username: kuber
       password: secret
     
-    # RocksDB settings
+    # RocksDB settings (default)
     rocksdb:
       path: ./data/rocksdb
 ```

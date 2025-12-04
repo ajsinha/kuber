@@ -107,6 +107,15 @@ public class CacheRegion implements Serializable {
     private Map<String, String> config = new HashMap<>();
     
     /**
+     * Attribute mapping configuration for JSON data transformation.
+     * Maps source attribute names to target attribute names.
+     * When JSON is stored in this region, attributes are renamed according to this mapping.
+     * Example: {"firstName": "first_name", "lastName": "last_name"}
+     */
+    @Builder.Default
+    private Map<String, String> attributeMapping = new HashMap<>();
+    
+    /**
      * MongoDB collection name for this region
      */
     private String collectionName;

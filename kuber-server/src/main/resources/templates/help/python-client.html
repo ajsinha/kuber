@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Python Client')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Python Client</li>
+            </ol>
+        </nav>
+
+        <!-- Content -->
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h1 class="display-5 mb-4"><i class="fab fa-python me-3 text-info"></i>Python Client</h1>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Kuber is fully compatible with standard Redis clients. Use <code>redis-py</code> or the REST API with <code>requests</code>.
+                </div>
+
+                <!-- Table of Contents -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Contents</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><a href="#installation">Installation</a></li>
+                                    <li><a href="#basic-ops">Basic Operations</a></li>
+                                    <li><a href="#rest-setup">REST API Setup</a></li>
+                                    <li><a href="#region-management">Region Management</a></li>
+                                    <li><a href="#attribute-mapping">Attribute Mapping</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><a href="#json-ops">JSON Operations</a></li>
+                                    <li><a href="#search">Search Operations</a></li>
+                                    <li><a href="#generic-search">Generic Search API</a></li>
+                                    <li><a href="#hash-list-set">Hash, List, Set Operations</a></li>
+                                    <li><a href="#complete-example">Complete Example</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Installation -->
+                <section id="installation" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-download me-2"></i>Installation</h3>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Using standard redis-py
+pip install redis
+
+# For REST API
+pip install requests</code></pre>
+                </section>
+
+                <!-- Basic Operations -->
+                <section id="basic-ops" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Basic Operations (Redis Protocol)</h3>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+# Connect to Kuber
+client = redis.Redis(
+    host='localhost',
+    port=6379,
+    password='admin123',
+    decode_responses=True
+)
+
+# Test connection
+print(client.ping())  # True
+
+# String operations
+client.set('user:1001', 'John Doe')
+name = client.get('user:1001')
+print(f"User: {name}")
+
+# Set with TTL (expires in 1 hour)
+client.setex('session:abc123', 3600, 'session-data')
+
+# Check TTL
+ttl = client.ttl('session:abc123')
+print(f"TTL: {ttl} seconds")
+
+# Increment/Decrement
+client.set('counter', 0)
+client.incr('counter')      # 1
+client.incrby('counter', 10) # 11
+
+# Delete keys
+client.delete('user:1001')</code></pre>
+                </section>
+
+                <!-- REST API Setup -->
+                <section id="rest-setup" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-cloud me-2"></i>REST API Setup</h3>
+                    <div class="alert alert-success">
+                        <i class="fas fa-rocket me-2"></i><strong>Recommended:</strong> Copy this setup code and use the helper functions for all REST operations.
+                    </div>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import requests
+from requests.auth import HTTPBasicAuth
+import json
+from typing import Optional, Dict, List, Any
+
+# Configuration
+BASE_URL = 'http://localhost:8080/api'
+auth = HTTPBasicAuth('admin', 'admin123')
+headers = {'Content-Type': 'application/json'}
+
+# Helper functions with error handling
+def api_get(endpoint: str, params: Optional[Dict] = None) -&gt; Optional[Dict]:
+    """GET request with error handling"""
+    try:
+        response = requests.get(f'{BASE_URL}{endpoint}', auth=auth, params=params, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.text else None
+    except requests.exceptions.RequestException as e:
+        print(f"GET {endpoint} failed: {e}")
+        return None
+
+def api_post(endpoint: str, data: Any = None) -&gt; Optional[Dict]:
+    """POST request with error handling"""
+    try:
+        response = requests.post(f'{BASE_URL}{endpoint}', auth=auth, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.text else {}
+    except requests.exceptions.RequestException as e:
+        print(f"POST {endpoint} failed: {e}")
+        return None
+
+def api_put(endpoint: str, data: Any = None) -&gt; bool:
+    """PUT request, returns success status"""
+    try:
+        response = requests.put(f'{BASE_URL}{endpoint}', auth=auth, headers=headers, json=data, timeout=30)
+        return response.status_code in (200, 201, 204)
+    except requests.exceptions.RequestException as e:
+        print(f"PUT {endpoint} failed: {e}")
+        return False
+
+def api_delete(endpoint: str) -&gt; bool:
+    """DELETE request, returns success status"""
+    try:
+        response = requests.delete(f'{BASE_URL}{endpoint}', auth=auth, timeout=30)
+        return response.status_code in (200, 204)
+    except requests.exceptions.RequestException as e:
+        print(f"DELETE {endpoint} failed: {e}")
+        return False
+
+# Test connection
+def test_connection() -&gt; bool:
+    info = api_get('/info')
+    if info:
+        print(f"Connected to Kuber v{info.get('version')}")
+        return True
+    return False
+
+test_connection()</code></pre>
+                </section>
+
+                <!-- Region Management -->
+                <section id="region-management" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-layer-group me-2"></i>Region Management</h3>
+                    <pre class="bg-dark text-light p-3 rounded"><code># List all regions
+regions = api_get('/regions')
+for region in (regions or []):
+    print(f"Region: {region['name']}, Entries: {region.get('entryCount', 0)}")
+
+# Create a new region
+api_post('/regions', {'name': 'users', 'description': 'User data storage'})
+
+# Get region info
+region_info = api_get('/regions/users')
+print(f"Region: {region_info}")
+
+# Store data in a region
+api_put('/cache/users/user:1001', {'name': 'John Doe', 'email': 'john@example.com'})
+
+# Get data from a region
+result = api_get('/cache/users/user:1001')
+print(f"User: {result.get('value')}")
+
+# Purge region (delete all entries)
+api_post('/regions/users/purge')
+
+# Delete region
+api_delete('/regions/users')</code></pre>
+                </section>
+
+                <!-- Attribute Mapping -->
+                <section id="attribute-mapping" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-exchange-alt me-2"></i>Attribute Mapping</h3>
+                    <p>Transform JSON field names automatically when storing data:</p>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Set attribute mapping for a region
+mapping = {
+    'firstName': 'first_name',
+    'lastName': 'last_name',
+    'emailAddress': 'email'
+}
+api_put('/regions/customers/attributemapping', mapping)
+
+# Get current mapping
+current = api_get('/regions/customers/attributemapping')
+print(f"Mapping: {current}")
+
+# Store data - fields are automatically transformed
+customer = {
+    'firstName': 'John',
+    'lastName': 'Doe',
+    'emailAddress': 'john@example.com'
+}
+api_put('/cache/customers/cust:1001', customer)
+
+# Retrieve - stored with transformed names
+result = api_get('/cache/customers/cust:1001')
+# Returns: {"first_name": "John", "last_name": "Doe", "email": "john@example.com"}
+
+# Clear mapping
+api_delete('/regions/customers/attributemapping')</code></pre>
+                </section>
+
+                <!-- JSON Operations -->
+                <section id="json-ops" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>JSON Operations</h3>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Store JSON document
+user = {
+    'name': 'John Doe',
+    'age': 30,
+    'email': 'john@example.com',
+    'status': 'active',
+    'address': {
+        'street': '123 Main St',
+        'city': 'New York',
+        'zip': '10001'
+    },
+    'tags': ['premium', 'verified']
+}
+api_put('/cache/users/user:1001', user)
+
+# Get entire document
+result = api_get('/cache/users/user:1001')
+print(f"User: {result.get('value')}")
+
+# Get specific path
+city = api_get('/cache/users/user:1001/json', {'path': '$.address.city'})
+print(f"City: {city}")
+
+# Get nested object
+address = api_get('/cache/users/user:1001/json', {'path': '$.address'})
+print(f"Address: {address}")</code></pre>
+                </section>
+
+                <!-- Search Operations -->
+                <section id="search" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-search me-2"></i>Search Operations</h3>
+                    <pre class="bg-dark text-light p-3 rounded"><code># List keys with glob pattern
+result = api_get('/cache/users/keys', {'pattern': 'user:*'})
+keys = result.get('keys', []) if result else []
+print(f"Found {len(keys)} keys")
+
+# KSEARCH - Regex key search with values
+results = api_get('/cache/users/ksearch', {'pattern': r'user:\d+', 'limit': 50})
+for item in (results or []):
+    print(f"Key: {item['key']}, Value: {item['value']}")
+
+# JSON Search - by attributes
+active_users = api_post('/cache/users/jsearch', {'query': '$.status=active'})
+print(f"Found {len(active_users or [])} active users")
+
+# Search with multiple conditions
+results = api_post('/cache/users/jsearch', {'query': '$.status=active,$.age&gt;25'})
+
+# Search with regex
+results = api_post('/cache/users/jsearch', {'query': '$.email~=.*@example\\.com'})</code></pre>
+                </section>
+
+                <!-- Generic Search API -->
+                <section id="generic-search" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-search-plus me-2"></i>Generic Search API</h3>
+                    <p>The Generic Search API provides unified search with field projection:</p>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Mode 1: Simple key lookup
+results = api_post('/genericsearch', {
+    'region': 'users',
+    'key': 'user:1001'
+})
+
+# Mode 2: Key pattern search (regex)
+results = api_post('/genericsearch', {
+    'region': 'users',
+    'keypattern': r'user:\d+'
+})
+
+# Mode 3: Key pattern with field projection
+results = api_post('/genericsearch', {
+    'region': 'users',
+    'keypattern': r'user:.*',
+    'fields': ['name', 'email', 'address.city'],
+    'limit': 100
+})
+
+# Mode 4: JSON attribute search
+results = api_post('/genericsearch', {
+    'region': 'users',
+    'type': 'json',
+    'values': [{'status': 'active'}, {'department': 'Engineering'}]
+})
+
+# Mode 5: JSON search with regex
+results = api_post('/genericsearch', {
+    'region': 'users',
+    'type': 'json',
+    'values': [{'email': '.*@example\\.com', 'type': 'regex'}]
+})
+
+# Mode 6: JSON search with IN operator
+results = api_post('/genericsearch', {
+    'region': 'orders',
+    'type': 'json',
+    'values': [{'status': ['pending', 'processing', 'shipped']}]
+})
+
+# Mode 7: Combined search with projection
+results = api_post('/genericsearch', {
+    'region': 'products',
+    'type': 'json',
+    'values': [{'category': 'Electronics'}],
+    'fields': ['name', 'price'],
+    'limit': 50
+})</code></pre>
+                </section>
+
+                <!-- Hash, List, Set Operations -->
+                <section id="hash-list-set" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-hashtag me-2"></i>Hash, List, Set Operations</h3>
+                    
+                    <h5 class="mt-4">Hash Operations</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Set multiple hash fields
+api_put('/cache/default/profile:1001/hash', {
+    'fields': {
+        'name': 'John Doe',
+        'email': 'john@example.com',
+        'age': '30'
+    }
+})
+
+# Get all hash fields
+result = api_get('/cache/default/profile:1001/hash')
+profile = result.get('fields', {}) if result else {}
+print(f"Profile: {profile}")</code></pre>
+
+                    <h5 class="mt-4">List Operations</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Push to list
+api_post('/cache/default/queue:tasks/list/lpush', {'values': ['task1', 'task2']})
+api_post('/cache/default/queue:tasks/list/rpush', {'values': ['task3', 'task4']})
+
+# Pop from list
+result = api_post('/cache/default/queue:tasks/list/lpop')
+task = result.get('value') if result else None
+
+# Get list range
+result = api_get('/cache/default/queue:tasks/list', {'start': 0, 'stop': -1})
+items = result.get('values', []) if result else []</code></pre>
+
+                    <h5 class="mt-4">Set Operations</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Add to set
+api_post('/cache/default/tags:user:1001/set/add', {
+    'values': ['premium', 'verified', 'active']
+})
+
+# Get all members
+result = api_get('/cache/default/tags:user:1001/set/members')
+members = result.get('members', []) if result else []
+print(f"Tags: {members}")</code></pre>
+                </section>
+
+                <!-- Complete Example -->
+                <section id="complete-example" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>Complete Example: User Manager</h3>
+                    <pre class="bg-dark text-light p-3 rounded"><code>class KuberUserManager:
+    def __init__(self, base_url='http://localhost:8080/api', 
+                 username='admin', password='admin123'):
+        self.base_url = base_url
+        self.auth = HTTPBasicAuth(username, password)
+        self.headers = {'Content-Type': 'application/json'}
+        self.region = 'users'
+        self._setup_region()
+    
+    def _setup_region(self):
+        # Create region and set attribute mapping
+        requests.post(f'{self.base_url}/regions',
+            auth=self.auth, headers=self.headers,
+            json={'name': self.region})
+        
+        mapping = {'firstName': 'first_name', 'lastName': 'last_name'}
+        requests.put(f'{self.base_url}/regions/{self.region}/attributemapping',
+            auth=self.auth, headers=self.headers, json=mapping)
+    
+    def create_user(self, user_id, data):
+        response = requests.put(
+            f'{self.base_url}/cache/{self.region}/user:{user_id}',
+            auth=self.auth, headers=self.headers, json=data)
+        return response.status_code == 200
+    
+    def get_user(self, user_id):
+        response = requests.get(
+            f'{self.base_url}/cache/{self.region}/user:{user_id}',
+            auth=self.auth)
+        if response.status_code == 200:
+            return response.json().get('value')
+        return None
+    
+    def find_by_status(self, status, limit=100):
+        response = requests.post(f'{self.base_url}/genericsearch',
+            auth=self.auth, headers=self.headers,
+            json={
+                'region': self.region,
+                'type': 'json',
+                'values': [{'status': status}],
+                'limit': limit
+            })
+        return response.json() if response.status_code == 200 else []
+
+# Usage
+manager = KuberUserManager()
+manager.create_user('1001', {'firstName': 'John', 'lastName': 'Doe', 'status': 'active'})
+user = manager.get_user('1001')
+active_users = manager.find_by_status('active')</code></pre>
+                </section>
+
+                <!-- Back to Help -->
+                <div class="mt-5 text-center">
+                    <a href="/help" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Help Index
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="py-4 mt-5 border-top">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                    <p class="text-muted small mb-0">Version 1.1.3</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="text-muted small mb-0">
+                        Copyright &copy; 2025-2030, All Rights Reserved<br>
+                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                        <span class="badge bg-warning text-dark">Patent Pending</span>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</main>
+
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

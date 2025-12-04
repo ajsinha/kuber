@@ -12,6 +12,8 @@
 package com.kuber.server.cache;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
@@ -273,6 +275,140 @@ public class CacheService {
         return regions.containsKey(name);
     }
     
+    // ==================== Attribute Mapping Operations ====================
+    
+    /**
+     * Set attribute mapping for a region.
+     * Maps source attribute names to target attribute names for JSON transformation.
+     * 
+     * @param regionName Region name
+     * @param mapping Map of source attribute name to target attribute name
+     */
+    public void setAttributeMapping(String regionName, Map<String, String> mapping) {
+        checkWriteAccess();
+        ensureRegionExists(regionName);
+        
+        CacheRegion region = regions.get(regionName);
+        if (region == null) {
+            throw RegionException.notFound(regionName);
+        }
+        
+        region.setAttributeMapping(mapping != null ? new HashMap<>(mapping) : new HashMap<>());
+        region.setUpdatedAt(Instant.now());
+        
+        // Persist the updated region
+        try {
+            persistenceStore.saveRegion(region);
+            log.info("Updated attribute mapping for region '{}': {} mappings", 
+                    regionName, mapping != null ? mapping.size() : 0);
+        } catch (Exception e) {
+            log.error("Failed to persist attribute mapping for region '{}': {}", 
+                    regionName, e.getMessage());
+        }
+    }
+    
+    /**
+     * Get attribute mapping for a region.
+     * 
+     * @param regionName Region name
+     * @return Attribute mapping map, or empty map if none configured
+     */
+    public Map<String, String> getAttributeMapping(String regionName) {
+        CacheRegion region = regions.get(regionName);
+        if (region == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> mapping = region.getAttributeMapping();
+        return mapping != null ? Collections.unmodifiableMap(mapping) : Collections.emptyMap();
+    }
+    
+    /**
+     * Clear attribute mapping for a region.
+     * 
+     * @param regionName Region name
+     */
+    public void clearAttributeMapping(String regionName) {
+        setAttributeMapping(regionName, null);
+    }
+    
+    /**
+     * Apply attribute mapping to a JSON node.
+     * Creates a new JSON object with renamed attributes based on the mapping.
+     * 
+     * @param regionName Region to get mapping from
+     * @param jsonNode Original JSON node
+     * @return Transformed JSON node with renamed attributes
+     */
+    public JsonNode applyAttributeMapping(String regionName, JsonNode jsonNode) {
+        if (jsonNode == null || !jsonNode.isObject()) {
+            return jsonNode;
+        }
+        
+        Map<String, String> mapping = getAttributeMapping(regionName);
+        if (mapping == null || mapping.isEmpty()) {
+            return jsonNode;
+        }
+        
+        return transformJsonWithMapping(jsonNode, mapping);
+    }
+    
+    /**
+     * Apply attribute mapping from an explicit mapping.
+     * 
+     * @param jsonNode Original JSON node
+     * @param mapping Attribute mapping to apply
+     * @return Transformed JSON node with renamed attributes
+     */
+    public JsonNode applyAttributeMapping(JsonNode jsonNode, Map<String, String> mapping) {
+        if (jsonNode == null || !jsonNode.isObject() || mapping == null || mapping.isEmpty()) {
+            return jsonNode;
+        }
+        return transformJsonWithMapping(jsonNode, mapping);
+    }
+    
+    /**
+     * Transform JSON node using the given mapping.
+     * Supports nested object transformation recursively.
+     */
+    private JsonNode transformJsonWithMapping(JsonNode jsonNode, Map<String, String> mapping) {
+        if (!jsonNode.isObject()) {
+            return jsonNode;
+        }
+        
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode result = mapper.createObjectNode();
+        
+        Iterator<Map.Entry<String, JsonNode>> fields = jsonNode.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> field = fields.next();
+            String originalName = field.getKey();
+            JsonNode value = field.getValue();
+            
+            // Get mapped name or use original
+            String mappedName = mapping.getOrDefault(originalName, originalName);
+            
+            // Recursively transform nested objects
+            if (value.isObject()) {
+                result.set(mappedName, transformJsonWithMapping(value, mapping));
+            } else if (value.isArray()) {
+                // Transform array elements if they are objects
+                com.fasterxml.jackson.databind.node.ArrayNode arrayNode = mapper.createArrayNode();
+                for (JsonNode element : value) {
+                    if (element.isObject()) {
+                        arrayNode.add(transformJsonWithMapping(element, mapping));
+                    } else {
+                        arrayNode.add(element);
+                    }
+                }
+                result.set(mappedName, arrayNode);
+            } else {
+                result.set(mappedName, value);
+            }
+        }
+        
+        return result;
+    }
+    
     // ==================== String Operations ====================
     
     public String get(String region, String key) {
@@ -294,12 +430,19 @@ public class CacheService {
         Instant now = Instant.now();
         Instant expiresAt = ttlSeconds > 0 ? now.plusSeconds(ttlSeconds) : null;
         
+        // Apply attribute mapping if value is JSON and region has mapping configured
+        String finalValue = value;
+        Map<String, String> mapping = getAttributeMapping(region);
+        if (mapping != null && !mapping.isEmpty() && JsonUtils.isValidJson(value)) {
+            finalValue = JsonUtils.applyAttributeMapping(value, mapping);
+        }
+        
         CacheEntry entry = CacheEntry.builder()
                 .id(UUID.randomUUID().toString())
                 .key(key)
                 .region(region)
                 .valueType(CacheEntry.ValueType.STRING)
-                .stringValue(value)
+                .stringValue(finalValue)
                 .ttlSeconds(ttlSeconds)
                 .createdAt(now)
                 .updatedAt(now)
@@ -308,7 +451,7 @@ public class CacheService {
         
         putEntry(region, key, entry);
         
-        eventPublisher.publish(CacheEvent.entrySet(region, key, value, properties.getNodeId()));
+        eventPublisher.publish(CacheEvent.entrySet(region, key, finalValue, properties.getNodeId()));
     }
     
     public boolean setNx(String region, String key, String value) {
@@ -603,7 +746,8 @@ public class CacheService {
             // Update existing JSON at path
             finalValue = JsonUtils.setPath(existing.getJsonValue().deepCopy(), path, value);
         } else {
-            finalValue = value;
+            // Apply attribute mapping for root-level JSON set operations
+            finalValue = applyAttributeMapping(region, value);
         }
         
         CacheEntry entry = CacheEntry.builder()

@@ -367,6 +367,15 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
             case RSELECT:
                 return handleRSelect(session, args);
             
+            case RSETMAP:
+                return handleRSetMap(region, args);
+            
+            case RGETMAP:
+                return handleRGetMap(region, args);
+            
+            case RCLEARMAP:
+                return handleRClearMap(region, args);
+            
             // Server commands
             case INFO:
                 return handleInfo();
@@ -852,6 +861,79 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
         }
         session.setAttribute(SESSION_REGION, regionName);
         return RedisResponse.ok();
+    }
+    
+    /**
+     * Handle RSETMAP command - Set attribute mapping for a region.
+     * Syntax: RSETMAP [region] json_mapping
+     * Example: RSETMAP users {"firstName":"first_name","lastName":"last_name"}
+     * If region is omitted, uses current session region.
+     */
+    private RedisResponse handleRSetMap(String currentRegion, List<String> args) {
+        if (args.isEmpty()) {
+            return RedisResponse.error("wrong number of arguments for 'rsetmap' command");
+        }
+        
+        String regionName;
+        String jsonMapping;
+        
+        if (args.size() == 1) {
+            // Only mapping provided, use current region
+            regionName = currentRegion;
+            jsonMapping = args.get(0);
+        } else {
+            // Region and mapping provided
+            regionName = args.get(0);
+            jsonMapping = args.get(1);
+        }
+        
+        try {
+            // Parse the JSON mapping
+            Map<String, String> mapping = JsonUtils.getObjectMapper()
+                    .readValue(jsonMapping, new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+            
+            cacheService.setAttributeMapping(regionName, mapping);
+            return RedisResponse.ok();
+        } catch (Exception e) {
+            return RedisResponse.error("ERR invalid JSON mapping: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handle RGETMAP command - Get attribute mapping for a region.
+     * Syntax: RGETMAP [region]
+     * If region is omitted, uses current session region.
+     */
+    private RedisResponse handleRGetMap(String currentRegion, List<String> args) {
+        String regionName = args.isEmpty() ? currentRegion : args.get(0);
+        
+        Map<String, String> mapping = cacheService.getAttributeMapping(regionName);
+        if (mapping == null || mapping.isEmpty()) {
+            return RedisResponse.nullBulkString();
+        }
+        
+        try {
+            String json = JsonUtils.getObjectMapper().writeValueAsString(mapping);
+            return RedisResponse.bulkString(json);
+        } catch (Exception e) {
+            return RedisResponse.error("ERR " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handle RCLEARMAP command - Clear attribute mapping for a region.
+     * Syntax: RCLEARMAP [region]
+     * If region is omitted, uses current session region.
+     */
+    private RedisResponse handleRClearMap(String currentRegion, List<String> args) {
+        String regionName = args.isEmpty() ? currentRegion : args.get(0);
+        
+        try {
+            cacheService.clearAttributeMapping(regionName);
+            return RedisResponse.ok();
+        } catch (Exception e) {
+            return RedisResponse.error("ERR " + e.getMessage());
+        }
     }
     
     // Server commands

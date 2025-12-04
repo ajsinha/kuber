@@ -237,6 +237,69 @@ class KuberRedisClient:
         """Get region information."""
         return self._send_command('RINFO', name)
     
+    # ==================== Attribute Mapping ====================
+    
+    def set_attribute_mapping(self, region: str, mapping: Dict[str, str]) -> str:
+        """
+        Set attribute mapping for a region.
+        
+        When JSON data is stored in a region with attribute mapping,
+        the source attribute names are automatically renamed to target names.
+        
+        Args:
+            region: Region name
+            mapping: Dictionary mapping source attribute names to target names
+                     Example: {"firstName": "first_name", "lastName": "last_name"}
+        
+        Returns:
+            OK on success
+            
+        Example:
+            client.set_attribute_mapping('users', {
+                'firstName': 'first_name',
+                'lastName': 'last_name',
+                'emailAddress': 'email'
+            })
+        """
+        return self._send_command('RSETMAP', region, json.dumps(mapping))
+    
+    def get_attribute_mapping(self, region: str) -> Optional[Dict[str, str]]:
+        """
+        Get attribute mapping for a region.
+        
+        Args:
+            region: Region name
+            
+        Returns:
+            Dictionary of attribute mappings, or None if no mapping set
+            
+        Example:
+            mapping = client.get_attribute_mapping('users')
+            # Returns: {"firstName": "first_name", "lastName": "last_name"}
+        """
+        result = self._send_command('RGETMAP', region)
+        if result:
+            try:
+                return json.loads(result)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
+    
+    def clear_attribute_mapping(self, region: str) -> str:
+        """
+        Clear attribute mapping for a region.
+        
+        Args:
+            region: Region name
+            
+        Returns:
+            OK on success
+            
+        Example:
+            client.clear_attribute_mapping('users')
+        """
+        return self._send_command('RCLEARMAP', region)
+    
     # ==================== String Operations ====================
     
     def get(self, key: str) -> Optional[str]:

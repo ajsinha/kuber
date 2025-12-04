@@ -13,6 +13,7 @@ package com.kuber.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -179,6 +180,55 @@ public class KuberClient implements AutoCloseable {
      */
     public void purgeRegion(String name) throws IOException {
         sendCommand("RPURGE", name);
+    }
+    
+    // ==================== Attribute Mapping ====================
+    
+    /**
+     * Set attribute mapping for a region.
+     * When JSON data is stored in a region with attribute mapping,
+     * the source attribute names are automatically renamed to target names.
+     *
+     * @param region Region name
+     * @param mapping Map of source attribute names to target names
+     * @throws IOException if communication error occurs
+     * 
+     * Example:
+     * <pre>
+     * Map&lt;String, String&gt; mapping = new HashMap&lt;&gt;();
+     * mapping.put("firstName", "first_name");
+     * mapping.put("lastName", "last_name");
+     * client.setAttributeMapping("users", mapping);
+     * </pre>
+     */
+    public void setAttributeMapping(String region, Map<String, String> mapping) throws IOException {
+        String mappingJson = objectMapper.writeValueAsString(mapping);
+        sendCommand("RSETMAP", region, mappingJson);
+    }
+    
+    /**
+     * Get attribute mapping for a region.
+     *
+     * @param region Region name
+     * @return Map of attribute mappings, or null if no mapping set
+     * @throws IOException if communication error occurs
+     */
+    public Map<String, String> getAttributeMapping(String region) throws IOException {
+        String result = sendCommand("RGETMAP", region);
+        if (result != null && !result.isEmpty()) {
+            return objectMapper.readValue(result, new TypeReference<Map<String, String>>() {});
+        }
+        return null;
+    }
+    
+    /**
+     * Clear attribute mapping for a region.
+     *
+     * @param region Region name
+     * @throws IOException if communication error occurs
+     */
+    public void clearAttributeMapping(String region) throws IOException {
+        sendCommand("RCLEARMAP", region);
     }
     
     // ==================== String Operations ====================

@@ -205,6 +205,7 @@ public class AutoloadService {
      */
     private void processFile(Path dataFile) {
         Path metadataPath = dataFile.resolveSibling(dataFile.getFileName() + ".metadata");
+        Path attributeMappingPath = dataFile.resolveSibling(dataFile.getFileName() + ".metadata.attributemapping.json");
         String fileName = dataFile.getFileName().toString();
         
         log.info("Processing file: {}", fileName);
@@ -213,10 +214,19 @@ public class AutoloadService {
             // Parse metadata
             AutoloadMetadata metadata = parseMetadata(metadataPath);
             
+            // Parse attribute mapping if present
+            Map<String, String> attributeMapping = null;
+            if (Files.exists(attributeMappingPath)) {
+                attributeMapping = parseAttributeMapping(attributeMappingPath);
+                log.info("Found attribute mapping file with {} mappings", 
+                        attributeMapping != null ? attributeMapping.size() : 0);
+            }
+            metadata.setAttributeMapping(attributeMapping);
+            
             // Validate metadata
             if (metadata.getKeyField() == null || metadata.getKeyField().isBlank()) {
                 log.error("Missing key_field in metadata for file: {}", fileName);
-                moveToOutbox(dataFile, metadataPath, "ERROR_NO_KEY_FIELD");
+                moveToOutbox(dataFile, metadataPath, attributeMappingPath, "ERROR_NO_KEY_FIELD");
                 totalErrors.incrementAndGet();
                 return;
             }
@@ -233,7 +243,7 @@ public class AutoloadService {
                     fileName, result.getLoaded(), result.getSkipped(), result.getErrors());
             
             // Move to outbox
-            moveToOutbox(dataFile, metadataPath, "SUCCESS");
+            moveToOutbox(dataFile, metadataPath, attributeMappingPath, "SUCCESS");
             
             totalFilesProcessed.incrementAndGet();
             totalRecordsLoaded.addAndGet(result.getLoaded());
@@ -242,12 +252,24 @@ public class AutoloadService {
         } catch (Exception e) {
             log.error("Failed to process file: {}", fileName, e);
             try {
-                moveToOutbox(dataFile, metadataPath, "ERROR_" + e.getClass().getSimpleName());
+                moveToOutbox(dataFile, metadataPath, attributeMappingPath, "ERROR_" + e.getClass().getSimpleName());
             } catch (IOException ioe) {
                 log.error("Failed to move file to outbox", ioe);
             }
             totalErrors.incrementAndGet();
         }
+    }
+    
+    /**
+     * Parse attribute mapping file.
+     * Expected format: JSON object mapping source attribute names to target names.
+     * Example: {"firstName": "first_name", "lastName": "last_name"}
+     */
+    private Map<String, String> parseAttributeMapping(Path mappingPath) throws IOException {
+        Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
+        String content = Files.readString(mappingPath, charset);
+        return objectMapper.readValue(content, 
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
     }
     
     /**
@@ -336,6 +358,9 @@ public class AutoloadService {
             int maxRecords = properties.getAutoload().getMaxRecordsPerFile();
             int recordCount = 0;
             
+            // Get attribute mapping if present
+            Map<String, String> attrMapping = metadata.getAttributeMapping();
+            
             for (CSVRecord record : parser) {
                 if (maxRecords > 0 && recordCount >= maxRecords) {
                     log.info("Reached max records limit: {}", maxRecords);
@@ -348,12 +373,16 @@ public class AutoloadService {
                     for (String header : headers) {
                         String value = record.get(header);
                         if (value != null) {
+                            // Apply attribute mapping if present
+                            String targetField = (attrMapping != null) 
+                                    ? attrMapping.getOrDefault(header, header) 
+                                    : header;
                             // Try to parse as number or boolean and put appropriately
-                            putParsedValue(jsonNode, header, value);
+                            putParsedValue(jsonNode, targetField, value);
                         }
                     }
                     
-                    // Get key value
+                    // Get key value (use original key field name, not mapped)
                     String keyValue = record.get(metadata.getKeyField());
                     if (keyValue == null || keyValue.isBlank()) {
                         log.debug("Skipping record {} - empty key field", record.getRecordNumber());
@@ -361,7 +390,8 @@ public class AutoloadService {
                         continue;
                     }
                     
-                    // Save to cache (this will trigger replication if enabled)
+                    // Save to cache (attribute mapping already applied above)
+                    // Use direct jsonSet without region mapping since we applied file mapping
                     cacheService.jsonSet(
                             metadata.getRegion(),
                             keyValue,
@@ -395,6 +425,9 @@ public class AutoloadService {
         int recordCount = 0;
         int lineNumber = 0;
         
+        // Get attribute mapping if present
+        Map<String, String> attrMapping = metadata.getAttributeMapping();
+        
         try (BufferedReader reader = Files.newBufferedReader(jsonFile, charset)) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -420,7 +453,7 @@ public class AutoloadService {
                         continue;
                     }
                     
-                    // Get key value
+                    // Get key value (use original key field name, not mapped)
                     JsonNode keyNode = jsonNode.get(metadata.getKeyField());
                     if (keyNode == null || keyNode.isNull()) {
                         log.debug("Skipping line {} - missing key field '{}'", 
@@ -436,12 +469,18 @@ public class AutoloadService {
                         continue;
                     }
                     
-                    // Save to cache (this will trigger replication if enabled)
+                    // Apply attribute mapping if present
+                    JsonNode finalNode = jsonNode;
+                    if (attrMapping != null && !attrMapping.isEmpty()) {
+                        finalNode = cacheService.applyAttributeMapping(jsonNode, attrMapping);
+                    }
+                    
+                    // Save to cache
                     cacheService.jsonSet(
                             metadata.getRegion(),
                             keyValue,
                             "$",
-                            jsonNode,
+                            finalNode,
                             metadata.getTtl()
                     );
                     
@@ -499,6 +538,13 @@ public class AutoloadService {
      * Move processed files to outbox.
      */
     private void moveToOutbox(Path dataFile, Path metadataPath, String status) throws IOException {
+        moveToOutbox(dataFile, metadataPath, null, status);
+    }
+    
+    /**
+     * Move processed files to outbox, including optional attribute mapping file.
+     */
+    private void moveToOutbox(Path dataFile, Path metadataPath, Path attributeMappingPath, String status) throws IOException {
         String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
         String baseName = dataFile.getFileName().toString();
         
@@ -512,7 +558,15 @@ public class AutoloadService {
         Files.move(dataFile, targetData, StandardCopyOption.REPLACE_EXISTING);
         Files.move(metadataPath, targetMeta, StandardCopyOption.REPLACE_EXISTING);
         
-        log.debug("Moved files to outbox: {}, {}", newDataName, newMetaName);
+        // Move attribute mapping file if it exists
+        if (attributeMappingPath != null && Files.exists(attributeMappingPath)) {
+            String newMappingName = timestamp + "_" + status + "_" + baseName + ".metadata.attributemapping.json";
+            Path targetMapping = outboxPath.resolve(newMappingName);
+            Files.move(attributeMappingPath, targetMapping, StandardCopyOption.REPLACE_EXISTING);
+            log.debug("Moved files to outbox: {}, {}, {}", newDataName, newMetaName, newMappingName);
+        } else {
+            log.debug("Moved files to outbox: {}, {}", newDataName, newMetaName);
+        }
     }
     
     /**
@@ -548,6 +602,11 @@ public class AutoloadService {
         private long ttl = -1;
         private String keyField;
         private char delimiter = ',';
+        /**
+         * Optional attribute mapping for JSON transformation.
+         * Loaded from .metadata.attributemapping.json file if present.
+         */
+        private Map<String, String> attributeMapping;
     }
     
     /**

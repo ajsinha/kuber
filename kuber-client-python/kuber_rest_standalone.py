@@ -197,6 +197,61 @@ class KuberRestClient:
         """Purge all entries in a region."""
         self._request('POST', f'/api/v1/regions/{name}/purge')
     
+    # ==================== Attribute Mapping ====================
+    
+    def set_attribute_mapping(self, region: str, mapping: Dict[str, str]):
+        """
+        Set attribute mapping for a region.
+        
+        When JSON data is stored in a region with attribute mapping,
+        the source attribute names are automatically renamed to target names.
+        
+        Args:
+            region: Region name
+            mapping: Dictionary mapping source attribute names to target names
+                     Example: {"firstName": "first_name", "lastName": "last_name"}
+                     
+        Example:
+            client.set_attribute_mapping('users', {
+                'firstName': 'first_name',
+                'lastName': 'last_name',
+                'emailAddress': 'email'
+            })
+        """
+        self._request('PUT', f'/api/regions/{region}/attributemapping', mapping)
+    
+    def get_attribute_mapping(self, region: str) -> Optional[Dict[str, str]]:
+        """
+        Get attribute mapping for a region.
+        
+        Args:
+            region: Region name
+            
+        Returns:
+            Dictionary of attribute mappings, or None if no mapping set
+            
+        Example:
+            mapping = client.get_attribute_mapping('users')
+            # Returns: {"firstName": "first_name", "lastName": "last_name"}
+        """
+        try:
+            result = self._request('GET', f'/api/regions/{region}/attributemapping')
+            return result if result else None
+        except KuberRestError:
+            return None
+    
+    def clear_attribute_mapping(self, region: str):
+        """
+        Clear attribute mapping for a region.
+        
+        Args:
+            region: Region name
+            
+        Example:
+            client.clear_attribute_mapping('users')
+        """
+        self._request('DELETE', f'/api/regions/{region}/attributemapping')
+    
     # ==================== Cache Operations ====================
     
     def get(self, key: str, region: Optional[str] = None) -> Optional[str]:
@@ -297,6 +352,34 @@ class KuberRestClient:
         r = region or self.current_region
         result = self._request('GET', f'/api/v1/cache/{r}/size')
         return result.get('size', 0) if result else 0
+    
+    def ksearch(self, regex_pattern: str, region: Optional[str] = None, 
+                limit: int = 1000) -> List[Dict[str, Any]]:
+        """
+        Search keys by regex pattern and return full key-value objects.
+        
+        Unlike keys() which uses glob pattern and returns only key names,
+        ksearch uses regex and returns complete key-value objects including
+        value, type, and TTL.
+        
+        Args:
+            regex_pattern: Regular expression pattern to match keys
+            region: Optional region (uses current region if not specified)
+            limit: Maximum number of results (default 1000)
+            
+        Returns:
+            List of dicts with keys: key, value, type, ttl
+            
+        Example:
+            # Find all user keys and their values
+            results = client.ksearch(r'user:.*', region='users')
+            for item in results:
+                print(f"Key: {item['key']}, Value: {item['value']}")
+        """
+        r = region or self.current_region
+        result = self._request('GET', f'/api/cache/{r}/ksearch', 
+                              {'pattern': regex_pattern, 'limit': limit})
+        return result if isinstance(result, list) else []
     
     # ==================== Hash Operations ====================
     

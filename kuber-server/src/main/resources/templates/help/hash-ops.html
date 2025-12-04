@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Hash Operations')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active">Hash Operations</li>
+            </ol>
+        </nav>
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h1 class="display-5 mb-4"><i class="fas fa-hashtag text-danger me-3"></i>Hash Operations</h1>
+
+                <h3>Commands</h3>
+                <table class="table table-striped">
+                    <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td>HSET key field value</td><td>Set hash field</td></tr>
+                        <tr><td>HGET key field</td><td>Get hash field</td></tr>
+                        <tr><td>HGETALL key</td><td>Get all fields</td></tr>
+                        <tr><td>HMSET key f1 v1 f2 v2</td><td>Set multiple</td></tr>
+                        <tr><td>HDEL key field</td><td>Delete field</td></tr>
+                        <tr><td>HEXISTS key field</td><td>Check field exists</td></tr>
+                        <tr><td>HKEYS key</td><td>Get all field names</td></tr>
+                        <tr><td>HVALS key</td><td>Get all values</td></tr>
+                    </tbody>
+                </table>
+                <div class="mt-5 text-center">
+                    <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                </div>
+            </div>
+        </div>
+        <footer class="py-4 mt-5 border-top">
+            <div class="row">
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.1.3</p></div>
+                <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
+            </div>
+        </footer>
+    </div>
+</main>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

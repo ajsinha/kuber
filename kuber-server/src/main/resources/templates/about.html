@@ -20,7 +20,7 @@
                 </div>
                 <h1 class="display-4 fw-bold mb-3"><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h1>
                 <p class="lead text-muted">
-                    A high-performance, Redis-compatible distributed caching solution with MongoDB persistence, 
+                    A high-performance, Redis-compatible distributed caching solution with pluggable persistence (RocksDB default), 
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
@@ -87,7 +87,7 @@
                         <h5 class="card-title">JSON Document Support</h5>
                         <p class="card-text text-muted">
                             Store, query, and manipulate JSON documents with JSONPath expressions. 
-                            Perfect for modern applications.
+                            Attribute mapping transforms field names on storage.
                         </p>
                     </div>
                 </div>

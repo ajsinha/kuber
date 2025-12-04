@@ -178,6 +178,9 @@ public class RedisCommand implements Serializable {
         RPURGE,     // Purge region
         RINFO,      // Region info
         RSELECT,    // Select region
+        RSETMAP,    // Set attribute mapping for region
+        RGETMAP,    // Get attribute mapping for region
+        RCLEARMAP,  // Clear attribute mapping for region
         
         SYNC,       // Sync with primary
         STATUS,     // Node status
@@ -215,7 +218,7 @@ public class RedisCommand implements Serializable {
                  ZSCORE, ZRANK, ZREVRANK, ZRANGE, ZREVRANGE, ZCARD, ZCOUNT,
                  PING, ECHO, INFO, DBSIZE, TTL, PTTL, TYPE, EXISTS, KEYS,
                  SCAN, HSCAN, SSCAN, ZSCAN, TIME, CONFIG, CLIENT, COMMAND,
-                 MEMORY, SLOWLOG, JGET, JQUERY, JSEARCH, REGIONS, RINFO,
+                 MEMORY, SLOWLOG, JGET, JQUERY, JSEARCH, REGIONS, RINFO, RGETMAP,
                  STATUS, REPLINFO, STRLEN, GETRANGE, LPOS, DEBUG, KSEARCH:
                 return false;
             default:

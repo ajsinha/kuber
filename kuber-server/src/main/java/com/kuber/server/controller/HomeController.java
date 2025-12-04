@@ -92,19 +92,9 @@ public class HomeController {
     }
     
     @GetMapping("/login")
-    public String login() {
+    public String login(Model model) {
+        // Model attributes like appName are injected by GlobalControllerAdvice
         return "login";
-    }
-    
-    @GetMapping("/help")
-    public String help(Model model) {
-        model.addAttribute("currentPage", "help");
-        
-        // Replication status for navbar
-        boolean isPrimary = replicationManager == null || replicationManager.isPrimary();
-        model.addAttribute("isPrimary", isPrimary);
-        
-        return "help";
     }
     
     @GetMapping("/about")

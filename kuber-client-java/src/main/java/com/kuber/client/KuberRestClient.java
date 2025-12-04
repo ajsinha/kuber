@@ -270,6 +270,58 @@ public class KuberRestClient implements AutoCloseable {
         request("POST", "/api/v1/regions/" + name + "/purge");
     }
     
+    // ==================== Attribute Mapping ====================
+    
+    /**
+     * Set attribute mapping for a region.
+     * When JSON data is stored in a region with attribute mapping,
+     * the source attribute names are automatically renamed to target names.
+     *
+     * @param region Region name
+     * @param mapping Map of source attribute names to target names
+     * @throws IOException if communication error occurs
+     * 
+     * Example:
+     * <pre>
+     * Map&lt;String, String&gt; mapping = new HashMap&lt;&gt;();
+     * mapping.put("firstName", "first_name");
+     * mapping.put("lastName", "last_name");
+     * client.setAttributeMapping("users", mapping);
+     * </pre>
+     */
+    public void setAttributeMapping(String region, Map<String, String> mapping) throws IOException {
+        request("PUT", "/api/regions/" + region + "/attributemapping", mapping);
+    }
+    
+    /**
+     * Get attribute mapping for a region.
+     *
+     * @param region Region name
+     * @return Map of attribute mappings, or null if no mapping set
+     * @throws IOException if communication error occurs
+     */
+    public Map<String, String> getAttributeMapping(String region) throws IOException {
+        try {
+            JsonNode result = request("GET", "/api/regions/" + region + "/attributemapping");
+            if (result != null && !result.isNull()) {
+                return objectMapper.convertValue(result, new TypeReference<Map<String, String>>() {});
+            }
+            return null;
+        } catch (KuberRestException e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Clear attribute mapping for a region.
+     *
+     * @param region Region name
+     * @throws IOException if communication error occurs
+     */
+    public void clearAttributeMapping(String region) throws IOException {
+        request("DELETE", "/api/regions/" + region + "/attributemapping");
+    }
+    
     // ==================== Cache Operations ====================
     
     /**
@@ -474,6 +526,47 @@ public class KuberRestClient implements AutoCloseable {
     public long dbSize(String region) throws IOException {
         JsonNode result = request("GET", "/api/v1/cache/" + region + "/size");
         return result != null ? result.path("size").asLong(0) : 0;
+    }
+    
+    /**
+     * Search keys by regex pattern and return full key-value objects.
+     * Unlike keys() which uses glob pattern and returns only key names,
+     * ksearch uses regex and returns complete key-value objects including
+     * value, type, and TTL.
+     *
+     * @param regexPattern Regular expression pattern to match keys
+     * @return List of maps with keys: key, value, type, ttl
+     */
+    public List<Map<String, Object>> ksearch(String regexPattern) throws IOException {
+        return ksearch(regexPattern, currentRegion, 1000);
+    }
+    
+    /**
+     * Search keys by regex pattern with limit
+     */
+    public List<Map<String, Object>> ksearch(String regexPattern, int limit) throws IOException {
+        return ksearch(regexPattern, currentRegion, limit);
+    }
+    
+    /**
+     * Search keys by regex pattern in specific region
+     *
+     * @param regexPattern Regular expression pattern to match keys
+     * @param region Region to search in
+     * @param limit Maximum number of results
+     * @return List of maps with keys: key, value, type, ttl
+     */
+    public List<Map<String, Object>> ksearch(String regexPattern, String region, int limit) throws IOException {
+        JsonNode result = request("GET", "/api/cache/" + region + "/ksearch?pattern=" + 
+                java.net.URLEncoder.encode(regexPattern, "UTF-8") + "&limit=" + limit);
+        if (result != null && result.isArray()) {
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (JsonNode node : result) {
+                results.add(objectMapper.convertValue(node, new TypeReference<Map<String, Object>>() {}));
+            }
+            return results;
+        }
+        return new ArrayList<>();
     }
     
     // ==================== Hash Operations ====================
