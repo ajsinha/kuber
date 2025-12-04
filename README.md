@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.0.8
+Version 1.1.0
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -97,6 +97,92 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
    127.0.0.1:6380> GET hello
    "world"
    ```
+
+## Client Libraries
+
+Kuber provides standalone client libraries for Python and Java, each supporting both Redis protocol and REST API.
+
+### Python Clients
+
+**Redis Protocol Client** (`kuber_redis_standalone.py`):
+```python
+from kuber_redis_standalone import KuberRedisClient
+
+with KuberRedisClient('localhost', 6380) as client:
+    # Basic operations
+    client.set('key', 'value')
+    value = client.get('key')
+    
+    # Store JSON in specific region
+    client.json_set('user:1', {'name': 'Alice', 'age': 30}, region='users')
+    
+    # Deep JSON search
+    results = client.json_search('$.age>25', region='users')
+```
+
+**REST API Client** (`kuber_rest_standalone.py`):
+```python
+from kuber_rest_standalone import KuberRestClient
+
+with KuberRestClient('localhost', 8080, username='admin', password='secret') as client:
+    # Basic operations  
+    client.set('key', 'value')
+    value = client.get('key')
+    
+    # JSON operations with specific region
+    client.json_set('product:1', {'name': 'Laptop', 'price': 999}, region='products')
+    
+    # Search across regions
+    results = client.json_search('$.price>500', region='products')
+```
+
+### Java Clients
+
+**Redis Protocol Client** (`KuberClient.java`):
+```java
+try (KuberClient client = new KuberClient("localhost", 6380)) {
+    // Basic operations
+    client.set("key", "value");
+    String value = client.get("key");
+    
+    // Region-based JSON storage
+    client.selectRegion("products");
+    client.jsonSet("prod:1", "{\"name\": \"Widget\", \"price\": 29.99}");
+    
+    // JSON search
+    List<JsonNode> results = client.jsonSearch("$.price<50");
+}
+```
+
+**REST API Client** (`KuberRestClient.java`):
+```java
+try (KuberRestClient client = new KuberRestClient("localhost", 8080, "admin", "secret")) {
+    // Basic operations
+    client.set("key", "value");
+    String value = client.get("key");
+    
+    // JSON with specific region and TTL
+    client.jsonSet("order:1", orderObject, "orders", Duration.ofDays(30));
+    
+    // Cross-region search
+    List<JsonNode> results = client.jsonSearch("$.status=shipped", "orders");
+}
+```
+
+### Client Features
+
+| Feature | Python Redis | Python REST | Java Redis | Java REST |
+|---------|:------------:|:-----------:|:----------:|:---------:|
+| GET/SET/MGET/MSET | ✓ | ✓ | ✓ | ✓ |
+| Key Pattern Search | ✓ | ✓ | ✓ | ✓ |
+| Hash Operations | ✓ | ✓ | ✓ | ✓ |
+| Region Management | ✓ | ✓ | ✓ | ✓ |
+| JSON Storage | ✓ | ✓ | ✓ | ✓ |
+| JSON Deep Search | ✓ | ✓ | ✓ | ✓ |
+| Cross-Region Search | ✓ | ✓ | ✓ | ✓ |
+| TTL Support | ✓ | ✓ | ✓ | ✓ |
+| Bulk Operations | - | ✓ | - | ✓ |
+| No Dependencies | ✓ | ✓ | - | - |
 
 ## Configuration
 

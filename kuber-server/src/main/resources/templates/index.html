@@ -130,6 +130,37 @@
             </div>
         </div>
         
+        <!-- Persistence Backend Card -->
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0 bg-dark bg-gradient rounded-3 p-3">
+                                <i class="fas fa-hdd fa-2x text-white"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h6 class="text-muted mb-1">Persistence Backend</h6>
+                                <div class="d-flex align-items-center">
+                                    <h4 class="mb-0 me-3" th:text="${persistenceType}">MONGODB</h4>
+                                    <span th:if="${persistenceAvailable}" class="badge bg-success">
+                                        <i class="fas fa-check-circle me-1"></i> Connected
+                                    </span>
+                                    <span th:unless="${persistenceAvailable}" class="badge bg-danger">
+                                        <i class="fas fa-times-circle me-1"></i> Unavailable
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3 text-end">
+                                <small class="text-muted d-block">Configuration</small>
+                                <code class="small" th:text="${persistenceConfig}">mongodb://localhost:27017</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Regions Table -->
         <div class="row">
             <div class="col-12">

@@ -55,6 +55,8 @@ public class KuberClient implements AutoCloseable {
     private final String host;
     private final int port;
     private final int timeout;
+    private final String username;
+    private final String password;
     
     private Socket socket;
     private BufferedWriter writer;
@@ -66,31 +68,51 @@ public class KuberClient implements AutoCloseable {
     private final ObjectMapper objectMapper;
     
     /**
-     * Create a new Kuber client connected to localhost:6380
+     * Create a new Kuber client with required authentication
+     * 
+     * @param host Server hostname
+     * @param port Server port
+     * @param username Username for authentication (required)
+     * @param password Password for authentication (required)
+     * @throws IllegalArgumentException if username or password is null
      */
-    public KuberClient() throws IOException {
-        this("localhost", DEFAULT_PORT);
+    public KuberClient(String host, int port, String username, String password) throws IOException {
+        this(host, port, username, password, DEFAULT_TIMEOUT);
     }
     
     /**
-     * Create a new Kuber client
+     * Create a new Kuber client with required authentication and custom timeout
+     * 
+     * @param host Server hostname
+     * @param port Server port
+     * @param username Username for authentication (required)
+     * @param password Password for authentication (required)
+     * @param timeoutMs Connection timeout in milliseconds
+     * @throws IllegalArgumentException if username or password is null
      */
-    public KuberClient(String host, int port) throws IOException {
-        this(host, port, DEFAULT_TIMEOUT);
-    }
-    
-    /**
-     * Create a new Kuber client with custom timeout
-     */
-    public KuberClient(String host, int port, int timeoutMs) throws IOException {
+    public KuberClient(String host, int port, String username, String password, int timeoutMs) throws IOException {
+        if (username == null || username.isEmpty()) {
+            throw new IllegalArgumentException("Username is required for authentication");
+        }
+        if (password == null || password.isEmpty()) {
+            throw new IllegalArgumentException("Password is required for authentication");
+        }
+        
         this.host = host;
         this.port = port;
         this.timeout = timeoutMs;
+        this.username = username;
+        this.password = password;
         
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         
         connect();
+        
+        // Authenticate
+        if (!auth(password)) {
+            throw new IOException("Authentication failed");
+        }
     }
     
     private void connect() throws IOException {
@@ -312,8 +334,8 @@ public class KuberClient implements AutoCloseable {
     /**
      * Find keys matching pattern
      */
-    public Set<String> keys(String pattern) throws IOException {
-        return new HashSet<>(sendCommandForList("KEYS", pattern));
+    public List<String> keys(String pattern) throws IOException {
+        return sendCommandForList("KEYS", pattern);
     }
     
     /**
@@ -337,6 +359,32 @@ public class KuberClient implements AutoCloseable {
      */
     public void hset(String key, String field, String value) throws IOException {
         sendCommand("HSET", key, field, value);
+    }
+    
+    /**
+     * Set multiple hash fields
+     */
+    public void hmset(String key, Map<String, String> fields) throws IOException {
+        String[] args = new String[fields.size() * 2 + 2];
+        args[0] = "HMSET";
+        args[1] = key;
+        int i = 2;
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            args[i++] = entry.getKey();
+            args[i++] = entry.getValue();
+        }
+        sendCommand(args);
+    }
+    
+    /**
+     * Get multiple hash fields
+     */
+    public List<String> hmget(String key, String... fields) throws IOException {
+        String[] args = new String[fields.length + 2];
+        args[0] = "HMGET";
+        args[1] = key;
+        System.arraycopy(fields, 0, args, 2, fields.length);
+        return sendCommandForList(args);
     }
     
     /**
@@ -372,8 +420,8 @@ public class KuberClient implements AutoCloseable {
     /**
      * Get all hash fields
      */
-    public Set<String> hkeys(String key) throws IOException {
-        return new HashSet<>(sendCommandForList("HKEYS", key));
+    public List<String> hkeys(String key) throws IOException {
+        return sendCommandForList("HKEYS", key);
     }
     
     /**

@@ -13,6 +13,7 @@ package com.kuber.server.controller;
 
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
 import com.kuber.server.security.JsonUserDetailsService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -39,6 +41,7 @@ public class AdminController {
     private final JsonUserDetailsService userService;
     private final CacheService cacheService;
     private final KuberProperties properties;
+    private final PersistenceStore persistenceStore;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -53,11 +56,48 @@ public class AdminController {
         model.addAttribute("serverInfo", cacheService.getServerInfo());
         model.addAttribute("properties", properties);
         
+        // Add persistence info
+        model.addAttribute("persistenceInfo", getPersistenceInfo());
+        
         if (replicationManager != null) {
             model.addAttribute("replicationInfo", replicationManager.getReplicationInfo());
         }
         
         return "admin/dashboard";
+    }
+    
+    private Map<String, Object> getPersistenceInfo() {
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("Type", persistenceStore.getType().name());
+        info.put("Available", persistenceStore.isAvailable() ? "Yes" : "No");
+        
+        String configuredType = properties.getPersistence().getType();
+        info.put("Configured", configuredType);
+        
+        // Add backend-specific details
+        switch (persistenceStore.getType()) {
+            case MONGODB -> {
+                info.put("URI", properties.getMongo().getUri());
+                info.put("Database", properties.getMongo().getDatabase());
+                info.put("Pool Size", properties.getMongo().getConnectionPoolSize());
+            }
+            case SQLITE -> {
+                info.put("Path", properties.getPersistence().getSqlite().getPath());
+            }
+            case POSTGRESQL -> {
+                info.put("URL", properties.getPersistence().getPostgresql().getUrl());
+                info.put("Username", properties.getPersistence().getPostgresql().getUsername());
+                info.put("Pool Size", properties.getPersistence().getPostgresql().getPoolSize());
+            }
+            case ROCKSDB -> {
+                info.put("Path", properties.getPersistence().getRocksdb().getPath());
+            }
+            case MEMORY -> {
+                info.put("Note", "Data is not persisted across restarts");
+            }
+        }
+        
+        return info;
     }
     
     // User Management (Read-Only - users are in users.json)

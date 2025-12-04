@@ -9,7 +9,10 @@
 # this module may be subject to patent applications.
 
 """
-Kuber Client - Main client implementation
+Kuber Client - Redis Protocol Client Implementation
+
+This client uses the Redis protocol with Kuber extensions for regions and JSON queries.
+For REST API access, use KuberRestClient from kuber.rest_client module.
 """
 
 import socket
@@ -29,34 +32,22 @@ class KuberException(Exception):
 
 class KuberClient:
     """
-    Python client for Kuber Distributed Cache.
+    Python client for Kuber Distributed Cache using Redis Protocol.
     
     Supports Redis protocol with Kuber extensions for regions and JSON queries.
-    
-    Example:
-        >>> with KuberClient('localhost', 6380) as client:
-        ...     client.set('user:1001', 'John Doe')
-        ...     name = client.get('user:1001')
-        ...     
-        ...     # JSON operations
-        ...     client.json_set('user:1002', {'name': 'Jane', 'age': 30})
-        ...     user = client.json_get('user:1002')
-        ...     
-        ...     # Region operations
-        ...     client.select_region('sessions')
-        ...     client.set('session:abc', 'data', ttl=timedelta(minutes=30))
     """
     
     DEFAULT_PORT = 6380
     DEFAULT_TIMEOUT = 30.0
-    BUFFER_SIZE = 4096
+    BUFFER_SIZE = 8192
     
     def __init__(
         self,
         host: str = 'localhost',
         port: int = DEFAULT_PORT,
         timeout: float = DEFAULT_TIMEOUT,
-        password: Optional[str] = None
+        password: Optional[str] = None,
+        region: str = 'default'
     ):
         """
         Initialize Kuber client.
@@ -66,13 +57,15 @@ class KuberClient:
             port: Server port (default: 6380)
             timeout: Socket timeout in seconds (default: 30)
             password: Optional password for authentication
+            region: Initial region to select (default: 'default')
         """
         self.host = host
         self.port = port
         self.timeout = timeout
         self.password = password
         self._socket: Optional[socket.socket] = None
-        self._current_region = 'default'
+        self._current_region = region
+        self._initial_region = region
         
     def __enter__(self):
         self.connect()
@@ -92,6 +85,9 @@ class KuberClient:
         
         if self.password:
             self.auth(self.password)
+        
+        if self._initial_region != 'default':
+            self.select_region(self._initial_region)
         
         logger.info(f"Connected to Kuber at {self.host}:{self.port}")
     
@@ -124,12 +120,7 @@ class KuberClient:
         return self._current_region
     
     def select_region(self, region: str) -> None:
-        """
-        Select a region (creates if not exists).
-        
-        Args:
-            region: Region name to select
-        """
+        """Select a region (creates if not exists)."""
         self._send_command('RSELECT', region)
         self._current_region = region
     
@@ -142,25 +133,25 @@ class KuberClient:
         self._send_command('RCREATE', name, description)
     
     def delete_region(self, name: str) -> None:
-        """Delete a region."""
+        """Delete a region and all its data."""
         self._send_command('RDROP', name)
     
     def purge_region(self, name: str) -> None:
         """Purge all entries in a region."""
         self._send_command('RPURGE', name)
     
+    def region_info(self, name: str = None) -> Dict[str, Any]:
+        """Get information about a region."""
+        region = name or self._current_region
+        result = self._send_command('RINFO', region)
+        if result:
+            return json.loads(result)
+        return {}
+    
     # ==================== String Operations ====================
     
     def get(self, key: str) -> Optional[str]:
-        """
-        Get a value by key.
-        
-        Args:
-            key: The key to retrieve
-            
-        Returns:
-            The value or None if not found
-        """
+        """Get a value by key."""
         return self._send_command('GET', key)
     
     def set(
@@ -171,19 +162,7 @@ class KuberClient:
         nx: bool = False,
         xx: bool = False
     ) -> Optional[str]:
-        """
-        Set a value.
-        
-        Args:
-            key: The key
-            value: The value
-            ttl: Time-to-live (seconds or timedelta)
-            nx: Only set if key doesn't exist
-            xx: Only set if key exists
-            
-        Returns:
-            'OK' on success, None if condition not met
-        """
+        """Set a value."""
         args = ['SET', key, value]
         
         if ttl is not None:
@@ -244,7 +223,7 @@ class KuberClient:
     # ==================== Key Operations ====================
     
     def delete(self, *keys: str) -> int:
-        """Delete keys."""
+        """Delete one or more keys."""
         return int(self._send_command('DEL', *keys))
     
     def exists(self, *keys: str) -> int:
@@ -271,6 +250,16 @@ class KuberClient:
         """Find keys matching pattern."""
         return set(self._send_command_list('KEYS', pattern))
     
+    def scan(self, cursor: int = 0, match: str = '*', count: int = 100) -> tuple:
+        """Incrementally iterate over keys."""
+        result = self._send_command('SCAN', str(cursor), 'MATCH', match, 'COUNT', str(count))
+        if result:
+            parts = result.split('\n')
+            next_cursor = int(parts[0]) if parts else 0
+            keys = parts[1:] if len(parts) > 1 else []
+            return (next_cursor, keys)
+        return (0, [])
+    
     def rename(self, old_key: str, new_key: str) -> str:
         """Rename a key."""
         return self._send_command('RENAME', old_key, new_key)
@@ -285,10 +274,21 @@ class KuberClient:
         """Set a hash field."""
         return int(self._send_command('HSET', key, field, value))
     
+    def hmset(self, key: str, mapping: Dict[str, str]) -> str:
+        """Set multiple hash fields."""
+        args = ['HMSET', key]
+        for f, v in mapping.items():
+            args.extend([f, v])
+        return self._send_command(*args)
+    
+    def hmget(self, key: str, *fields: str) -> List[Optional[str]]:
+        """Get multiple hash fields."""
+        return self._send_command_list('HMGET', key, *fields)
+    
     def hgetall(self, key: str) -> Dict[str, str]:
         """Get all hash fields and values."""
         items = self._send_command_list('HGETALL', key)
-        return dict(zip(items[::2], items[1::2]))
+        return dict(zip(items[::2], items[1::2])) if items else {}
     
     def hdel(self, key: str, *fields: str) -> int:
         """Delete hash fields."""
@@ -310,6 +310,10 @@ class KuberClient:
         """Get hash length."""
         return int(self._send_command('HLEN', key))
     
+    def hincrby(self, key: str, field: str, amount: int) -> int:
+        """Increment hash field by integer."""
+        return int(self._send_command('HINCRBY', key, field, str(amount)))
+    
     # ==================== JSON Operations ====================
     
     def json_set(
@@ -319,15 +323,7 @@ class KuberClient:
         path: str = '$',
         ttl: Optional[Union[int, timedelta]] = None
     ) -> str:
-        """
-        Set a JSON value.
-        
-        Args:
-            key: The key
-            value: Python object to store as JSON
-            path: JSONPath (default: $ for root)
-            ttl: Time-to-live
-        """
+        """Set a JSON value."""
         json_str = json.dumps(value) if not isinstance(value, str) else value
         args = ['JSET', key, json_str, path]
         
@@ -339,56 +335,75 @@ class KuberClient:
         return self._send_command(*args)
     
     def json_get(self, key: str, path: str = '$') -> Any:
-        """
-        Get a JSON value.
-        
-        Args:
-            key: The key
-            path: JSONPath (default: $ for root)
-            
-        Returns:
-            Parsed JSON object or None
-        """
+        """Get a JSON value."""
         result = self._send_command('JGET', key, path)
         if result:
             return json.loads(result)
         return None
     
+    def json_mget(self, *keys: str, path: str = '$') -> List[Any]:
+        """Get multiple JSON values."""
+        results = self._send_command_list('JMGET', *keys, path)
+        return [json.loads(r) if r else None for r in results]
+    
     def json_delete(self, key: str, path: str = '$') -> bool:
         """Delete a JSON path."""
         return self._send_command('JDEL', key, path) == '1'
     
-    def json_search(self, query: str) -> List[Dict[str, Any]]:
+    def json_type(self, key: str, path: str = '$') -> str:
+        """Get JSON type at path."""
+        return self._send_command('JTYPE', key, path)
+    
+    def json_search(self, query: str, region: str = None) -> List[Dict[str, Any]]:
         """
-        Search JSON documents.
+        Search JSON documents using deep search.
         
-        Args:
-            query: Query string (e.g., '$.status=active,$.age>25')
-            
-        Returns:
-            List of matching documents
+        Query format examples:
+            - '$.field=value'
+            - '$.field1=value1,$.field2>value2'
+            - Operators: =, !=, >, <, >=, <=, LIKE, IN, CONTAINS
         """
-        results = self._send_command_list('JSEARCH', query)
+        args = ['JSEARCH', query]
+        if region:
+            args.append(region)
+        
+        results = self._send_command_list(*args)
         documents = []
         
         for result in results:
-            if ':' in result:
-                key, json_str = result.split(':', 1)
-                documents.append({
-                    'key': key,
-                    'value': json.loads(json_str)
-                })
+            if result and ':' in result:
+                idx = result.index(':')
+                key = result[:idx]
+                json_str = result[idx+1:]
+                try:
+                    documents.append({
+                        'key': key,
+                        'value': json.loads(json_str)
+                    })
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse JSON for key {key}")
         
         return documents
     
+    def json_query(self, jsonpath: str, region: str = None) -> List[Dict[str, Any]]:
+        """Query JSON documents using JSONPath expression."""
+        args = ['JQUERY', jsonpath]
+        if region:
+            args.append(region)
+        
+        results = self._send_command_list(*args)
+        return [json.loads(r) for r in results if r]
+    
     # ==================== Server Operations ====================
     
-    def info(self) -> str:
+    def info(self, section: str = None) -> str:
         """Get server info."""
+        if section:
+            return self._send_command('INFO', section)
         return self._send_command('INFO')
     
     def dbsize(self) -> int:
-        """Get database size."""
+        """Get number of entries in current region."""
         return int(self._send_command('DBSIZE'))
     
     def flushdb(self) -> str:
@@ -396,7 +411,7 @@ class KuberClient:
         return self._send_command('FLUSHDB')
     
     def status(self) -> Dict[str, Any]:
-        """Get server status."""
+        """Get server status as JSON."""
         result = self._send_command('STATUS')
         return json.loads(result) if result else {}
     
@@ -404,21 +419,33 @@ class KuberClient:
         """Get replication info."""
         return self._send_command('REPLINFO')
     
+    def time(self) -> tuple:
+        """Get server time."""
+        result = self._send_command('TIME')
+        if result:
+            parts = result.split('\n')
+            return (int(parts[0]), int(parts[1])) if len(parts) >= 2 else (0, 0)
+        return (0, 0)
+    
     # ==================== Command Execution ====================
+    
+    def execute(self, *args: str) -> Any:
+        """Execute a raw command."""
+        return self._send_command(*args)
     
     def _send_command(self, *args: str) -> Optional[str]:
         """Send a command and return the response."""
         if not self._socket:
             raise KuberException("Not connected")
         
-        # Build command
         cmd_parts = []
         for arg in args:
-            if ' ' in arg or '"' in arg or '\n' in arg:
-                escaped = arg.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\t', '\\t')
+            arg_str = str(arg)
+            if ' ' in arg_str or '"' in arg_str or '\n' in arg_str or '\r' in arg_str:
+                escaped = arg_str.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
                 cmd_parts.append(f'"{escaped}"')
             else:
-                cmd_parts.append(arg)
+                cmd_parts.append(arg_str)
         
         cmd = ' '.join(cmd_parts) + '\r\n'
         
@@ -432,7 +459,7 @@ class KuberClient:
         response = self._send_command(*args)
         if response is None:
             return []
-        return response.split('\n') if response else []
+        return [r for r in response.split('\n') if r] if response else []
     
     def _read_response(self) -> Optional[str]:
         """Read and parse response from server."""
@@ -448,7 +475,7 @@ class KuberClient:
         
         line = response.decode('utf-8').strip()
         
-        logger.debug(f"Received: {line}")
+        logger.debug(f"Received: {line[:200]}...")
         
         if not line:
             return None
@@ -463,7 +490,6 @@ class KuberClient:
             length = int(line[1:])
             if length == -1:
                 return None
-            # Read bulk string
             data = b''
             while len(data) < length + 2:
                 data += self._socket.recv(length + 2 - len(data))
@@ -475,7 +501,7 @@ class KuberClient:
             items = []
             for _ in range(count):
                 items.append(self._read_response())
-            return '\n'.join(str(i) if i else '' for i in items)
+            return '\n'.join(str(i) if i is not None else '' for i in items)
         
         return line
 

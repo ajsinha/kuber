@@ -81,10 +81,10 @@
             </div>
         </div>
         
-        <div class="row">
+        <div class="row g-4">
             <!-- Server Info -->
-            <div class="col-lg-6">
-                <div class="card border-0 shadow-sm">
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 py-3">
                         <h5 class="mb-0">
                             <i class="fas fa-server me-2 text-primary"></i>
@@ -102,9 +102,36 @@
                 </div>
             </div>
             
+            <!-- Persistence Backend Info -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2 text-warning"></i>
+                            Persistence Backend
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div th:if="${persistenceInfo}">
+                            <ul class="list-group list-group-flush">
+                                <li th:each="entry : ${persistenceInfo}" class="list-group-item d-flex justify-content-between px-0">
+                                    <span class="text-muted" th:text="${entry.key}">Key</span>
+                                    <span th:text="${entry.value}" 
+                                          th:classappend="${entry.key == 'Available' and entry.value == 'Yes'} ? 'text-success fw-bold' : (${entry.key == 'Available' and entry.value == 'No'} ? 'text-danger fw-bold' : '')">Value</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div th:unless="${persistenceInfo}" class="text-center py-4 text-muted">
+                            <i class="fas fa-info-circle fa-2x mb-2 d-block"></i>
+                            Persistence info unavailable
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Replication Info -->
-            <div class="col-lg-6">
-                <div class="card border-0 shadow-sm">
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 py-3">
                         <h5 class="mb-0">
                             <i class="fas fa-sync me-2 text-success"></i>

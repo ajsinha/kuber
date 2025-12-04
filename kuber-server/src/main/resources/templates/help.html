@@ -50,7 +50,7 @@
                         <h5 class="alert-heading"><i class="fas fa-database me-2"></i>Welcome to Kuber Distributed Cache</h5>
                         <p class="mb-2">Kuber is a high-performance, Redis-compatible distributed caching system with:</p>
                         <ul class="mb-0">
-                            <li><strong>MongoDB Persistence</strong> - Durable storage that survives restarts</li>
+                            <li><strong>Multi-Backend Persistence</strong> - Choose from MongoDB, PostgreSQL, SQLite, RocksDB, or in-memory storage</li>
                             <li><strong>JSON Document Support</strong> - Store and query complex JSON with JSONPath</li>
                             <li><strong>Region Partitioning</strong> - Logical namespaces for multi-tenant applications</li>
                             <li><strong>Redis Compatibility</strong> - Use existing Redis clients and tools</li>
@@ -100,14 +100,20 @@
                             <i class="fas fa-terminal me-2"></i>Start Kuber Server
                         </div>
                         <div class="card-body">
-<pre class="bg-light p-3 rounded mb-0"><code># Start MongoDB (required)
+<pre class="bg-light p-3 rounded mb-0"><code># Start Kuber Server (uses embedded persistence by default)
+java -jar kuber-server-1.1.0-SNAPSHOT.jar
+
+# Or with specific persistence backend
+java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=sqlite
+java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=rocksdb
+java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=memory
+
+# For MongoDB persistence (requires MongoDB server)
 mongod --dbpath /data/db
+java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.persistence.type=mongodb
 
-# Start Kuber Server
-java -jar kuber-server-1.0.8-SNAPSHOT.jar
-
-# Or with custom config
-java -jar kuber-server-1.0.8-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
+# With custom ports
+java -jar kuber-server-1.1.0-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
                         </div>
                     </div>
                     
@@ -285,7 +291,7 @@ curl -u admin:admin123 http://localhost:8080/api/info
 # Response:
 {
   "server": "kuber",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "uptime_in_seconds": 3600,
   "connected_clients": 5,
   "total_regions": 3,
@@ -1183,7 +1189,7 @@ response = requests.post(
 &lt;dependency&gt;
     &lt;groupId&gt;com.kuber&lt;/groupId&gt;
     &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
-    &lt;version&gt;1.0.8&lt;/version&gt;
+    &lt;version&gt;1.1.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
                     <h4 class="mt-4 mb-3">Basic Jedis Example</h4>
@@ -1653,7 +1659,7 @@ public class CacheService {
                         <li><strong>default</strong> - Built-in region, cannot be deleted</li>
                         <li><strong>Isolation</strong> - Keys in different regions are completely separate</li>
                         <li><strong>Statistics</strong> - Each region tracks its own hit ratio and entry count</li>
-                        <li><strong>Persistence</strong> - Each region maps to a MongoDB collection</li>
+                        <li><strong>Persistence</strong> - Each region maps to a separate data store (collection, table, or column family depending on backend)</li>
                     </ul>
                     
                     <h4 class="mt-4 mb-3">Region Selection Methods</h4>
@@ -2069,14 +2075,15 @@ public class AutoloadExample {
                         </thead>
                         <tbody>
                             <tr><td><code>kuber.cache.max-memory-entries</code></td><td>100000</td><td>Max entries per region in memory</td></tr>
-                            <tr><td><code>kuber.cache.persistent-mode</code></td><td>true</td><td>Enable MongoDB persistence</td></tr>
+                            <tr><td><code>kuber.cache.persistent-mode</code></td><td>true</td><td>Enable persistence to configured backend</td></tr>
                             <tr><td><code>kuber.cache.ttl-cleanup-interval-seconds</code></td><td>60</td><td>TTL cleanup interval</td></tr>
                             <tr><td><code>kuber.cache.default-ttl</code></td><td>-1</td><td>Default TTL (-1 = no expiry)</td></tr>
                             <tr><td><code>kuber.cache.statistics-enabled</code></td><td>true</td><td>Enable hit/miss statistics</td></tr>
                         </tbody>
                     </table>
                     
-                    <h4 class="mt-4 mb-3">MongoDB Settings</h4>
+                    <h4 class="mt-4 mb-3">Default Persistence Settings (MongoDB)</h4>
+                    <p class="text-muted">These settings apply when using the default MongoDB persistence backend. See below for all backend options.</p>
                     <table class="table table-bordered table-sm">
                         <thead class="table-light">
                             <tr><th>Property</th><th>Default</th><th>Description</th></tr>
@@ -2089,21 +2096,71 @@ public class AutoloadExample {
                     </table>
                     
                     <h4 class="mt-4 mb-3">Persistence Backend Configuration</h4>
-                    <p>Kuber supports multiple persistence backends. Configure via <code>kuber.persistence.type</code>:</p>
+                    <p>Kuber supports multiple persistence backends, allowing you to choose the storage solution that best fits your deployment needs. 
+                       The persistence layer is pluggable and can be changed via configuration without code modifications.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> The default persistence backend is MongoDB. To switch backends, set the 
+                        <code>kuber.persistence.type</code> property in your <code>application.properties</code> file and restart Kuber.
+                    </div>
+                    
+                    <h5 class="mt-3 mb-2">Available Persistence Backends</h5>
                     <table class="table table-bordered table-sm">
                         <thead class="table-light">
-                            <tr><th>Type</th><th>Description</th><th>Use Case</th></tr>
+                            <tr><th>Type</th><th>Description</th><th>Use Case</th><th>Prerequisites</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td><code>mongodb</code></td><td>MongoDB document database</td><td>Production, distributed deployments</td></tr>
-                            <tr><td><code>sqlite</code></td><td>SQLite embedded database</td><td>Single-node, embedded applications</td></tr>
-                            <tr><td><code>postgresql</code></td><td>PostgreSQL with JSONB</td><td>Enterprise, existing PostgreSQL infrastructure</td></tr>
-                            <tr><td><code>rocksdb</code></td><td>RocksDB embedded KV store</td><td>High-performance, single-node</td></tr>
-                            <tr><td><code>memory</code></td><td>In-memory only</td><td>Testing, development, ephemeral cache</td></tr>
+                            <tr>
+                                <td><code>mongodb</code></td>
+                                <td>MongoDB document database</td>
+                                <td>Production, distributed deployments, cloud-native</td>
+                                <td>MongoDB 5.0+ server</td>
+                            </tr>
+                            <tr>
+                                <td><code>sqlite</code></td>
+                                <td>SQLite embedded database</td>
+                                <td>Single-node, embedded applications, edge deployments</td>
+                                <td>None (embedded)</td>
+                            </tr>
+                            <tr>
+                                <td><code>postgresql</code></td>
+                                <td>PostgreSQL with JSONB storage</td>
+                                <td>Enterprise, existing PostgreSQL infrastructure</td>
+                                <td>PostgreSQL 14+ server</td>
+                            </tr>
+                            <tr>
+                                <td><code>rocksdb</code></td>
+                                <td>RocksDB embedded key-value store</td>
+                                <td>High-performance, single-node, SSD-optimized</td>
+                                <td>None (embedded)</td>
+                            </tr>
+                            <tr>
+                                <td><code>memory</code></td>
+                                <td>In-memory only (no persistence)</td>
+                                <td>Testing, development, ephemeral cache</td>
+                                <td>None</td>
+                            </tr>
                         </tbody>
                     </table>
                     
-                    <h5 class="mt-3 mb-2">SQLite Configuration</h5>
+                    <h5 class="mt-4 mb-2"><i class="fas fa-leaf me-2 text-success"></i>MongoDB Backend (Default)</h5>
+                    <p>Best for distributed deployments and cloud-native environments. Supports replication and horizontal scaling.</p>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.persistence.type</code></td><td>mongodb</td><td>Set to <code>mongodb</code> (default)</td></tr>
+                            <tr><td><code>kuber.mongo.uri</code></td><td>mongodb://localhost:27017</td><td>MongoDB connection URI</td></tr>
+                            <tr><td><code>kuber.mongo.database</code></td><td>kuber</td><td>Database name</td></tr>
+                            <tr><td><code>kuber.mongo.connection-pool-size</code></td><td>50</td><td>Connection pool size</td></tr>
+                        </tbody>
+                    </table>
+                    <p><strong>Features:</strong> Automatic index creation, bulk write operations, document-level operations, TTL indexes for expiration.</p>
+                    
+                    <h5 class="mt-4 mb-2"><i class="fas fa-file-alt me-2 text-primary"></i>SQLite Backend</h5>
+                    <p>Perfect for single-node deployments, embedded applications, and edge computing. Zero external dependencies.</p>
                     <table class="table table-bordered table-sm">
                         <thead class="table-light">
                             <tr><th>Property</th><th>Default</th><th>Description</th></tr>
@@ -2113,8 +2170,10 @@ public class AutoloadExample {
                             <tr><td><code>kuber.persistence.sqlite.path</code></td><td>./data/kuber.db</td><td>Path to SQLite database file</td></tr>
                         </tbody>
                     </table>
+                    <p><strong>Features:</strong> WAL mode for concurrency, batch operations, automatic schema creation, portable single-file database.</p>
                     
-                    <h5 class="mt-3 mb-2">PostgreSQL Configuration</h5>
+                    <h5 class="mt-4 mb-2"><i class="fas fa-elephant me-2 text-info"></i>PostgreSQL Backend</h5>
+                    <p>Ideal for enterprise environments with existing PostgreSQL infrastructure. Uses JSONB for efficient JSON storage and querying.</p>
                     <table class="table table-bordered table-sm">
                         <thead class="table-light">
                             <tr><th>Property</th><th>Default</th><th>Description</th></tr>
@@ -2124,11 +2183,13 @@ public class AutoloadExample {
                             <tr><td><code>kuber.persistence.postgresql.url</code></td><td>jdbc:postgresql://localhost:5432/kuber</td><td>JDBC connection URL</td></tr>
                             <tr><td><code>kuber.persistence.postgresql.username</code></td><td>kuber</td><td>Database username</td></tr>
                             <tr><td><code>kuber.persistence.postgresql.password</code></td><td>kuber</td><td>Database password</td></tr>
-                            <tr><td><code>kuber.persistence.postgresql.pool-size</code></td><td>10</td><td>Connection pool size</td></tr>
+                            <tr><td><code>kuber.persistence.postgresql.pool-size</code></td><td>10</td><td>HikariCP connection pool size</td></tr>
                         </tbody>
                     </table>
+                    <p><strong>Features:</strong> JSONB column type, GIN indexes for JSON queries, HikariCP connection pooling, transaction support, ON CONFLICT upserts.</p>
                     
-                    <h5 class="mt-3 mb-2">RocksDB Configuration</h5>
+                    <h5 class="mt-4 mb-2"><i class="fas fa-bolt me-2 text-warning"></i>RocksDB Backend</h5>
+                    <p>High-performance embedded key-value store optimized for SSDs. Excellent for single-node high-throughput scenarios.</p>
                     <table class="table table-bordered table-sm">
                         <thead class="table-light">
                             <tr><th>Property</th><th>Default</th><th>Description</th></tr>
@@ -2138,25 +2199,58 @@ public class AutoloadExample {
                             <tr><td><code>kuber.persistence.rocksdb.path</code></td><td>./data/rocksdb</td><td>Path to RocksDB data directory</td></tr>
                         </tbody>
                     </table>
+                    <p><strong>Features:</strong> Column families per region, LZ4 compression, WriteBatch for bulk operations, LSM-tree architecture, SSD-optimized.</p>
                     
-                    <h5 class="mt-3 mb-2">Example Configurations</h5>
-<pre class="bg-light p-3 rounded"><code># Use SQLite for single-node deployment
+                    <h5 class="mt-4 mb-2"><i class="fas fa-memory me-2 text-secondary"></i>Memory Backend</h5>
+                    <p>In-memory storage for testing and development. Data is lost when the server restarts.</p>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.persistence.type</code></td><td>mongodb</td><td>Set to <code>memory</code></td></tr>
+                        </tbody>
+                    </table>
+                    <p><strong>Features:</strong> ConcurrentHashMap-based, zero configuration, instant startup, useful for unit tests and ephemeral caches.</p>
+                    
+                    <h5 class="mt-4 mb-2">Quick Start Examples</h5>
+<pre class="bg-dark text-light p-3 rounded"><code># MongoDB (default - production distributed deployment)
+kuber.persistence.type=mongodb
+kuber.mongo.uri=mongodb://localhost:27017
+kuber.mongo.database=kuber
+
+# SQLite (single-node, zero dependencies)
 kuber.persistence.type=sqlite
 kuber.persistence.sqlite.path=/var/lib/kuber/cache.db
 
-# Use PostgreSQL for enterprise deployment
+# PostgreSQL (enterprise with existing PostgreSQL)
 kuber.persistence.type=postgresql
 kuber.persistence.postgresql.url=jdbc:postgresql://db.example.com:5432/kuber
 kuber.persistence.postgresql.username=kuber_app
 kuber.persistence.postgresql.password=secret
 kuber.persistence.postgresql.pool-size=20
 
-# Use RocksDB for high-performance single-node
+# RocksDB (high-performance single-node)
 kuber.persistence.type=rocksdb
 kuber.persistence.rocksdb.path=/var/lib/kuber/rocksdb
 
-# Use in-memory for testing
+# Memory (testing and development only)
 kuber.persistence.type=memory</code></pre>
+
+                    <h5 class="mt-4 mb-2">Choosing the Right Backend</h5>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Scenario</th><th>Recommended Backend</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Cloud/Kubernetes deployment</td><td>MongoDB</td><td>Scalable, managed services available (MongoDB Atlas)</td></tr>
+                            <tr><td>Single server, simple setup</td><td>SQLite</td><td>No external dependencies, single file backup</td></tr>
+                            <tr><td>Enterprise with PostgreSQL</td><td>PostgreSQL</td><td>Leverage existing infrastructure and tooling</td></tr>
+                            <tr><td>Maximum single-node performance</td><td>RocksDB</td><td>LSM-tree optimized for high write throughput</td></tr>
+                            <tr><td>Unit testing / CI pipelines</td><td>Memory</td><td>Fast, no cleanup required, isolated tests</td></tr>
+                            <tr><td>Edge/IoT devices</td><td>SQLite or RocksDB</td><td>Embedded, resource-efficient</td></tr>
+                        </tbody>
+                    </table>
 
                     <h4 class="mt-4 mb-3">Autoload Settings</h4>
                     <table class="table table-bordered table-sm">
@@ -2200,7 +2294,7 @@ kuber.replication.zookeeper.session-timeout-ms=30000</code></pre>
                     <div class="row">
                         <div class="col-md-6">
                             <h6><i class="fas fa-database me-2"></i>Kuber Distributed Cache</h6>
-                            <p class="text-muted small mb-0">Version 1.0.8</p>
+                            <p class="text-muted small mb-0">Version 1.1.0</p>
                         </div>
                         <div class="col-md-6 text-end">
                             <p class="text-muted small mb-0">

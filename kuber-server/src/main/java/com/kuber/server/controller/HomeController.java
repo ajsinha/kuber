@@ -15,6 +15,7 @@ import com.kuber.core.model.CacheRegion;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.network.RedisProtocolServer;
+import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ public class HomeController {
     private final CacheService cacheService;
     private final KuberProperties properties;
     private final RedisProtocolServer redisServer;
+    private final PersistenceStore persistenceStore;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -71,7 +73,22 @@ public class HomeController {
         model.addAttribute("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());
         model.addAttribute("persistentMode", properties.getCache().isPersistentMode());
         
+        // Persistence backend info
+        model.addAttribute("persistenceType", persistenceStore.getType().name());
+        model.addAttribute("persistenceAvailable", persistenceStore.isAvailable());
+        model.addAttribute("persistenceConfig", getPersistenceConfigSummary());
+        
         return "index";
+    }
+    
+    private String getPersistenceConfigSummary() {
+        return switch (persistenceStore.getType()) {
+            case MONGODB -> properties.getMongo().getUri();
+            case SQLITE -> properties.getPersistence().getSqlite().getPath();
+            case POSTGRESQL -> properties.getPersistence().getPostgresql().getUrl();
+            case ROCKSDB -> properties.getPersistence().getRocksdb().getPath();
+            case MEMORY -> "In-Memory (no persistence)";
+        };
     }
     
     @GetMapping("/login")
