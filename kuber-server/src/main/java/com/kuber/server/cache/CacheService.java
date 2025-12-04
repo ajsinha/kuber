@@ -25,7 +25,7 @@ import com.kuber.core.model.CacheRegion;
 import com.kuber.core.util.JsonUtils;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.event.EventPublisher;
-import com.kuber.server.persistence.MongoRepository;
+import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 public class CacheService {
     
     private final KuberProperties properties;
-    private final MongoRepository mongoRepository;
+    private final PersistenceStore persistenceStore;
     private final EventPublisher eventPublisher;
     
     @Autowired(required = false)
@@ -65,18 +65,19 @@ public class CacheService {
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
     
     public CacheService(KuberProperties properties, 
-                        MongoRepository mongoRepository,
+                        PersistenceStore persistenceStore,
                         EventPublisher eventPublisher) {
         this.properties = properties;
-        this.mongoRepository = mongoRepository;
+        this.persistenceStore = persistenceStore;
         this.eventPublisher = eventPublisher;
     }
     
     @PostConstruct
     public void initialize() {
         log.info("Initializing Kuber cache service...");
+        log.info("Using persistence store: {}", persistenceStore.getType());
         
-        // Load regions from MongoDB
+        // Load regions from persistence store
         loadRegions();
         
         // Ensure default region exists
@@ -84,7 +85,7 @@ public class CacheService {
             createDefaultRegion();
         }
         
-        // Prime cache from MongoDB if configured
+        // Prime cache from persistence store if configured
         primeCache();
         
         log.info("Cache service initialized with {} regions", regions.size());
@@ -92,17 +93,17 @@ public class CacheService {
     
     private void loadRegions() {
         try {
-            log.info("Loading regions from MongoDB...");
-            List<CacheRegion> savedRegions = mongoRepository.loadAllRegions();
-            log.info("Found {} regions in MongoDB", savedRegions.size());
+            log.info("Loading regions from {} persistence store...", persistenceStore.getType());
+            List<CacheRegion> savedRegions = persistenceStore.loadAllRegions();
+            log.info("Found {} regions in persistence store", savedRegions.size());
             
             for (CacheRegion region : savedRegions) {
-                log.info("Loading region '{}' from MongoDB", region.getName());
+                log.info("Loading region '{}' from persistence store", region.getName());
                 regions.put(region.getName(), region);
                 createCacheForRegion(region.getName());
             }
         } catch (Exception e) {
-            log.error("Failed to load regions from MongoDB: {}", e.getMessage(), e);
+            log.error("Failed to load regions from persistence store: {}", e.getMessage(), e);
         }
     }
     
@@ -112,7 +113,7 @@ public class CacheService {
         createCacheForRegion(KuberConstants.DEFAULT_REGION);
         
         try {
-            mongoRepository.saveRegion(defaultRegion);
+            persistenceStore.saveRegion(defaultRegion);
         } catch (Exception e) {
             log.warn("Failed to persist default region: {}", e.getMessage());
         }
@@ -141,11 +142,11 @@ public class CacheService {
     }
     
     private void primeCache() {
-        log.info("Priming cache from MongoDB...");
+        log.info("Priming cache from {} persistence store...", persistenceStore.getType());
         
         for (String regionName : regions.keySet()) {
             try {
-                List<CacheEntry> entries = mongoRepository.loadEntries(regionName, 
+                List<CacheEntry> entries = persistenceStore.loadEntries(regionName, 
                         properties.getCache().getMaxMemoryEntries());
                 Cache<String, CacheEntry> cache = regionCaches.get(regionName);
                 
@@ -185,13 +186,13 @@ public class CacheService {
         regions.put(name, region);
         createCacheForRegion(name);
         
-        // Always persist region metadata to MongoDB (regardless of persistentMode)
+        // Always persist region metadata (regardless of persistentMode)
         try {
-            log.info("Persisting region '{}' to MongoDB with collection '{}'", name, collectionName);
-            mongoRepository.saveRegion(region);
-            log.info("Successfully persisted region '{}' to MongoDB", name);
+            log.info("Persisting region '{}' to {} persistence store", name, persistenceStore.getType());
+            persistenceStore.saveRegion(region);
+            log.info("Successfully persisted region '{}' to persistence store", name);
         } catch (Exception e) {
-            log.error("Failed to persist region '{}' to MongoDB: {}", name, e.getMessage(), e);
+            log.error("Failed to persist region '{}' to persistence store: {}", name, e.getMessage(), e);
             // Don't throw - region is still usable in-memory
         }
         
@@ -222,8 +223,8 @@ public class CacheService {
         regions.remove(name);
         statistics.remove(name);
         
-        // Delete from MongoDB
-        mongoRepository.deleteRegion(name);
+        // Delete from persistence store
+        persistenceStore.deleteRegion(name);
         
         eventPublisher.publish(CacheEvent.regionDeleted(name, properties.getNodeId()));
         
@@ -246,8 +247,8 @@ public class CacheService {
         region.setEntryCount(0);
         region.setUpdatedAt(Instant.now());
         
-        // Purge from MongoDB
-        mongoRepository.purgeRegion(name);
+        // Purge from persistence store
+        persistenceStore.purgeRegion(name);
         
         eventPublisher.publish(CacheEvent.builder()
                 .eventId(UUID.randomUUID().toString())
@@ -403,7 +404,7 @@ public class CacheService {
         
         if (removed != null) {
             cache.invalidate(key);
-            mongoRepository.deleteEntry(region, key);
+            persistenceStore.deleteEntry(region, key);
             
             CacheRegion regionObj = regions.get(region);
             if (regionObj != null) {
@@ -733,8 +734,8 @@ public class CacheService {
         CacheEntry entry = cache.getIfPresent(key);
         
         if (entry == null) {
-            // Try loading from MongoDB
-            entry = mongoRepository.loadEntry(region, key);
+            // Try loading from persistence store
+            entry = persistenceStore.loadEntry(region, key);
             if (entry != null && !entry.isExpired()) {
                 cache.put(key, entry);
             } else {
@@ -752,11 +753,11 @@ public class CacheService {
                     regionObj.decrementEntryCount();
                 }
                 
-                // Delete from MongoDB
+                // Delete from persistence store
                 try {
-                    mongoRepository.deleteEntry(region, key);
+                    persistenceStore.deleteEntry(region, key);
                 } catch (Exception e) {
-                    log.warn("Failed to delete expired entry '{}' from MongoDB: {}", key, e.getMessage());
+                    log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
                 }
                 
                 recordStatistic(region, KuberConstants.STAT_EXPIRED);
@@ -789,11 +790,11 @@ public class CacheService {
         
         recordStatistic(region, KuberConstants.STAT_SETS);
         
-        // Persist to MongoDB
+        // Persist to persistence store
         if (properties.getCache().isPersistentMode()) {
-            mongoRepository.saveEntry(entry);
+            persistenceStore.saveEntry(entry);
         } else {
-            mongoRepository.saveEntryAsync(entry);
+            persistenceStore.saveEntryAsync(entry);
         }
     }
     
@@ -929,11 +930,11 @@ public class CacheService {
                     region.decrementEntryCount();
                 }
                 
-                // Delete from MongoDB
+                // Delete from persistence store
                 try {
-                    mongoRepository.deleteEntry(regionName, key);
+                    persistenceStore.deleteEntry(regionName, key);
                 } catch (Exception e) {
-                    log.warn("Failed to delete expired entry '{}' from MongoDB: {}", key, e.getMessage());
+                    log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
                 }
                 
                 recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
@@ -950,7 +951,8 @@ public class CacheService {
     
     @jakarta.annotation.PreDestroy
     public void shutdown() {
-        log.info("Shutting down Kuber cache service - persisting all data to MongoDB...");
+        log.info("Shutting down Kuber cache service - persisting all data to {} persistence store...", 
+                persistenceStore.getType());
         
         long totalEntries = 0;
         long totalRegions = 0;
@@ -960,7 +962,7 @@ public class CacheService {
             for (CacheRegion region : regions.values()) {
                 try {
                     region.setUpdatedAt(Instant.now());
-                    mongoRepository.saveRegion(region);
+                    persistenceStore.saveRegion(region);
                     totalRegions++;
                 } catch (Exception e) {
                     log.error("Failed to persist region '{}': {}", region.getName(), e.getMessage());
@@ -982,9 +984,9 @@ public class CacheService {
                                 .filter(e -> !e.isExpired())
                                 .collect(Collectors.toList());
                         
-                        // Batch save to MongoDB
+                        // Batch save to persistence store
                         if (!validEntries.isEmpty()) {
-                            mongoRepository.saveEntries(validEntries);
+                            persistenceStore.saveEntries(validEntries);
                             totalEntries += validEntries.size();
                             log.info("Persisted {} entries from region '{}'", validEntries.size(), regionName);
                         }
@@ -994,8 +996,8 @@ public class CacheService {
                 }
             }
             
-            log.info("Shutdown complete - persisted {} regions and {} entries to MongoDB", 
-                    totalRegions, totalEntries);
+            log.info("Shutdown complete - persisted {} regions and {} entries to {} persistence store", 
+                    totalRegions, totalEntries, persistenceStore.getType());
             
         } catch (Exception e) {
             log.error("Error during shutdown persistence: {}", e.getMessage(), e);

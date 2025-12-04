@@ -17,7 +17,7 @@
 
     <groupId>com.kuber</groupId>
     <artifactId>kuber-parent</artifactId>
-    <version>1.0.7</version>
+    <version>1.0.8</version>
     <packaging>pom</packaging>
 
     <name>Kuber Distributed Cache</name>
@@ -50,6 +50,10 @@
         <caffeine.version>3.1.8</caffeine.version>
         <lombok.version>1.18.32</lombok.version>
         <commons-csv.version>1.10.0</commons-csv.version>
+        <sqlite-jdbc.version>3.45.1.0</sqlite-jdbc.version>
+        <hikaricp.version>5.1.0</hikaricp.version>
+        <postgresql.version>42.7.2</postgresql.version>
+        <rocksdb.version>9.0.0</rocksdb.version>
     </properties>
 
     <dependencyManagement>
@@ -127,6 +131,34 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-csv</artifactId>
                 <version>${commons-csv.version}</version>
+            </dependency>
+
+            <!-- SQLite JDBC -->
+            <dependency>
+                <groupId>org.xerial</groupId>
+                <artifactId>sqlite-jdbc</artifactId>
+                <version>${sqlite-jdbc.version}</version>
+            </dependency>
+
+            <!-- PostgreSQL JDBC -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+
+            <!-- HikariCP Connection Pool -->
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikaricp.version}</version>
+            </dependency>
+
+            <!-- RocksDB -->
+            <dependency>
+                <groupId>org.rocksdb</groupId>
+                <artifactId>rocksdbjni</artifactId>
+                <version>${rocksdb.version}</version>
             </dependency>
 
             <!-- Lombok -->

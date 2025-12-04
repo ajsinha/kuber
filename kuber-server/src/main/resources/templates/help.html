@@ -104,10 +104,10 @@
 mongod --dbpath /data/db
 
 # Start Kuber Server
-java -jar kuber-server-1.0.7-SNAPSHOT.jar
+java -jar kuber-server-1.0.8-SNAPSHOT.jar
 
 # Or with custom config
-java -jar kuber-server-1.0.7-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
+java -jar kuber-server-1.0.8-SNAPSHOT.jar --kuber.network.port=6380 --server.port=8081</code></pre>
                         </div>
                     </div>
                     
@@ -285,7 +285,7 @@ curl -u admin:admin123 http://localhost:8080/api/info
 # Response:
 {
   "server": "kuber",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "uptime_in_seconds": 3600,
   "connected_clients": 5,
   "total_regions": 3,
@@ -1183,7 +1183,7 @@ response = requests.post(
 &lt;dependency&gt;
     &lt;groupId&gt;com.kuber&lt;/groupId&gt;
     &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
-    &lt;version&gt;1.0.7&lt;/version&gt;
+    &lt;version&gt;1.0.8&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
                     <h4 class="mt-4 mb-3">Basic Jedis Example</h4>
@@ -2006,7 +2006,7 @@ public class AutoloadExample {
         
         // Create JSON data file
         try (BufferedWriter writer = Files.newBufferedWriter(inbox.resolve("orders.json"))) {
-            for (int i = 1; i <= 100; i++) {
+            for (int i = 1; i &lt;= 100; i++) {
                 String json = String.format(
                     "{\"order_id\":\"ORD%04d\",\"customer\":\"Customer %d\",\"total\":%.2f}",
                     i, i, Math.random() * 1000
@@ -2088,6 +2088,76 @@ public class AutoloadExample {
                         </tbody>
                     </table>
                     
+                    <h4 class="mt-4 mb-3">Persistence Backend Configuration</h4>
+                    <p>Kuber supports multiple persistence backends. Configure via <code>kuber.persistence.type</code>:</p>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Type</th><th>Description</th><th>Use Case</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>mongodb</code></td><td>MongoDB document database</td><td>Production, distributed deployments</td></tr>
+                            <tr><td><code>sqlite</code></td><td>SQLite embedded database</td><td>Single-node, embedded applications</td></tr>
+                            <tr><td><code>postgresql</code></td><td>PostgreSQL with JSONB</td><td>Enterprise, existing PostgreSQL infrastructure</td></tr>
+                            <tr><td><code>rocksdb</code></td><td>RocksDB embedded KV store</td><td>High-performance, single-node</td></tr>
+                            <tr><td><code>memory</code></td><td>In-memory only</td><td>Testing, development, ephemeral cache</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h5 class="mt-3 mb-2">SQLite Configuration</h5>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.persistence.type</code></td><td>mongodb</td><td>Set to <code>sqlite</code></td></tr>
+                            <tr><td><code>kuber.persistence.sqlite.path</code></td><td>./data/kuber.db</td><td>Path to SQLite database file</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h5 class="mt-3 mb-2">PostgreSQL Configuration</h5>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.persistence.type</code></td><td>mongodb</td><td>Set to <code>postgresql</code></td></tr>
+                            <tr><td><code>kuber.persistence.postgresql.url</code></td><td>jdbc:postgresql://localhost:5432/kuber</td><td>JDBC connection URL</td></tr>
+                            <tr><td><code>kuber.persistence.postgresql.username</code></td><td>kuber</td><td>Database username</td></tr>
+                            <tr><td><code>kuber.persistence.postgresql.password</code></td><td>kuber</td><td>Database password</td></tr>
+                            <tr><td><code>kuber.persistence.postgresql.pool-size</code></td><td>10</td><td>Connection pool size</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h5 class="mt-3 mb-2">RocksDB Configuration</h5>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.persistence.type</code></td><td>mongodb</td><td>Set to <code>rocksdb</code></td></tr>
+                            <tr><td><code>kuber.persistence.rocksdb.path</code></td><td>./data/rocksdb</td><td>Path to RocksDB data directory</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h5 class="mt-3 mb-2">Example Configurations</h5>
+<pre class="bg-light p-3 rounded"><code># Use SQLite for single-node deployment
+kuber.persistence.type=sqlite
+kuber.persistence.sqlite.path=/var/lib/kuber/cache.db
+
+# Use PostgreSQL for enterprise deployment
+kuber.persistence.type=postgresql
+kuber.persistence.postgresql.url=jdbc:postgresql://db.example.com:5432/kuber
+kuber.persistence.postgresql.username=kuber_app
+kuber.persistence.postgresql.password=secret
+kuber.persistence.postgresql.pool-size=20
+
+# Use RocksDB for high-performance single-node
+kuber.persistence.type=rocksdb
+kuber.persistence.rocksdb.path=/var/lib/kuber/rocksdb
+
+# Use in-memory for testing
+kuber.persistence.type=memory</code></pre>
+
                     <h4 class="mt-4 mb-3">Autoload Settings</h4>
                     <table class="table table-bordered table-sm">
                         <thead class="table-light">
@@ -2130,7 +2200,7 @@ kuber.replication.zookeeper.session-timeout-ms=30000</code></pre>
                     <div class="row">
                         <div class="col-md-6">
                             <h6><i class="fas fa-database me-2"></i>Kuber Distributed Cache</h6>
-                            <p class="text-muted small mb-0">Version 1.0.7</p>
+                            <p class="text-muted small mb-0">Version 1.0.8</p>
                         </div>
                         <div class="col-md-6 text-end">
                             <p class="text-muted small mb-0">

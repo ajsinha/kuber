@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.0.7
+Version 1.0.8
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -16,7 +16,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Redis Protocol Compatibility**: Connect using any Redis client
 - **Region-Based Organization**: Logical isolation of cache entries
 - **JSON Document Support**: Store and query JSON documents with JSONPath
-- **MongoDB Persistence**: Durable storage with configurable sync modes
+- **Multi-Backend Persistence**: MongoDB, SQLite, PostgreSQL, or RocksDB
 - **Primary/Secondary Replication**: Automatic failover via ZooKeeper
 - **Autoload**: Bulk data import from CSV and JSON files
 - **Web Management UI**: Browser-based administration interface
@@ -40,7 +40,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
 | Feature | Description |
 |---------|-------------|
-| MongoDB Backend | Persistent storage with configurable sync |
+| Multi-Backend Persistence | MongoDB, SQLite, PostgreSQL, RocksDB, or in-memory |
 | ZooKeeper Replication | Automatic primary/secondary failover |
 | Autoload | Bulk CSV/JSON import with metadata |
 | CSV Export | Export regions and query results |
@@ -54,7 +54,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 ### Prerequisites
 
 - Java 17 or higher
-- MongoDB 5.0 or higher
+- One of: MongoDB 5.0+, PostgreSQL 14+, or local file system for SQLite/RocksDB
 - Maven 3.8 or higher
 - ZooKeeper 3.8+ (optional, for replication)
 

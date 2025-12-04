@@ -11,7 +11,6 @@
  */
 package com.kuber.server.persistence;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.kuber.core.constants.KuberConstants;
 import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheRegion;
@@ -20,43 +19,56 @@ import com.kuber.server.config.KuberProperties;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Repository;
 
-import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
- * MongoDB repository for persisting cache data.
- * Each region maps to a separate collection.
- * Only activated when kuber.persistence.type=mongodb (default).
+ * MongoDB implementation of PersistenceStore.
  */
 @Slf4j
-@Repository
-@RequiredArgsConstructor
-@ConditionalOnProperty(name = "kuber.persistence.type", havingValue = "mongodb", matchIfMissing = true)
-public class MongoRepository {
+public class MongoPersistenceStore extends AbstractPersistenceStore {
     
     private final MongoDatabase database;
     private final KuberProperties properties;
     
-    @PostConstruct
+    public MongoPersistenceStore(MongoDatabase database, KuberProperties properties) {
+        this.database = database;
+        this.properties = properties;
+    }
+    
+    @Override
+    public PersistenceType getType() {
+        return PersistenceType.MONGODB;
+    }
+    
+    @Override
     public void initialize() {
-        log.info("Initializing MongoDB repository...");
+        log.info("Initializing MongoDB persistence store...");
         
-        // Create indexes for system collections
-        createIndexes(KuberConstants.MONGO_REGIONS_COLLECTION,
-                Indexes.ascending("name"));
-        
-        log.info("MongoDB repository initialized");
+        try {
+            // Create indexes for system collections
+            createIndexes(KuberConstants.MONGO_REGIONS_COLLECTION,
+                    Indexes.ascending("name"));
+            
+            available = true;
+            log.info("MongoDB persistence store initialized successfully");
+        } catch (Exception e) {
+            log.error("Failed to initialize MongoDB persistence store: {}", e.getMessage(), e);
+            available = false;
+        }
+    }
+    
+    @Override
+    public void shutdown() {
+        log.info("Shutting down MongoDB persistence store...");
+        available = false;
+        // MongoDatabase is managed by Spring, no explicit close needed
     }
     
     private void createIndexes(String collectionName, Bson... indexes) {
@@ -72,6 +84,7 @@ public class MongoRepository {
     
     // ==================== Region Operations ====================
     
+    @Override
     public void saveRegion(CacheRegion region) {
         log.info("Saving region '{}' to MongoDB collection '{}'", region.getName(), KuberConstants.MONGO_REGIONS_COLLECTION);
         
@@ -118,6 +131,7 @@ public class MongoRepository {
         }
     }
     
+    @Override
     public List<CacheRegion> loadAllRegions() {
         log.info("Loading all regions from MongoDB collection '{}'", KuberConstants.MONGO_REGIONS_COLLECTION);
         
@@ -134,12 +148,14 @@ public class MongoRepository {
         return regions;
     }
     
+    @Override
     public CacheRegion loadRegion(String name) {
         MongoCollection<Document> collection = database.getCollection(KuberConstants.MONGO_REGIONS_COLLECTION);
         Document doc = collection.find(Filters.eq("name", name)).first();
         return doc != null ? documentToRegion(doc) : null;
     }
     
+    @Override
     public void deleteRegion(String name) {
         // Delete region metadata
         MongoCollection<Document> collection = database.getCollection(KuberConstants.MONGO_REGIONS_COLLECTION);
@@ -149,7 +165,7 @@ public class MongoRepository {
         if (regionDoc != null) {
             String collectionName = regionDoc.getString("collectionName");
             if (collectionName == null) {
-                collectionName = "kuber_" + name.toLowerCase().replaceAll("[^a-z0-9_]", "_");
+                collectionName = getCollectionName(name);
             }
             try {
                 database.getCollection(collectionName).drop();
@@ -159,6 +175,7 @@ public class MongoRepository {
         }
     }
     
+    @Override
     public void purgeRegion(String name) {
         CacheRegion region = loadRegion(name);
         if (region != null) {
@@ -183,25 +200,9 @@ public class MongoRepository {
                 .build();
     }
     
-    /**
-     * Convert MongoDB date field to Instant.
-     * MongoDB stores dates as java.util.Date, need to convert to Instant.
-     */
-    private Instant toInstant(Object dateObj) {
-        if (dateObj == null) {
-            return null;
-        }
-        if (dateObj instanceof Instant) {
-            return (Instant) dateObj;
-        }
-        if (dateObj instanceof java.util.Date) {
-            return ((java.util.Date) dateObj).toInstant();
-        }
-        return null;
-    }
-    
     // ==================== Entry Operations ====================
     
+    @Override
     public void saveEntry(CacheEntry entry) {
         String collectionName = getCollectionName(entry.getRegion());
         MongoCollection<Document> collection = database.getCollection(collectionName);
@@ -215,11 +216,7 @@ public class MongoRepository {
         );
     }
     
-    @Async
-    public CompletableFuture<Void> saveEntryAsync(CacheEntry entry) {
-        return CompletableFuture.runAsync(() -> saveEntry(entry));
-    }
-    
+    @Override
     public void saveEntries(List<CacheEntry> entries) {
         if (entries.isEmpty()) {
             return;
@@ -227,7 +224,7 @@ public class MongoRepository {
         
         // Group by region
         entries.stream()
-                .collect(java.util.stream.Collectors.groupingBy(CacheEntry::getRegion))
+                .collect(Collectors.groupingBy(CacheEntry::getRegion))
                 .forEach((region, regionEntries) -> {
                     String collectionName = getCollectionName(region);
                     MongoCollection<Document> collection = database.getCollection(collectionName);
@@ -247,6 +244,7 @@ public class MongoRepository {
                 });
     }
     
+    @Override
     public CacheEntry loadEntry(String region, String key) {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);
@@ -255,6 +253,7 @@ public class MongoRepository {
         return doc != null ? documentToEntry(doc, region) : null;
     }
     
+    @Override
     public List<CacheEntry> loadEntries(String region, int limit) {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);
@@ -268,16 +267,38 @@ public class MongoRepository {
         return entries;
     }
     
+    @Override
     public void deleteEntry(String region, String key) {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);
         collection.deleteOne(Filters.eq("key", key));
     }
     
+    @Override
     public void deleteEntries(String region, List<String> keys) {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);
         collection.deleteMany(Filters.in("key", keys));
+    }
+    
+    @Override
+    public long countEntries(String region) {
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        return collection.countDocuments();
+    }
+    
+    @Override
+    public List<String> getKeys(String region, String pattern, int limit) {
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        List<String> keys = new ArrayList<>();
+        collection.find()
+                .projection(Projections.include("key"))
+                .forEach(doc -> keys.add(doc.getString("key")));
+        
+        return filterKeys(keys, pattern, limit);
     }
     
     private Document entryToDocument(CacheEntry entry) {
@@ -322,10 +343,5 @@ public class MongoRepository {
         }
         
         return builder.build();
-    }
-    
-    private String getCollectionName(String region) {
-        return KuberConstants.MONGO_COLLECTION_PREFIX + 
-               region.toLowerCase().replaceAll("[^a-z0-9_]", "_");
     }
 }

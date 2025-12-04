@@ -6,8 +6,8 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="kuber-client-java" />
         <module name="kuber-server" />
+        <module name="kuber-client-java" />
         <module name="kuber-core" />
       </profile>
     </annotationProcessing>

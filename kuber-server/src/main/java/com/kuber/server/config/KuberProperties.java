@@ -50,6 +50,11 @@ public class KuberProperties {
     private Mongo mongo = new Mongo();
     
     /**
+     * Persistence configuration
+     */
+    private Persistence persistence = new Persistence();
+    
+    /**
      * ZooKeeper configuration
      */
     private Zookeeper zookeeper = new Zookeeper();
@@ -331,5 +336,93 @@ public class KuberProperties {
          * File encoding
          */
         private String fileEncoding = "UTF-8";
+    }
+    
+    @Data
+    public static class Persistence {
+        /**
+         * Persistence store type: mongodb, sqlite, postgresql, rocksdb, memory
+         */
+        @NotBlank
+        private String type = "mongodb";
+        
+        /**
+         * SQLite configuration
+         */
+        private Sqlite sqlite = new Sqlite();
+        
+        /**
+         * PostgreSQL configuration
+         */
+        private Postgresql postgresql = new Postgresql();
+        
+        /**
+         * RocksDB configuration
+         */
+        private Rocksdb rocksdb = new Rocksdb();
+    }
+    
+    @Data
+    public static class Sqlite {
+        /**
+         * Path to SQLite database file
+         */
+        private String path = "./data/kuber.db";
+    }
+    
+    @Data
+    public static class Postgresql {
+        /**
+         * PostgreSQL JDBC URL
+         */
+        private String url = "jdbc:postgresql://localhost:5432/kuber";
+        
+        /**
+         * Database username
+         */
+        private String username = "kuber";
+        
+        /**
+         * Database password
+         */
+        private String password = "kuber";
+        
+        /**
+         * Connection pool size
+         */
+        @Min(1)
+        private int poolSize = 10;
+        
+        /**
+         * Minimum idle connections
+         */
+        @Min(1)
+        private int minIdle = 2;
+        
+        /**
+         * Connection timeout in milliseconds
+         */
+        @Min(1000)
+        private long connectionTimeoutMs = 30000;
+        
+        /**
+         * Idle timeout in milliseconds
+         */
+        @Min(10000)
+        private long idleTimeoutMs = 600000;
+        
+        /**
+         * Maximum connection lifetime in milliseconds
+         */
+        @Min(30000)
+        private long maxLifetimeMs = 1800000;
+    }
+    
+    @Data
+    public static class Rocksdb {
+        /**
+         * Path to RocksDB database directory
+         */
+        private String path = "./data/rocksdb";
     }
 }

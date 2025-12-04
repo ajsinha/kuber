@@ -1,0 +1,527 @@
+/*
+ * Copyright © 2025-2030, All Rights Reserved
+ * Ashutosh Sinha | Email: ajsinha@gmail.com
+ *
+ * Legal Notice: This module and the associated software architecture are proprietary
+ * and confidential. Unauthorized copying, distribution, modification, or use is
+ * strictly prohibited without explicit written permission from the copyright holder.
+ *
+ * Patent Pending: Certain architectural patterns and implementations described in
+ * this module may be subject to patent applications.
+ */
+package com.kuber.server.persistence;
+
+import com.kuber.core.model.CacheEntry;
+import com.kuber.core.model.CacheRegion;
+import com.kuber.core.util.JsonUtils;
+import com.kuber.server.config.KuberProperties;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import lombok.extern.slf4j.Slf4j;
+
+import java.sql.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * PostgreSQL implementation of PersistenceStore.
+ * Uses JSONB for efficient JSON storage and querying.
+ */
+@Slf4j
+public class PostgresPersistenceStore extends AbstractPersistenceStore {
+    
+    private final KuberProperties properties;
+    private HikariDataSource dataSource;
+    
+    public PostgresPersistenceStore(KuberProperties properties) {
+        this.properties = properties;
+    }
+    
+    @Override
+    public PersistenceType getType() {
+        return PersistenceType.POSTGRESQL;
+    }
+    
+    @Override
+    public void initialize() {
+        KuberProperties.Postgresql pgProps = properties.getPersistence().getPostgresql();
+        log.info("Initializing PostgreSQL persistence store at: {}", pgProps.getUrl());
+        
+        try {
+            // Configure HikariCP connection pool
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(pgProps.getUrl());
+            config.setUsername(pgProps.getUsername());
+            config.setPassword(pgProps.getPassword());
+            config.setMaximumPoolSize(pgProps.getPoolSize());
+            config.setMinimumIdle(pgProps.getMinIdle());
+            config.setConnectionTimeout(pgProps.getConnectionTimeoutMs());
+            config.setIdleTimeout(pgProps.getIdleTimeoutMs());
+            config.setMaxLifetime(pgProps.getMaxLifetimeMs());
+            config.setPoolName("kuber-postgres-pool");
+            
+            dataSource = new HikariDataSource(config);
+            
+            // Create tables
+            createTables();
+            
+            available = true;
+            log.info("PostgreSQL persistence store initialized successfully");
+        } catch (Exception e) {
+            log.error("Failed to initialize PostgreSQL persistence store: {}", e.getMessage(), e);
+            available = false;
+        }
+    }
+    
+    @Override
+    public void shutdown() {
+        log.info("Shutting down PostgreSQL persistence store...");
+        available = false;
+        
+        if (dataSource != null && !dataSource.isClosed()) {
+            dataSource.close();
+        }
+    }
+    
+    private Connection getConnection() throws SQLException {
+        return dataSource.getConnection();
+    }
+    
+    private void createTables() throws SQLException {
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+            
+            // Regions table
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS kuber_regions (
+                    name VARCHAR(255) PRIMARY KEY,
+                    description TEXT,
+                    captive BOOLEAN DEFAULT FALSE,
+                    max_entries BIGINT DEFAULT -1,
+                    default_ttl_seconds BIGINT DEFAULT -1,
+                    entry_count BIGINT DEFAULT 0,
+                    created_at TIMESTAMP WITH TIME ZONE,
+                    updated_at TIMESTAMP WITH TIME ZONE,
+                    created_by VARCHAR(255),
+                    enabled BOOLEAN DEFAULT TRUE,
+                    collection_name VARCHAR(255)
+                )
+            """);
+            
+            // Entries table with JSONB for json_value
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS kuber_entries (
+                    region VARCHAR(255) NOT NULL,
+                    key VARCHAR(1024) NOT NULL,
+                    value_type VARCHAR(50) NOT NULL,
+                    string_value TEXT,
+                    json_value JSONB,
+                    ttl_seconds BIGINT DEFAULT -1,
+                    created_at TIMESTAMP WITH TIME ZONE,
+                    updated_at TIMESTAMP WITH TIME ZONE,
+                    expires_at TIMESTAMP WITH TIME ZONE,
+                    version BIGINT DEFAULT 1,
+                    access_count BIGINT DEFAULT 0,
+                    last_accessed_at TIMESTAMP WITH TIME ZONE,
+                    metadata TEXT,
+                    PRIMARY KEY (region, key)
+                )
+            """);
+            
+            // Create indexes
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_entries_region ON kuber_entries(region)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_entries_expires ON kuber_entries(expires_at)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_entries_json ON kuber_entries USING GIN (json_value)");
+        }
+    }
+    
+    // ==================== Region Operations ====================
+    
+    @Override
+    public void saveRegion(CacheRegion region) {
+        String sql = """
+            INSERT INTO kuber_regions 
+            (name, description, captive, max_entries, default_ttl_seconds, entry_count, 
+             created_at, updated_at, created_by, enabled, collection_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (name) DO UPDATE SET
+                description = EXCLUDED.description,
+                captive = EXCLUDED.captive,
+                max_entries = EXCLUDED.max_entries,
+                default_ttl_seconds = EXCLUDED.default_ttl_seconds,
+                entry_count = EXCLUDED.entry_count,
+                updated_at = EXCLUDED.updated_at,
+                enabled = EXCLUDED.enabled,
+                collection_name = EXCLUDED.collection_name
+        """;
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, region.getName());
+            stmt.setString(2, region.getDescription());
+            stmt.setBoolean(3, region.isCaptive());
+            stmt.setLong(4, region.getMaxEntries());
+            stmt.setLong(5, region.getDefaultTtlSeconds());
+            stmt.setLong(6, region.getEntryCount());
+            stmt.setTimestamp(7, toTimestamp(region.getCreatedAt()));
+            stmt.setTimestamp(8, toTimestamp(region.getUpdatedAt()));
+            stmt.setString(9, region.getCreatedBy());
+            stmt.setBoolean(10, region.isEnabled());
+            stmt.setString(11, region.getCollectionName());
+            stmt.executeUpdate();
+            
+            log.info("Saved region '{}' to PostgreSQL", region.getName());
+        } catch (SQLException e) {
+            log.error("Failed to save region '{}': {}", region.getName(), e.getMessage(), e);
+            throw new RuntimeException("Failed to save region", e);
+        }
+    }
+    
+    @Override
+    public List<CacheRegion> loadAllRegions() {
+        List<CacheRegion> regions = new ArrayList<>();
+        String sql = "SELECT * FROM kuber_regions";
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                regions.add(resultSetToRegion(rs));
+            }
+            
+            log.info("Loaded {} regions from PostgreSQL", regions.size());
+        } catch (SQLException e) {
+            log.error("Failed to load regions: {}", e.getMessage(), e);
+        }
+        
+        return regions;
+    }
+    
+    @Override
+    public CacheRegion loadRegion(String name) {
+        String sql = "SELECT * FROM kuber_regions WHERE name = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, name);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return resultSetToRegion(rs);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to load region '{}': {}", name, e.getMessage(), e);
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public void deleteRegion(String name) {
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            
+            try {
+                // Delete all entries in the region
+                try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM kuber_entries WHERE region = ?")) {
+                    stmt.setString(1, name);
+                    stmt.executeUpdate();
+                }
+                
+                // Delete the region
+                try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM kuber_regions WHERE name = ?")) {
+                    stmt.setString(1, name);
+                    stmt.executeUpdate();
+                }
+                
+                conn.commit();
+                log.info("Deleted region '{}' from PostgreSQL", name);
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            log.error("Failed to delete region '{}': {}", name, e.getMessage(), e);
+            throw new RuntimeException("Failed to delete region", e);
+        }
+    }
+    
+    @Override
+    public void purgeRegion(String name) {
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement("DELETE FROM kuber_entries WHERE region = ?")) {
+            
+            stmt.setString(1, name);
+            int deleted = stmt.executeUpdate();
+            log.info("Purged {} entries from region '{}' in PostgreSQL", deleted, name);
+        } catch (SQLException e) {
+            log.error("Failed to purge region '{}': {}", name, e.getMessage(), e);
+            throw new RuntimeException("Failed to purge region", e);
+        }
+    }
+    
+    private CacheRegion resultSetToRegion(ResultSet rs) throws SQLException {
+        return CacheRegion.builder()
+                .name(rs.getString("name"))
+                .description(rs.getString("description"))
+                .captive(rs.getBoolean("captive"))
+                .maxEntries(rs.getLong("max_entries"))
+                .defaultTtlSeconds(rs.getLong("default_ttl_seconds"))
+                .entryCount(rs.getLong("entry_count"))
+                .createdAt(toInstant(rs.getTimestamp("created_at")))
+                .updatedAt(toInstant(rs.getTimestamp("updated_at")))
+                .createdBy(rs.getString("created_by"))
+                .enabled(rs.getBoolean("enabled"))
+                .collectionName(rs.getString("collection_name"))
+                .build();
+    }
+    
+    // ==================== Entry Operations ====================
+    
+    @Override
+    public void saveEntry(CacheEntry entry) {
+        String sql = """
+            INSERT INTO kuber_entries 
+            (region, key, value_type, string_value, json_value, ttl_seconds, 
+             created_at, updated_at, expires_at, version, access_count, last_accessed_at, metadata)
+            VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (region, key) DO UPDATE SET
+                value_type = EXCLUDED.value_type,
+                string_value = EXCLUDED.string_value,
+                json_value = EXCLUDED.json_value,
+                ttl_seconds = EXCLUDED.ttl_seconds,
+                updated_at = EXCLUDED.updated_at,
+                expires_at = EXCLUDED.expires_at,
+                version = EXCLUDED.version,
+                access_count = EXCLUDED.access_count,
+                last_accessed_at = EXCLUDED.last_accessed_at,
+                metadata = EXCLUDED.metadata
+        """;
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            setEntryParameters(stmt, entry);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Failed to save entry '{}' in region '{}': {}", entry.getKey(), entry.getRegion(), e.getMessage(), e);
+            throw new RuntimeException("Failed to save entry", e);
+        }
+    }
+    
+    @Override
+    public void saveEntries(List<CacheEntry> entries) {
+        if (entries.isEmpty()) {
+            return;
+        }
+        
+        String sql = """
+            INSERT INTO kuber_entries 
+            (region, key, value_type, string_value, json_value, ttl_seconds, 
+             created_at, updated_at, expires_at, version, access_count, last_accessed_at, metadata)
+            VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (region, key) DO UPDATE SET
+                value_type = EXCLUDED.value_type,
+                string_value = EXCLUDED.string_value,
+                json_value = EXCLUDED.json_value,
+                ttl_seconds = EXCLUDED.ttl_seconds,
+                updated_at = EXCLUDED.updated_at,
+                expires_at = EXCLUDED.expires_at,
+                version = EXCLUDED.version,
+                access_count = EXCLUDED.access_count,
+                last_accessed_at = EXCLUDED.last_accessed_at,
+                metadata = EXCLUDED.metadata
+        """;
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            for (CacheEntry entry : entries) {
+                setEntryParameters(stmt, entry);
+                stmt.addBatch();
+            }
+            stmt.executeBatch();
+            log.debug("Saved {} entries to PostgreSQL", entries.size());
+        } catch (SQLException e) {
+            log.error("Failed to save entries: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to save entries", e);
+        }
+    }
+    
+    private void setEntryParameters(PreparedStatement stmt, CacheEntry entry) throws SQLException {
+        stmt.setString(1, entry.getRegion());
+        stmt.setString(2, entry.getKey());
+        stmt.setString(3, entry.getValueType().name());
+        stmt.setString(4, entry.getStringValue());
+        stmt.setString(5, entry.getJsonValue() != null ? JsonUtils.toJson(entry.getJsonValue()) : null);
+        stmt.setLong(6, entry.getTtlSeconds());
+        stmt.setTimestamp(7, toTimestamp(entry.getCreatedAt()));
+        stmt.setTimestamp(8, toTimestamp(entry.getUpdatedAt()));
+        stmt.setTimestamp(9, toTimestamp(entry.getExpiresAt()));
+        stmt.setLong(10, entry.getVersion());
+        stmt.setLong(11, entry.getAccessCount());
+        stmt.setTimestamp(12, toTimestamp(entry.getLastAccessedAt()));
+        stmt.setString(13, entry.getMetadata());
+    }
+    
+    @Override
+    public CacheEntry loadEntry(String region, String key) {
+        String sql = "SELECT * FROM kuber_entries WHERE region = ? AND key = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, region);
+            stmt.setString(2, key);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return resultSetToEntry(rs);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to load entry '{}' from region '{}': {}", key, region, e.getMessage(), e);
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public List<CacheEntry> loadEntries(String region, int limit) {
+        List<CacheEntry> entries = new ArrayList<>();
+        String sql = "SELECT * FROM kuber_entries WHERE region = ? ORDER BY updated_at DESC LIMIT ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, region);
+            stmt.setInt(2, limit);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    entries.add(resultSetToEntry(rs));
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to load entries from region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return entries;
+    }
+    
+    @Override
+    public void deleteEntry(String region, String key) {
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement("DELETE FROM kuber_entries WHERE region = ? AND key = ?")) {
+            
+            stmt.setString(1, region);
+            stmt.setString(2, key);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Failed to delete entry '{}' from region '{}': {}", key, region, e.getMessage(), e);
+            throw new RuntimeException("Failed to delete entry", e);
+        }
+    }
+    
+    @Override
+    public void deleteEntries(String region, List<String> keys) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        
+        String placeholders = String.join(",", keys.stream().map(k -> "?").toList());
+        String sql = "DELETE FROM kuber_entries WHERE region = ? AND key IN (" + placeholders + ")";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, region);
+            for (int i = 0; i < keys.size(); i++) {
+                stmt.setString(i + 2, keys.get(i));
+            }
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Failed to delete entries from region '{}': {}", region, e.getMessage(), e);
+            throw new RuntimeException("Failed to delete entries", e);
+        }
+    }
+    
+    @Override
+    public long countEntries(String region) {
+        String sql = "SELECT COUNT(*) FROM kuber_entries WHERE region = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, region);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to count entries in region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return 0;
+    }
+    
+    @Override
+    public List<String> getKeys(String region, String pattern, int limit) {
+        List<String> keys = new ArrayList<>();
+        String sql = "SELECT key FROM kuber_entries WHERE region = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, region);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    keys.add(rs.getString("key"));
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to get keys from region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return filterKeys(keys, pattern, limit);
+    }
+    
+    private CacheEntry resultSetToEntry(ResultSet rs) throws SQLException {
+        CacheEntry.CacheEntryBuilder builder = CacheEntry.builder()
+                .region(rs.getString("region"))
+                .key(rs.getString("key"))
+                .valueType(CacheEntry.ValueType.valueOf(rs.getString("value_type")))
+                .stringValue(rs.getString("string_value"))
+                .ttlSeconds(rs.getLong("ttl_seconds"))
+                .createdAt(toInstant(rs.getTimestamp("created_at")))
+                .updatedAt(toInstant(rs.getTimestamp("updated_at")))
+                .expiresAt(toInstant(rs.getTimestamp("expires_at")))
+                .version(rs.getLong("version"))
+                .accessCount(rs.getLong("access_count"))
+                .lastAccessedAt(toInstant(rs.getTimestamp("last_accessed_at")))
+                .metadata(rs.getString("metadata"));
+        
+        String jsonValue = rs.getString("json_value");
+        if (jsonValue != null) {
+            builder.jsonValue(JsonUtils.parse(jsonValue));
+        }
+        
+        return builder.build();
+    }
+    
+    private Timestamp toTimestamp(Instant instant) {
+        return instant != null ? Timestamp.from(instant) : null;
+    }
+    
+    private Instant toInstant(Timestamp timestamp) {
+        return timestamp != null ? timestamp.toInstant() : null;
+    }
+}
