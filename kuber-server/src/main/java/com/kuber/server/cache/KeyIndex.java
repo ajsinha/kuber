@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * In-memory key index for a single region.
+ * In-memory key index for a single region (ON-HEAP).
  * 
  * This class maintains an index of ALL keys in a region, enabling:
  * - O(1) key existence checks
@@ -35,10 +35,12 @@ import java.util.stream.Collectors;
  * 
  * Thread-safe using ConcurrentHashMap.
  * 
- * @version 1.2.1
+ * For off-heap storage, use OffHeapKeyIndex instead.
+ * 
+ * @version 1.2.2
  */
 @Slf4j
-public class KeyIndex {
+public class KeyIndex implements KeyIndexInterface {
     
     private final String region;
     private final ConcurrentHashMap<String, KeyIndexEntry> index;

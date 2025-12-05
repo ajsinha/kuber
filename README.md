@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.2.1
+Version 1.2.2
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,6 +13,7 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
+- **Off-Heap Key Index (v1.2.2)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
 - **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
 - **Redis Protocol Compatibility**: Connect using any Redis client
 - **Region-Based Organization**: Logical isolation with dedicated database per region

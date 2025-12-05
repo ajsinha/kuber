@@ -38,7 +38,7 @@ import java.util.*;
  * - Startup is slightly longer but runtime performance is better
  * 
  * @author Ashutosh Sinha
- * @version 1.2.1
+ * @version 1.2.2
  */
 public class PreStartupCompaction {
     

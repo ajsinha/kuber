@@ -2,6 +2,58 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.2] - 2025-12-05 - OFF-HEAP KEY INDEX
+
+### Added
+- **Off-Heap Key Index**: Optional DRAM-based key storage outside Java heap
+  - Keys stored in direct ByteBuffer memory, not subject to GC
+  - Zero GC pressure for key storage - no heap scans during garbage collection
+  - Automatic buffer growth and compaction
+  - Configurable initial and maximum buffer sizes
+  - Proper memory cleanup on shutdown
+
+- **Configuration Options**:
+  ```yaml
+  kuber:
+    cache:
+      off-heap-key-index: true  # Enable off-heap key storage
+      off-heap-key-index-initial-size-mb: 16  # Initial buffer per region
+      off-heap-key-index-max-size-mb: 1024  # Max buffer per region
+  ```
+
+- **KeyIndexInterface**: Abstraction layer for pluggable key storage implementations
+  - `KeyIndex`: On-heap implementation (default, uses ConcurrentHashMap)
+  - `OffHeapKeyIndex`: Off-heap implementation (uses direct ByteBuffer)
+
+- **Extended Autoload File Format Support**:
+  - **TXT files**: Now supported with `.txt` extension (processed identically to CSV)
+
+- **Composite Key Support in Autoload**: Support for composite keys in data file loading
+  - Use "/" separator in `key_field` to specify multiple fields: `key_field:country/state/city`
+  - Values are extracted and joined with "/" delimiter: `US/CA/Los Angeles`
+  - Optional `key_delimiter` to customize the join character (default: "/")
+  - Works for CSV, TXT, and JSON file formats
+
+  Example metadata file:
+  ```
+  region:locations
+  ttl:3600
+  key_field:country/state/city
+  key_delimiter:/
+  ```
+
+### Performance Benefits
+| Scenario | On-Heap | Off-Heap | Benefit |
+|----------|---------|----------|---------|
+| 1M keys | ~500MB heap | ~50MB heap + 80MB DRAM | 90% less GC pressure |
+| GC pauses | May affect key ops | No impact on keys | More predictable latency |
+| Max keys | Limited by heap | Limited by DRAM | Can scale further |
+
+### Changed
+- CacheService now uses `KeyIndexInterface` for flexibility
+- Server info includes off-heap memory usage when enabled
+- Shutdown properly releases off-heap memory
+
 ## [1.2.1] - 2025-12-05 - HYBRID MEMORY ARCHITECTURE
 
 ### Added

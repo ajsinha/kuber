@@ -158,6 +158,32 @@ public class KuberProperties {
         private java.util.Map<String, Integer> regionMemoryLimits = new java.util.HashMap<>();
         
         /**
+         * Use off-heap (direct memory) for key index storage.
+         * When enabled, keys are stored in DRAM outside the Java heap, providing:
+         * - Zero GC pressure for key storage
+         * - Better scalability for millions of keys
+         * - No GC pauses affecting key lookups
+         * 
+         * Default: false (use on-heap ConcurrentHashMap)
+         */
+        private boolean offHeapKeyIndex = false;
+        
+        /**
+         * Initial size in MB for off-heap key index per region.
+         * Only used when offHeapKeyIndex is enabled.
+         * The buffer grows automatically up to offHeapKeyIndexMaxSizeMb.
+         */
+        @Min(1)
+        private int offHeapKeyIndexInitialSizeMb = 16;
+        
+        /**
+         * Maximum size in MB for off-heap key index per region.
+         * Only used when offHeapKeyIndex is enabled.
+         */
+        @Min(16)
+        private int offHeapKeyIndexMaxSizeMb = 1024;
+        
+        /**
          * Whether to use persistent mode (sync writes to MongoDB)
          */
         private boolean persistentMode = false;

@@ -37,10 +37,16 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Service for automatically loading data from CSV and JSON files into the cache.
+ * Service for automatically loading data from CSV, TXT, and JSON files into the cache.
  * 
- * <p>Watches the configured autoload/inbox directory for data files (.csv, .json)
- * that have corresponding metadata files (.csv.metadata, .json.metadata).
+ * <p>Watches the configured autoload/inbox directory for data files (.csv, .txt, .json)
+ * that have corresponding metadata files (.csv.metadata, .txt.metadata, .json.metadata).
+ * 
+ * <p>Supported file formats:
+ * <ul>
+ *   <li><b>CSV/TXT</b>: Delimited text files with header row. TXT files are processed identically to CSV.</li>
+ *   <li><b>JSON</b>: JSONL format (one JSON object per line).</li>
+ * </ul>
  * 
  * <p>Metadata file format:
  * <pre>
@@ -48,10 +54,26 @@ import java.util.concurrent.atomic.AtomicLong;
  * ttl:60
  * key_field:id
  * delimiter:,
+ * key_delimiter:/
  * </pre>
  * 
- * <p>For CSV files, each row is converted to JSON using the header fields,
- * and the value from key_field column is used as the cache key.
+ * <p>Composite Key Support:
+ * <p>The key_field supports composite keys using "/" as separator:
+ * <pre>
+ * key_field:country/state/city
+ * </pre>
+ * <p>This will extract values from "country", "state", and "city" fields
+ * and join them with "/" to form keys like "US/CA/Los Angeles".
+ * 
+ * <p>The key_delimiter can be customized if needed (default is "/"):
+ * <pre>
+ * key_field:country/state/city
+ * key_delimiter:-
+ * </pre>
+ * <p>This would produce keys like "US-CA-Los Angeles".
+ * 
+ * <p>For CSV/TXT files, each row is converted to JSON using the header fields,
+ * and the value from key_field column(s) is used as the cache key.
  * 
  * <p>For JSON files, each line should be a complete JSON object,
  * and the value from key_field is used as the cache key.
@@ -189,7 +211,8 @@ public class AutoloadService {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(inboxPath)) {
                 for (Path file : stream) {
                     String fileName = file.getFileName().toString().toLowerCase();
-                    if ((fileName.endsWith(".csv") || fileName.endsWith(".json")) 
+                    if ((fileName.endsWith(".csv") || fileName.endsWith(".txt") || 
+                         fileName.endsWith(".json")) 
                             && !fileName.endsWith(".metadata")) {
                         pendingFiles++;
                         // Check if metadata file exists
@@ -260,7 +283,8 @@ public class AutoloadService {
             
             // Process based on file type
             ProcessingResult result;
-            if (fileName.toLowerCase().endsWith(".csv")) {
+            String fileNameLower = fileName.toLowerCase();
+            if (fileNameLower.endsWith(".csv") || fileNameLower.endsWith(".txt")) {
                 result = processCsvFile(dataFile, metadata);
             } else {
                 result = processJsonFile(dataFile, metadata);
@@ -367,6 +391,11 @@ public class AutoloadService {
                             metadata.setDelimiter(value.charAt(0));
                         }
                         break;
+                    case "key_delimiter":
+                        if (!value.isEmpty()) {
+                            metadata.setKeyDelimiter(value);
+                        }
+                        break;
                     default:
                         log.debug("Unknown metadata field: {}", key);
                 }
@@ -403,12 +432,26 @@ public class AutoloadService {
                 return result;
             }
             
-            // Check if key field exists in headers
-            if (!headers.contains(metadata.getKeyField())) {
-                log.error("Key field '{}' not found in CSV headers: {}", 
-                        metadata.getKeyField(), headers);
+            // Get key fields (supports composite keys with "/" separator)
+            List<String> keyFields = metadata.getKeyFields();
+            if (keyFields.isEmpty()) {
+                log.error("No key fields specified in metadata for file: {}", csvFile.getFileName());
                 result.setErrors(1);
                 return result;
+            }
+            
+            // Validate all key fields exist in headers
+            for (String keyField : keyFields) {
+                if (!headers.contains(keyField)) {
+                    log.error("Key field '{}' not found in CSV headers: {}", keyField, headers);
+                    result.setErrors(1);
+                    return result;
+                }
+            }
+            
+            if (metadata.isCompositeKey()) {
+                log.info("Using composite key from fields: {} (joined with '{}')", 
+                        keyFields, metadata.getKeyDelimiter());
             }
             
             int maxRecords = properties.getAutoload().getMaxRecordsPerFile();
@@ -438,10 +481,10 @@ public class AutoloadService {
                         }
                     }
                     
-                    // Get key value (use original key field name, not mapped)
-                    String keyValue = record.get(metadata.getKeyField());
+                    // Build key value (single or composite)
+                    String keyValue = buildCompositeKeyFromCsvRecord(record, keyFields, metadata.getKeyDelimiter());
                     if (keyValue == null || keyValue.isBlank()) {
-                        log.debug("Skipping record {} - empty key field", record.getRecordNumber());
+                        log.debug("Skipping record {} - empty key field(s)", record.getRecordNumber());
                         result.incrementSkipped();
                         continue;
                     }
@@ -470,6 +513,27 @@ public class AutoloadService {
     }
     
     /**
+     * Build composite key from CSV record by extracting values for each key field
+     * and joining them with the specified delimiter.
+     * 
+     * @param record the CSV record
+     * @param keyFields list of field names (e.g., ["country", "state", "city"])
+     * @param delimiter the delimiter to join values (e.g., "/")
+     * @return composite key (e.g., "US/CA/Los Angeles") or null if any field is empty
+     */
+    private String buildCompositeKeyFromCsvRecord(CSVRecord record, List<String> keyFields, String delimiter) {
+        List<String> values = new ArrayList<>();
+        for (String field : keyFields) {
+            String value = record.get(field);
+            if (value == null || value.isBlank()) {
+                return null; // All parts of composite key must have values
+            }
+            values.add(value.trim());
+        }
+        return String.join(delimiter, values);
+    }
+    
+    /**
      * Process a JSON file (one JSON object per line - JSONL format).
      */
     private ProcessingResult processJsonFile(Path jsonFile, AutoloadMetadata metadata) throws IOException {
@@ -480,6 +544,19 @@ public class AutoloadService {
         int maxRecords = properties.getAutoload().getMaxRecordsPerFile();
         int recordCount = 0;
         int lineNumber = 0;
+        
+        // Get key fields (supports composite keys with "/" separator)
+        List<String> keyFields = metadata.getKeyFields();
+        if (keyFields.isEmpty()) {
+            log.error("No key fields specified in metadata for file: {}", jsonFile.getFileName());
+            result.setErrors(1);
+            return result;
+        }
+        
+        if (metadata.isCompositeKey()) {
+            log.info("Using composite key from fields: {} (joined with '{}')", 
+                    keyFields, metadata.getKeyDelimiter());
+        }
         
         // Get attribute mapping if present
         Map<String, String> attrMapping = metadata.getAttributeMapping();
@@ -509,18 +586,10 @@ public class AutoloadService {
                         continue;
                     }
                     
-                    // Get key value (use original key field name, not mapped)
-                    JsonNode keyNode = jsonNode.get(metadata.getKeyField());
-                    if (keyNode == null || keyNode.isNull()) {
-                        log.debug("Skipping line {} - missing key field '{}'", 
-                                lineNumber, metadata.getKeyField());
-                        result.incrementSkipped();
-                        continue;
-                    }
-                    
-                    String keyValue = keyNode.asText();
-                    if (keyValue.isBlank()) {
-                        log.debug("Skipping line {} - empty key field", lineNumber);
+                    // Build key value (single or composite)
+                    String keyValue = buildCompositeKeyFromJsonNode(jsonNode, keyFields, metadata.getKeyDelimiter());
+                    if (keyValue == null || keyValue.isBlank()) {
+                        log.debug("Skipping line {} - missing or empty key field(s)", lineNumber);
                         result.incrementSkipped();
                         continue;
                     }
@@ -551,6 +620,31 @@ public class AutoloadService {
         }
         
         return result;
+    }
+    
+    /**
+     * Build composite key from JSON node by extracting values for each key field
+     * and joining them with the specified delimiter.
+     * 
+     * @param jsonNode the JSON object
+     * @param keyFields list of field names (e.g., ["country", "state", "city"])
+     * @param delimiter the delimiter to join values (e.g., "/")
+     * @return composite key (e.g., "US/CA/Los Angeles") or null if any field is missing/empty
+     */
+    private String buildCompositeKeyFromJsonNode(JsonNode jsonNode, List<String> keyFields, String delimiter) {
+        List<String> values = new ArrayList<>();
+        for (String field : keyFields) {
+            JsonNode fieldNode = jsonNode.get(field);
+            if (fieldNode == null || fieldNode.isNull()) {
+                return null; // All parts of composite key must have values
+            }
+            String value = fieldNode.asText();
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            values.add(value.trim());
+        }
+        return String.join(delimiter, values);
     }
     
     /**
@@ -717,10 +811,37 @@ public class AutoloadService {
         private String keyField;
         private char delimiter = ',';
         /**
+         * Delimiter used to join composite key parts.
+         * Default is "/" (e.g., "US/CA/12345" for country/state/zipcode).
+         */
+        private String keyDelimiter = "/";
+        /**
          * Optional attribute mapping for JSON transformation.
          * Loaded from .metadata.attributemapping.json file if present.
          */
         private Map<String, String> attributeMapping;
+        
+        /**
+         * Parse key_field into list of field names.
+         * Supports "/" separated composite keys (e.g., "country/state/city").
+         * @return list of key field names, never null
+         */
+        public List<String> getKeyFields() {
+            if (keyField == null || keyField.isBlank()) {
+                return Collections.emptyList();
+            }
+            return Arrays.stream(keyField.split("/"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
+        
+        /**
+         * Check if this is a composite key (multiple fields separated by "/").
+         */
+        public boolean isCompositeKey() {
+            return getKeyFields().size() > 1;
+        }
     }
     
     /**

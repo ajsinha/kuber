@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.2.1</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.2.2</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -71,7 +71,7 @@
                         </div>
                         <h5 class="card-title">Multi-Backend Persistence</h5>
                         <p class="card-text text-muted">
-                            Choose your persistence backend: MongoDB, SQLite, PostgreSQL, or RocksDB. 
+                            Choose your persistence backend: RocksDB, LMDB, MongoDB, SQLite, or PostgreSQL. 
                             Each region gets its own dedicated database instance for maximum concurrency.
                         </p>
                     </div>
@@ -101,7 +101,7 @@
                         </div>
                         <h5 class="card-title">Region Isolation</h5>
                         <p class="card-text text-muted">
-                            Each region gets its own dedicated database instance (RocksDB/SQLite) for 
+                            Each region gets its own dedicated database instance (RocksDB/LMDB/SQLite) for 
                             better concurrency, isolation, and performance. Independent compaction per region.
                         </p>
                     </div>
@@ -131,7 +131,7 @@
                         </div>
                         <h5 class="card-title">Autoload</h5>
                         <p class="card-text text-muted">
-                            Bulk data import from CSV and JSON files. Drop files in inbox folder 
+                            Bulk data import from CSV, TXT, and JSON files. Drop files in inbox folder 
                             and <span th:text="${appName} ?: 'Kuber'">Kuber</span> automatically loads them into cache with configurable TTL and regions.
                         </p>
                     </div>
@@ -169,7 +169,7 @@
                                     </li>
                                     <li class="mb-3">
                                         <i class="fas fa-check-circle text-success me-2"></i>
-                                        <strong>Persistence Layer</strong> - MongoDB repository
+                                        <strong>Persistence Layer</strong> - RocksDB, LMDB, MongoDB, PostgreSQL, SQLite, Memory
                                     </li>
                                     <li class="mb-3">
                                         <i class="fas fa-check-circle text-success me-2"></i>
@@ -199,7 +199,7 @@
                                         </tr>
                                         <tr>
                                             <td><strong>Persistence</strong></td>
-                                            <td>MongoDB 4.x+</td>
+                                            <td>RocksDB (default), LMDB, MongoDB, PostgreSQL, SQLite</td>
                                         </tr>
                                         <tr>
                                             <td><strong>Coordination</strong></td>
@@ -306,8 +306,23 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.2.1</span>
-                                    <span class="text-muted small">Current - Major Release</span>
+                                    <span class="badge bg-primary me-2">v1.2.2</span>
+                                    <span class="text-muted small">Current - Off-Heap Key Index</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Off-Heap Key Index (DRAM)</strong>: Optional storage of keys in direct memory outside Java heap</li>
+                                    <li>Zero GC pressure for key storage - no heap scans for keys</li>
+                                    <li>Configurable via <code>kuber.cache.off-heap-key-index=true</code></li>
+                                    <li>Automatic buffer management with compaction</li>
+                                    <li>Proper memory cleanup on shutdown</li>
+                                    <li>KeyIndexInterface for pluggable key storage implementations</li>
+                                    <li><strong>TXT File Support</strong>: Autoload now supports .txt files (processed same as CSV)</li>
+                                    <li><strong>Composite Keys</strong>: Autoload supports composite keys with "/" separator</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.2.1</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Hybrid Memory Architecture</strong>: All keys always in memory (Aerospike-like)</li>
@@ -315,7 +330,6 @@
                                     <li>KeyIndex per region: tracks key metadata, TTL, value location</li>
                                     <li>Values can overflow to disk while keys stay in memory</li>
                                     <li>DBSIZE returns instant O(1) exact count from KeyIndex</li>
-                                    <li>Negative lookups are instant (key not in index = doesn't exist)</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
@@ -577,7 +591,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.2.1
+                                <strong>Version:</strong> 1.2.2
                             </li>
                         </ul>
                     </div>
