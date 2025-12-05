@@ -1415,7 +1415,7 @@ public class CacheService {
         Map<String, Object> info = new HashMap<>();
         
         info.put("nodeId", properties.getNodeId());
-        info.put("version", "1.1.13");
+        info.put("version", "1.1.14");
         info.put("regionCount", regions.size());
         info.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         info.put("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());

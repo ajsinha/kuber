@@ -180,33 +180,6 @@
             </div>
         </div>
         
-        <!-- Expiration Service Row -->
-        <div class="row g-4 mb-4">
-            <!-- Expiration Service Card -->
-            <div class="col-lg-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-clock me-2 text-warning"></i>
-                            TTL Expiration
-                        </h5>
-                        <button class="btn btn-sm btn-warning" onclick="triggerExpirationCleanup()" id="expireButton">
-                            <i class="fas fa-broom me-1"></i>Cleanup
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div id="expirationInfo">
-                            <div class="text-center py-4">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
         <!-- Charts Row -->
         <div class="row g-4 mb-4">
             <!-- Cache Activity Line Chart -->
@@ -772,34 +745,12 @@
             });
     }
     
-    // Trigger Expiration Cleanup
-    function triggerExpirationCleanup() {
-        const btn = document.getElementById('expireButton');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        
-        fetch('/api/monitoring/expiration/trigger', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-broom me-1"></i>Cleanup';
-                if (data.success) {
-                    alert('Cleaned up ' + data.deleted + ' expired entries from persistence');
-                }
-                loadExpirationInfo();
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-broom me-1"></i>Cleanup';
-            });
-    }
-    
-    // Refresh Expiration Info (for new card)
+    // Refresh Expiration Info
     function refreshExpirationInfo() {
         loadExpirationInfo();
     }
     
-    // Trigger Expiration (for new card)
+    // Trigger Expiration Cleanup
     function triggerExpiration() {
         const btn = document.getElementById('expirationBtn');
         btn.disabled = true;

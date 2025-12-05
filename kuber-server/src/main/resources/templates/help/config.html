@@ -31,7 +31,7 @@ kuber.persistence.rocksdb.compaction-interval-minutes=30
 # SQLite (each region gets separate database file)
 kuber.persistence.sqlite.path=./data/sqlite
 
-# Cache Memory Management (v1.1.13)
+# Cache Memory Management (v1.1.14)
 kuber.cache.max-memory-entries=100000           # Default per-region limit
 kuber.cache.global-max-memory-entries=500000    # Global cap across all regions (0=unlimited)
 kuber.cache.region-memory-limits.customers=50000   # Per-region override
@@ -44,17 +44,17 @@ kuber.autoload.directory=./data/autoload</code></pre>
                 
                 <div class="alert alert-info mt-3">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Region Isolation (v1.1.13):</strong> RocksDB and SQLite now use separate database instances per region for improved concurrency and isolation. Each region has its own directory/file under the configured path.
+                    <strong>Region Isolation (v1.1.14):</strong> RocksDB and SQLite now use separate database instances per region for improved concurrency and isolation. Each region has its own directory/file under the configured path.
                 </div>
                 
                 <div class="alert alert-success mt-3">
                     <i class="fas fa-memory me-2"></i>
-                    <strong>Smart Memory Allocation (v1.1.13):</strong> When <code>global-max-memory-entries</code> is set and total configured limits exceed the global cap, Kuber uses smart proportional allocation based on 50% configured limits and 50% actual data size.
+                    <strong>Smart Memory Allocation (v1.1.14):</strong> When <code>global-max-memory-entries</code> is set and total configured limits exceed the global cap, Kuber uses smart proportional allocation based on 50% configured limits and 50% actual data size.
                 </div>
                 
                 <div class="alert alert-warning mt-3">
                     <i class="fas fa-broom me-2"></i>
-                    <strong>Maintenance (v1.1.13):</strong> 
+                    <strong>Maintenance (v1.1.14):</strong> 
                     <ul class="mb-0 mt-2">
                         <li><strong>RocksDB:</strong> Compaction runs on cron schedule (default: <code>0 0 2 * * ?</code> = 2 AM daily) or trigger manually via API</li>
                         <li><strong>SQLite:</strong> Runs VACUUM on all databases during initialization to optimize storage</li>
@@ -72,7 +72,7 @@ kuber.autoload.directory=./data/autoload</code></pre>
                 
                 <div class="alert alert-primary mt-3">
                     <i class="fas fa-tachometer-alt me-2"></i>
-                    <strong>Fast Entry Counts (v1.1.13):</strong> Dashboard and UI pages use O(1) fast estimates from RocksDB native properties. This ensures instant page loads even with millions of entries. The counts are approximate but highly accurate for typical use cases.
+                    <strong>Fast Entry Counts (v1.1.14):</strong> Dashboard and UI pages use O(1) fast estimates from RocksDB native properties. This ensures instant page loads even with millions of entries. The counts are approximate but highly accurate for typical use cases.
                 </div>
                 
                 <h3 class="mt-4">Security</h3>
@@ -85,7 +85,7 @@ kuber.security.admin-password=admin123</code></pre>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.1.13</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.1.14</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>
