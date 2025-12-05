@@ -35,6 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Directory structure:
  * - {basePath}/{regionName}/ - Separate RocksDB instance for each region's entries
  * - {basePath}/{regionName}/_region.json - Region metadata file
+ * 
+ * @version 1.1.18
  */
 @Slf4j
 public class RocksDbPersistenceStore extends AbstractPersistenceStore {
@@ -132,8 +134,29 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         return true;
     }
     
+    // Lock for database creation to prevent race conditions
+    private final Object dbCreationLock = new Object();
+    
     private RocksDB getOrCreateRegionDatabase(String region) {
-        return regionDatabases.computeIfAbsent(region, this::openRegionDatabase);
+        // Fast path: check if already exists
+        RocksDB existingDb = regionDatabases.get(region);
+        if (existingDb != null) {
+            return existingDb;
+        }
+        
+        // Slow path: synchronized creation
+        synchronized (dbCreationLock) {
+            // Double-check after acquiring lock
+            existingDb = regionDatabases.get(region);
+            if (existingDb != null) {
+                return existingDb;
+            }
+            
+            // Create new database
+            RocksDB newDb = openRegionDatabase(region);
+            regionDatabases.put(region, newDb);
+            return newDb;
+        }
     }
     
     private RocksDB openRegionDatabase(String region) {
@@ -404,6 +427,51 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             log.error("Failed to load entry '{}' from region '{}': {}", key, region, e.getMessage(), e);
         }
         return null;
+    }
+    
+    @Override
+    public java.util.Map<String, CacheEntry> loadEntriesByKeys(String region, List<String> keys) {
+        java.util.Map<String, CacheEntry> result = new java.util.HashMap<>();
+        RocksDB regionDb = regionDatabases.get(region);
+        if (regionDb == null || keys.isEmpty()) return result;
+        
+        try {
+            // Convert keys to byte arrays
+            List<byte[]> keyBytes = new ArrayList<>(keys.size());
+            for (String key : keys) {
+                keyBytes.add(key.getBytes(StandardCharsets.UTF_8));
+            }
+            
+            // Use RocksDB multiGet for batch retrieval
+            List<byte[]> values = regionDb.multiGetAsList(keyBytes);
+            
+            // Process results
+            for (int i = 0; i < keys.size(); i++) {
+                byte[] value = values.get(i);
+                if (value != null) {
+                    try {
+                        String json = new String(value, StandardCharsets.UTF_8);
+                        Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                        CacheEntry entry = mapToEntry(map, region);
+                        if (entry != null) {
+                            result.put(keys.get(i), entry);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to parse entry for key '{}': {}", keys.get(i), e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to batch load entries from region '{}': {}", region, e.getMessage(), e);
+            // Fall back to individual loads
+            for (String key : keys) {
+                CacheEntry entry = loadEntry(region, key);
+                if (entry != null) {
+                    result.put(key, entry);
+                }
+            }
+        }
+        return result;
     }
     
     @Override

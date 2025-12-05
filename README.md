@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.1.14
+Version 1.1.18
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -19,8 +19,8 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Multi-Backend Persistence**: RocksDB (default), MongoDB, SQLite, PostgreSQL
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
-- **Automatic Compaction**: RocksDB compaction via cron schedule (default: 2 AM daily)
-- **SQLite Auto-Vacuum**: VACUUM on all SQLite databases at startup
+- **Pre-Startup Compaction**: RocksDB/SQLite optimized BEFORE Spring context loads
+- **Scheduled Compaction**: Additional cron-based compaction (default: 2 AM daily)
 - **Primary/Secondary Replication**: Automatic failover via ZooKeeper
 - **Autoload**: Bulk data import from CSV and JSON files
 - **Web Management UI**: Browser-based administration interface
@@ -47,9 +47,10 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 | Multi-Backend Persistence | RocksDB (default), MongoDB, SQLite, PostgreSQL, or in-memory |
 | Region Isolation | Separate database instance per region (RocksDB/SQLite) |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
-| Automatic Compaction | RocksDB compaction via cron schedule (default: 2 AM daily) or manual trigger |
+| Automatic Compaction | Pre-startup compaction before Spring + cron schedule (default: 2 AM daily) |
 | Smart Cache Priming | Loads most recently accessed entries first on restart |
 | Fast Entry Counts | O(1) entry estimation for dashboard - instant with millions of entries |
+| Custom Error Pages | Detailed error information with status-specific suggestions and stack traces |
 | SQLite Auto-Vacuum | Runs VACUUM on all SQLite databases at startup |
 | ZooKeeper Replication | Automatic primary/secondary failover |
 | Autoload | Bulk CSV/JSON import with metadata |

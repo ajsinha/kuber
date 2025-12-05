@@ -33,6 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * File structure:
  * - {basePath}/_metadata.db - SQLite database for region metadata
  * - {basePath}/{regionName}.db - Separate SQLite database for each region's entries
+ * 
+ * @version 1.1.18
  */
 @Slf4j
 public class SqlitePersistenceStore extends AbstractPersistenceStore {
@@ -84,8 +86,8 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
             // Discover and open existing region databases
             discoverExistingRegions();
             
-            // Run vacuum on all databases at startup to optimize storage
-            runStartupVacuum();
+            // Note: Startup vacuum is now handled by PreStartupCompaction
+            // which runs BEFORE Spring context initialization
             
             available = true;
             log.info("SQLite persistence store initialized successfully with {} region databases", 
@@ -177,8 +179,29 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
         return true;
     }
     
+    // Lock for connection creation to prevent race conditions
+    private final Object connCreationLock = new Object();
+    
     private Connection getOrCreateRegionConnection(String region) {
-        return regionConnections.computeIfAbsent(region, this::openRegionDatabase);
+        // Fast path: check if already exists
+        Connection existingConn = regionConnections.get(region);
+        if (existingConn != null) {
+            return existingConn;
+        }
+        
+        // Slow path: synchronized creation
+        synchronized (connCreationLock) {
+            // Double-check after acquiring lock
+            existingConn = regionConnections.get(region);
+            if (existingConn != null) {
+                return existingConn;
+            }
+            
+            // Create new connection
+            Connection newConn = openRegionDatabase(region);
+            regionConnections.put(region, newConn);
+            return newConn;
+        }
     }
     
     private Connection openRegionDatabase(String region) {
@@ -527,6 +550,45 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
         }
         
         return null;
+    }
+    
+    @Override
+    public java.util.Map<String, CacheEntry> loadEntriesByKeys(String region, List<String> keys) {
+        java.util.Map<String, CacheEntry> result = new java.util.HashMap<>();
+        Connection conn = regionConnections.get(region);
+        if (conn == null || keys.isEmpty()) return result;
+        
+        // Build SQL with IN clause for batch retrieval
+        StringBuilder sql = new StringBuilder("SELECT * FROM kuber_entries WHERE key IN (");
+        for (int i = 0; i < keys.size(); i++) {
+            sql.append(i > 0 ? ",?" : "?");
+        }
+        sql.append(")");
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < keys.size(); i++) {
+                stmt.setString(i + 1, keys.get(i));
+            }
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    CacheEntry entry = resultSetToEntry(rs, region);
+                    if (entry != null) {
+                        result.put(entry.getKey(), entry);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to batch load entries from region '{}': {}", region, e.getMessage(), e);
+            // Fall back to individual loads
+            for (String key : keys) {
+                CacheEntry entry = loadEntry(region, key);
+                if (entry != null) {
+                    result.put(key, entry);
+                }
+            }
+        }
+        return result;
     }
     
     @Override

@@ -95,6 +95,24 @@ public interface PersistenceStore {
     CacheEntry loadEntry(String region, String key);
     
     /**
+     * Load multiple cache entries by keys (batch operation).
+     * This is more efficient than calling loadEntry multiple times.
+     * @param region Region name
+     * @param keys List of keys to load
+     * @return Map of key to CacheEntry (missing keys are not included)
+     */
+    default java.util.Map<String, CacheEntry> loadEntriesByKeys(String region, java.util.List<String> keys) {
+        java.util.Map<String, CacheEntry> result = new java.util.HashMap<>();
+        for (String key : keys) {
+            CacheEntry entry = loadEntry(region, key);
+            if (entry != null) {
+                result.put(key, entry);
+            }
+        }
+        return result;
+    }
+    
+    /**
      * Load multiple cache entries from a region.
      * @param region Region name
      * @param limit Maximum number of entries to load

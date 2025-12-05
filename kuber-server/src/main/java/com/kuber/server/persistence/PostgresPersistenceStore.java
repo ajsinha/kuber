@@ -392,6 +392,47 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
     }
     
     @Override
+    public java.util.Map<String, CacheEntry> loadEntriesByKeys(String region, java.util.List<String> keys) {
+        java.util.Map<String, CacheEntry> result = new java.util.HashMap<>();
+        if (keys == null || keys.isEmpty()) return result;
+        
+        // Build SQL with IN clause for batch retrieval
+        StringBuilder sql = new StringBuilder("SELECT * FROM kuber_entries WHERE region = ? AND key IN (");
+        for (int i = 0; i < keys.size(); i++) {
+            sql.append(i > 0 ? ",?" : "?");
+        }
+        sql.append(")");
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            
+            stmt.setString(1, region);
+            for (int i = 0; i < keys.size(); i++) {
+                stmt.setString(i + 2, keys.get(i));
+            }
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    CacheEntry entry = resultSetToEntry(rs);
+                    if (entry != null) {
+                        result.put(entry.getKey(), entry);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to batch load entries from region '{}': {}", region, e.getMessage(), e);
+            // Fall back to individual loads
+            for (String key : keys) {
+                CacheEntry entry = loadEntry(region, key);
+                if (entry != null) {
+                    result.put(key, entry);
+                }
+            }
+        }
+        return result;
+    }
+    
+    @Override
     public List<CacheEntry> loadEntries(String region, int limit) {
         List<CacheEntry> entries = new ArrayList<>();
         // Order by last_accessed_at first (if exists), then by updated_at - most recently accessed entries first

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Error')}">
+    <title>Error - Kuber Cache</title>
+</head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-grow-1">
+    <div class="container py-5">
+        <!-- Error Header -->
+        <div class="row justify-content-center mb-4">
+            <div class="col-lg-8 text-center">
+                <!-- Error Icon based on status -->
+                <div class="mb-4">
+                    <i th:if="${status != null and status == 404}" class="fas fa-search fa-5x text-warning"></i>
+                    <i th:if="${status != null and status == 403}" class="fas fa-lock fa-5x text-danger"></i>
+                    <i th:if="${status != null and status == 401}" class="fas fa-user-lock fa-5x text-warning"></i>
+                    <i th:if="${status != null and status == 400}" class="fas fa-exclamation-circle fa-5x text-warning"></i>
+                    <i th:if="${status != null and status == 500}" class="fas fa-server fa-5x text-danger"></i>
+                    <i th:if="${status != null and (status == 502 or status == 503 or status == 504)}" class="fas fa-plug fa-5x text-danger"></i>
+                    <i th:if="${status == null or (status != 404 and status != 403 and status != 401 and status != 400 and status != 500 and status != 502 and status != 503 and status != 504)}" 
+                       class="fas fa-exclamation-triangle fa-5x text-danger"></i>
+                </div>
+                
+                <!-- Status Code -->
+                <h1 class="display-1 fw-bold" th:classappend="${status != null and status ge 500} ? 'text-danger' : 'text-warning'">
+                    <span th:if="${status != null}" th:text="${status}">500</span>
+                    <span th:if="${status == null}">500</span>
+                </h1>
+                
+                <!-- Error Title -->
+                <h2 class="mb-3">
+                    <span th:if="${errorTitle != null}" th:text="${errorTitle}">Error</span>
+                    <span th:if="${errorTitle == null and error != null}" th:text="${error}">Error</span>
+                    <span th:if="${errorTitle == null and error == null}">Something went wrong</span>
+                </h2>
+                
+                <!-- Error Message -->
+                <p class="lead text-muted">
+                    <span th:if="${message != null}" th:text="${message}">An unexpected error occurred.</span>
+                    <span th:if="${message == null}">An unexpected error occurred while processing your request.</span>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Error Details Card -->
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2 text-primary"></i>
+                            Error Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-4">Status Code</dt>
+                                    <dd class="col-sm-8">
+                                        <span class="badge" 
+                                              th:classappend="${status != null and status ge 500} ? 'bg-danger' : (${status != null and status ge 400} ? 'bg-warning text-dark' : 'bg-info')">
+                                            <span th:if="${status != null}" th:text="${status}">500</span>
+                                            <span th:if="${status == null}">Unknown</span>
+                                        </span>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Error</dt>
+                                    <dd class="col-sm-8">
+                                        <span th:if="${error != null}" th:text="${error}">Error</span>
+                                        <span th:if="${error == null}">Internal Server Error</span>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Path</dt>
+                                    <dd class="col-sm-8">
+                                        <code th:if="${path != null}" th:text="${path}">Unknown</code>
+                                        <code th:if="${path == null}">Unknown</code>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Timestamp</dt>
+                                    <dd class="col-sm-8">
+                                        <span th:if="${timestamp != null}" th:text="${#temporals.format(timestamp, 'yyyy-MM-dd HH:mm:ss')}">Now</span>
+                                        <span th:if="${timestamp == null}" th:text="${#dates.format(#dates.createNow(), 'yyyy-MM-dd HH:mm:ss')}">Now</span>
+                                    </dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-6">
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-4">Request ID</dt>
+                                    <dd class="col-sm-8">
+                                        <code class="small" th:if="${requestId != null}" th:text="${requestId}">N/A</code>
+                                        <code class="small" th:if="${requestId == null}">N/A</code>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Node</dt>
+                                    <dd class="col-sm-8">
+                                        <span th:if="${nodeId != null}" th:text="${nodeId}">Unknown</span>
+                                        <span th:if="${nodeId == null}">Unknown</span>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Version</dt>
+                                    <dd class="col-sm-8">v1.1.18</dd>
+                                </dl>
+                            </div>
+                        </div>
+                        
+                        <!-- Exception Details (if available) -->
+                        <div th:if="${exception != null}" class="mt-4">
+                            <h6 class="text-danger">
+                                <i class="fas fa-bug me-2"></i>Exception Details
+                            </h6>
+                            <div class="alert alert-danger mb-0">
+                                <strong th:text="${exception}">Exception</strong>
+                                <p th:if="${exceptionMessage != null}" class="mb-0 mt-2 small" th:text="${exceptionMessage}">Message</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Stack Trace (collapsible, if available) -->
+                        <div th:if="${trace != null}" class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" 
+                                    data-bs-target="#stackTrace" aria-expanded="false">
+                                <i class="fas fa-code me-1"></i>Show Stack Trace
+                            </button>
+                            <div class="collapse mt-2" id="stackTrace">
+                                <pre class="bg-dark text-light p-3 rounded small" style="max-height: 400px; overflow-y: auto;"><code th:text="${trace}">Stack trace</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Helpful Actions Card -->
+                <div class="card border-0 shadow-sm mt-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-lightbulb me-2 text-warning"></i>
+                            What can you do?
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- 404-specific suggestions -->
+                            <div th:if="${status != null and status == 404}" class="col-12">
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Check that the URL is spelled correctly</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>The resource may have been moved or deleted</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Try navigating from the <a th:href="@{/}">Dashboard</a></li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Use the search feature to find what you're looking for</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- 403-specific suggestions -->
+                            <div th:if="${status != null and status == 403}" class="col-12">
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>You may not have permission to access this resource</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Contact your administrator if you need access</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Try logging out and logging back in</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- 500-specific suggestions -->
+                            <div th:if="${status != null and status == 500}" class="col-12">
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Wait a moment and try again</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Check the server logs for more details</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Verify database connectivity</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Contact support if the problem persists</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Generic suggestions (default) -->
+                            <div th:if="${status == null or (status != 404 and status != 403 and status != 500)}" class="col-12">
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Refresh the page and try again</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Clear your browser cache</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Check your network connection</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Contact support if the problem persists</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Links -->
+                <div class="text-center mt-4">
+                    <a th:href="@{/}" class="btn btn-primary me-2">
+                        <i class="fas fa-home me-1"></i>Go to Dashboard
+                    </a>
+                    <a href="javascript:history.back()" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left me-1"></i>Go Back
+                    </a>
+                    <a th:href="@{/help}" class="btn btn-outline-info">
+                        <i class="fas fa-book me-1"></i>View Help
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Status (for 5xx errors) -->
+        <div th:if="${status != null and status ge 500}" class="row justify-content-center mt-4">
+            <div class="col-lg-10">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="fas fa-heartbeat me-2"></i>System Status
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="mb-2">
+                                    <i class="fas fa-database fa-2x" th:classappend="${persistenceAvailable == true} ? 'text-success' : 'text-danger'"></i>
+                                </div>
+                                <small class="text-muted">Persistence</small><br>
+                                <span th:if="${persistenceAvailable == true}" class="badge bg-success">Online</span>
+                                <span th:if="${persistenceAvailable != true}" class="badge bg-danger">Offline</span>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-2">
+                                    <i class="fas fa-memory fa-2x" th:classappend="${heapUsagePercent != null and heapUsagePercent lt 90} ? 'text-success' : 'text-danger'"></i>
+                                </div>
+                                <small class="text-muted">Memory</small><br>
+                                <span th:if="${heapUsagePercent != null}" th:text="${heapUsagePercent} + '%'">N/A</span>
+                                <span th:if="${heapUsagePercent == null}">N/A</span>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-2">
+                                    <i class="fas fa-server fa-2x text-success"></i>
+                                </div>
+                                <small class="text-muted">Server</small><br>
+                                <span class="badge bg-success">Running</span>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-2">
+                                    <i class="fas fa-clock fa-2x text-info"></i>
+                                </div>
+                                <small class="text-muted">Uptime</small><br>
+                                <span th:if="${uptime != null}" th:text="${uptime}">N/A</span>
+                                <span th:if="${uptime == null}">N/A</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

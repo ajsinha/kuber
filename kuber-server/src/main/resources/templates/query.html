@@ -291,8 +291,8 @@
                                                           th:text="${entry['type']}">type</span>
                                                 </td>
                                                 <td>
-                                                    <span th:if="${entry['ttl'] >= 0}" th:text="${entry['ttl'] + 's'}">ttl</span>
-                                                    <span th:if="${entry['ttl'] < 0}" class="text-muted">∞</span>
+                                                    <span th:if="${entry['ttl'] ge 0}" th:text="${entry['ttl'] + 's'}">ttl</span>
+                                                    <span th:if="${entry['ttl'] lt 0}" class="text-muted">∞</span>
                                                 </td>
                                                 <td>
                                                     <a th:href="@{/cache/entry(region=${queryRegion},key=${entry['key']})}" 

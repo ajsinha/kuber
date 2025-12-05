@@ -254,6 +254,25 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
     }
     
     @Override
+    public java.util.Map<String, CacheEntry> loadEntriesByKeys(String region, List<String> keys) {
+        java.util.Map<String, CacheEntry> result = new java.util.HashMap<>();
+        if (keys == null || keys.isEmpty()) return result;
+        
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        // Use MongoDB's $in operator for batch retrieval
+        collection.find(Filters.in("key", keys)).forEach(doc -> {
+            CacheEntry entry = documentToEntry(doc, region);
+            if (entry != null) {
+                result.put(entry.getKey(), entry);
+            }
+        });
+        
+        return result;
+    }
+    
+    @Override
     public List<CacheEntry> loadEntries(String region, int limit) {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);

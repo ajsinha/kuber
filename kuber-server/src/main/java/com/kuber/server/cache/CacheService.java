@@ -45,10 +45,20 @@ import java.util.stream.Collectors;
 /**
  * Main cache service providing all cache operations.
  * Supports regions, TTL, JSON queries, and replication.
+ * 
+ * Performance optimizations:
+ * - Negative cache to avoid repeated persistence lookups for missing keys
+ * - Batch operations for MGET
+ * - Memory-first lookup with fast path
  */
 @Slf4j
 @Service
 public class CacheService {
+    
+    private static final String VERSION = "1.1.18";
+    
+    // Negative cache TTL - how long to remember that a key doesn't exist
+    private static final long NEGATIVE_CACHE_TTL_MS = 30_000; // 30 seconds
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -69,6 +79,13 @@ public class CacheService {
     
     // Statistics
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
+    
+    // Negative cache: tracks keys known to not exist in persistence store
+    // Maps region:key -> timestamp when the negative entry was recorded
+    private final Cache<String, Long> negativeCache = Caffeine.newBuilder()
+            .maximumSize(100_000)
+            .expireAfterWrite(NEGATIVE_CACHE_TTL_MS, TimeUnit.MILLISECONDS)
+            .build();
     
     public CacheService(KuberProperties properties, 
                         PersistenceStore persistenceStore,
@@ -744,10 +761,101 @@ public class CacheService {
     }
     
     public List<String> mget(String region, List<String> keys) {
-        List<String> values = new ArrayList<>();
-        for (String key : keys) {
-            values.add(get(region, key));
+        if (keys == null || keys.isEmpty()) {
+            return new ArrayList<>();
         }
+        
+        ensureRegionExists(region);
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        CacheRegion regionMeta = regions.get(region);
+        
+        List<String> values = new ArrayList<>(keys.size());
+        List<String> keysToLoadFromPersistence = new ArrayList<>();
+        Map<Integer, String> keyIndexMap = new HashMap<>(); // Track which keys need persistence lookup
+        
+        // First pass: check memory cache and negative cache
+        for (int i = 0; i < keys.size(); i++) {
+            String key = keys.get(i);
+            CacheEntry entry = cache.getIfPresent(key);
+            
+            if (entry != null) {
+                // Found in memory
+                if (entry.isExpired()) {
+                    // Handle expired entry
+                    cache.invalidate(key);
+                    try {
+                        persistenceStore.deleteEntry(region, key);
+                    } catch (Exception e) {
+                        log.warn("Failed to delete expired entry '{}': {}", key, e.getMessage());
+                    }
+                    recordStatistic(region, KuberConstants.STAT_EXPIRED);
+                    metricsService.recordGet(region, false);
+                    values.add(null);
+                } else {
+                    // Valid entry in memory - fast path
+                    entry.recordAccess();
+                    regionMeta.recordHit();
+                    recordStatistic(region, KuberConstants.STAT_HITS);
+                    metricsService.recordGet(region, true);
+                    values.add(entry.getStringValue());
+                }
+            } else {
+                // Check negative cache
+                String negativeCacheKey = region + ":" + key;
+                if (negativeCache.getIfPresent(negativeCacheKey) != null) {
+                    // Known to not exist - skip persistence lookup
+                    regionMeta.recordMiss();
+                    recordStatistic(region, KuberConstants.STAT_MISSES);
+                    metricsService.recordGet(region, false);
+                    values.add(null);
+                } else {
+                    // Need to load from persistence
+                    keysToLoadFromPersistence.add(key);
+                    keyIndexMap.put(i, key);
+                    values.add(null); // Placeholder
+                }
+            }
+        }
+        
+        // Batch load from persistence if needed
+        if (!keysToLoadFromPersistence.isEmpty()) {
+            Map<String, CacheEntry> loaded = persistenceStore.loadEntriesByKeys(region, keysToLoadFromPersistence);
+            
+            for (Map.Entry<Integer, String> indexEntry : keyIndexMap.entrySet()) {
+                int index = indexEntry.getKey();
+                String key = indexEntry.getValue();
+                CacheEntry entry = loaded.get(key);
+                
+                if (entry != null && !entry.isExpired()) {
+                    // Found in persistence - add to memory cache
+                    cache.put(key, entry);
+                    entry.recordAccess();
+                    regionMeta.recordHit();
+                    recordStatistic(region, KuberConstants.STAT_HITS);
+                    metricsService.recordGet(region, true);
+                    values.set(index, entry.getStringValue());
+                    
+                    // Clear from negative cache if present
+                    negativeCache.invalidate(region + ":" + key);
+                } else {
+                    // Not found or expired - add to negative cache
+                    negativeCache.put(region + ":" + key, System.currentTimeMillis());
+                    regionMeta.recordMiss();
+                    recordStatistic(region, KuberConstants.STAT_MISSES);
+                    metricsService.recordGet(region, false);
+                    
+                    if (entry != null && entry.isExpired()) {
+                        try {
+                            persistenceStore.deleteEntry(region, key);
+                        } catch (Exception e) {
+                            log.warn("Failed to delete expired entry '{}': {}", key, e.getMessage());
+                        }
+                        recordStatistic(region, KuberConstants.STAT_EXPIRED);
+                    }
+                }
+            }
+        }
+        
         return values;
     }
     
@@ -824,6 +932,9 @@ public class CacheService {
             log.debug("Entry '{}' not found in persistence for region '{}'", key, region);
         }
         
+        // Add to negative cache since key no longer exists
+        negativeCache.put(region + ":" + key, System.currentTimeMillis());
+        
         // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
         
         if (existedInMemory || deletedFromPersistence) {
@@ -848,8 +959,22 @@ public class CacheService {
     }
     
     public boolean exists(String region, String key) {
-        CacheEntry entry = getEntry(region, key);
-        return entry != null;
+        ensureRegionExists(region);
+        
+        // Fast path: check memory cache first
+        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        CacheEntry entry = cache.getIfPresent(key);
+        if (entry != null && !entry.isExpired()) {
+            return true;
+        }
+        
+        // Check negative cache
+        if (negativeCache.getIfPresent(region + ":" + key) != null) {
+            return false;
+        }
+        
+        // Fall back to full lookup which will populate caches
+        return getEntry(region, key) != null;
     }
     
     public long exists(String region, List<String> keys) {
@@ -1274,50 +1399,80 @@ public class CacheService {
         Cache<String, CacheEntry> cache = regionCaches.get(region);
         CacheEntry entry = cache.getIfPresent(key);
         
-        if (entry == null) {
-            // Try loading from persistence store
-            entry = persistenceStore.loadEntry(region, key);
-            if (entry != null && !entry.isExpired()) {
-                cache.put(key, entry);
-            } else {
-                entry = null;
-            }
-        }
-        
+        // Fast path: entry found in memory
         if (entry != null) {
             if (entry.isExpired()) {
+                // Handle expired entry
                 cache.invalidate(key);
-                
-                // Delete from persistence store
-                // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
                 try {
                     persistenceStore.deleteEntry(region, key);
                 } catch (Exception e) {
                     log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
                 }
-                
                 recordStatistic(region, KuberConstants.STAT_EXPIRED);
                 metricsService.recordGet(region, false);
+                
+                // Add to negative cache
+                negativeCache.put(region + ":" + key, System.currentTimeMillis());
                 return null;
             }
             
+            // Valid entry - fast path complete
             entry.recordAccess();
             regions.get(region).recordHit();
             recordStatistic(region, KuberConstants.STAT_HITS);
             metricsService.recordGet(region, true);
-        } else {
+            return entry;
+        }
+        
+        // Check negative cache before hitting persistence
+        String negativeCacheKey = region + ":" + key;
+        if (negativeCache.getIfPresent(negativeCacheKey) != null) {
+            // Known to not exist in persistence - skip lookup
             regions.get(region).recordMiss();
             recordStatistic(region, KuberConstants.STAT_MISSES);
             metricsService.recordGet(region, false);
+            return null;
         }
         
-        return entry;
+        // Try loading from persistence store
+        entry = persistenceStore.loadEntry(region, key);
+        
+        if (entry != null) {
+            if (!entry.isExpired()) {
+                // Found valid entry in persistence - add to memory cache
+                cache.put(key, entry);
+                entry.recordAccess();
+                regions.get(region).recordHit();
+                recordStatistic(region, KuberConstants.STAT_HITS);
+                metricsService.recordGet(region, true);
+                return entry;
+            } else {
+                // Expired in persistence - clean up
+                try {
+                    persistenceStore.deleteEntry(region, key);
+                } catch (Exception e) {
+                    log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
+                }
+                recordStatistic(region, KuberConstants.STAT_EXPIRED);
+            }
+        }
+        
+        // Not found - add to negative cache
+        negativeCache.put(negativeCacheKey, System.currentTimeMillis());
+        regions.get(region).recordMiss();
+        recordStatistic(region, KuberConstants.STAT_MISSES);
+        metricsService.recordGet(region, false);
+        return null;
     }
     
     private void putEntry(String region, String key, CacheEntry entry) {
         Cache<String, CacheEntry> cache = regionCaches.get(region);
         
         cache.put(key, entry);
+        
+        // Invalidate negative cache since this key now exists
+        negativeCache.invalidate(region + ":" + key);
         
         // Note: entryCount is dynamically calculated from persistence, so no manual increment needed
         
@@ -1415,7 +1570,7 @@ public class CacheService {
         Map<String, Object> info = new HashMap<>();
         
         info.put("nodeId", properties.getNodeId());
-        info.put("version", "1.1.14");
+        info.put("version", VERSION);
         info.put("regionCount", regions.size());
         info.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         info.put("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());

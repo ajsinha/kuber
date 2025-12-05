@@ -178,11 +178,13 @@
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <span class="text-muted">Created</span>
-                                <span th:text="${#temporals.format(region.createdAt, 'MMM dd, yyyy HH:mm')}">Date</span>
+                                <span th:if="${region.createdAt != null}" th:text="${#temporals.format(region.createdAt, 'MMM dd, yyyy HH:mm')}">Date</span>
+                                <span th:if="${region.createdAt == null}">N/A</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <span class="text-muted">Updated</span>
-                                <span th:text="${#temporals.format(region.updatedAt, 'MMM dd, yyyy HH:mm')}">Date</span>
+                                <span th:if="${region.updatedAt != null}" th:text="${#temporals.format(region.updatedAt, 'MMM dd, yyyy HH:mm')}">Date</span>
+                                <span th:if="${region.updatedAt == null}">N/A</span>
                             </li>
                         </ul>
                     </div>

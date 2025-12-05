@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.1.14</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.1.18</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -306,8 +306,59 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.1.14</span>
+                                    <span class="badge bg-primary me-2">v1.1.18</span>
                                     <span class="text-muted small">Current</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Fixed RocksDB lock error during concurrent autoload operations</li>
+                                    <li>Fixed SQLite connection race condition during concurrent operations</li>
+                                    <li>Proper double-checked locking for region database/connection creation</li>
+                                    <li>Prevents "lock hold by current process" errors on RocksDB</li>
+                                    <li>Thread-safe region database initialization for all file-based stores</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.17</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Major performance optimizations for GET operations</li>
+                                    <li>Negative cache to skip persistence lookups for missing keys</li>
+                                    <li>Batch loading for MGET (RocksDB multiGet, SQLite IN clause)</li>
+                                    <li>Fast path for memory cache hits (skip unnecessary checks)</li>
+                                    <li>Optimized exists() with negative cache check</li>
+                                    <li>Fixed Thymeleaf template parsing errors (XML-safe operators)</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.16</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Custom error pages with detailed error information</li>
+                                    <li>Status-specific icons and suggestions (404, 403, 500, etc.)</li>
+                                    <li>Exception details and collapsible stack traces</li>
+                                    <li>System status display for server errors</li>
+                                    <li>Request ID tracking for debugging</li>
+                                    <li>JSON error responses for API requests</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.15</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Pre-startup database compaction/vacuum before Spring context</li>
+                                    <li>Standalone PreStartupCompaction class (non-Spring)</li>
+                                    <li>RocksDB compaction runs BEFORE web server starts</li>
+                                    <li>SQLite VACUUM runs BEFORE web server starts</li>
+                                    <li>No resource contention - databases optimized before any requests</li>
+                                    <li>Progress output with size savings displayed</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.14</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li>Fixed TTL Expiration Service card not loading on admin dashboard</li>
@@ -333,7 +384,6 @@
                                 <ul class="small text-muted mb-0">
                                     <li>Cron-based RocksDB compaction scheduling (default: 2:00 AM daily)</li>
                                     <li>Configurable cron expression for off-hours maintenance</li>
-                                    <li>No startup compaction - prevents blocking during server start</li>
                                     <li>Manual compaction trigger via API and UI</li>
                                 </ul>
                             </div>
@@ -348,7 +398,6 @@
                                     <li>Removed RocksDB metadata database - relies solely on folder discovery</li>
                                     <li>Region metadata stored as JSON file in each region directory</li>
                                     <li>Smart cache priming - loads most recently accessed entries first</li>
-                                    <li>SQLite startup vacuum - optimizes all databases on startup</li>
                                     <li>Fixed critical bug: cache now properly reloads from disk on restart</li>
                                 </ul>
                             </div>
@@ -507,7 +556,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.1.14
+                                <strong>Version:</strong> 1.1.18
                             </li>
                         </ul>
                     </div>

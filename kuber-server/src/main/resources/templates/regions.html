@@ -76,7 +76,7 @@
                         <div class="small text-muted">
                             <div class="mb-1">
                                 <i class="fas fa-clock me-1"></i>
-                                Created: <span th:text="${#temporals.format(region.createdAt, 'MMM dd, yyyy')}">Date</span>
+                                Created: <span th:if="${region.createdAt != null}" th:text="${#temporals.format(region.createdAt, 'MMM dd, yyyy')}">Date</span><span th:if="${region.createdAt == null}">N/A</span>
                             </div>
                             <div>
                                 <i class="fas fa-database me-1"></i>
