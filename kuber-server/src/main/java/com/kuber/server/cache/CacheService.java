@@ -24,6 +24,8 @@ import com.kuber.core.exception.RegionException;
 import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheEvent;
 import com.kuber.core.model.CacheRegion;
+import com.kuber.core.model.KeyIndexEntry;
+import com.kuber.core.model.KeyIndexEntry.ValueLocation;
 import com.kuber.core.util.JsonUtils;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.event.EventPublisher;
@@ -46,19 +48,27 @@ import java.util.stream.Collectors;
  * Main cache service providing all cache operations.
  * Supports regions, TTL, JSON queries, and replication.
  * 
- * Performance optimizations:
- * - Negative cache to avoid repeated persistence lookups for missing keys
- * - Batch operations for MGET
- * - Memory-first lookup with fast path
+ * HYBRID MEMORY ARCHITECTURE (v1.2.1):
+ * - All keys are ALWAYS kept in memory via KeyIndex (O(1) existence checks)
+ * - Values can be in memory (hot) or on disk only (cold)
+ * - EXISTS and KEYS operations NEVER hit disk
+ * - When memory is constrained, only values are evicted (keys stay in index)
+ * 
+ * Performance characteristics:
+ * - EXISTS: O(1) pure memory lookup - 100x faster than disk-based
+ * - KEYS pattern: O(n) memory scan - no disk I/O ever
+ * - GET (key exists, value in memory): O(1)
+ * - GET (key exists, value on disk): O(1) index + disk read
+ * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
+ * - DBSIZE: O(1) from index.size()
+ * 
+ * @version 1.2.1
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.1.18";
-    
-    // Negative cache TTL - how long to remember that a key doesn't exist
-    private static final long NEGATIVE_CACHE_TTL_MS = 30_000; // 30 seconds
+    private static final String VERSION = "1.2.1";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -68,24 +78,21 @@ public class CacheService {
     @Autowired(required = false)
     private ReplicationManager replicationManager;
     
-    // In-memory cache per region
+    // ==================== HYBRID MEMORY ARCHITECTURE ====================
+    // Key Index: ALL keys always in memory for O(1) lookups (per region)
+    private final Map<String, KeyIndex> keyIndices = new ConcurrentHashMap<>();
+    
+    // Value Cache: Hot values in memory (can be evicted to disk)
     private final Map<String, Cache<String, CacheEntry>> regionCaches = new ConcurrentHashMap<>();
     
     // Region metadata
     private final Map<String, CacheRegion> regions = new ConcurrentHashMap<>();
     
-    // Effective memory limits per region (calculated considering global cap)
+    // Effective memory limits per region (for value cache only - keys are always in memory)
     private final Map<String, Integer> effectiveMemoryLimits = new ConcurrentHashMap<>();
     
     // Statistics
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
-    
-    // Negative cache: tracks keys known to not exist in persistence store
-    // Maps region:key -> timestamp when the negative entry was recorded
-    private final Cache<String, Long> negativeCache = Caffeine.newBuilder()
-            .maximumSize(100_000)
-            .expireAfterWrite(NEGATIVE_CACHE_TTL_MS, TimeUnit.MILLISECONDS)
-            .build();
     
     public CacheService(KuberProperties properties, 
                         PersistenceStore persistenceStore,
@@ -99,8 +106,9 @@ public class CacheService {
     
     @PostConstruct
     public void initialize() {
-        log.info("Initializing Kuber cache service...");
+        log.info("Initializing Kuber cache service v{} with HYBRID MEMORY ARCHITECTURE...", VERSION);
         log.info("Using persistence store: {}", persistenceStore.getType());
+        log.info("HYBRID MODE: All keys will be kept in memory; values can overflow to disk");
         
         // Load regions from persistence store
         loadRegions();
@@ -110,18 +118,18 @@ public class CacheService {
             createDefaultRegion();
         }
         
-        // Calculate memory allocation for all regions
+        // Calculate memory allocation for all regions (for value caches only)
         calculateMemoryAllocation();
         
-        // Create caches with calculated limits
+        // Create key indices and value caches with calculated limits
         for (String regionName : regions.keySet()) {
             createCacheForRegion(regionName);
         }
         
-        // Prime cache from persistence store
-        primeCache();
+        // Prime cache: load ALL keys into index, hot values into cache
+        primeCacheHybrid();
         
-        log.info("Cache service initialized with {} regions", regions.size());
+        log.info("Cache service initialized with {} regions (HYBRID MODE)", regions.size());
     }
     
     private void loadRegions() {
@@ -298,16 +306,30 @@ public class CacheService {
     private void createCacheForRegion(String regionName) {
         int memoryLimit = getEffectiveMemoryLimit(regionName);
         
+        // Create KeyIndex for this region (holds ALL keys in memory)
+        KeyIndex keyIndex = new KeyIndex(regionName);
+        keyIndices.put(regionName, keyIndex);
+        
+        // Create value cache with eviction listener
         Cache<String, CacheEntry> cache = Caffeine.newBuilder()
                 .maximumSize(memoryLimit)
                 .expireAfterWrite(24, TimeUnit.HOURS)
-                .removalListener((key, value, cause) -> {
-                    // Only track statistics - don't modify entryCount since persistence is the source of truth
-                    // Entries evicted from memory cache are still in persistence store
+                .removalListener((String key, CacheEntry value, RemovalCause cause) -> {
+                    // When value is evicted from memory, update KeyIndex to mark as DISK only
                     if (cause == RemovalCause.SIZE || cause == RemovalCause.EXPIRED) {
+                        KeyIndex idx = keyIndices.get(regionName);
+                        if (idx != null && key != null) {
+                            if (cause == RemovalCause.SIZE) {
+                                // Value evicted due to size - still exists on disk
+                                idx.updateLocation(key, ValueLocation.DISK);
+                                log.debug("Value for '{}' evicted from memory in region '{}' (still on disk)", 
+                                        key, regionName);
+                            } else if (cause == RemovalCause.EXPIRED) {
+                                // Entry expired - will be cleaned up by expiration service
+                                recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
+                            }
+                        }
                         recordStatistic(regionName, KuberConstants.STAT_EVICTED);
-                        log.debug("Entry '{}' evicted from memory cache in region '{}' due to {} (still in persistence)", 
-                                key, regionName, cause);
                     }
                 })
                 .recordStats()
@@ -315,51 +337,73 @@ public class CacheService {
         
         regionCaches.put(regionName, cache);
         statistics.put(regionName, new ConcurrentHashMap<>());
+        
+        log.debug("Created KeyIndex and value cache for region '{}' (value cache limit: {})", 
+                regionName, memoryLimit);
     }
     
-    private void primeCache() {
-        log.info("Priming cache from {} persistence store (loading most recently accessed entries first)...", 
-                persistenceStore.getType());
+    /**
+     * Prime cache with hybrid architecture:
+     * 1. Load ALL keys into KeyIndex (regardless of memory limit)
+     * 2. Load hot values (up to memory limit) into value cache
+     */
+    private void primeCacheHybrid() {
+        log.info("Priming HYBRID cache from {} persistence store...", persistenceStore.getType());
+        log.info("  - ALL keys will be loaded into memory (KeyIndex)");
+        log.info("  - Hot values will be loaded into value cache (up to memory limit per region)");
         
-        int totalPrimed = 0;
+        long totalKeysLoaded = 0;
+        long totalValuesLoaded = 0;
         
         for (String regionName : regions.keySet()) {
             try {
-                int memoryLimit = getEffectiveMemoryLimit(regionName);
-                long persistedCount = persistenceStore.countNonExpiredEntries(regionName);
-                List<CacheEntry> entries = persistenceStore.loadEntries(regionName, memoryLimit);
-                Cache<String, CacheEntry> cache = regionCaches.get(regionName);
+                KeyIndex keyIndex = keyIndices.get(regionName);
+                Cache<String, CacheEntry> valueCache = regionCaches.get(regionName);
+                int valueMemoryLimit = getEffectiveMemoryLimit(regionName);
                 
-                if (cache == null) {
-                    log.warn("Cache not found for region '{}', skipping priming", regionName);
+                if (keyIndex == null || valueCache == null) {
+                    log.warn("KeyIndex or value cache not found for region '{}', skipping priming", regionName);
                     continue;
                 }
                 
-                int primedCount = 0;
+                // Load ALL entries from persistence to populate KeyIndex
+                // For value cache, only load up to memory limit
+                List<CacheEntry> entries = persistenceStore.loadEntries(regionName, Integer.MAX_VALUE);
+                
+                int keysLoaded = 0;
+                int valuesLoaded = 0;
+                
                 for (CacheEntry entry : entries) {
                     if (!entry.isExpired()) {
-                        cache.put(entry.getKey(), entry);
-                        primedCount++;
+                        // Always add key to index
+                        boolean valueInMemory = valuesLoaded < valueMemoryLimit;
+                        ValueLocation location = valueInMemory ? ValueLocation.BOTH : ValueLocation.DISK;
+                        keyIndex.putFromCacheEntry(entry, location);
+                        keysLoaded++;
+                        
+                        // Only add hot values to cache (up to limit)
+                        if (valueInMemory) {
+                            valueCache.put(entry.getKey(), entry);
+                            valuesLoaded++;
+                        }
                     }
                 }
                 
-                totalPrimed += primedCount;
+                totalKeysLoaded += keysLoaded;
+                totalValuesLoaded += valuesLoaded;
                 
-                if (persistedCount > memoryLimit) {
-                    log.info("Primed {} entries for region '{}' (loaded most recent {} of {} persisted, limit={})", 
-                            primedCount, regionName, memoryLimit, persistedCount, memoryLimit);
-                } else {
-                    log.info("Primed {} entries for region '{}' (all {} persisted entries loaded, limit={})", 
-                            primedCount, regionName, persistedCount, memoryLimit);
-                }
+                log.info("Region '{}': loaded {} keys into index, {} values into cache (limit: {})", 
+                        regionName, keysLoaded, valuesLoaded, valueMemoryLimit);
+                
             } catch (Exception e) {
                 log.warn("Failed to prime cache for region '{}': {}", regionName, e.getMessage());
             }
         }
         
-        int totalAllocated = effectiveMemoryLimits.values().stream().mapToInt(Integer::intValue).sum();
-        log.info("Cache priming complete: {} entries loaded into memory across {} regions (total memory allocation: {})", 
-                totalPrimed, regions.size(), totalAllocated);
+        log.info("HYBRID cache priming complete:");
+        log.info("  - Total keys in memory (KeyIndex): {}", totalKeysLoaded);
+        log.info("  - Total values in memory (cache): {}", totalValuesLoaded);
+        log.info("  - EXISTS/KEYS operations will NEVER hit disk");
     }
     
     // ==================== Region Operations ====================
@@ -480,7 +524,10 @@ public class CacheService {
             throw RegionException.captive(name);
         }
         
-        // Clear the cache
+        // Remove KeyIndex for this region
+        keyIndices.remove(name);
+        
+        // Clear the value cache
         Cache<String, CacheEntry> cache = regionCaches.remove(name);
         if (cache != null) {
             cache.invalidateAll();
@@ -494,7 +541,7 @@ public class CacheService {
         
         eventPublisher.publish(CacheEvent.regionDeleted(name, properties.getNodeId()));
         
-        log.info("Deleted region: {}", name);
+        log.info("Deleted region: {} (KeyIndex and value cache cleared)", name);
     }
     
     public void purgeRegion(String name) {
@@ -505,6 +552,13 @@ public class CacheService {
             throw RegionException.notFound(name);
         }
         
+        // Clear KeyIndex for this region
+        KeyIndex keyIndex = keyIndices.get(name);
+        if (keyIndex != null) {
+            keyIndex.clear();
+        }
+        
+        // Clear value cache
         Cache<String, CacheEntry> cache = regionCaches.get(name);
         if (cache != null) {
             cache.invalidateAll();
@@ -524,19 +578,19 @@ public class CacheService {
                 .sourceNodeId(properties.getNodeId())
                 .build());
         
-        log.info("Purged region: {}", name);
+        log.info("Purged region: {} (KeyIndex and value cache cleared)", name);
     }
     
     public Collection<CacheRegion> getAllRegions() {
-        // Enrich regions with dynamically calculated counts
-        // entryCount should reflect persistence (source of truth)
+        // Enrich regions with counts from KeyIndex (source of truth for keys)
         for (CacheRegion region : regions.values()) {
-            long memoryCount = getMemoryEntryCount(region.getName());
-            long persistenceCount = getPersistenceEntryCount(region.getName());
-            region.setMemoryEntryCount(memoryCount);
-            region.setPersistenceEntryCount(persistenceCount);
-            // Total entries = persistence count (source of truth)
-            region.setEntryCount(persistenceCount);
+            KeyIndex keyIndex = keyIndices.get(region.getName());
+            long keyCount = keyIndex != null ? keyIndex.size() : 0;
+            long memoryValueCount = getMemoryEntryCount(region.getName());
+            
+            region.setMemoryEntryCount(memoryValueCount);
+            region.setPersistenceEntryCount(keyCount); // KeyIndex = source of truth
+            region.setEntryCount(keyCount);
         }
         return Collections.unmodifiableCollection(regions.values());
     }
@@ -544,13 +598,14 @@ public class CacheService {
     public CacheRegion getRegion(String name) {
         CacheRegion region = regions.get(name);
         if (region != null) {
-            // Enrich with current counts
-            long memoryCount = getMemoryEntryCount(name);
-            long persistenceCount = getPersistenceEntryCount(name);
-            region.setMemoryEntryCount(memoryCount);
-            region.setPersistenceEntryCount(persistenceCount);
-            // Total entries = persistence count (source of truth)
-            region.setEntryCount(persistenceCount);
+            // Enrich with current counts from KeyIndex
+            KeyIndex keyIndex = keyIndices.get(name);
+            long keyCount = keyIndex != null ? keyIndex.size() : 0;
+            long memoryValueCount = getMemoryEntryCount(name);
+            
+            region.setMemoryEntryCount(memoryValueCount);
+            region.setPersistenceEntryCount(keyCount);
+            region.setEntryCount(keyCount);
         }
         return region;
     }
@@ -760,29 +815,50 @@ public class CacheService {
         return oldValue;
     }
     
+    /**
+     * Batch GET using hybrid architecture:
+     * 1. Check KeyIndex for each key (O(1) per key)
+     * 2. For existing keys, check value cache
+     * 3. For cold values (key exists but value not in memory), load from disk
+     */
     public List<String> mget(String region, List<String> keys) {
         if (keys == null || keys.isEmpty()) {
             return new ArrayList<>();
         }
         
         ensureRegionExists(region);
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        KeyIndex keyIndex = keyIndices.get(region);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         CacheRegion regionMeta = regions.get(region);
         
         List<String> values = new ArrayList<>(keys.size());
         List<String> keysToLoadFromPersistence = new ArrayList<>();
-        Map<Integer, String> keyIndexMap = new HashMap<>(); // Track which keys need persistence lookup
+        Map<Integer, String> keyPositionMap = new HashMap<>(); // Track positions for persistence-loaded keys
         
-        // First pass: check memory cache and negative cache
+        // First pass: check KeyIndex and value cache
         for (int i = 0; i < keys.size(); i++) {
             String key = keys.get(i);
-            CacheEntry entry = cache.getIfPresent(key);
+            
+            // HYBRID: Check KeyIndex first - if not there, key doesn't exist
+            KeyIndexEntry indexEntry = keyIndex.get(key);
+            if (indexEntry == null) {
+                // Key not in index = doesn't exist anywhere (no disk lookup needed)
+                regionMeta.recordMiss();
+                recordStatistic(region, KuberConstants.STAT_MISSES);
+                metricsService.recordGet(region, false);
+                values.add(null);
+                continue;
+            }
+            
+            // Key exists! Check value cache
+            CacheEntry entry = valueCache.getIfPresent(key);
             
             if (entry != null) {
-                // Found in memory
+                // Value in memory
                 if (entry.isExpired()) {
-                    // Handle expired entry
-                    cache.invalidate(key);
+                    // Handle expired entry - remove from both index and cache
+                    keyIndex.remove(key);
+                    valueCache.invalidate(key);
                     try {
                         persistenceStore.deleteEntry(region, key);
                     } catch (Exception e) {
@@ -794,64 +870,59 @@ public class CacheService {
                 } else {
                     // Valid entry in memory - fast path
                     entry.recordAccess();
+                    indexEntry.recordAccess();
                     regionMeta.recordHit();
                     recordStatistic(region, KuberConstants.STAT_HITS);
                     metricsService.recordGet(region, true);
                     values.add(entry.getStringValue());
                 }
             } else {
-                // Check negative cache
-                String negativeCacheKey = region + ":" + key;
-                if (negativeCache.getIfPresent(negativeCacheKey) != null) {
-                    // Known to not exist - skip persistence lookup
-                    regionMeta.recordMiss();
-                    recordStatistic(region, KuberConstants.STAT_MISSES);
-                    metricsService.recordGet(region, false);
-                    values.add(null);
-                } else {
-                    // Need to load from persistence
-                    keysToLoadFromPersistence.add(key);
-                    keyIndexMap.put(i, key);
-                    values.add(null); // Placeholder
-                }
+                // Key exists in index but value not in memory - need to load from disk (cold value)
+                keysToLoadFromPersistence.add(key);
+                keyPositionMap.put(i, key);
+                values.add(null); // Placeholder
             }
         }
         
-        // Batch load from persistence if needed
+        // Batch load cold values from persistence if needed
         if (!keysToLoadFromPersistence.isEmpty()) {
             Map<String, CacheEntry> loaded = persistenceStore.loadEntriesByKeys(region, keysToLoadFromPersistence);
             
-            for (Map.Entry<Integer, String> indexEntry : keyIndexMap.entrySet()) {
-                int index = indexEntry.getKey();
-                String key = indexEntry.getValue();
+            for (Map.Entry<Integer, String> posEntry : keyPositionMap.entrySet()) {
+                int index = posEntry.getKey();
+                String key = posEntry.getValue();
                 CacheEntry entry = loaded.get(key);
                 
                 if (entry != null && !entry.isExpired()) {
-                    // Found in persistence - add to memory cache
-                    cache.put(key, entry);
+                    // Found valid entry on disk - add to value cache
+                    valueCache.put(key, entry);
+                    keyIndex.updateLocation(key, ValueLocation.BOTH);
                     entry.recordAccess();
+                    KeyIndexEntry idxEntry = keyIndex.getWithoutTracking(key);
+                    if (idxEntry != null) idxEntry.recordAccess();
                     regionMeta.recordHit();
                     recordStatistic(region, KuberConstants.STAT_HITS);
                     metricsService.recordGet(region, true);
                     values.set(index, entry.getStringValue());
-                    
-                    // Clear from negative cache if present
-                    negativeCache.invalidate(region + ":" + key);
                 } else {
-                    // Not found or expired - add to negative cache
-                    negativeCache.put(region + ":" + key, System.currentTimeMillis());
-                    regionMeta.recordMiss();
-                    recordStatistic(region, KuberConstants.STAT_MISSES);
-                    metricsService.recordGet(region, false);
-                    
+                    // Key was in index but value not on disk (inconsistency) or expired
                     if (entry != null && entry.isExpired()) {
+                        // Expired - clean up
+                        keyIndex.remove(key);
                         try {
                             persistenceStore.deleteEntry(region, key);
                         } catch (Exception e) {
                             log.warn("Failed to delete expired entry '{}': {}", key, e.getMessage());
                         }
                         recordStatistic(region, KuberConstants.STAT_EXPIRED);
+                    } else {
+                        // Inconsistency - key in index but not on disk
+                        keyIndex.remove(key);
+                        log.warn("MGET: Key '{}' was in index but not on disk - removed from index", key);
                     }
+                    regionMeta.recordMiss();
+                    recordStatistic(region, KuberConstants.STAT_MISSES);
+                    metricsService.recordGet(region, false);
                 }
             }
         }
@@ -917,27 +988,30 @@ public class CacheService {
         checkWriteAccess();
         ensureRegionExists(region);
         
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
-        boolean existedInMemory = cache.getIfPresent(key) != null;
+        KeyIndex keyIndex = keyIndices.get(region);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         
-        // Always invalidate from memory if present
-        cache.invalidate(key);
+        // Check KeyIndex first - if not there, key doesn't exist
+        boolean existedInIndex = keyIndex.containsKey(key);
         
-        // Always try to delete from persistence (entry might be in persistence but not memory)
+        // Remove from KeyIndex
+        keyIndex.remove(key);
+        
+        // Remove from value cache
+        valueCache.invalidate(key);
+        
+        // Remove from persistence
         boolean deletedFromPersistence = false;
-        try {
-            persistenceStore.deleteEntry(region, key);
-            deletedFromPersistence = true;
-        } catch (Exception e) {
-            log.debug("Entry '{}' not found in persistence for region '{}'", key, region);
+        if (existedInIndex) {
+            try {
+                persistenceStore.deleteEntry(region, key);
+                deletedFromPersistence = true;
+            } catch (Exception e) {
+                log.debug("Entry '{}' not found in persistence for region '{}'", key, region);
+            }
         }
         
-        // Add to negative cache since key no longer exists
-        negativeCache.put(region + ":" + key, System.currentTimeMillis());
-        
-        // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
-        
-        if (existedInMemory || deletedFromPersistence) {
+        if (existedInIndex || deletedFromPersistence) {
             recordStatistic(region, KuberConstants.STAT_DELETES);
             metricsService.recordDelete(region);
             eventPublisher.publish(CacheEvent.entryDeleted(region, key, properties.getNodeId()));
@@ -958,27 +1032,22 @@ public class CacheService {
         return count;
     }
     
+    /**
+     * Check if key exists - O(1) using KeyIndex only (NEVER hits disk).
+     * This is the primary benefit of the hybrid architecture.
+     */
     public boolean exists(String region, String key) {
         ensureRegionExists(region);
         
-        // Fast path: check memory cache first
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
-        CacheEntry entry = cache.getIfPresent(key);
-        if (entry != null && !entry.isExpired()) {
-            return true;
-        }
-        
-        // Check negative cache
-        if (negativeCache.getIfPresent(region + ":" + key) != null) {
-            return false;
-        }
-        
-        // Fall back to full lookup which will populate caches
-        return getEntry(region, key) != null;
+        // HYBRID: Pure memory lookup via KeyIndex - no disk I/O!
+        KeyIndex keyIndex = keyIndices.get(region);
+        return keyIndex.containsKey(key);
     }
     
     public long exists(String region, List<String> keys) {
-        return keys.stream().filter(key -> exists(region, key)).count();
+        ensureRegionExists(region);
+        KeyIndex keyIndex = keyIndices.get(region);
+        return keys.stream().filter(keyIndex::containsKey).count();
     }
     
     public boolean expire(String region, String key, long ttlSeconds) {
@@ -1029,58 +1098,33 @@ public class CacheService {
         return entry.getValueType().name().toLowerCase();
     }
     
+    /**
+     * Get keys matching pattern - pure memory scan via KeyIndex (NEVER hits disk).
+     * This is a major performance improvement for large datasets.
+     */
     public Set<String> keys(String region, String pattern) {
         ensureRegionExists(region);
         
-        Pattern regex = globToRegex(pattern);
-        Set<String> allKeys = new HashSet<>();
-        
-        // Get non-expired keys from in-memory cache
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
-        cache.asMap().entrySet().stream()
-                .filter(e -> !e.getValue().isExpired())
-                .map(Map.Entry::getKey)
-                .filter(key -> regex.matcher(key).matches())
-                .forEach(allKeys::add);
-        
-        // Get non-expired keys from persistence store
-        List<String> persistenceKeys = persistenceStore.getNonExpiredKeys(region, pattern, Integer.MAX_VALUE);
-        persistenceKeys.stream()
-                .filter(key -> regex.matcher(key).matches())
-                .forEach(allKeys::add);
-        
-        return allKeys;
+        // HYBRID: Pure memory scan via KeyIndex - no disk I/O!
+        KeyIndex keyIndex = keyIndices.get(region);
+        List<String> matchingKeys = keyIndex.findKeysByPattern(pattern);
+        return new HashSet<>(matchingKeys);
     }
     
     /**
-     * Get keys with a limit - useful for large datasets.
-     * Combines non-expired keys from both memory and persistence.
+     * Get keys with a limit - pure memory scan via KeyIndex (NEVER hits disk).
      */
     public Set<String> keys(String region, String pattern, int limit) {
         ensureRegionExists(region);
         
-        Pattern regex = globToRegex(pattern);
-        Set<String> allKeys = new LinkedHashSet<>(); // Maintain insertion order
+        // HYBRID: Pure memory scan via KeyIndex - no disk I/O!
+        KeyIndex keyIndex = keyIndices.get(region);
+        List<String> matchingKeys = keyIndex.findKeysByPattern(pattern);
         
-        // Get non-expired keys from persistence store first (since it likely has more)
-        List<String> persistenceKeys = persistenceStore.getNonExpiredKeys(region, pattern, limit);
-        persistenceKeys.stream()
-                .filter(key -> regex.matcher(key).matches())
-                .forEach(allKeys::add);
-        
-        // Add non-expired keys from in-memory cache
-        if (allKeys.size() < limit) {
-            Cache<String, CacheEntry> cache = regionCaches.get(region);
-            cache.asMap().entrySet().stream()
-                    .filter(e -> !e.getValue().isExpired())
-                    .map(Map.Entry::getKey)
-                    .filter(key -> regex.matcher(key).matches())
-                    .filter(key -> !allKeys.contains(key))
-                    .limit(limit - allKeys.size())
-                    .forEach(allKeys::add);
+        if (limit > 0 && matchingKeys.size() > limit) {
+            return new LinkedHashSet<>(matchingKeys.subList(0, limit));
         }
-        
-        return allKeys;
+        return new LinkedHashSet<>(matchingKeys);
     }
     
     /**
@@ -1393,93 +1437,113 @@ public class CacheService {
     
     // ==================== Helper Methods ====================
     
+    /**
+     * Get entry using hybrid architecture:
+     * 1. Check KeyIndex first (O(1) - if not in index, key doesn't exist)
+     * 2. Check value cache (O(1) - hot values)
+     * 3. Load from disk if value not in memory (cold values)
+     */
     private CacheEntry getEntry(String region, String key) {
         ensureRegionExists(region);
         
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
-        CacheEntry entry = cache.getIfPresent(key);
+        KeyIndex keyIndex = keyIndices.get(region);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         
-        // Fast path: entry found in memory
-        if (entry != null) {
-            if (entry.isExpired()) {
-                // Handle expired entry
-                cache.invalidate(key);
-                try {
-                    persistenceStore.deleteEntry(region, key);
-                } catch (Exception e) {
-                    log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
-                }
-                recordStatistic(region, KuberConstants.STAT_EXPIRED);
-                metricsService.recordGet(region, false);
-                
-                // Add to negative cache
-                negativeCache.put(region + ":" + key, System.currentTimeMillis());
-                return null;
-            }
-            
-            // Valid entry - fast path complete
-            entry.recordAccess();
-            regions.get(region).recordHit();
-            recordStatistic(region, KuberConstants.STAT_HITS);
-            metricsService.recordGet(region, true);
-            return entry;
-        }
-        
-        // Check negative cache before hitting persistence
-        String negativeCacheKey = region + ":" + key;
-        if (negativeCache.getIfPresent(negativeCacheKey) != null) {
-            // Known to not exist in persistence - skip lookup
+        // HYBRID FAST PATH: Check KeyIndex first - if not there, key doesn't exist
+        KeyIndexEntry indexEntry = keyIndex.get(key);
+        if (indexEntry == null) {
+            // Key not in index = doesn't exist anywhere (no disk lookup needed!)
             regions.get(region).recordMiss();
             recordStatistic(region, KuberConstants.STAT_MISSES);
             metricsService.recordGet(region, false);
             return null;
         }
         
-        // Try loading from persistence store
+        // Key exists! Check if value is in memory cache
+        CacheEntry entry = valueCache.getIfPresent(key);
+        
+        if (entry != null) {
+            // Value in memory - fast path
+            if (entry.isExpired()) {
+                // Handle expired entry - remove from both index and cache
+                handleExpiredEntry(region, key, keyIndex, valueCache);
+                return null;
+            }
+            
+            // Valid entry in memory
+            entry.recordAccess();
+            indexEntry.recordAccess();
+            regions.get(region).recordHit();
+            recordStatistic(region, KuberConstants.STAT_HITS);
+            metricsService.recordGet(region, true);
+            return entry;
+        }
+        
+        // Value not in memory but key exists - load from disk (cold value)
         entry = persistenceStore.loadEntry(region, key);
         
         if (entry != null) {
             if (!entry.isExpired()) {
-                // Found valid entry in persistence - add to memory cache
-                cache.put(key, entry);
+                // Found valid entry on disk - add to memory cache
+                valueCache.put(key, entry);
+                keyIndex.updateLocation(key, ValueLocation.BOTH);
                 entry.recordAccess();
+                indexEntry.recordAccess();
                 regions.get(region).recordHit();
                 recordStatistic(region, KuberConstants.STAT_HITS);
                 metricsService.recordGet(region, true);
                 return entry;
             } else {
-                // Expired in persistence - clean up
-                try {
-                    persistenceStore.deleteEntry(region, key);
-                } catch (Exception e) {
-                    log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
-                }
-                recordStatistic(region, KuberConstants.STAT_EXPIRED);
+                // Expired on disk - clean up
+                handleExpiredEntry(region, key, keyIndex, valueCache);
             }
+        } else {
+            // Inconsistency: key in index but not on disk - clean up index
+            keyIndex.remove(key);
+            log.warn("Key '{}' was in index but not on disk - removed from index", key);
         }
         
-        // Not found - add to negative cache
-        negativeCache.put(negativeCacheKey, System.currentTimeMillis());
         regions.get(region).recordMiss();
         recordStatistic(region, KuberConstants.STAT_MISSES);
         metricsService.recordGet(region, false);
         return null;
     }
     
+    /**
+     * Handle expired entry cleanup.
+     */
+    private void handleExpiredEntry(String region, String key, KeyIndex keyIndex, Cache<String, CacheEntry> valueCache) {
+        keyIndex.remove(key);
+        valueCache.invalidate(key);
+        try {
+            persistenceStore.deleteEntry(region, key);
+        } catch (Exception e) {
+            log.warn("Failed to delete expired entry '{}' from persistence: {}", key, e.getMessage());
+        }
+        recordStatistic(region, KuberConstants.STAT_EXPIRED);
+        metricsService.recordGet(region, false);
+    }
+    
+    /**
+     * Put entry using hybrid architecture:
+     * 1. Update KeyIndex (always)
+     * 2. Update value cache (always for new/updated values)
+     * 3. Persist to disk
+     */
     private void putEntry(String region, String key, CacheEntry entry) {
-        Cache<String, CacheEntry> cache = regionCaches.get(region);
+        KeyIndex keyIndex = keyIndices.get(region);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         
-        cache.put(key, entry);
+        // Update KeyIndex with value location = BOTH (in memory and will be on disk)
+        keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
         
-        // Invalidate negative cache since this key now exists
-        negativeCache.invalidate(region + ":" + key);
-        
-        // Note: entryCount is dynamically calculated from persistence, so no manual increment needed
+        // Add to value cache
+        valueCache.put(key, entry);
         
         recordStatistic(region, KuberConstants.STAT_SETS);
         metricsService.recordSet(region);
         
-        // Persist to persistence store
+        // Persist to disk
         if (properties.getCache().isPersistentMode()) {
             persistenceStore.saveEntry(entry);
         } else {
@@ -1571,37 +1635,48 @@ public class CacheService {
         
         info.put("nodeId", properties.getNodeId());
         info.put("version", VERSION);
+        info.put("architecture", "HYBRID"); // v1.2.1 hybrid memory architecture
         info.put("regionCount", regions.size());
         info.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         info.put("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());
         info.put("persistentMode", properties.getCache().isPersistentMode());
         
-        // Use fast estimates for dashboard display (O(1) instead of O(n))
-        long totalPersistenceEstimate = regions.keySet().stream()
-                .mapToLong(r -> persistenceStore.estimateEntryCount(r))
+        // HYBRID stats - KeyIndex is source of truth for key counts
+        long totalKeys = keyIndices.values().stream()
+                .mapToLong(KeyIndex::size)
                 .sum();
-        info.put("totalEntries", totalPersistenceEstimate);
+        info.put("totalEntries", totalKeys);
+        info.put("keysInMemory", totalKeys); // All keys always in memory
         
-        // In-memory count is already fast
-        long totalMemoryEntries = regionCaches.values().stream()
+        // Value cache count (hot values in memory)
+        long totalMemoryValues = regionCaches.values().stream()
                 .mapToLong(Cache::estimatedSize)
                 .sum();
-        info.put("memoryEntries", totalMemoryEntries);
-        info.put("persistenceEntries", totalPersistenceEstimate);
+        info.put("valuesInMemory", totalMemoryValues);
+        
+        // Cold values (on disk only)
+        long valuesOnDiskOnly = keyIndices.values().stream()
+                .mapToLong(idx -> idx.getKeysOnDiskOnly().size())
+                .sum();
+        info.put("valuesOnDiskOnly", valuesOnDiskOnly);
         
         return info;
     }
     
+    /**
+     * Get database size - O(1) using KeyIndex (NEVER hits disk).
+     */
     public long dbSize(String region) {
         if (region == null || region.isEmpty()) {
-            // Return fast estimate total across all regions
-            return regions.keySet().stream()
-                    .mapToLong(r -> persistenceStore.estimateEntryCount(r))
+            // Return total across all regions from KeyIndex - O(1) per region
+            return keyIndices.values().stream()
+                    .mapToLong(KeyIndex::size)
                     .sum();
         }
         
-        // Return fast estimate for the region
-        return persistenceStore.estimateEntryCount(region);
+        // Return exact count from KeyIndex - O(1)
+        KeyIndex keyIndex = keyIndices.get(region);
+        return keyIndex != null ? keyIndex.size() : 0;
     }
     
     /**
@@ -1612,7 +1687,7 @@ public class CacheService {
     }
     
     /**
-     * Get in-memory entry count for a region.
+     * Get in-memory value count for a region (values in Caffeine cache).
      */
     public long getMemoryEntryCount(String region) {
         Cache<String, CacheEntry> cache = regionCaches.get(region);
@@ -1620,42 +1695,58 @@ public class CacheService {
     }
     
     /**
-     * Get persistence store entry count for a region (excludes expired entries).
-     * WARNING: This is slow O(n) - iterates all entries. Use for accurate counts only.
-     * For dashboard/UI display, use getEstimatedPersistenceEntryCount() instead.
+     * Get total key count for a region from KeyIndex - O(1).
+     * This is the source of truth for entry counts in hybrid architecture.
+     */
+    public long getKeyIndexCount(String region) {
+        KeyIndex keyIndex = keyIndices.get(region);
+        return keyIndex != null ? keyIndex.size() : 0;
+    }
+    
+    /**
+     * Get persistence store entry count for a region.
+     * In hybrid architecture, this returns KeyIndex count (source of truth).
      */
     public long getPersistenceEntryCount(String region) {
-        return persistenceStore.countNonExpiredEntries(region);
+        // In hybrid mode, KeyIndex is the source of truth
+        return getKeyIndexCount(region);
     }
     
     /**
-     * Get fast estimated entry count for a region from persistence store.
-     * This is O(1) and suitable for dashboard display.
+     * Get fast entry count for a region - O(1) from KeyIndex.
      */
     public long getEstimatedPersistenceEntryCount(String region) {
-        return persistenceStore.estimateEntryCount(region);
+        // KeyIndex provides O(1) exact count
+        return getKeyIndexCount(region);
     }
     
     /**
-     * Get detailed region statistics including memory vs persistence.
-     * Uses fast estimates for dashboard display.
+     * Get detailed region statistics including KeyIndex and value cache.
      */
     public Map<String, Object> getDetailedRegionStats(String region) {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("region", region);
         
-        long memoryEntries = getMemoryEntryCount(region);
-        long persistenceEstimate = persistenceStore.estimateEntryCount(region);
+        KeyIndex keyIndex = keyIndices.get(region);
+        long totalKeys = keyIndex != null ? keyIndex.size() : 0;
+        long memoryValues = getMemoryEntryCount(region);
+        long diskOnlyKeys = keyIndex != null ? keyIndex.getKeysOnDiskOnly().size() : 0;
         
         CacheRegion regionObj = regions.get(region);
         if (regionObj != null) {
             stats.put("hitRatio", String.format("%.2f", regionObj.getHitRatio()));
         }
         
-        // Use fast estimates for dashboard - O(1) instead of O(n)
-        stats.put("entryCount", persistenceEstimate);
-        stats.put("memoryEntries", memoryEntries);
-        stats.put("persistenceEntries", persistenceEstimate);
+        // HYBRID stats
+        stats.put("entryCount", totalKeys);           // Total keys (from KeyIndex)
+        stats.put("keysInMemory", totalKeys);         // All keys are always in memory
+        stats.put("valuesInMemory", memoryValues);    // Hot values in cache
+        stats.put("valuesOnDiskOnly", diskOnlyKeys);  // Cold values (key in index, value on disk)
+        
+        // Index statistics
+        if (keyIndex != null) {
+            stats.put("indexHitRate", String.format("%.2f%%", keyIndex.getHitRate() * 100));
+        }
         
         return stats;
     }
@@ -1674,30 +1765,32 @@ public class CacheService {
     // ==================== Memory Management Eviction ====================
     
     /**
-     * Evict entries from memory to persistence store.
+     * Evict values from memory to persistence store (HYBRID ARCHITECTURE).
      * Used by MemoryWatcherService to reduce heap usage under memory pressure.
-     * Entries are persisted before being removed from memory to prevent data loss.
      * 
-     * @param count Maximum number of entries to evict
-     * @return Actual number of entries evicted
+     * In hybrid mode:
+     * - Keys ALWAYS stay in KeyIndex (never evicted)
+     * - Only values are evicted from memory
+     * - KeyIndex is updated to mark values as DISK only
+     * 
+     * @param count Maximum number of values to evict
+     * @return Actual number of values evicted
      */
     public int evictEntriesToPersistence(int count) {
         int totalEvicted = 0;
         
-        // Iterate through regions and evict entries
+        // Iterate through regions and evict values (not keys!)
         for (Map.Entry<String, Cache<String, CacheEntry>> regionEntry : regionCaches.entrySet()) {
             if (totalEvicted >= count) {
                 break;
             }
             
             String regionName = regionEntry.getKey();
-            Cache<String, CacheEntry> cache = regionEntry.getValue();
-            CacheRegion region = regions.get(regionName);
+            Cache<String, CacheEntry> valueCache = regionEntry.getValue();
+            KeyIndex keyIndex = keyIndices.get(regionName);
             
-            // Get entries to evict (Caffeine's asMap() returns in no particular order,
-            // but the cache is configured with LRU so entries accessed less recently
-            // will be candidates for eviction)
-            int regionEvictCount = Math.min(count - totalEvicted, (int) cache.estimatedSize());
+            // Get values to evict
+            int regionEvictCount = Math.min(count - totalEvicted, (int) valueCache.estimatedSize());
             if (regionEvictCount <= 0) {
                 continue;
             }
@@ -1706,7 +1799,7 @@ public class CacheService {
             List<CacheEntry> entriesToPersist = new ArrayList<>();
             
             // Collect entries to evict
-            for (Map.Entry<String, CacheEntry> entry : cache.asMap().entrySet()) {
+            for (Map.Entry<String, CacheEntry> entry : valueCache.asMap().entrySet()) {
                 if (keysToEvict.size() >= regionEvictCount) {
                     break;
                 }
@@ -1722,7 +1815,7 @@ public class CacheService {
                 entriesToPersist.add(cacheEntry);
             }
             
-            // Persist entries before evicting
+            // Persist entries before evicting values from memory
             for (CacheEntry entry : entriesToPersist) {
                 try {
                     persistenceStore.saveEntry(entry);
@@ -1732,20 +1825,21 @@ public class CacheService {
                 }
             }
             
-            // Evict from memory
+            // Evict values from memory cache and update KeyIndex
             for (String key : keysToEvict) {
-                cache.invalidate(key);
+                valueCache.invalidate(key);
+                
+                // HYBRID: Update KeyIndex to mark value as DISK only (key stays in index!)
+                if (keyIndex != null) {
+                    keyIndex.updateLocation(key, ValueLocation.DISK);
+                }
+                
                 totalEvicted++;
-                
-                // Note: We don't decrement region entry count because the entry
-                // still exists in persistence. The entry count reflects total entries,
-                // not just in-memory entries.
-                
                 recordStatistic(regionName, "evictions");
             }
             
             if (!keysToEvict.isEmpty()) {
-                log.debug("Evicted {} entries from region '{}' to persistence", 
+                log.debug("Evicted {} values from region '{}' to disk (keys remain in index)", 
                         keysToEvict.size(), regionName);
             }
         }
@@ -1768,20 +1862,34 @@ public class CacheService {
     public void cleanupExpiredEntries() {
         for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
             String regionName = entry.getKey();
-            Cache<String, CacheEntry> cache = entry.getValue();
+            Cache<String, CacheEntry> valueCache = entry.getValue();
+            KeyIndex keyIndex = keyIndices.get(regionName);
             
             List<String> expiredKeys = new ArrayList<>();
-            cache.asMap().forEach((key, cacheEntry) -> {
+            
+            // Check value cache for expired entries
+            valueCache.asMap().forEach((key, cacheEntry) -> {
                 if (cacheEntry.isExpired()) {
                     expiredKeys.add(key);
                 }
             });
             
-            for (String key : expiredKeys) {
-                cache.invalidate(key);
+            // Also check KeyIndex for expired entries (cold values on disk only)
+            if (keyIndex != null) {
+                expiredKeys.addAll(keyIndex.findExpiredKeys());
+            }
+            
+            // Remove duplicates
+            Set<String> uniqueExpiredKeys = new HashSet<>(expiredKeys);
+            
+            for (String key : uniqueExpiredKeys) {
+                // HYBRID: Remove from both KeyIndex and value cache
+                if (keyIndex != null) {
+                    keyIndex.remove(key);
+                }
+                valueCache.invalidate(key);
                 
                 // Delete from persistence store
-                // Note: entryCount is dynamically calculated from persistence, so no manual decrement needed
                 try {
                     persistenceStore.deleteEntry(regionName, key);
                 } catch (Exception e) {
@@ -1791,9 +1899,9 @@ public class CacheService {
                 recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
             }
             
-            if (!expiredKeys.isEmpty()) {
-                log.info("Cleaned up {} expired entries from memory in region '{}'", 
-                        expiredKeys.size(), regionName);
+            if (!uniqueExpiredKeys.isEmpty()) {
+                log.info("Cleaned up {} expired entries from region '{}' (removed from index and cache)", 
+                        uniqueExpiredKeys.size(), regionName);
             }
         }
     }

@@ -295,8 +295,8 @@
             </div>
         </div>
         
-        <!-- RocksDB Compaction Row -->
-        <div class="row mt-4">
+        <!-- RocksDB Compaction Row (only shown when using RocksDB persistence) -->
+        <div class="row mt-4" th:if="${persistenceType == 'ROCKSDB'}">
             <div class="col-lg-6">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
@@ -325,6 +325,37 @@
                 </div>
             </div>
             
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock me-2 text-danger"></i>
+                            TTL Expiration Service
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="refreshExpirationInfo()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="triggerExpiration()" id="expirationBtn">
+                                <i class="fas fa-broom me-1"></i>Clean Now
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="expirationInfo">
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TTL Expiration Row (shown when NOT using RocksDB - full width) -->
+        <div class="row mt-4" th:if="${persistenceType != 'ROCKSDB'}">
             <div class="col-lg-6">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
@@ -385,8 +416,8 @@
                                     <dd class="text-muted">Moving entries from memory to persistence to free heap space.</dd>
                                     <dt>Autoload</dt>
                                     <dd class="text-muted">Automatic file-based data loading from inbox directory.</dd>
-                                    <dt>Compaction</dt>
-                                    <dd class="text-muted">RocksDB process to merge SST files and reclaim disk space from deleted entries.</dd>
+                                    <dt th:if="${persistenceType == 'ROCKSDB'}">Compaction</dt>
+                                    <dd th:if="${persistenceType == 'ROCKSDB'}" class="text-muted">RocksDB process to merge SST files and reclaim disk space from deleted entries.</dd>
                                 </dl>
                             </div>
                             <div class="col-md-3">
@@ -414,6 +445,7 @@
 <script>
     let activityChart = null;
     let regionChart = null;
+    const persistenceType = /*[[${persistenceType}]]*/ 'ROCKSDB';
     
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
@@ -422,7 +454,9 @@
         refreshMemoryWatcherInfo();
         refreshAutoloadInfo();
         loadExpirationInfo();
-        refreshCompactionInfo();
+        if (persistenceType === 'ROCKSDB') {
+            refreshCompactionInfo();
+        }
         initActivityChart();
         initRegionChart();
         
@@ -433,7 +467,9 @@
             refreshMemoryWatcherInfo();
             refreshAutoloadInfo();
             loadExpirationInfo();
-            refreshCompactionInfo();
+            if (persistenceType === 'ROCKSDB') {
+                refreshCompactionInfo();
+            }
         }, 10000);
         
         // Refresh charts every 30 seconds

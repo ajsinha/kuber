@@ -58,6 +58,7 @@ public class AdminController {
         
         // Add persistence info
         model.addAttribute("persistenceInfo", getPersistenceInfo());
+        model.addAttribute("persistenceType", persistenceStore.getType().name());
         
         if (replicationManager != null) {
             model.addAttribute("replicationInfo", replicationManager.getReplicationInfo());
@@ -91,6 +92,10 @@ public class AdminController {
             }
             case ROCKSDB -> {
                 info.put("Path", properties.getPersistence().getRocksdb().getPath());
+            }
+            case LMDB -> {
+                info.put("Path", properties.getPersistence().getLmdb().getPath());
+                info.put("Map Size", formatBytes(properties.getPersistence().getLmdb().getMapSize()));
             }
             case MEMORY -> {
                 info.put("Note", "Data is not persisted across restarts");
@@ -155,5 +160,15 @@ public class AdminController {
         }
         
         return "admin/stats";
+    }
+    
+    /**
+     * Format bytes to human readable string.
+     */
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+        return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
     }
 }

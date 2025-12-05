@@ -186,6 +186,7 @@ public interface PersistenceStore {
         SQLITE("sqlite"),
         POSTGRESQL("postgresql"),
         ROCKSDB("rocksdb"),
+        LMDB("lmdb"),
         MEMORY("memory");
         
         private final String value;

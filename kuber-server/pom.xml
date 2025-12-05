@@ -18,7 +18,7 @@
     <parent>
         <groupId>com.kuber</groupId>
         <artifactId>kuber-parent</artifactId>
-        <version>1.1.18-SNAPSHOT</version>
+        <version>1.2.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>kuber-server</artifactId>
@@ -166,6 +166,13 @@
             <groupId>org.webjars.npm</groupId>
             <artifactId>codemirror</artifactId>
             <version>5.65.16</version>
+        </dependency>
+
+        <!-- LMDB - Lightning Memory-Mapped Database -->
+        <dependency>
+            <groupId>org.lmdbjava</groupId>
+            <artifactId>lmdbjava</artifactId>
+            <version>0.9.0</version>
         </dependency>
 
         <!-- Test dependencies -->

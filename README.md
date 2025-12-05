@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.1.18
+Version 1.2.1
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,10 +13,11 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
+- **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
 - **Redis Protocol Compatibility**: Connect using any Redis client
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
-- **Multi-Backend Persistence**: RocksDB (default), MongoDB, SQLite, PostgreSQL
+- **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
 - **Pre-Startup Compaction**: RocksDB/SQLite optimized BEFORE Spring context loads
@@ -28,6 +29,42 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **CSV Export**: Export cache data to CSV files
 
 ## Features
+
+### Hybrid Memory Architecture (v1.2.1)
+
+Kuber uses an Aerospike-inspired hybrid storage model where **all keys are always kept in memory** while values can overflow to disk:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              KeyIndex (Always In Memory - Per Region)           │
+│  ┌─────────┬──────────────┬─────────┬────────────┬───────────┐ │
+│  │   Key   │ ValueInMem?  │  Size   │  ExpiresAt │  Type     │ │
+│  │ user:1  │     true     │  1.2KB  │  16:00:00  │  JSON     │ │
+│  │ user:2  │     false    │  2.1KB  │     -1     │  STRING   │ │
+│  │ user:3  │     true     │  0.5KB  │  17:30:00  │  JSON     │ │
+│  └─────────┴──────────────┴─────────┴────────────┴───────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│         Value Cache (Memory - Hot Values)                       │
+│         Persistence Store (Disk - All Values)                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Component | Storage | Purpose |
+|-----------|---------|---------|
+| KeyIndex | Always in Memory | O(1) existence checks, pattern matching, TTL tracking |
+| Hot Values | Memory (Caffeine) | Frequently accessed data |
+| Cold Values | Disk Only | Overflow when memory is constrained |
+| All Values | Disk | Durability (RocksDB/LMDB/SQLite/MongoDB/PostgreSQL) |
+
+**Performance Benefits:**
+
+| Operation | Before v1.2.1 | After v1.2.1 | Improvement |
+|-----------|---------------|--------------|-------------|
+| EXISTS | May hit disk | O(1) pure memory | **10-100x faster** |
+| KEYS * | Scans disk | O(n) memory scan | **100x+ faster** |
+| GET (missing key) | Negative cache (30s TTL) | O(1) instant fail | **Always instant** |
+| DBSIZE | O(n) disk scan | O(1) index.size() | **1000x faster** |
+| Entry count | Estimate from disk | Exact from index | **Instant & accurate** |
 
 ### Core Features
 
@@ -44,8 +81,9 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
 | Feature | Description |
 |---------|-------------|
-| Multi-Backend Persistence | RocksDB (default), MongoDB, SQLite, PostgreSQL, or in-memory |
-| Region Isolation | Separate database instance per region (RocksDB/SQLite) |
+| Multi-Backend Persistence | RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL, or in-memory |
+| LMDB Support (v1.2.0) | Lightning Memory-Mapped Database with zero-copy reads |
+| Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
 | Automatic Compaction | Pre-startup compaction before Spring + cron schedule (default: 2 AM daily) |
 | Smart Cache Priming | Loads most recently accessed entries first on restart |
@@ -65,7 +103,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 ### Prerequisites
 
 - Java 17 or higher
-- One of: MongoDB 5.0+, PostgreSQL 14+, or local file system for SQLite/RocksDB
+- One of: MongoDB 5.0+, PostgreSQL 14+, or local file system for SQLite/RocksDB/LMDB
 - Maven 3.8 or higher
 - ZooKeeper 3.8+ (optional, for replication)
 
@@ -209,7 +247,7 @@ kuber:
   
   # Cache settings
   cache:
-    max-memory-entries: 100000          # Default per-region limit
+    max-memory-entries: 100000          # Default per-region limit (for value cache)
     global-max-memory-entries: 500000   # Global cap across all regions (0=unlimited)
     region-memory-limits:               # Per-region overrides
       customers: 50000
@@ -217,13 +255,16 @@ kuber:
     persistent-mode: false
     eviction-policy: LRU
   
-  # Persistence (rocksdb, mongodb, postgresql, sqlite, memory)
+  # Persistence (rocksdb, lmdb, mongodb, postgresql, sqlite, memory)
   persistence:
-    type: rocksdb
+    type: rocksdb                       # Options: rocksdb, lmdb, mongodb, postgresql, sqlite, memory
     rocksdb:
       path: ./data/rocksdb
       compaction-enabled: true
-      compaction-interval-minutes: 30
+      compaction-cron: "0 0 2 * * ?"    # 2 AM daily
+    lmdb:
+      path: ./data/lmdb
+      map-size: 1073741824              # 1GB (increase for larger datasets)
   
   # MongoDB settings (if persistence.type=mongodb)
   mongo:
@@ -236,7 +277,18 @@ kuber:
     connect-string: localhost:2181
 ```
 
-### Memory Management (v1.1.11)
+### Persistence Store Comparison
+
+| Store | Speed | Durability | Use Case |
+|-------|-------|------------|----------|
+| RocksDB | Very Fast | Excellent | Default - production workloads |
+| LMDB | Extremely Fast | Excellent | Read-heavy workloads, memory-mapped |
+| SQLite | Fast | Good | Simple deployments |
+| MongoDB | Fast | Excellent | Document-native, flexible queries |
+| PostgreSQL | Fast | Excellent | JSONB support, SQL queries |
+| Memory | Fastest | None | Testing, ephemeral data |
+
+### Memory Management (v1.2.0)
 
 Kuber provides flexible memory management:
 

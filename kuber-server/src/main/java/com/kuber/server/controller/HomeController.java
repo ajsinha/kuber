@@ -87,6 +87,7 @@ public class HomeController {
             case SQLITE -> properties.getPersistence().getSqlite().getPath();
             case POSTGRESQL -> properties.getPersistence().getPostgresql().getUrl();
             case ROCKSDB -> properties.getPersistence().getRocksdb().getPath();
+            case LMDB -> properties.getPersistence().getLmdb().getPath();
             case MEMORY -> "In-Memory (no persistence)";
         };
     }

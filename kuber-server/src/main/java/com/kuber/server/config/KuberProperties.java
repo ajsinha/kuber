@@ -405,7 +405,7 @@ public class KuberProperties {
     @Data
     public static class Persistence {
         /**
-         * Persistence store type: mongodb, sqlite, postgresql, rocksdb, memory
+         * Persistence store type: mongodb, sqlite, postgresql, rocksdb, lmdb, memory
          * Default: rocksdb (no external dependencies required)
          */
         @NotBlank
@@ -425,6 +425,11 @@ public class KuberProperties {
          * RocksDB configuration
          */
         private Rocksdb rocksdb = new Rocksdb();
+        
+        /**
+         * LMDB configuration
+         */
+        private Lmdb lmdb = new Lmdb();
     }
     
     @Data
@@ -507,5 +512,34 @@ public class KuberProperties {
          *   "0 0 * * * ?"     - Every hour
          */
         private String compactionCron = "0 0 2 * * ?";
+    }
+    
+    @Data
+    public static class Lmdb {
+        /**
+         * Path to LMDB database directory
+         */
+        private String path = "./data/lmdb";
+        
+        /**
+         * Maximum database size (map size) in bytes.
+         * LMDB memory-maps the entire database, so this sets the upper limit.
+         * Default: 1GB. Increase for larger datasets.
+         * 
+         * Common values:
+         *   1GB  = 1073741824
+         *   2GB  = 2147483648
+         *   4GB  = 4294967296
+         *   8GB  = 8589934592
+         *   16GB = 17179869184
+         */
+        private long mapSize = 1073741824L; // 1GB
+        
+        /**
+         * Whether to sync writes immediately.
+         * true = safer but slower (MDB_NOSYNC disabled)
+         * false = faster but risk of data loss on crash (MDB_NOSYNC enabled)
+         */
+        private boolean syncWrites = true;
     }
 }

@@ -29,11 +29,12 @@
                     <h5 class="alert-heading"><i class="fas fa-database me-2"></i>Welcome to <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h5>
                     <p class="mb-2"><span th:text="${appName} ?: 'Kuber'">Kuber</span> is a high-performance, Redis-compatible distributed caching system with:</p>
                     <ul class="mb-0">
-                        <li><strong>Multi-Backend Persistence</strong> - Choose from MongoDB, PostgreSQL, SQLite, RocksDB, or in-memory storage</li>
+                        <li><strong>Hybrid Memory Architecture (v1.2.1)</strong> - All keys in memory, values can overflow to disk (Aerospike-like)</li>
+                        <li><strong>Multi-Backend Persistence</strong> - Choose from RocksDB, LMDB, MongoDB, PostgreSQL, SQLite, or in-memory</li>
                         <li><strong>JSON Document Support</strong> - Store and query complex JSON with JSONPath</li>
                         <li><strong>Region Partitioning</strong> - Logical namespaces with auto-creation on first use</li>
                         <li><strong>Redis Compatibility</strong> - Use existing Redis clients and tools</li>
-                        <li><strong>High Performance</strong> - Sub-millisecond operations with Caffeine cache</li>
+                        <li><strong>High Performance</strong> - O(1) key existence checks via KeyIndex, sub-millisecond operations</li>
                         <li><strong>Replication</strong> - Primary/Secondary architecture with ZooKeeper coordination</li>
                         <li><strong>Autoload</strong> - Bulk data import from CSV and JSON files</li>
                     </ul>
@@ -151,7 +152,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.1.18</p>
+                    <p class="text-muted small mb-0">Version 1.2.1</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

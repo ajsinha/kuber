@@ -44,6 +44,7 @@ public class PersistenceConfig {
             case "sqlite" -> createSqlitePersistenceStore();
             case "postgresql", "postgres" -> createPostgresPersistenceStore();
             case "rocksdb", "rocks" -> createRocksDbPersistenceStore();
+            case "lmdb" -> createLmdbPersistenceStore();
             case "memory", "mem" -> createMemoryPersistenceStore();
             default -> {
                 log.warn("Unknown persistence type '{}', defaulting to RocksDB", type);
@@ -85,6 +86,13 @@ public class PersistenceConfig {
         log.info("Creating RocksDB persistence store at: {}", 
                 properties.getPersistence().getRocksdb().getPath());
         return new RocksDbPersistenceStore(properties);
+    }
+    
+    private PersistenceStore createLmdbPersistenceStore() {
+        log.info("Creating LMDB persistence store at: {} (map size: {} MB)", 
+                properties.getPersistence().getLmdb().getPath(),
+                properties.getPersistence().getLmdb().getMapSize() / (1024 * 1024));
+        return new LmdbPersistenceStore(properties);
     }
     
     private PersistenceStore createMemoryPersistenceStore() {
