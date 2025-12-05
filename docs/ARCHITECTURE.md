@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.1.3**
+**Version 1.2.4**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,14 +13,15 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 1. [Overview](#1-overview)
 2. [System Architecture](#2-system-architecture)
-3. [Core Components](#3-core-components)
-4. [Client Architecture](#4-client-architecture)
-5. [Protocol Design](#5-protocol-design)
-6. [Persistence Layer](#6-persistence-layer)
-7. [Replication Architecture](#7-replication-architecture)
-8. [Security Architecture](#8-security-architecture)
-9. [Data Flow](#9-data-flow)
-10. [Deployment Patterns](#10-deployment-patterns)
+3. [Startup Orchestration](#3-startup-orchestration)
+4. [Core Components](#4-core-components)
+5. [Client Architecture](#5-client-architecture)
+6. [Protocol Design](#6-protocol-design)
+7. [Persistence Layer](#7-persistence-layer)
+8. [Replication Architecture](#8-replication-architecture)
+9. [Security Architecture](#9-security-architecture)
+10. [Data Flow](#10-data-flow)
+11. [Deployment Patterns](#11-deployment-patterns)
 
 ---
 
@@ -168,9 +169,156 @@ kuber/
 
 ---
 
-## 3. Core Components
+## 3. Startup Orchestration
 
-### 3.1 Cache Service
+Kuber uses a `StartupOrchestrator` to ensure correct initialization order and prevent race conditions during application startup. This is critical for data integrity and system stability.
+
+### 3.1 The Problem
+
+Without proper orchestration, several race conditions can occur:
+
+| Race Condition | Description | Impact |
+|----------------|-------------|--------|
+| **Early Data Recovery** | Persistence recovery starts before Spring context is fully loaded | Missing bean dependencies, null pointers |
+| **Premature Client Connections** | Redis server accepts connections before cache is ready | Clients receive errors or stale data |
+| **Autoload Race** | Files processed before persistence recovery completes | Data overwrites, inconsistent state |
+| **Scheduled Task Conflicts** | @Scheduled methods run before initialization | Operations on uninitialized caches |
+
+### 11.2 Startup Sequence
+
+The `StartupOrchestrator` guarantees this strict initialization order:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         STARTUP SEQUENCE (v1.2.4)                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ PHASE 0: Spring Boot Initialization                                  │   │
+│  │ • Spring context loads all beans                                     │   │
+│  │ • Dependency injection completes                                     │   │
+│  │ • ApplicationReadyEvent fires                                        │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ STABILIZATION: Wait 10 seconds                                       │   │
+│  │ • Allows all Spring beans to fully initialize                        │   │
+│  │ • Ensures async initializations complete                             │   │
+│  │ • Prevents premature service access                                  │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ PHASE 1: Cache Service Initialization                                │   │
+│  │ • Load regions from persistence store                                │   │
+│  │ • Recover all cached data from disk/database                         │   │
+│  │ • Build KeyIndex for each region (all keys in memory)                │   │
+│  │ • Prime value cache with hot entries                                 │   │
+│  │ • Mark CacheService as initialized                                   │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ PHASE 2: Redis Protocol Server                                       │   │
+│  │ • Bind to configured port (default: 6380)                            │   │
+│  │ • Start accepting client connections                                 │   │
+│  │ • Clients can now safely connect with full data available            │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ PHASE 3: Autoload Service                                            │   │
+│  │ • Initialize inbox/outbox directories                                │   │
+│  │ • Start file watcher for new data files                              │   │
+│  │ • Process any pending files in inbox                                 │   │
+│  │ • Mark startup as complete                                           │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 Scheduled Task Protection
+
+All `@Scheduled` methods check for cache initialization before executing:
+
+```java
+@Scheduled(fixedRate = 60000)
+public void cleanupExpiredEntries() {
+    // Skip if cache service not yet initialized
+    if (!cacheService.isInitialized()) {
+        return;
+    }
+    // ... perform cleanup
+}
+```
+
+Protected scheduled tasks include:
+
+| Service | Method | Protection |
+|---------|--------|------------|
+| CacheService | cleanupExpiredEntries() | `initialized.get()` |
+| MemoryWatcherService | checkMemoryUsage() | `cacheService.isInitialized()` |
+| PersistenceExpirationService | cleanupExpiredEntries() | `cacheService.isInitialized()` |
+| RocksDbCompactionService | scheduledCompaction() | `enabled.get()` |
+
+### 4.4 Startup Logging
+
+The orchestrator provides clear visual logging of each phase:
+
+```
+╔════════════════════════════════════════════════════════════════════╗
+║  Spring context ready - starting initialization sequence...        ║
+╚════════════════════════════════════════════════════════════════════╝
+Waiting 10 seconds for Spring context stabilization...
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Phase 1: Starting cache service initialization...                 ║
+║           Recovering data from persistence store...                ║
+╚════════════════════════════════════════════════════════════════════╝
+Cache service initialization completed in 1234 ms
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Phase 2: Starting Redis protocol server...                        ║
+╚════════════════════════════════════════════════════════════════════╝
+Redis protocol server started on port 6380
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Phase 3: Starting autoload service...                             ║
+╚════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Startup sequence completed successfully!                          ║
+║  - Cache service: initialized (data recovered)                     ║
+║  - Redis server: accepting connections                             ║
+║  - Autoload service: started                                       ║
+╚════════════════════════════════════════════════════════════════════╝
+```
+
+### 3.5 Checking Startup Status
+
+Services can query the orchestrator for startup status:
+
+```java
+@Autowired
+private StartupOrchestrator startupOrchestrator;
+
+// Check if cache is ready
+if (startupOrchestrator.isCacheReady()) {
+    // Safe to perform cache operations
+}
+
+// Check if full startup is complete
+if (startupOrchestrator.isStartupComplete()) {
+    // All services are ready
+}
+```
+
+---
+
+## 4. Core Components
+
+### 11.1 Cache Service
 
 The `CacheService` is the central component managing all cache operations:
 
@@ -207,7 +355,7 @@ The `CacheService` is the central component managing all cache operations:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Region Manager
+### 11.2 Region Manager
 
 Regions provide logical isolation for cache entries:
 
@@ -235,7 +383,7 @@ Regions can have optional attribute mapping configuration that transforms JSON a
 
 Example: If region has mapping `{"firstName":"first_name"}`, storing `{"firstName":"John"}` saves as `{"first_name":"John"}`
 
-### 3.3 JSON Service
+### 4.3 JSON Service
 
 Native JSON document support with JSONPath queries:
 
@@ -272,9 +420,9 @@ Native JSON document support with JSONPath queries:
 
 ---
 
-## 4. Client Architecture
+## 5. Client Architecture
 
-### 4.1 Client Overview
+### 11.1 Client Overview
 
 **IMPORTANT: All clients require authentication with username and password.**
 
@@ -307,7 +455,7 @@ Native JSON document support with JSONPath queries:
 └─────────────────────────┴───────────────────────────────────────────────┘
 ```
 
-### 4.2 Authentication Requirement
+### 11.2 Authentication Requirement
 
 All client constructors require username and password:
 
@@ -364,9 +512,9 @@ KuberRestClient client = new KuberRestClient(host, port, username, password);
 
 ---
 
-## 5. Protocol Design
+## 6. Protocol Design
 
-### 5.1 Redis RESP Protocol
+### 11.1 Redis RESP Protocol
 
 Kuber implements the Redis Serialization Protocol (RESP):
 
@@ -379,7 +527,7 @@ Kuber implements the Redis Serialization Protocol (RESP):
 | Array | `*` | `*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n` |
 | Null | `$-1` | `$-1\r\n` |
 
-### 5.2 Kuber Protocol Extensions
+### 11.2 Kuber Protocol Extensions
 
 Additional commands beyond standard Redis:
 
@@ -396,7 +544,7 @@ Additional commands beyond standard Redis:
 | `STATUS` | Server status | `STATUS` |
 | `REPLINFO` | Replication info | `REPLINFO` |
 
-### 5.3 REST API Endpoints
+### 7.3 REST API Endpoints
 
 ```
 Base URL: http://server:8080/api/v1
@@ -449,9 +597,9 @@ Bulk Operations:
 
 ---
 
-## 6. Persistence Layer
+## 7. Persistence Layer
 
-### 6.1 Pluggable Persistence Architecture
+### 11.1 Pluggable Persistence Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -478,7 +626,7 @@ Bulk Operations:
 └─────────┴─────────┴───────────┴─────────┴──────────┘
 ```
 
-### 6.2 Backend Comparison
+### 11.2 Backend Comparison
 
 | Backend | Use Case | Pros | Cons |
 |---------|----------|------|------|
@@ -488,7 +636,7 @@ Bulk Operations:
 | **RocksDB** | High-performance | Embedded, LSM-tree | Complex tuning |
 | **InMemory** | Testing/Dev | Fastest, no I/O | No persistence |
 
-### 6.3 Configuration
+### 7.3 Configuration
 
 ```yaml
 kuber:
@@ -519,9 +667,9 @@ kuber:
 
 ---
 
-## 7. Replication Architecture
+## 8. Replication Architecture
 
-### 7.1 Primary/Secondary Replication
+### 11.1 Primary/Secondary Replication
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -550,7 +698,7 @@ kuber:
 └───────────────┘           └───────────────┘
 ```
 
-### 7.2 Failover Process
+### 11.2 Failover Process
 
 1. **Primary Failure Detection**: ZooKeeper detects primary node is unresponsive
 2. **Leader Election**: Remaining nodes participate in leader election
@@ -560,9 +708,9 @@ kuber:
 
 ---
 
-## 8. Security Architecture
+## 9. Security Architecture
 
-### 8.1 Authentication
+### 11.1 Authentication
 
 **All clients MUST provide credentials. This is enforced at the client level.**
 
@@ -595,7 +743,7 @@ kuber:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 User Configuration
+### 11.2 User Configuration
 
 Users are configured in `users.json`:
 
@@ -620,9 +768,9 @@ Users are configured in `users.json`:
 
 ---
 
-## 9. Data Flow
+## 10. Data Flow
 
-### 9.1 Write Operation Flow
+### 11.1 Write Operation Flow
 
 ```
 ┌──────────┐   ┌───────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
@@ -645,7 +793,7 @@ Users are configured in `users.json`:
      │               │                │                 │                 │
 ```
 
-### 9.2 Read Operation Flow
+### 11.2 Read Operation Flow
 
 ```
 ┌──────────┐   ┌───────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
@@ -670,9 +818,9 @@ Users are configured in `users.json`:
 
 ---
 
-## 10. Deployment Patterns
+## 11. Deployment Patterns
 
-### 10.1 Single Node (Development)
+### 11.1 Single Node (Development)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -687,7 +835,7 @@ Users are configured in `users.json`:
 └─────────────────────────────────────────┘
 ```
 
-### 10.2 High Availability Cluster
+### 11.2 High Availability Cluster
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐

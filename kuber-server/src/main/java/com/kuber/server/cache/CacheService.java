@@ -36,11 +36,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -62,13 +62,13 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.2.2
+ * @version 1.2.4
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.2.2";
+    private static final String VERSION = "1.2.4";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -95,6 +95,9 @@ public class CacheService {
     // Statistics
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
     
+    // Initialization state - prevents operations before recovery is complete
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
+    
     public CacheService(KuberProperties properties, 
                         PersistenceStore persistenceStore,
                         EventPublisher eventPublisher,
@@ -105,8 +108,16 @@ public class CacheService {
         this.metricsService = metricsService;
     }
     
-    @PostConstruct
+    /**
+     * Initialize the cache service.
+     * Called by StartupOrchestrator after Spring context is fully loaded.
+     * This method recovers data from persistence store.
+     */
     public void initialize() {
+        if (initialized.get()) {
+            log.warn("CacheService already initialized, skipping...");
+            return;
+        }
         log.info("Initializing Kuber cache service v{} with HYBRID MEMORY ARCHITECTURE...", VERSION);
         log.info("Using persistence store: {}", persistenceStore.getType());
         log.info("HYBRID MODE: All keys will be kept in memory; values can overflow to disk");
@@ -130,7 +141,18 @@ public class CacheService {
         // Prime cache: load ALL keys into index, hot values into cache
         primeCacheHybrid();
         
+        // Mark as initialized
+        initialized.set(true);
+        
         log.info("Cache service initialized with {} regions (HYBRID MODE)", regions.size());
+    }
+    
+    /**
+     * Check if cache service has completed initialization.
+     * Used by other services to wait for recovery to complete.
+     */
+    public boolean isInitialized() {
+        return initialized.get();
     }
     
     private void loadRegions() {
@@ -1885,6 +1907,11 @@ public class CacheService {
     
     @Scheduled(fixedRateString = "${kuber.cache.ttl-cleanup-interval-seconds:60}000")
     public void cleanupExpiredEntries() {
+        // Skip if cache service not yet initialized
+        if (!initialized.get()) {
+            return;
+        }
+        
         for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
             String regionName = entry.getKey();
             Cache<String, CacheEntry> valueCache = entry.getValue();

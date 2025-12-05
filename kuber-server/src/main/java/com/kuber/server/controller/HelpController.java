@@ -34,7 +34,7 @@ public class HelpController {
     
     // Valid section names
     private static final Set<String> VALID_SECTIONS = Set.of(
-        "overview", "quickstart", "web-ui", "config",
+        "overview", "quickstart", "web-ui", "config", "architecture",
         "rest-api", "redis-protocol", "generic-search", "autoload",
         "python-client", "java-client",
         "string-ops", "json-ops", "hash-ops", "key-ops", "ttl-ops", "batch-ops",

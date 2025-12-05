@@ -2,6 +2,59 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.4] - 2025-12-05 - STARTUP RACE CONDITION FIX
+
+### Fixed
+- **Startup Race Condition**: Fixed critical race condition where data recovery and autoload could start before Spring context was fully loaded
+- **Redis Server Delayed Start**: Redis protocol server now starts AFTER cache service initialization and data recovery
+  - Clients cannot connect until cache is ready with recovered data
+  - Prevents "cache not initialized" errors during client connections
+- **Memory Watcher Guard**: Memory watcher service now checks if cache is initialized before performing operations
+- **Scheduled Task Protection**: All @Scheduled methods now check for cache initialization before executing
+- **Ordered Startup Sequence**: Guaranteed startup order:
+  1. Spring context fully loads (ApplicationReadyEvent)
+  2. Wait 10 seconds for system stabilization
+  3. Initialize CacheService (recover data from persistence store)
+  4. Start Redis Protocol Server (now accepts client connections)
+  5. Start Autoload Service (process inbox files)
+
+### Added
+- **Startup Orchestration Documentation**: Comprehensive documentation of startup sequence
+  - Added Section 3 "Startup Orchestration" to ARCHITECTURE.md with diagrams and tables
+  - Added Section 3 "Startup Orchestration" to architecture.html with visual diagrams
+  - Added "Startup Sequence" card to help index page linking to architecture#startup-orchestration
+  - Documents race condition prevention strategies
+  - Documents scheduled task protection mechanisms
+  - Includes startup logging examples
+
+### Changed
+- `StartupOrchestrator` now controls Redis server startup in addition to cache and autoload
+- `RedisProtocolServer` no longer uses @PostConstruct - started explicitly by orchestrator
+- `MemoryWatcherService` skips operations until cache is initialized
+- `PersistenceExpirationService` skips operations until cache is initialized
+- `CacheService.cleanupExpiredEntries()` skips until initialized
+- Added `isCacheReady()` method to StartupOrchestrator for service coordination
+- Renumbered architecture documentation sections (Core Components now Section 4, etc.)
+
+## [1.2.3] - 2025-12-05 - ARCHITECTURE DOCUMENTATION
+
+### Added
+- **Architecture Help Page**: Comprehensive system architecture documentation accessible from Help menu
+  - High-level architecture diagrams
+  - Hybrid memory architecture explanation
+  - Core components description
+  - Persistence layer comparison
+  - Protocol design documentation
+  - Replication architecture
+  - Security architecture
+  - Data flow diagrams
+  - Deployment patterns
+  - Accessible to non-authenticated users
+
+### Changed
+- Help index now includes Architecture card in Getting Started section
+- Version bumped to 1.2.3 across all modules and documentation
+
 ## [1.2.2] - 2025-12-05 - OFF-HEAP KEY INDEX
 
 ### Added

@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.2.2</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.2.4</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -306,8 +306,32 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.2.2</span>
-                                    <span class="text-muted small">Current - Off-Heap Key Index</span>
+                                    <span class="badge bg-primary me-2">v1.2.4</span>
+                                    <span class="text-muted small">Current - Startup Race Condition Fix</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Startup Race Condition Fix</strong>: Fixed critical race condition in application startup</li>
+                                    <li>Redis server now starts AFTER cache service initialization and data recovery</li>
+                                    <li>Clients cannot connect until cache is fully ready with recovered data</li>
+                                    <li>Memory watcher service waits for cache initialization</li>
+                                    <li>Guaranteed startup order: Spring → Wait 10s → Cache Recovery → Redis Server → Autoload</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.2.3</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Architecture Help Page</strong>: Comprehensive system architecture documentation</li>
+                                    <li>High-level architecture diagrams and component descriptions</li>
+                                    <li>Hybrid memory architecture explanation</li>
+                                    <li>Persistence layer comparison and protocol design</li>
+                                    <li>Accessible to non-authenticated users</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.2.2</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Off-Heap Key Index (DRAM)</strong>: Optional storage of keys in direct memory outside Java heap</li>
@@ -591,7 +615,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.2.2
+                                <strong>Version:</strong> 1.2.4
                             </li>
                         </ul>
                     </div>

@@ -16,7 +16,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -115,20 +114,47 @@ public class AutoloadService {
     private static final DateTimeFormatter TIMESTAMP_FORMAT = 
             DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
     
-    @PostConstruct
-    public void init() {
+    // Track if autoload has been started (to prevent double-start)
+    private volatile boolean started = false;
+    
+    /**
+     * Start autoload service after cache recovery is complete.
+     * Called by StartupOrchestrator after CacheService is initialized.
+     * This ensures autoload does not process files before persistence recovery.
+     */
+    public synchronized void startAfterRecovery() {
+        if (started) {
+            log.warn("AutoloadService already started, skipping...");
+            return;
+        }
+        
         if (!properties.getAutoload().isEnabled()) {
             log.info("Autoload service is disabled");
+            started = true;
+            return;
+        }
+        
+        // Verify cache service is initialized
+        if (!cacheService.isInitialized()) {
+            log.error("Cannot start AutoloadService - CacheService not initialized!");
             return;
         }
         
         try {
             initializeDirectories();
             startWatcher();
+            started = true;
             log.info("Autoload service started - watching: {}", inboxPath);
         } catch (Exception e) {
             log.error("Failed to initialize autoload service", e);
         }
+    }
+    
+    /**
+     * Check if autoload service has been started.
+     */
+    public boolean isStarted() {
+        return started;
     }
     
     @PreDestroy

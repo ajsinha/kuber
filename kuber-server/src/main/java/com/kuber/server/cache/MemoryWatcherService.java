@@ -94,6 +94,11 @@ public class MemoryWatcherService {
      */
     @Scheduled(fixedDelayString = "${kuber.cache.memory-watcher-interval-ms:5000}")
     public void checkMemoryUsage() {
+        // Skip if cache service not yet initialized
+        if (!cacheService.isInitialized()) {
+            return;
+        }
+        
         // Skip if eviction is already in progress
         if (!evictionInProgress.compareAndSet(false, true)) {
             return;

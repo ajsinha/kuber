@@ -22,16 +22,22 @@ import org.apache.mina.filter.executor.ExecutorFilter;
 import org.apache.mina.transport.socket.nio.NioSocketAcceptor;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Redis protocol server using Apache MINA.
  * Handles incoming Redis protocol connections.
+ * 
+ * <p>The server is started by {@link com.kuber.server.startup.StartupOrchestrator}
+ * after the cache service has been initialized and data has been recovered from
+ * persistence. This prevents clients from connecting before the cache is ready.
+ * 
+ * @version 1.2.4
  */
 @Slf4j
 @Component
@@ -42,9 +48,19 @@ public class RedisProtocolServer {
     private final RedisProtocolHandler protocolHandler;
     
     private IoAcceptor acceptor;
+    private final AtomicBoolean started = new AtomicBoolean(false);
     
-    @PostConstruct
-    public void start() {
+    /**
+     * Start the Redis protocol server.
+     * Called by StartupOrchestrator after cache service is initialized.
+     * This ensures clients cannot connect before data recovery is complete.
+     */
+    public synchronized void startServer() {
+        if (started.get()) {
+            log.warn("Redis protocol server already started, skipping...");
+            return;
+        }
+        
         try {
             KuberProperties.Network networkConfig = properties.getNetwork();
             
@@ -83,6 +99,7 @@ public class RedisProtocolServer {
                     networkConfig.getPort());
             
             acceptor.bind(bindAddress);
+            started.set(true);
             
             log.info("Redis protocol server started on {}:{}", 
                     networkConfig.getBindAddress(), 
@@ -116,6 +133,6 @@ public class RedisProtocolServer {
      * Check if the server is running
      */
     public boolean isRunning() {
-        return acceptor != null && acceptor.isActive();
+        return started.get() && acceptor != null && acceptor.isActive();
     }
 }

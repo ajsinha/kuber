@@ -11,6 +11,7 @@
  */
 package com.kuber.server.service;
 
+import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.persistence.PersistenceStore;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class PersistenceExpirationService {
     
     private final PersistenceStore persistenceStore;
     private final KuberProperties properties;
+    private final CacheService cacheService;
     
     // Statistics
     private final AtomicLong totalExpiredDeleted = new AtomicLong(0);
@@ -42,9 +44,11 @@ public class PersistenceExpirationService {
     private volatile boolean enabled = true;
     
     public PersistenceExpirationService(PersistenceStore persistenceStore, 
-                                        KuberProperties properties) {
+                                        KuberProperties properties,
+                                        CacheService cacheService) {
         this.persistenceStore = persistenceStore;
         this.properties = properties;
+        this.cacheService = cacheService;
     }
     
     @PostConstruct
@@ -61,6 +65,12 @@ public class PersistenceExpirationService {
     @Scheduled(fixedDelayString = "${kuber.expiration.cleanup-interval-ms:60000}")
     public void cleanupExpiredEntries() {
         if (!enabled) {
+            return;
+        }
+        
+        // Wait for cache service to be initialized
+        if (!cacheService.isInitialized()) {
+            log.debug("Cache service not yet initialized, skipping persistence expiration cleanup");
             return;
         }
         

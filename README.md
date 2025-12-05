@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.2.2
+Version 1.2.4
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
