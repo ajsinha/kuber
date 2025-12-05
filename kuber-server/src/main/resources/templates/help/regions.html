@@ -18,6 +18,32 @@
                 <h3>Overview</h3>
                 <p>Regions are logical namespaces for organizing cache data. Regions are auto-created when data is stored.</p>
                 
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Region Isolation (v1.1.13):</strong> Each region gets its own dedicated database instance (RocksDB or SQLite). 
+                    This provides better concurrency, isolation, and the ability to compact individual regions independently.
+                </div>
+                
+                <h3 class="mt-4">Region Name Rules</h3>
+                <p>Region names must follow these rules:</p>
+                <ul>
+                    <li>Only alphanumeric characters and underscores: <code>[a-zA-Z0-9_]</code></li>
+                    <li>Must contain at least one alphabetic character</li>
+                    <li>Valid: <code>default</code>, <code>customers</code>, <code>cache_v2</code>, <code>Region1</code></li>
+                    <li>Invalid: <code>123</code>, <code>_</code>, <code>my-region</code>, <code>cache.data</code></li>
+                </ul>
+                
+                <h3 class="mt-4">Per-Region Memory Limits (v1.1.13)</h3>
+                <p>Configure memory limits for individual regions:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code># application.yml
+kuber:
+  cache:
+    max-memory-entries: 100000           # Default for all regions
+    global-max-memory-entries: 500000    # Global cap (0 = unlimited)
+    region-memory-limits:
+      customers: 50000                   # Override for customers region
+      products: 200000                   # Override for products region</code></pre>
+                
                 <h3 class="mt-4">REST API</h3>
                 <table class="table table-striped">
                     <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
@@ -41,7 +67,7 @@
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.1.6</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.1.13</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

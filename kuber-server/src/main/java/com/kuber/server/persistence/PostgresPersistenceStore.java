@@ -394,7 +394,12 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
     @Override
     public List<CacheEntry> loadEntries(String region, int limit) {
         List<CacheEntry> entries = new ArrayList<>();
-        String sql = "SELECT * FROM kuber_entries WHERE region = ? ORDER BY updated_at DESC LIMIT ?";
+        // Order by last_accessed_at first (if exists), then by updated_at - most recently accessed entries first
+        // COALESCE handles null last_accessed_at by falling back to updated_at
+        // Also filter out expired entries
+        String sql = "SELECT * FROM kuber_entries WHERE region = ? " +
+                     "AND (expires_at IS NULL OR expires_at >= NOW()) " +
+                     "ORDER BY COALESCE(last_accessed_at, updated_at) DESC LIMIT ?";
         
         try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {

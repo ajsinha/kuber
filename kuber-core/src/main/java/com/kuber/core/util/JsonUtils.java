@@ -12,6 +12,7 @@
 package com.kuber.core.util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -57,6 +58,18 @@ public final class JsonUtils {
     public static JsonNode parse(String json) {
         try {
             return objectMapper.readTree(json);
+        } catch (JsonProcessingException e) {
+            throw new KuberException(KuberException.ErrorCode.JSON_PARSE_ERROR, 
+                    "Failed to parse JSON: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Parse JSON string to specified type using TypeReference
+     */
+    public static <T> T fromJson(String json, TypeReference<T> typeReference) {
+        try {
+            return objectMapper.readValue(json, typeReference);
         } catch (JsonProcessingException e) {
             throw new KuberException(KuberException.ErrorCode.JSON_PARSE_ERROR, 
                     "Failed to parse JSON: " + e.getMessage(), e);

@@ -103,12 +103,16 @@
                         <div id="collapsePersistence" class="accordion-collapse collapse" data-bs-parent="#featuresAccordion">
                             <div class="accordion-body">
                                 <ul>
-                                    <li><strong>RocksDB</strong> - Embedded key-value store, great for single-node deployments</li>
+                                    <li><strong>RocksDB</strong> - Embedded key-value store with separate database per region for concurrent access</li>
                                     <li><strong>MongoDB</strong> - Document database with rich querying capabilities</li>
                                     <li><strong>PostgreSQL</strong> - Enterprise-grade relational database</li>
-                                    <li><strong>SQLite</strong> - Lightweight embedded database</li>
+                                    <li><strong>SQLite</strong> - Lightweight embedded database with separate file per region</li>
                                     <li><strong>Memory</strong> - Pure in-memory for testing or ephemeral caching</li>
                                 </ul>
+                                <p class="small text-muted mt-2 mb-0">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <em>RocksDB and SQLite use region isolation - each region has its own database instance for better concurrency and performance.</em>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -147,7 +151,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.1.6</p>
+                    <p class="text-muted small mb-0">Version 1.1.13</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

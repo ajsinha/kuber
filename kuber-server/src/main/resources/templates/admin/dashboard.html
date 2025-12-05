@@ -907,7 +907,7 @@
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-compress me-1"></i>Compact Now';
                 if (data.success) {
-                    alert('Compaction completed! Reclaimed ' + data.reclaimedMB + ' MB in ' + data.durationMs + 'ms');
+                    alert('Compaction completed! ' + (data.regionsCompacted || 0) + ' region(s) compacted, reclaimed ' + data.reclaimedMB + ' MB in ' + data.durationMs + 'ms');
                 } else {
                     alert('Compaction failed: ' + (data.error || data.message));
                 }

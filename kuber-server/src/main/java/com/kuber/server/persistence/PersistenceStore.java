@@ -141,8 +141,19 @@ public interface PersistenceStore {
     
     /**
      * Count non-expired entries in a region.
+     * WARNING: This can be slow for large datasets as it iterates all entries.
+     * Use estimateEntryCount() for dashboard/UI display.
      */
     long countNonExpiredEntries(String region);
+    
+    /**
+     * Fast estimate of entry count in a region.
+     * This is approximate but very fast - suitable for dashboard display.
+     * For accurate counts, use countNonExpiredEntries() (slower).
+     */
+    default long estimateEntryCount(String region) {
+        return countEntries(region);
+    }
     
     /**
      * Get non-expired keys in a region.

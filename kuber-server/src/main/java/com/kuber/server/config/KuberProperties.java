@@ -134,10 +134,28 @@ public class KuberProperties {
     @Data
     public static class Cache {
         /**
-         * Maximum number of entries to keep in memory
+         * Default maximum number of entries to keep in memory per region.
+         * This is used when no region-specific limit is configured.
          */
         @Min(1000)
         private int maxMemoryEntries = 100000;
+        
+        /**
+         * Global maximum number of entries across ALL regions combined.
+         * When set (> 0), the total in-memory entries across all regions
+         * will not exceed this value. Memory is allocated proportionally
+         * based on each region's data size and configured limits.
+         * Set to 0 to disable global limiting (each region uses its own limit).
+         */
+        @Min(0)
+        private int globalMaxMemoryEntries = 0;
+        
+        /**
+         * Per-region memory limits. Keys are region names, values are max entries.
+         * If a region is not specified here, maxMemoryEntries is used as default.
+         * Example: { "customers": 50000, "products": 200000 }
+         */
+        private java.util.Map<String, Integer> regionMemoryLimits = new java.util.HashMap<>();
         
         /**
          * Whether to use persistent mode (sync writes to MongoDB)
@@ -176,6 +194,14 @@ public class KuberProperties {
          * Enable statistics collection
          */
         private boolean enableStatistics = true;
+        
+        /**
+         * Get the memory limit for a specific region.
+         * Returns the region-specific limit if configured, otherwise the default.
+         */
+        public int getMemoryLimitForRegion(String regionName) {
+            return regionMemoryLimits.getOrDefault(regionName, maxMemoryEntries);
+        }
         
         // ==================== Memory Management ====================
         
@@ -470,9 +496,16 @@ public class KuberProperties {
         private boolean compactionEnabled = true;
         
         /**
-         * Compaction interval in minutes
+         * Cron expression for scheduled compaction.
+         * Default: "0 0 2 * * ?" runs at 2:00 AM daily.
+         * 
+         * Format: second minute hour day-of-month month day-of-week
+         * Examples:
+         *   "0 0 2 * * ?"     - 2:00 AM daily
+         *   "0 0 3 * * SUN"   - 3:00 AM every Sunday
+         *   "0 0 1,13 * * ?"  - 1:00 AM and 1:00 PM daily
+         *   "0 0 * * * ?"     - Every hour
          */
-        @Min(1)
-        private int compactionIntervalMinutes = 30;
+        private String compactionCron = "0 0 2 * * ?";
     }
 }

@@ -64,6 +64,9 @@ public class CacheService {
     // Region metadata
     private final Map<String, CacheRegion> regions = new ConcurrentHashMap<>();
     
+    // Effective memory limits per region (calculated considering global cap)
+    private final Map<String, Integer> effectiveMemoryLimits = new ConcurrentHashMap<>();
+    
     // Statistics
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
     
@@ -90,7 +93,15 @@ public class CacheService {
             createDefaultRegion();
         }
         
-        // Prime cache from persistence store if configured
+        // Calculate memory allocation for all regions
+        calculateMemoryAllocation();
+        
+        // Create caches with calculated limits
+        for (String regionName : regions.keySet()) {
+            createCacheForRegion(regionName);
+        }
+        
+        // Prime cache from persistence store
         primeCache();
         
         log.info("Cache service initialized with {} regions", regions.size());
@@ -105,7 +116,7 @@ public class CacheService {
             for (CacheRegion region : savedRegions) {
                 log.info("Loading region '{}' from persistence store", region.getName());
                 regions.put(region.getName(), region);
-                createCacheForRegion(region.getName());
+                // Note: Cache creation moved to initialize() after memory allocation calculation
             }
         } catch (Exception e) {
             log.error("Failed to load regions from persistence store: {}", e.getMessage(), e);
@@ -115,7 +126,7 @@ public class CacheService {
     private void createDefaultRegion() {
         CacheRegion defaultRegion = CacheRegion.createDefault();
         regions.put(KuberConstants.DEFAULT_REGION, defaultRegion);
-        createCacheForRegion(KuberConstants.DEFAULT_REGION);
+        // Note: Cache creation moved to initialize() after memory allocation calculation
         
         try {
             persistenceStore.saveRegion(defaultRegion);
@@ -124,9 +135,154 @@ public class CacheService {
         }
     }
     
+    /**
+     * Calculate memory allocation for all regions.
+     * Uses smart allocation logic considering:
+     * 1. Per-region configured limits (or default)
+     * 2. Global cap (if enabled)
+     * 3. Proportional allocation based on persisted entry counts
+     */
+    private void calculateMemoryAllocation() {
+        int globalMax = properties.getCache().getGlobalMaxMemoryEntries();
+        int defaultLimit = properties.getCache().getMaxMemoryEntries();
+        
+        log.info("Calculating memory allocation: globalMax={}, defaultPerRegion={}", 
+                globalMax > 0 ? globalMax : "unlimited", defaultLimit);
+        
+        // Step 1: Collect configured/default limits and persisted counts for each region
+        Map<String, Integer> configuredLimits = new HashMap<>();
+        Map<String, Long> persistedCounts = new HashMap<>();
+        long totalPersistedCount = 0;
+        
+        for (String regionName : regions.keySet()) {
+            int configuredLimit = properties.getCache().getMemoryLimitForRegion(regionName);
+            configuredLimits.put(regionName, configuredLimit);
+            
+            try {
+                long count = persistenceStore.countNonExpiredEntries(regionName);
+                persistedCounts.put(regionName, count);
+                totalPersistedCount += count;
+            } catch (Exception e) {
+                persistedCounts.put(regionName, 0L);
+                log.warn("Could not get entry count for region '{}': {}", regionName, e.getMessage());
+            }
+        }
+        
+        // Step 2: Calculate effective limits
+        if (globalMax <= 0) {
+            // No global cap - use configured/default limits directly
+            for (String regionName : regions.keySet()) {
+                int limit = configuredLimits.get(regionName);
+                effectiveMemoryLimits.put(regionName, limit);
+                log.info("Region '{}': memory limit = {} (no global cap)", regionName, limit);
+            }
+        } else {
+            // Global cap enabled - use smart allocation
+            int totalConfigured = configuredLimits.values().stream().mapToInt(Integer::intValue).sum();
+            
+            if (totalConfigured <= globalMax) {
+                // Total configured fits within global cap - use configured limits
+                for (String regionName : regions.keySet()) {
+                    int limit = configuredLimits.get(regionName);
+                    effectiveMemoryLimits.put(regionName, limit);
+                    log.info("Region '{}': memory limit = {} (within global cap)", regionName, limit);
+                }
+            } else {
+                // Need to scale down - use smart proportional allocation
+                log.info("Total configured ({}) exceeds global cap ({}), using smart allocation", 
+                        totalConfigured, globalMax);
+                
+                // Allocate based on: 50% proportional to configured limit, 50% proportional to data size
+                int remaining = globalMax;
+                int regionCount = regions.size();
+                int minPerRegion = Math.max(1000, globalMax / (regionCount * 10)); // Minimum 1000 or 10% fair share
+                
+                for (String regionName : regions.keySet()) {
+                    int configuredLimit = configuredLimits.get(regionName);
+                    long persistedCount = persistedCounts.getOrDefault(regionName, 0L);
+                    
+                    // Calculate proportional share
+                    double configuredRatio = (double) configuredLimit / totalConfigured;
+                    double dataRatio = totalPersistedCount > 0 
+                            ? (double) persistedCount / totalPersistedCount 
+                            : 1.0 / regionCount;
+                    
+                    // Weighted average: 50% config-based, 50% data-based
+                    double combinedRatio = (configuredRatio + dataRatio) / 2.0;
+                    
+                    // Calculate allocation
+                    int allocation = (int) Math.max(minPerRegion, Math.round(globalMax * combinedRatio));
+                    
+                    // Don't exceed configured limit even if we have room
+                    allocation = Math.min(allocation, configuredLimit);
+                    
+                    // Don't exceed what's actually persisted (no point allocating more)
+                    if (persistedCount > 0 && persistedCount < allocation) {
+                        allocation = (int) Math.min(allocation, persistedCount + 1000); // Some headroom
+                    }
+                    
+                    effectiveMemoryLimits.put(regionName, allocation);
+                    remaining -= allocation;
+                    
+                    log.info("Region '{}': memory limit = {} (configured={}, persisted={}, globalCap={})", 
+                            regionName, allocation, configuredLimit, persistedCount, globalMax);
+                }
+                
+                // If we have remaining capacity, redistribute to regions that could use more
+                if (remaining > 0) {
+                    redistributeRemainingCapacity(remaining, configuredLimits, persistedCounts);
+                }
+            }
+        }
+        
+        int totalAllocated = effectiveMemoryLimits.values().stream().mapToInt(Integer::intValue).sum();
+        log.info("Memory allocation complete: {} total entries across {} regions", 
+                totalAllocated, regions.size());
+    }
+    
+    /**
+     * Redistribute remaining capacity to regions that could benefit from more memory.
+     */
+    private void redistributeRemainingCapacity(int remaining, 
+                                               Map<String, Integer> configuredLimits,
+                                               Map<String, Long> persistedCounts) {
+        // Find regions that have more persisted data than allocated memory
+        List<String> needMoreMemory = new ArrayList<>();
+        for (String regionName : regions.keySet()) {
+            int allocated = effectiveMemoryLimits.get(regionName);
+            int configured = configuredLimits.get(regionName);
+            long persisted = persistedCounts.getOrDefault(regionName, 0L);
+            
+            if (allocated < configured && allocated < persisted) {
+                needMoreMemory.add(regionName);
+            }
+        }
+        
+        if (!needMoreMemory.isEmpty() && remaining > 0) {
+            int perRegion = remaining / needMoreMemory.size();
+            for (String regionName : needMoreMemory) {
+                int current = effectiveMemoryLimits.get(regionName);
+                int configured = configuredLimits.get(regionName);
+                int newLimit = Math.min(current + perRegion, configured);
+                effectiveMemoryLimits.put(regionName, newLimit);
+                log.debug("Redistributed {} extra entries to region '{}'", newLimit - current, regionName);
+            }
+        }
+    }
+    
+    /**
+     * Get the effective memory limit for a region.
+     */
+    public int getEffectiveMemoryLimit(String regionName) {
+        return effectiveMemoryLimits.getOrDefault(regionName, 
+                properties.getCache().getMemoryLimitForRegion(regionName));
+    }
+    
     private void createCacheForRegion(String regionName) {
+        int memoryLimit = getEffectiveMemoryLimit(regionName);
+        
         Cache<String, CacheEntry> cache = Caffeine.newBuilder()
-                .maximumSize(properties.getCache().getMaxMemoryEntries())
+                .maximumSize(memoryLimit)
                 .expireAfterWrite(24, TimeUnit.HOURS)
                 .removalListener((key, value, cause) -> {
                     // Only track statistics - don't modify entryCount since persistence is the source of truth
@@ -145,38 +301,87 @@ public class CacheService {
     }
     
     private void primeCache() {
-        log.info("Priming cache from {} persistence store...", persistenceStore.getType());
+        log.info("Priming cache from {} persistence store (loading most recently accessed entries first)...", 
+                persistenceStore.getType());
+        
+        int totalPrimed = 0;
         
         for (String regionName : regions.keySet()) {
             try {
-                List<CacheEntry> entries = persistenceStore.loadEntries(regionName, 
-                        properties.getCache().getMaxMemoryEntries());
+                int memoryLimit = getEffectiveMemoryLimit(regionName);
+                long persistedCount = persistenceStore.countNonExpiredEntries(regionName);
+                List<CacheEntry> entries = persistenceStore.loadEntries(regionName, memoryLimit);
                 Cache<String, CacheEntry> cache = regionCaches.get(regionName);
                 
+                if (cache == null) {
+                    log.warn("Cache not found for region '{}', skipping priming", regionName);
+                    continue;
+                }
+                
+                int primedCount = 0;
                 for (CacheEntry entry : entries) {
                     if (!entry.isExpired()) {
                         cache.put(entry.getKey(), entry);
+                        primedCount++;
                     }
                 }
                 
-                log.info("Primed {} entries for region '{}'", entries.size(), regionName);
+                totalPrimed += primedCount;
+                
+                if (persistedCount > memoryLimit) {
+                    log.info("Primed {} entries for region '{}' (loaded most recent {} of {} persisted, limit={})", 
+                            primedCount, regionName, memoryLimit, persistedCount, memoryLimit);
+                } else {
+                    log.info("Primed {} entries for region '{}' (all {} persisted entries loaded, limit={})", 
+                            primedCount, regionName, persistedCount, memoryLimit);
+                }
             } catch (Exception e) {
                 log.warn("Failed to prime cache for region '{}': {}", regionName, e.getMessage());
             }
         }
+        
+        int totalAllocated = effectiveMemoryLimits.values().stream().mapToInt(Integer::intValue).sum();
+        log.info("Cache priming complete: {} entries loaded into memory across {} regions (total memory allocation: {})", 
+                totalPrimed, regions.size(), totalAllocated);
     }
     
     // ==================== Region Operations ====================
     
+    /**
+     * Validate region name: alphanumeric and underscore only, at least one alphabetic character.
+     * This ensures directory/file discovery is sufficient without metadata dependency.
+     */
+    public static boolean isValidRegionName(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        // Must contain only alphanumeric and underscore
+        if (!name.matches("^[a-zA-Z0-9_]+$")) {
+            return false;
+        }
+        // Must contain at least one alphabetic character
+        if (!name.matches(".*[a-zA-Z].*")) {
+            return false;
+        }
+        return true;
+    }
+    
     public CacheRegion createRegion(String name, String description) {
         checkWriteAccess();
+        
+        // Validate region name
+        if (!isValidRegionName(name)) {
+            throw new IllegalArgumentException(
+                "Invalid region name '" + name + "'. Region names must contain only alphanumeric characters " +
+                "and underscores, with at least one alphabetic character.");
+        }
         
         if (regions.containsKey(name)) {
             throw RegionException.alreadyExists(name);
         }
         
-        // Generate collection name
-        String collectionName = "kuber_" + name.toLowerCase().replaceAll("[^a-z0-9_]", "_");
+        // Generate collection name (same as region name since it's already validated)
+        String collectionName = "kuber_" + name.toLowerCase();
         
         CacheRegion region = CacheRegion.builder()
                 .name(name)
@@ -187,6 +392,10 @@ public class CacheService {
                 .build();
         
         regions.put(name, region);
+        
+        // Calculate memory limit for new region (considering global cap if enabled)
+        calculateMemoryLimitForNewRegion(name);
+        
         createCacheForRegion(name);
         
         // Always persist region metadata (regardless of persistentMode)
@@ -201,8 +410,45 @@ public class CacheService {
         
         eventPublisher.publish(CacheEvent.regionCreated(name, properties.getNodeId()));
         
-        log.info("Created region: {}", name);
+        log.info("Created region '{}' with memory limit {}", name, getEffectiveMemoryLimit(name));
         return region;
+    }
+    
+    /**
+     * Calculate memory limit for a newly created region.
+     * If global cap is enabled and we're near capacity, may need to reduce other regions.
+     */
+    private void calculateMemoryLimitForNewRegion(String regionName) {
+        int globalMax = properties.getCache().getGlobalMaxMemoryEntries();
+        int configuredLimit = properties.getCache().getMemoryLimitForRegion(regionName);
+        
+        if (globalMax <= 0) {
+            // No global cap - use configured/default limit
+            effectiveMemoryLimits.put(regionName, configuredLimit);
+            return;
+        }
+        
+        // Check current total allocation
+        int currentTotal = effectiveMemoryLimits.values().stream().mapToInt(Integer::intValue).sum();
+        int available = globalMax - currentTotal;
+        
+        if (available >= configuredLimit) {
+            // Enough room for full allocation
+            effectiveMemoryLimits.put(regionName, configuredLimit);
+        } else if (available > 0) {
+            // Partial allocation available
+            int minAllocation = Math.max(1000, configuredLimit / 10);
+            int allocation = Math.max(minAllocation, available);
+            effectiveMemoryLimits.put(regionName, allocation);
+            log.warn("Region '{}' allocated {} entries (requested {}, global cap reached)", 
+                    regionName, allocation, configuredLimit);
+        } else {
+            // No room - allocate minimum and log warning
+            int minAllocation = Math.max(1000, globalMax / (regions.size() * 10));
+            effectiveMemoryLimits.put(regionName, minAllocation);
+            log.warn("Region '{}' allocated minimum {} entries (global cap {} fully utilized)", 
+                    regionName, minAllocation, globalMax);
+        }
     }
     
     public void deleteRegion(String name) {
@@ -1169,38 +1415,38 @@ public class CacheService {
         Map<String, Object> info = new HashMap<>();
         
         info.put("nodeId", properties.getNodeId());
-        info.put("version", "1.1.8");
+        info.put("version", "1.1.13");
         info.put("regionCount", regions.size());
         info.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         info.put("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());
         info.put("persistentMode", properties.getCache().isPersistentMode());
         
-        // Total entries from persistence (source of truth)
-        long totalPersistenceEntries = regions.keySet().stream()
-                .mapToLong(this::getPersistenceEntryCount)
+        // Use fast estimates for dashboard display (O(1) instead of O(n))
+        long totalPersistenceEstimate = regions.keySet().stream()
+                .mapToLong(r -> persistenceStore.estimateEntryCount(r))
                 .sum();
-        info.put("totalEntries", totalPersistenceEntries);
+        info.put("totalEntries", totalPersistenceEstimate);
         
-        // Also include memory count for reference
+        // In-memory count is already fast
         long totalMemoryEntries = regionCaches.values().stream()
                 .mapToLong(Cache::estimatedSize)
                 .sum();
         info.put("memoryEntries", totalMemoryEntries);
-        info.put("persistenceEntries", totalPersistenceEntries);
+        info.put("persistenceEntries", totalPersistenceEstimate);
         
         return info;
     }
     
     public long dbSize(String region) {
         if (region == null || region.isEmpty()) {
-            // Return total across all regions from persistence
+            // Return fast estimate total across all regions
             return regions.keySet().stream()
-                    .mapToLong(r -> getPersistenceEntryCount(r))
+                    .mapToLong(r -> persistenceStore.estimateEntryCount(r))
                     .sum();
         }
         
-        // Return persistence count for the region (most accurate total)
-        return getPersistenceEntryCount(region);
+        // Return fast estimate for the region
+        return persistenceStore.estimateEntryCount(region);
     }
     
     /**
@@ -1220,30 +1466,41 @@ public class CacheService {
     
     /**
      * Get persistence store entry count for a region (excludes expired entries).
+     * WARNING: This is slow O(n) - iterates all entries. Use for accurate counts only.
+     * For dashboard/UI display, use getEstimatedPersistenceEntryCount() instead.
      */
     public long getPersistenceEntryCount(String region) {
         return persistenceStore.countNonExpiredEntries(region);
     }
     
     /**
+     * Get fast estimated entry count for a region from persistence store.
+     * This is O(1) and suitable for dashboard display.
+     */
+    public long getEstimatedPersistenceEntryCount(String region) {
+        return persistenceStore.estimateEntryCount(region);
+    }
+    
+    /**
      * Get detailed region statistics including memory vs persistence.
+     * Uses fast estimates for dashboard display.
      */
     public Map<String, Object> getDetailedRegionStats(String region) {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("region", region);
         
         long memoryEntries = getMemoryEntryCount(region);
-        long persistenceEntries = getPersistenceEntryCount(region);
+        long persistenceEstimate = persistenceStore.estimateEntryCount(region);
         
         CacheRegion regionObj = regions.get(region);
         if (regionObj != null) {
             stats.put("hitRatio", String.format("%.2f", regionObj.getHitRatio()));
         }
         
-        // Use dynamic counts - persistence is the source of truth for total
-        stats.put("entryCount", persistenceEntries);
+        // Use fast estimates for dashboard - O(1) instead of O(n)
+        stats.put("entryCount", persistenceEstimate);
         stats.put("memoryEntries", memoryEntries);
-        stats.put("persistenceEntries", persistenceEntries);
+        stats.put("persistenceEntries", persistenceEstimate);
         
         return stats;
     }

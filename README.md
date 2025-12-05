@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.1.3
+Version 1.1.11
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -14,9 +14,13 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
 - **Redis Protocol Compatibility**: Connect using any Redis client
-- **Region-Based Organization**: Logical isolation of cache entries
+- **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
-- **Multi-Backend Persistence**: MongoDB, SQLite, PostgreSQL, or RocksDB
+- **Multi-Backend Persistence**: RocksDB (default), MongoDB, SQLite, PostgreSQL
+- **Region Isolation**: Each region gets its own database instance for better concurrency
+- **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
+- **Automatic Compaction**: RocksDB compaction via cron schedule (default: 2 AM daily)
+- **SQLite Auto-Vacuum**: VACUUM on all SQLite databases at startup
 - **Primary/Secondary Replication**: Automatic failover via ZooKeeper
 - **Autoload**: Bulk data import from CSV and JSON files
 - **Web Management UI**: Browser-based administration interface
@@ -40,7 +44,13 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
 | Feature | Description |
 |---------|-------------|
-| Multi-Backend Persistence | MongoDB, SQLite, PostgreSQL, RocksDB, or in-memory |
+| Multi-Backend Persistence | RocksDB (default), MongoDB, SQLite, PostgreSQL, or in-memory |
+| Region Isolation | Separate database instance per region (RocksDB/SQLite) |
+| Smart Memory Management | Global cap and per-region limits with proportional allocation |
+| Automatic Compaction | RocksDB compaction via cron schedule (default: 2 AM daily) or manual trigger |
+| Smart Cache Priming | Loads most recently accessed entries first on restart |
+| Fast Entry Counts | O(1) entry estimation for dashboard - instant with millions of entries |
+| SQLite Auto-Vacuum | Runs VACUUM on all SQLite databases at startup |
 | ZooKeeper Replication | Automatic primary/secondary failover |
 | Autoload | Bulk CSV/JSON import with metadata |
 | CSV Export | Export regions and query results |
@@ -198,11 +208,23 @@ kuber:
   
   # Cache settings
   cache:
-    max-memory-entries: 100000
+    max-memory-entries: 100000          # Default per-region limit
+    global-max-memory-entries: 500000   # Global cap across all regions (0=unlimited)
+    region-memory-limits:               # Per-region overrides
+      customers: 50000
+      products: 200000
     persistent-mode: false
     eviction-policy: LRU
   
-  # MongoDB settings
+  # Persistence (rocksdb, mongodb, postgresql, sqlite, memory)
+  persistence:
+    type: rocksdb
+    rocksdb:
+      path: ./data/rocksdb
+      compaction-enabled: true
+      compaction-interval-minutes: 30
+  
+  # MongoDB settings (if persistence.type=mongodb)
   mongo:
     uri: mongodb://localhost:27017
     database: kuber
@@ -212,6 +234,17 @@ kuber:
     enabled: false
     connect-string: localhost:2181
 ```
+
+### Memory Management (v1.1.11)
+
+Kuber provides flexible memory management:
+
+- **Per-Region Limits**: Configure memory for individual regions via `region-memory-limits`
+- **Global Cap**: Set `global-max-memory-entries` to limit total memory across all regions
+- **Smart Allocation**: When global cap is exceeded, memory is allocated proportionally based on:
+  - 50% configured limits
+  - 50% actual data size (persisted entry count)
+- **Smart Priming**: On restart, most recently accessed entries are loaded first
 
 ## Usage
 
@@ -353,9 +386,22 @@ with KuberClient('localhost', 6380) as client:
 
 Regions provide logical isolation for cache entries:
 
-- Each region maps to a separate MongoDB collection
+- **RocksDB/SQLite**: Each region gets its own dedicated database instance
+  - Better concurrency - parallel I/O across regions
+  - Better isolation - issues in one region don't affect others
+  - Independent compaction - compact individual regions
+- **MongoDB**: Each region maps to a separate collection
 - The `default` region is captive (cannot be deleted)
 - Regions have independent statistics and TTL settings
+
+```
+Directory Structure (RocksDB):
+./data/rocksdb/
+  ├── _metadata/     # Region metadata
+  ├── default/       # Default region database
+  ├── users/         # Users region database
+  └── sessions/      # Sessions region database
+```
 
 ```redis
 RCREATE sessions "User session data"

@@ -118,7 +118,18 @@ public class MemoryPersistenceStore extends AbstractPersistenceStore {
             return new ArrayList<>();
         }
         
+        // Sort by last accessed time (most recent first), then by updated time
         return regionEntries.values().stream()
+                .filter(entry -> !entry.isExpired())
+                .sorted((a, b) -> {
+                    // Prefer lastAccessedAt if available, otherwise use updatedAt
+                    Instant aTime = a.getLastAccessedAt() != null ? a.getLastAccessedAt() : a.getUpdatedAt();
+                    Instant bTime = b.getLastAccessedAt() != null ? b.getLastAccessedAt() : b.getUpdatedAt();
+                    if (aTime == null && bTime == null) return 0;
+                    if (aTime == null) return 1;
+                    if (bTime == null) return -1;
+                    return bTime.compareTo(aTime); // Descending order (most recent first)
+                })
                 .limit(limit)
                 .collect(Collectors.toList());
     }

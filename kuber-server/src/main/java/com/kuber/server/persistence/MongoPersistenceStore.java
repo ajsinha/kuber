@@ -259,10 +259,17 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
         MongoCollection<Document> collection = database.getCollection(collectionName);
         
         List<CacheEntry> entries = new ArrayList<>();
+        // Sort by lastAccessedAt first (if exists), then by updatedAt - most recently accessed entries first
+        // Using compound sort: lastAccessedAt DESC, then updatedAt DESC as fallback
         collection.find()
-                .sort(Sorts.descending("updatedAt"))
+                .sort(Sorts.orderBy(Sorts.descending("lastAccessedAt"), Sorts.descending("updatedAt")))
                 .limit(limit)
-                .forEach(doc -> entries.add(documentToEntry(doc, region)));
+                .forEach(doc -> {
+                    CacheEntry entry = documentToEntry(doc, region);
+                    if (!entry.isExpired()) {
+                        entries.add(entry);
+                    }
+                });
         
         return entries;
     }

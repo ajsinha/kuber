@@ -59,12 +59,13 @@ public class RocksDbCompactionService {
     public void initialize() {
         if (persistenceStore instanceof RocksDbPersistenceStore) {
             boolean compactionEnabled = properties.getPersistence().getRocksdb().isCompactionEnabled();
-            int intervalMinutes = properties.getPersistence().getRocksdb().getCompactionIntervalMinutes();
+            String cronExpression = properties.getPersistence().getRocksdb().getCompactionCron();
             
             enabled.set(compactionEnabled);
             
             if (compactionEnabled) {
-                log.info("RocksDB compaction service initialized - interval: {} minutes", intervalMinutes);
+                log.info("RocksDB compaction service initialized - cron schedule: {}", cronExpression);
+                log.info("Compaction runs on schedule or can be triggered manually via /api/monitoring/compaction/trigger");
             } else {
                 log.info("RocksDB compaction service is disabled via configuration");
             }
@@ -77,10 +78,9 @@ public class RocksDbCompactionService {
     
     /**
      * Scheduled compaction task.
-     * Runs based on configured interval (default: 30 minutes).
-     * The interval is converted from minutes to milliseconds.
+     * Runs based on cron expression (default: 2:00 AM daily).
      */
-    @Scheduled(fixedRateString = "#{${kuber.persistence.rocksdb.compaction-interval-minutes:30} * 60 * 1000}")
+    @Scheduled(cron = "${kuber.persistence.rocksdb.compaction-cron:0 0 2 * * ?}")
     public void scheduledCompaction() {
         if (!enabled.get()) {
             return;
@@ -126,8 +126,8 @@ public class RocksDbCompactionService {
                 totalCompactions.incrementAndGet();
                 totalReclaimedBytes.addAndGet(result.reclaimedBytes());
                 
-                log.info("RocksDB compaction completed: {} column families, {}ms, reclaimed {} MB",
-                        result.columnFamiliesCompacted(),
+                log.info("RocksDB compaction completed: {} region databases, {}ms, reclaimed {} MB",
+                        result.regionsCompacted(),
                         duration.toMillis(),
                         String.format("%.2f", result.reclaimedMB()));
             } else {
@@ -141,12 +141,27 @@ public class RocksDbCompactionService {
                     duration,
                     result.reclaimedBytes(),
                     totalReclaimedBytes.get(),
-                    result.columnFamiliesCompacted()
+                    result.regionsCompacted()
             );
             
         } finally {
             compactionInProgress.set(false);
         }
+    }
+    
+    /**
+     * Trigger compaction for a specific region.
+     * 
+     * @param region The region name to compact
+     * @return CompactionResult with results of the operation
+     */
+    public RocksDbPersistenceStore.CompactionResult triggerRegionCompaction(String region) {
+        if (!(persistenceStore instanceof RocksDbPersistenceStore rocksDb)) {
+            return new RocksDbPersistenceStore.CompactionResult(false, "RocksDB persistence not in use", 0, 0, 0);
+        }
+        
+        log.info("Starting RocksDB compaction for region '{}'...", region);
+        return rocksDb.compactRegion(region);
     }
     
     /**
@@ -172,10 +187,10 @@ public class RocksDbCompactionService {
     }
     
     /**
-     * Get the configured compaction interval in minutes.
+     * Get the configured compaction cron expression.
      */
-    public int getCompactionIntervalMinutes() {
-        return properties.getPersistence().getRocksdb().getCompactionIntervalMinutes();
+    public String getCompactionCron() {
+        return properties.getPersistence().getRocksdb().getCompactionCron();
     }
     
     /**
@@ -192,7 +207,7 @@ public class RocksDbCompactionService {
                 compactionInProgress.get(),
                 totalCompactions.get(),
                 totalReclaimedBytes.get(),
-                properties.getPersistence().getRocksdb().getCompactionIntervalMinutes(),
+                properties.getPersistence().getRocksdb().getCompactionCron(),
                 lastCompactionTime,
                 lastCompactionDuration,
                 lastReclaimedBytes,
@@ -211,7 +226,7 @@ public class RocksDbCompactionService {
             Duration duration,
             long reclaimedBytes,
             long totalReclaimedBytes,
-            int columnFamiliesCompacted
+            int regionsCompacted
     ) {
         public double reclaimedMB() {
             return reclaimedBytes / (1024.0 * 1024.0);
@@ -230,7 +245,7 @@ public class RocksDbCompactionService {
             boolean compactionInProgress,
             long totalCompactions,
             long totalReclaimedBytes,
-            int intervalMinutes,
+            String cronExpression,
             Instant lastCompactionTime,
             Duration lastCompactionDuration,
             long lastReclaimedBytes,

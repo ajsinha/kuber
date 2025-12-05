@@ -203,7 +203,7 @@
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Collection</h5>
-                            <p class="card-text">The internal storage container name in the persistence backend. Each region maps to a collection (e.g., <code>kuber_default</code> for the default region). In MongoDB, this is a MongoDB collection; in RocksDB, it's a column family prefix.</p>
+                            <p class="card-text">The internal storage container name in the persistence backend. Each region maps to a separate database instance (e.g., <code>kuber_default</code> for the default region). In MongoDB, this is a MongoDB collection; in RocksDB and SQLite, each region has its own dedicated database directory or file.</p>
                             <span class="badge bg-light text-dark">Persistence</span>
                             <span class="badge bg-light text-dark">Storage</span>
                         </div>
@@ -212,7 +212,7 @@
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Compaction</h5>
-                            <p class="card-text">A RocksDB maintenance operation that merges SST (Sorted String Table) files and removes deleted/expired entries to reclaim disk space. Kuber runs compaction automatically at configurable intervals (default: 30 minutes). Can also be triggered manually via the admin dashboard.</p>
+                            <p class="card-text">A RocksDB maintenance operation that merges SST (Sorted String Table) files and removes deleted/expired entries to reclaim disk space. Each region database is compacted independently for better performance. Kuber runs compaction automatically at configurable intervals (default: 30 minutes). Can also be triggered manually via the admin dashboard - either for all regions or a specific region.</p>
                             <span class="badge bg-light text-dark">RocksDB</span>
                             <span class="badge bg-light text-dark">Maintenance</span>
                         </div>
@@ -931,7 +931,7 @@
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>RocksDB</h5>
-                            <p class="card-text">An embedded, high-performance key-value store used as the default persistence backend. Developed by Facebook, it provides excellent performance without requiring external database infrastructure.</p>
+                            <p class="card-text">An embedded, high-performance key-value store used as the default persistence backend. Developed by Facebook, it provides excellent performance without requiring external database infrastructure. Each region gets its own dedicated RocksDB instance (separate directory) for improved concurrency and isolation.</p>
                             <span class="badge bg-light text-dark">Persistence</span>
                             <span class="badge bg-light text-dark">Database</span>
                         </div>
@@ -990,7 +990,7 @@
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>SQLite</h5>
-                            <p class="card-text">A lightweight, file-based relational database supported as a persistence backend. Good for development and single-server deployments. Configure with <code>kuber.persistence.type=sqlite</code>.</p>
+                            <p class="card-text">A lightweight, file-based relational database supported as a persistence backend. Good for development and single-server deployments. Each region gets its own dedicated SQLite database file for improved concurrency and isolation. Configure with <code>kuber.persistence.type=sqlite</code>.</p>
                             <span class="badge bg-light text-dark">Persistence</span>
                             <span class="badge bg-light text-dark">Database</span>
                         </div>

@@ -484,7 +484,7 @@ public class MonitoringApiController {
         result.put("compactionInProgress", stats.compactionInProgress());
         result.put("totalCompactions", stats.totalCompactions());
         result.put("totalReclaimedMB", String.format("%.2f", stats.totalReclaimedMB()));
-        result.put("intervalMinutes", stats.intervalMinutes());
+        result.put("cronExpression", stats.cronExpression());
         
         if (stats.lastCompactionTime() != null) {
             result.put("lastCompactionTime", stats.lastCompactionTime().toString());
@@ -532,7 +532,7 @@ public class MonitoringApiController {
         result.put("message", stats.message());
         result.put("durationMs", stats.duration().toMillis());
         result.put("reclaimedMB", String.format("%.2f", stats.reclaimedMB()));
-        result.put("columnFamiliesCompacted", stats.columnFamiliesCompacted());
+        result.put("regionsCompacted", stats.regionsCompacted());
         result.put("totalCompactions", stats.totalCompactions());
         result.put("totalReclaimedMB", String.format("%.2f", stats.totalReclaimedMB()));
         
@@ -557,6 +557,31 @@ public class MonitoringApiController {
         result.put("success", true);
         result.put("enabled", enabled);
         result.put("message", "Compaction service " + (enabled ? "enabled" : "disabled"));
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Trigger compaction for a specific region.
+     */
+    @PostMapping("/compaction/trigger/{region}")
+    public ResponseEntity<Map<String, Object>> triggerRegionCompaction(@PathVariable String region) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (compactionService == null) {
+            result.put("success", false);
+            result.put("error", "RocksDB compaction service not available");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        log.info("Manual RocksDB compaction triggered for region '{}' by admin", region);
+        var stats = compactionService.triggerRegionCompaction(region);
+        
+        result.put("success", stats.success());
+        result.put("region", region);
+        result.put("message", stats.message());
+        result.put("durationMs", stats.durationMs());
+        result.put("reclaimedMB", String.format("%.2f", stats.reclaimedMB()));
         
         return ResponseEntity.ok(result);
     }

@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.1.6</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.1.13</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -72,7 +72,7 @@
                         <h5 class="card-title">Multi-Backend Persistence</h5>
                         <p class="card-text text-muted">
                             Choose your persistence backend: MongoDB, SQLite, PostgreSQL, or RocksDB. 
-                            Data survives restarts with configurable sync modes.
+                            Each region gets its own dedicated database instance for maximum concurrency.
                         </p>
                     </div>
                 </div>
@@ -99,10 +99,10 @@
                         <div class="rounded-circle bg-danger bg-opacity-10 p-3 d-inline-block mb-3">
                             <i class="fas fa-layer-group fa-2x text-danger"></i>
                         </div>
-                        <h5 class="card-title">Region Partitioning</h5>
+                        <h5 class="card-title">Region Isolation</h5>
                         <p class="card-text text-muted">
-                            Organize cache data into logical regions with independent namespaces. 
-                            Regions are auto-created on first use - just store data and regions appear automatically.
+                            Each region gets its own dedicated database instance (RocksDB/SQLite) for 
+                            better concurrency, isolation, and performance. Independent compaction per region.
                         </p>
                     </div>
                 </div>
@@ -306,8 +306,70 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.1.7</span>
+                                    <span class="badge bg-primary me-2">v1.1.13</span>
                                     <span class="text-muted small">Current</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Fast entry count estimates using RocksDB native properties</li>
+                                    <li>Dashboard and login pages now load instantly with large datasets</li>
+                                    <li>O(1) entry counting instead of O(n) iteration</li>
+                                    <li>Fixes slow page loads with 1M+ entries</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.12</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Cron-based RocksDB compaction scheduling (default: 2:00 AM daily)</li>
+                                    <li>Configurable cron expression for off-hours maintenance</li>
+                                    <li>No startup compaction - prevents blocking during server start</li>
+                                    <li>Manual compaction trigger via API and UI</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.11</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Global memory limit configuration - cap total entries across all regions</li>
+                                    <li>Per-region memory limits - configure memory allocation per region</li>
+                                    <li>Smart memory allocation - proportional distribution based on data size</li>
+                                    <li>Removed RocksDB metadata database - relies solely on folder discovery</li>
+                                    <li>Region metadata stored as JSON file in each region directory</li>
+                                    <li>Smart cache priming - loads most recently accessed entries first</li>
+                                    <li>SQLite startup vacuum - optimizes all databases on startup</li>
+                                    <li>Fixed critical bug: cache now properly reloads from disk on restart</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.9</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Separate database instance per region for RocksDB and SQLite</li>
+                                    <li>Improved concurrency - parallel I/O across regions with no lock contention</li>
+                                    <li>Better isolation - issues in one region don't affect others</li>
+                                    <li>Per-region compaction - compact individual regions independently</li>
+                                    <li>New API endpoint: POST /api/monitoring/compaction/trigger/{region}</li>
+                                    <li>Region name validation: alphanumeric and underscore only</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.8</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li>Fixed entry counting bug - persistence is now source of truth</li>
+                                    <li>Stats page showing correct counts dynamically calculated</li>
+                                    <li>RocksDB automatic compaction service with 30-minute intervals</li>
+                                    <li>Admin dashboard compaction UI with manual trigger</li>
+                                    <li>New API endpoints for compaction management</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.1.7</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li>Added pluggable persistence layer with 5 backends: MongoDB, SQLite, PostgreSQL, RocksDB, In-Memory</li>
@@ -435,7 +497,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.1.6
+                                <strong>Version:</strong> 1.1.13
                             </li>
                         </ul>
                     </div>
