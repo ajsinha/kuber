@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - {basePath}/_metadata.db - SQLite database for region metadata
  * - {basePath}/{regionName}.db - Separate SQLite database for each region's entries
  * 
- * @version 1.2.4
+ * @version 1.2.6
  */
 @Slf4j
 public class SqlitePersistenceStore extends AbstractPersistenceStore {

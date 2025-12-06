@@ -11,6 +11,7 @@
  */
 package com.kuber.server.config;
 
+import com.kuber.server.security.ApiKeyAuthenticationFilter;
 import com.kuber.server.security.JsonUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -21,11 +22,19 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /**
  * Security configuration for Kuber web interface.
- * Uses simple cleartext password authentication from users.json file.
+ * Supports both username/password and API Key authentication.
+ * 
+ * Authentication methods:
+ * 1. Form login (web UI)
+ * 2. HTTP Basic (REST API)
+ * 3. API Key (X-API-Key header, Authorization: ApiKey, or api_key query param)
+ *
+ * @version 1.2.6
  */
 @Configuration
 @EnableWebSecurity
@@ -34,6 +43,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 public class SecurityConfig {
     
     private final JsonUserDetailsService userDetailsService;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
@@ -75,7 +85,9 @@ public class SecurityConfig {
                 .maximumSessions(5)
                 .maxSessionsPreventsLogin(false)
             )
-            .userDetailsService(userDetailsService);
+            .userDetailsService(userDetailsService)
+            // Add API Key filter before username/password authentication
+            .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
     }

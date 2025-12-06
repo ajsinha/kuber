@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.2.4</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.2.6</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -306,8 +306,34 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.2.4</span>
-                                    <span class="text-muted small">Current - Startup Race Condition Fix</span>
+                                    <span class="badge bg-primary me-2">v1.2.6</span>
+                                    <span class="text-muted small">Current - Startup Orchestration</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Configurable API Keys Path</strong>: kuber.security.api-keys-file property</li>
+                                    <li><strong>Improved Startup Orchestration</strong>: Database maintenance now runs within Spring context</li>
+                                    <li>New startup sequence: Spring → 10s wait → Compaction → 2s → Cache Init → 2s → Redis → 2s → Autoload → 2s → Ready</li>
+                                    <li>PersistenceMaintenanceService for RocksDB compaction and SQLite vacuum</li>
+                                    <li>Pre-startup compaction deprecated in favor of in-context maintenance</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.2.5</span>
+                                    <span class="text-muted small">API Key Authentication</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>API Key Authentication</strong>: Generate and manage API keys for programmatic access</li>
+                                    <li>Admin UI for key generation, revocation, and management</li>
+                                    <li>REST API: X-API-Key header, Authorization: ApiKey, query param support</li>
+                                    <li>Redis Protocol: AUTH APIKEY command support</li>
+                                    <li>Role-based access control with optional key expiration</li>
+                                    <li>Python, Java, and REST client support for API keys</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.2.4</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Startup Race Condition Fix</strong>: Fixed critical race condition in application startup</li>
@@ -615,7 +641,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.2.4
+                                <strong>Version:</strong> 1.2.6
                             </li>
                         </ul>
                     </div>

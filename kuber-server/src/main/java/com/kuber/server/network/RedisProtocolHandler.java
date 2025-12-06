@@ -24,6 +24,8 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.event.EventPublisher;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.security.ApiKey;
+import com.kuber.server.security.ApiKeyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.mina.core.service.IoHandlerAdapter;
@@ -39,6 +41,12 @@ import java.util.stream.Collectors;
 /**
  * Handles Redis protocol commands via MINA.
  * Supports standard Redis commands plus Kuber extensions for regions and JSON.
+ * 
+ * Authentication methods:
+ * 1. Password: AUTH password
+ * 2. API Key: AUTH APIKEY kub_xxx...
+ *
+ * @version 1.2.6
  */
 @Slf4j
 @Component
@@ -47,6 +55,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     
     private static final String SESSION_REGION = "currentRegion";
     private static final String SESSION_AUTHENTICATED = "authenticated";
+    private static final String SESSION_AUTH_USER = "authUser";
     private static final String SESSION_IN_MULTI = "inMulti";
     private static final String SESSION_QUEUED_COMMANDS = "queuedCommands";
     private static final String SESSION_SUBSCRIPTIONS = "subscriptions";
@@ -54,6 +63,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     private final CacheService cacheService;
     private final KuberProperties properties;
     private final EventPublisher eventPublisher;
+    private final ApiKeyService apiKeyService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -426,11 +436,51 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     
     // ==================== Command Handlers ====================
     
+    /**
+     * Handle AUTH command.
+     * Supports two formats:
+     * 1. AUTH password - traditional password authentication
+     * 2. AUTH APIKEY kub_xxx... - API key authentication
+     */
     private RedisResponse handleAuth(IoSession session, List<String> args) {
         if (args.isEmpty()) {
             return RedisResponse.error("wrong number of arguments for 'auth' command");
         }
         
+        // Check for API key authentication: AUTH APIKEY kub_xxx...
+        if (args.size() >= 2 && "APIKEY".equalsIgnoreCase(args.get(0))) {
+            String apiKeyValue = args.get(1);
+            Optional<ApiKey> validatedKey = apiKeyService.validateKey(apiKeyValue);
+            
+            if (validatedKey.isPresent()) {
+                ApiKey key = validatedKey.get();
+                session.setAttribute(SESSION_AUTHENTICATED, true);
+                session.setAttribute(SESSION_AUTH_USER, key.getUserId());
+                log.info("Redis client authenticated via API key: {} ({})", key.getKeyId(), key.getName());
+                return RedisResponse.ok();
+            }
+            
+            log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
+            return RedisResponse.error("invalid API key");
+        }
+        
+        // Check for API key directly (if it starts with kub_)
+        if (args.get(0).startsWith("kub_")) {
+            Optional<ApiKey> validatedKey = apiKeyService.validateKey(args.get(0));
+            
+            if (validatedKey.isPresent()) {
+                ApiKey key = validatedKey.get();
+                session.setAttribute(SESSION_AUTHENTICATED, true);
+                session.setAttribute(SESSION_AUTH_USER, key.getUserId());
+                log.info("Redis client authenticated via API key: {} ({})", key.getKeyId(), key.getName());
+                return RedisResponse.ok();
+            }
+            
+            log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
+            return RedisResponse.error("invalid API key");
+        }
+        
+        // Traditional password authentication
         String password = properties.getSecurity().getRedisPassword();
         if (password == null || password.equals(args.get(0))) {
             session.setAttribute(SESSION_AUTHENTICATED, true);

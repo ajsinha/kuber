@@ -2,6 +2,84 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.6] - 2025-12-06 - STARTUP ORCHESTRATION & CONFIGURABLE API KEYS PATH
+
+### Added
+- **Configurable API Keys Path**: API keys file location now configurable via properties
+  - New property: `kuber.security.api-keys-file` (default: `config/apikeys.json`)
+  - Supports any file path relative to working directory or absolute path
+
+- **PersistenceMaintenanceService**: New Spring-managed service for database maintenance
+  - Runs within Spring context after ApplicationReadyEvent
+  - Supports RocksDB compaction and SQLite vacuum
+  - Replaces pre-Spring PreStartupCompaction approach
+
+### Changed
+- **Startup Orchestration**: Complete restructuring of startup sequence
+  - Phase 0: Spring context initialization
+  - Phase 1: 10-second stabilization wait
+  - Phase 2: Persistence maintenance (compaction/vacuum)
+  - Phase 3: 2-second wait + Cache service initialization
+  - Phase 4: 2-second wait + Redis protocol server start
+  - Phase 5: 2-second wait + Autoload service start
+  - Phase 6: 2-second wait + Final system ready announcement
+
+- **Removed Pre-Startup Compaction**: Database maintenance now runs after Spring context loads
+  - PreStartupCompaction.run() removed from KuberApplication.main()
+  - PreStartupCompaction class marked as @Deprecated (retained for standalone testing)
+  - Compaction/vacuum now managed by StartupOrchestrator via PersistenceMaintenanceService
+
+- **ApiKeyService**: Now uses configurable path from properties
+  - Falls back to `config/apikeys.json` if not specified
+
+### Fixed
+- Startup timing improved with explicit delays between phases
+- Better isolation of database maintenance from cache initialization
+
+## [1.2.5] - 2025-12-05 - API KEY AUTHENTICATION
+
+### Added
+- **API Key Authentication**: Full support for API key-based authentication
+  - Generate API keys from Admin UI (/admin/apikeys)
+  - API keys can be used by REST, Python, Java, and Redis clients
+  - Keys associated with users and inherit their roles
+  - Optional expiration dates for keys
+  - Key revocation and reactivation
+  - Last-used tracking for audit purposes
+
+- **API Key Service**: New `ApiKeyService` for key management
+  - Secure key generation (kub_ prefix + 64 hex characters)
+  - JSON file storage (config/apikeys.json)
+  - Key validation with expiration checking
+  - Statistics and audit tracking
+
+- **API Key Authentication Filter**: Spring Security filter for REST API
+  - X-API-Key header support
+  - Authorization: ApiKey scheme support
+  - Query parameter (api_key) support
+
+- **Redis Protocol API Key Support**: 
+  - `AUTH APIKEY kub_xxx...` command
+  - `AUTH kub_xxx...` direct key authentication
+
+- **Admin API Keys Page**: Full management UI
+  - Generate new keys with roles and expiration
+  - View all keys with masked values
+  - Revoke/activate/delete keys
+  - Usage instructions for all client types
+
+- **Documentation Updates**:
+  - API Key section in architecture documentation
+  - Help pages for API key usage
+  - Client examples for all supported languages
+
+### Changed
+- SecurityConfig updated to support API key filter
+- AdminController extended with API key endpoints
+- RedisProtocolHandler supports API key authentication
+- Layout updated with API Keys menu item
+- Version bumped to 1.2.5 across all modules
+
 ## [1.2.4] - 2025-12-05 - STARTUP RACE CONDITION FIX
 
 ### Fixed

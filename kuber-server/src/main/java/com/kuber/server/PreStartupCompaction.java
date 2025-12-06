@@ -23,23 +23,23 @@ import java.util.*;
 /**
  * Standalone pre-startup compaction utility.
  * 
- * This class runs BEFORE Spring context initialization to ensure databases
- * are in optimal state before the application starts serving requests.
+ * <strong>DEPRECATED:</strong> As of v1.2.6, database maintenance runs within Spring context
+ * via {@link com.kuber.server.persistence.PersistenceMaintenanceService} called from
+ * {@link com.kuber.server.startup.StartupOrchestrator}.
+ * 
+ * This class is retained for standalone testing and manual execution only.
+ * It is no longer called from KuberApplication.main().
  * 
  * Key features:
  * - Loads configuration directly from application.properties (no Spring dependency)
  * - Detects persistence type (RocksDB or SQLite)
  * - Performs compaction/vacuum on all region databases
- * - Runs synchronously to completion before Spring starts
- * 
- * This ensures:
- * - No resource contention with web server threads
- * - Databases are optimized before any queries
- * - Startup is slightly longer but runtime performance is better
  * 
  * @author Ashutosh Sinha
- * @version 1.2.4
+ * @version 1.2.6
+ * @deprecated Use {@link PersistenceMaintenanceService} instead for in-context maintenance
  */
+@Deprecated(since = "1.2.6", forRemoval = false)
 public class PreStartupCompaction {
     
     private static final String PROPERTIES_FILE = "application.properties";

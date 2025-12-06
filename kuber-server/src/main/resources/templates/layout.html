@@ -94,6 +94,11 @@
                                 <i class="fas fa-users me-2"></i> Manage Users
                             </a>
                         </li>
+                        <li sec:authorize="hasRole('ADMIN')">
+                            <a class="dropdown-item" th:href="@{/admin/apikeys}">
+                                <i class="fas fa-key me-2"></i> API Keys
+                            </a>
+                        </li>
                         <li sec:authorize="hasRole('ADMIN')"><hr class="dropdown-divider"></li>
                         <li>
                             <form th:action="@{/logout}" method="post" class="d-inline">

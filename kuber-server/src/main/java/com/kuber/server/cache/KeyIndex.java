@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  * 
  * For off-heap storage, use OffHeapKeyIndex instead.
  * 
- * @version 1.2.4
+ * @version 1.2.6
  */
 @Slf4j
 public class KeyIndex implements KeyIndexInterface {

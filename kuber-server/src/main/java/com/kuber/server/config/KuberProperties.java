@@ -382,6 +382,12 @@ public class KuberProperties {
         private String usersFile = "classpath:users.json";
         
         /**
+         * Path to API keys JSON file.
+         * Default: config/apikeys.json
+         */
+        private String apiKeysFile = "config/apikeys.json";
+        
+        /**
          * Session timeout in minutes
          */
         @Min(1)

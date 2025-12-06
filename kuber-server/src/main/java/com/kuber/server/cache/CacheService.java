@@ -62,13 +62,13 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.2.4
+ * @version 1.2.6
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.2.4";
+    private static final String VERSION = "1.2.6";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;

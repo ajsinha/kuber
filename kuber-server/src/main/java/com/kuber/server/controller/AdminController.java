@@ -15,6 +15,8 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.security.ApiKey;
+import com.kuber.server.security.ApiKeyService;
 import com.kuber.server.security.JsonUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,13 +26,13 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Controller for administrative operations.
- * Users are managed via users.json file - this provides read-only view.
+ * Manages users (read-only from users.json) and API keys.
+ *
+ * @version 1.2.6
  */
 @Controller
 @RequestMapping("/admin")
@@ -39,6 +41,7 @@ import java.util.Map;
 public class AdminController {
     
     private final JsonUserDetailsService userService;
+    private final ApiKeyService apiKeyService;
     private final CacheService cacheService;
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -59,6 +62,9 @@ public class AdminController {
         // Add persistence info
         model.addAttribute("persistenceInfo", getPersistenceInfo());
         model.addAttribute("persistenceType", persistenceStore.getType().name());
+        
+        // Add API key stats
+        model.addAttribute("apiKeyStats", apiKeyService.getStatistics());
         
         if (replicationManager != null) {
             model.addAttribute("replicationInfo", replicationManager.getReplicationInfo());
@@ -105,7 +111,8 @@ public class AdminController {
         return info;
     }
     
-    // User Management (Read-Only - users are in users.json)
+    // ==================== User Management ====================
+    
     @GetMapping("/users")
     public String listUsers(Model model) {
         Collection<JsonUserDetailsService.JsonUser> users = userService.getAllUsers();
@@ -137,14 +144,118 @@ public class AdminController {
         return "redirect:/admin/users";
     }
     
-    // System Configuration
+    // ==================== API Key Management ====================
+    
+    @GetMapping("/apikeys")
+    public String listApiKeys(Model model) {
+        List<ApiKey> keys = apiKeyService.getAllKeys();
+        model.addAttribute("apiKeys", keys);
+        model.addAttribute("apiKeyStats", apiKeyService.getStatistics());
+        model.addAttribute("users", userService.getAllUsers());
+        return "admin/apikeys";
+    }
+    
+    @PostMapping("/apikeys/generate")
+    public String generateApiKey(
+            @RequestParam String name,
+            @RequestParam String userId,
+            @RequestParam(required = false) List<String> roles,
+            @RequestParam(required = false) Integer expirationDays,
+            RedirectAttributes redirectAttributes) {
+        
+        try {
+            if (name == null || name.trim().isEmpty()) {
+                redirectAttributes.addFlashAttribute("error", "API key name is required");
+                return "redirect:/admin/apikeys";
+            }
+            
+            if (userId == null || userId.trim().isEmpty()) {
+                redirectAttributes.addFlashAttribute("error", "User ID is required");
+                return "redirect:/admin/apikeys";
+            }
+            
+            // Use default roles if none provided
+            if (roles == null || roles.isEmpty()) {
+                roles = List.of("USER");
+            }
+            
+            ApiKey apiKey = apiKeyService.generateApiKey(name.trim(), userId.trim(), roles, expirationDays);
+            
+            // Flash the full key value so user can copy it (only shown once)
+            redirectAttributes.addFlashAttribute("success", "API key generated successfully");
+            redirectAttributes.addFlashAttribute("newKeyValue", apiKey.getKeyValue());
+            redirectAttributes.addFlashAttribute("newKeyName", apiKey.getName());
+            
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to generate API key: " + e.getMessage());
+        }
+        
+        return "redirect:/admin/apikeys";
+    }
+    
+    @PostMapping("/apikeys/{keyId}/revoke")
+    public String revokeApiKey(@PathVariable String keyId, RedirectAttributes redirectAttributes) {
+        try {
+            if (apiKeyService.revokeKey(keyId)) {
+                redirectAttributes.addFlashAttribute("success", "API key revoked successfully");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "API key not found");
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to revoke API key: " + e.getMessage());
+        }
+        return "redirect:/admin/apikeys";
+    }
+    
+    @PostMapping("/apikeys/{keyId}/activate")
+    public String activateApiKey(@PathVariable String keyId, RedirectAttributes redirectAttributes) {
+        try {
+            if (apiKeyService.activateKey(keyId)) {
+                redirectAttributes.addFlashAttribute("success", "API key activated successfully");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "API key not found");
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to activate API key: " + e.getMessage());
+        }
+        return "redirect:/admin/apikeys";
+    }
+    
+    @PostMapping("/apikeys/{keyId}/delete")
+    public String deleteApiKey(@PathVariable String keyId, RedirectAttributes redirectAttributes) {
+        try {
+            if (apiKeyService.deleteKey(keyId)) {
+                redirectAttributes.addFlashAttribute("success", "API key deleted permanently");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "API key not found");
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to delete API key: " + e.getMessage());
+        }
+        return "redirect:/admin/apikeys";
+    }
+    
+    @PostMapping("/apikeys/reload")
+    public String reloadApiKeys(RedirectAttributes redirectAttributes) {
+        try {
+            apiKeyService.reloadKeys();
+            redirectAttributes.addFlashAttribute("success", "API keys reloaded from file successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to reload API keys: " + e.getMessage());
+        }
+        return "redirect:/admin/apikeys";
+    }
+    
+    // ==================== System Configuration ====================
+    
     @GetMapping("/config")
     public String viewConfig(Model model) {
         model.addAttribute("properties", properties);
         return "admin/config";
     }
     
-    // Statistics
+    // ==================== Statistics ====================
+    
     @GetMapping("/stats")
     public String viewStats(Model model) {
         model.addAttribute("serverInfo", cacheService.getServerInfo());

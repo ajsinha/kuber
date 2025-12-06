@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - {basePath}/{regionName}/ - Separate RocksDB instance for each region's entries
  * - {basePath}/{regionName}/_region.json - Region metadata file
  * 
- * @version 1.2.4
+ * @version 1.2.6
  */
 @Slf4j
 public class RocksDbPersistenceStore extends AbstractPersistenceStore {

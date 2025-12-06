@@ -78,6 +78,8 @@
                 <!-- Jedis Examples -->
                 <section id="jedis" class="mb-5">
                     <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Jedis Examples</h3>
+                    
+                    <h4>Password Authentication</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
 
 public class KuberExample {
@@ -109,6 +111,29 @@ public class KuberExample {
         }
     }
 }</code></pre>
+                    
+                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+
+public class KuberApiKeyExample {
+    public static void main(String[] args) {
+        String apiKey = "kub_your_api_key_here";
+        
+        try (Jedis jedis = new Jedis("localhost", 6380)) {
+            // Authenticate with API Key
+            jedis.auth(apiKey);
+            // Or use: jedis.sendCommand(() -> "AUTH", "APIKEY", apiKey);
+            
+            // Test connection
+            System.out.println("PING: " + jedis.ping());
+            
+            // Use normally
+            jedis.set("key", "value");
+            String value = jedis.get("key");
+            System.out.println("Value: " + value);
+        }
+    }
+}</code></pre>
                 </section>
 
                 <!-- REST API -->
@@ -117,6 +142,8 @@ public class KuberExample {
                     <div class="alert alert-success">
                         <i class="fas fa-rocket me-2"></i><strong>Recommended:</strong> Copy the KuberRestApi class below for all REST operations.
                     </div>
+                    
+                    <h4>Password Authentication</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -201,6 +228,65 @@ public class KuberRestApi {
             System.err.println("Connection failed: " + e.getMessage());
         }
         return false;
+    }
+}</code></pre>
+                    
+                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.time.Duration;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+
+public class KuberApiKeyClient {
+    private final String baseUrl;
+    private final HttpClient client;
+    private final String apiKey;
+    private final ObjectMapper mapper;
+    
+    public KuberApiKeyClient(String host, int port, String apiKey) {
+        this.baseUrl = String.format("http://%s:%d/api", host, port);
+        this.client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(30))
+            .build();
+        this.apiKey = apiKey;
+        this.mapper = new ObjectMapper();
+    }
+    
+    public JsonNode get(String endpoint) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + endpoint))
+            .header("X-API-Key", apiKey)  // API Key header
+            .GET()
+            .build();
+        HttpResponse&lt;String&gt; response = client.send(request, 
+            HttpResponse.BodyHandlers.ofString());
+        return mapper.readTree(response.body());
+    }
+    
+    public boolean put(String endpoint, Object body) throws Exception {
+        String json = body != null ? mapper.writeValueAsString(body) : "";
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + endpoint))
+            .header("X-API-Key", apiKey)  // API Key header
+            .header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .build();
+        int status = client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
+        return status == 200 || status == 201;
+    }
+    
+    public static void main(String[] args) throws Exception {
+        KuberApiKeyClient client = new KuberApiKeyClient(
+            "localhost", 8080, "kub_your_api_key_here"
+        );
+        
+        // Store and retrieve data
+        client.put("/cache/default/user:1", Map.of("name", "John"));
+        JsonNode user = client.get("/cache/default/user:1");
+        System.out.println("User: " + user);
     }
 }</code></pre>
                 </section>
@@ -408,7 +494,7 @@ public class UserService {
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.4</p>
+                    <p class="text-muted small mb-0">Version 1.2.6</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

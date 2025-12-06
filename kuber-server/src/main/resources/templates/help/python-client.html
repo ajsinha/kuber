@@ -74,7 +74,7 @@ pip install requests</code></pre>
                     <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Basic Operations (Redis Protocol)</h3>
                     <pre class="bg-dark text-light p-3 rounded"><code>import redis
 
-# Connect to Kuber
+# Connect to Kuber with password
 client = redis.Redis(
     host='localhost',
     port=6379,
@@ -104,6 +104,22 @@ client.incrby('counter', 10) # 11
 
 # Delete keys
 client.delete('user:1001')</code></pre>
+                    
+                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import redis
+
+# Connect using API Key
+client = redis.Redis(host='localhost', port=6380, decode_responses=True)
+
+# Authenticate with API Key
+client.execute_command('AUTH', 'APIKEY', 'kub_your_api_key_here')
+# Or directly:
+# client.execute_command('AUTH', 'kub_your_api_key_here')
+
+# Now use normally
+client.set('key', 'value')
+value = client.get('key')
+print(f"Value: {value}")</code></pre>
                 </section>
 
                 <!-- REST API Setup -->
@@ -112,6 +128,8 @@ client.delete('user:1001')</code></pre>
                     <div class="alert alert-success">
                         <i class="fas fa-rocket me-2"></i><strong>Recommended:</strong> Copy this setup code and use the helper functions for all REST operations.
                     </div>
+                    
+                    <h4>Password Authentication</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>import requests
 from requests.auth import HTTPBasicAuth
 import json
@@ -170,6 +188,53 @@ def test_connection() -&gt; bool:
     return False
 
 test_connection()</code></pre>
+                    
+                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import requests
+
+# Configuration with API Key
+BASE_URL = 'http://localhost:8080/api'
+API_KEY = 'kub_your_api_key_here'
+
+# Method 1: X-API-Key header (recommended)
+headers = {
+    'Content-Type': 'application/json',
+    'X-API-Key': API_KEY
+}
+response = requests.get(f'{BASE_URL}/cache/default/mykey', headers=headers)
+
+# Method 2: Authorization header
+headers = {
+    'Content-Type': 'application/json',
+    'Authorization': f'ApiKey {API_KEY}'
+}
+response = requests.get(f'{BASE_URL}/cache/default/mykey', headers=headers)
+
+# Method 3: Query parameter
+response = requests.get(f'{BASE_URL}/cache/default/mykey?api_key={API_KEY}')
+
+# Helper class for API Key authentication
+class KuberApiClient:
+    def __init__(self, base_url: str, api_key: str):
+        self.base_url = base_url
+        self.headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': api_key
+        }
+    
+    def get(self, key: str, region: str = 'default'):
+        response = requests.get(f'{self.base_url}/cache/{region}/{key}', headers=self.headers)
+        return response.json() if response.ok else None
+    
+    def set(self, key: str, value, region: str = 'default'):
+        response = requests.put(f'{self.base_url}/cache/{region}/{key}', 
+                               headers=self.headers, json=value)
+        return response.ok
+
+# Usage
+client = KuberApiClient('http://localhost:8080/api', 'kub_your_api_key_here')
+client.set('user:1001', {'name': 'John'})
+user = client.get('user:1001')</code></pre>
                 </section>
 
                 <!-- Region Management -->
@@ -455,7 +520,7 @@ active_users = manager.find_by_status('active')</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.4</p>
+                    <p class="text-muted small mb-0">Version 1.2.6</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

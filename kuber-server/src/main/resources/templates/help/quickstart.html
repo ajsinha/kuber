@@ -16,15 +16,15 @@
                 <h1 class="display-5 mb-4"><i class="fas fa-bolt me-3 text-warning"></i>Quick Start</h1>
                 
                 <h3 class="mt-4">1. Start the Server</h3>
-                <pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server-1.2.4.jar</code></pre>
+                <pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server-1.2.6.jar</code></pre>
                 
                 <h3 class="mt-4">2. Connect with Redis CLI</h3>
-                <pre class="bg-dark text-light p-3 rounded"><code>redis-cli -p 6379 -a admin123
-127.0.0.1:6379&gt; PING
+                <pre class="bg-dark text-light p-3 rounded"><code>redis-cli -p 6380 -a admin123
+127.0.0.1:6380&gt; PING
 PONG
-127.0.0.1:6379&gt; SET user:1001 "John Doe"
+127.0.0.1:6380&gt; SET user:1001 "John Doe"
 OK
-127.0.0.1:6379&gt; GET user:1001
+127.0.0.1:6380&gt; GET user:1001
 "John Doe"</code></pre>
                 
                 <h3 class="mt-4">3. Use REST API</h3>
@@ -42,17 +42,93 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
                 
                 <div class="alert alert-info mt-4">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Default Ports:</strong> REST API on 8080, Redis protocol on 6379
+                    <strong>Default Ports:</strong> REST API on 8080, Redis protocol on 6380
+                </div>
+
+                <!-- Key Operational Highlights -->
+                <h2 class="mt-5 border-bottom pb-2"><i class="fas fa-cogs me-2 text-secondary"></i>Key Operational Highlights</h2>
+                
+                <div class="row mt-4">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-success">
+                            <div class="card-header bg-success text-white">
+                                <i class="fas fa-memory me-2"></i>Memory Management
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    <li><strong>Hybrid Architecture:</strong> All keys always in memory, values can overflow to disk</li>
+                                    <li><strong>Auto-Protection:</strong> Memory Watcher evicts values when heap exceeds 85%</li>
+                                    <li><strong>No OOM Crashes:</strong> Values are persisted before eviction</li>
+                                    <li><strong>O(1) EXISTS:</strong> Key lookups never hit disk</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <i class="fas fa-key me-2"></i>Key Management
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    <li><strong>KeyIndex:</strong> Every key tracked in memory (~100 bytes/key)</li>
+                                    <li><strong>Off-Heap Option:</strong> Zero GC for 10+ million keys</li>
+                                    <li><strong>Fast Operations:</strong> EXISTS, KEYS, DBSIZE are all O(1) or O(n) in memory</li>
+                                    <li><strong>Never Evicted:</strong> Keys remain even under memory pressure</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-info">
+                            <div class="card-header bg-info text-white">
+                                <i class="fas fa-database me-2"></i>Persistence &amp; Durability
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    <li><strong>Multiple Backends:</strong> RocksDB (default), LMDB, SQLite, MongoDB</li>
+                                    <li><strong>Crash-Safe:</strong> RocksDB WAL, LMDB ACID, SQLite journaling</li>
+                                    <li><strong>Async Writes:</strong> Fast response, background persistence</li>
+                                    <li><strong>Auto-Compaction:</strong> RocksDB optimized at 2 AM daily</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-dark">
+                            <div class="card-header bg-dark text-white">
+                                <i class="fas fa-shield-alt me-2"></i>Data Safety &amp; Recovery
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    <li><strong>Startup Recovery:</strong> All data recovered from persistence on restart</li>
+                                    <li><strong>Orchestrated Startup:</strong> Spring → Compaction → Cache → Redis → Autoload</li>
+                                    <li><strong>No Data Loss:</strong> Graceful shutdown completes pending writes</li>
+                                    <li><strong>TTL Cleanup:</strong> Expired entries automatically removed</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-success mt-4">
+                    <i class="fas fa-book me-2"></i>
+                    <strong>Learn More:</strong> See <a href="/help/internals" class="alert-link">System Internals</a> for detailed 
+                    documentation on memory management, persistence, thread model, and data safety.
                 </div>
                 
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                    <a href="/help/internals" class="btn btn-outline-secondary ms-2"><i class="fas fa-cogs me-2"></i>System Internals</a>
                 </div>
             </div>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.2.4</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.2.6</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

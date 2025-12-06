@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.2.4**
+**Version 1.2.6**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -190,7 +190,7 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STARTUP SEQUENCE (v1.2.4)                            │
+│                         STARTUP SEQUENCE (v1.2.6)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -210,7 +210,16 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 │                                    │                                         │
 │                                    ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 1: Cache Service Initialization                                │   │
+│  │ PHASE 1: Persistence Maintenance                                     │   │
+│  │ • RocksDB: Full compaction of all region databases                   │   │
+│  │ • SQLite: VACUUM on all region database files                        │   │
+│  │ • LMDB: Skip (B+ tree auto-balances)                                 │   │
+│  │ • Other backends: Skip                                               │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼ (2 second wait)                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ PHASE 2: Cache Service Initialization                                │   │
 │  │ • Load regions from persistence store                                │   │
 │  │ • Recover all cached data from disk/database                         │   │
 │  │ • Build KeyIndex for each region (all keys in memory)                │   │
@@ -218,21 +227,27 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 │  │ • Mark CacheService as initialized                                   │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
-│                                    ▼                                         │
+│                                    ▼ (2 second wait)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 2: Redis Protocol Server                                       │   │
+│  │ PHASE 3: Redis Protocol Server                                       │   │
 │  │ • Bind to configured port (default: 6380)                            │   │
 │  │ • Start accepting client connections                                 │   │
 │  │ • Clients can now safely connect with full data available            │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
-│                                    ▼                                         │
+│                                    ▼ (2 second wait)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 3: Autoload Service                                            │   │
+│  │ PHASE 4: Autoload Service                                            │   │
 │  │ • Initialize inbox/outbox directories                                │   │
 │  │ • Start file watcher for new data files                              │   │
 │  │ • Process any pending files in inbox                                 │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼ (2 second wait)                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ SYSTEM READY: Final Announcement                                     │   │
 │  │ • Mark startup as complete                                           │   │
+│  │ • Log system ready message                                           │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -455,26 +470,42 @@ Native JSON document support with JSONPath queries:
 └─────────────────────────┴───────────────────────────────────────────────┘
 ```
 
-### 11.2 Authentication Requirement
+### 5.2 Authentication Methods
 
-All client constructors require username and password:
+All client constructors support both password and API key authentication:
 
 **Python Redis Client:**
 ```python
-# Both username and password are REQUIRED
+# Password authentication
 client = KuberRedisClient(host, port, username='admin', password='secret')
+
+# API Key authentication (v1.2.5)
+import redis
+r = redis.Redis(host='localhost', port=6380)
+r.execute_command('AUTH', 'APIKEY', 'kub_your_api_key_here')
 ```
 
 **Python REST Client:**
 ```python
-# Both username and password are REQUIRED
+# Password authentication
 client = KuberRestClient(host, port, username='admin', password='secret')
+
+# API Key authentication (v1.2.5)
+import requests
+headers = {'X-API-Key': 'kub_your_api_key_here'}
+response = requests.get('http://localhost:8080/api/cache/default/mykey', headers=headers)
 ```
 
 **Java Redis Client:**
 ```java
-// Both username and password are REQUIRED
+// Password authentication
 KuberClient client = new KuberClient(host, port, username, password);
+
+// API Key authentication (v1.2.5)
+try (Jedis jedis = new Jedis("localhost", 6380)) {
+    jedis.auth("kub_your_api_key_here");
+    jedis.set("key", "value");
+}
 ```
 
 **Java REST Client:**
@@ -620,20 +651,21 @@ Bulk Operations:
               │
               │ implements
               ▼
-┌─────────┬─────────┬───────────┬─────────┬──────────┐
-│ MongoDB │ SQLite  │PostgreSQL │ RocksDB │ InMemory │
-│  Store  │  Store  │   Store   │  Store  │   Store  │
-└─────────┴─────────┴───────────┴─────────┴──────────┘
+┌─────────┬─────────┬──────┬───────────┬─────────┬──────────┐
+│ MongoDB │ SQLite  │ LMDB │PostgreSQL │ RocksDB │ InMemory │
+│  Store  │  Store  │Store │   Store   │  Store  │   Store  │
+└─────────┴─────────┴──────┴───────────┴─────────┴──────────┘
 ```
 
 ### 11.2 Backend Comparison
 
 | Backend | Use Case | Pros | Cons |
 |---------|----------|------|------|
+| **RocksDB** | High-performance (Default) | Embedded, LSM-tree, per-region isolation | Complex tuning |
+| **LMDB** | Zero-copy reads (v1.2.0) | ACID, crash-safe, memory-mapped, zero-copy | Write-heavy workloads |
 | **MongoDB** | Production clusters | Distributed, scalable | Requires separate server |
 | **SQLite** | Development/Single-node | Zero config, file-based | Single-writer, limited scale |
 | **PostgreSQL** | Enterprise | ACID, mature tooling | Requires separate server |
-| **RocksDB** | High-performance | Embedded, LSM-tree | Complex tuning |
 | **InMemory** | Testing/Dev | Fastest, no I/O | No persistence |
 
 ### 7.3 Configuration
@@ -641,7 +673,7 @@ Bulk Operations:
 ```yaml
 kuber:
   persistence:
-    # Options: mongodb, sqlite, postgresql, rocksdb, memory
+    # Options: mongodb, sqlite, postgresql, rocksdb, lmdb, memory
     # Default: rocksdb (embedded, no external dependencies)
     backend: rocksdb
     
@@ -663,6 +695,11 @@ kuber:
     # RocksDB settings (default)
     rocksdb:
       path: ./data/rocksdb
+    
+    # LMDB settings (v1.2.0+)
+    lmdb:
+      path: ./data/lmdb
+      map-size: 10737418240   # 10GB max database size
 ```
 
 ---
@@ -710,13 +747,63 @@ kuber:
 
 ## 9. Security Architecture
 
-### 11.1 Authentication
+### 9.1 Authentication Methods
+
+Kuber supports multiple authentication methods for different use cases (v1.2.5):
+
+| Method | Use Case | Protocol |
+|--------|----------|----------|
+| **Username/Password** | Web UI, interactive use | Form login, HTTP Basic |
+| **API Key** | Programmatic access, CI/CD, services | Header, query param |
+| **Redis AUTH** | Redis protocol clients | AUTH command |
+
+### 9.2 API Key Authentication (v1.2.5)
+
+API keys provide secure, revocable authentication for programmatic access:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  API Key Authentication                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Key Format: kub_[64 hexadecimal characters]                │
+│  Example: kub_a1b2c3d4e5f6...                               │
+│                                                              │
+│  REST API Methods:                                           │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  1. X-API-Key Header (Recommended)                    │   │
+│  │     curl -H "X-API-Key: kub_xxx..." /api/cache/key   │   │
+│  │                                                       │   │
+│  │  2. Authorization Header                              │   │
+│  │     curl -H "Authorization: ApiKey kub_xxx..." ...   │   │
+│  │                                                       │   │
+│  │  3. Query Parameter                                   │   │
+│  │     curl "/api/cache/key?api_key=kub_xxx..."         │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  Redis Protocol:                                             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  AUTH APIKEY kub_xxx...                              │   │
+│  │  AUTH kub_xxx...                                      │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  Key Features:                                               │
+│  • Secure 64-character cryptographically random keys        │
+│  • Role-based access (USER, OPERATOR, ADMIN)                │
+│  • Optional expiration dates                                 │
+│  • Revocation and reactivation                              │
+│  • Last-used tracking for audit                              │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 Password Authentication
 
 **All clients MUST provide credentials. This is enforced at the client level.**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  Authentication Flow                         │
+│                  Password Authentication                     │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Redis Protocol:                                             │
@@ -743,7 +830,7 @@ kuber:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 11.2 User Configuration
+### 9.4 User Configuration
 
 Users are configured in `users.json`:
 
@@ -894,6 +981,77 @@ Users are configured in `users.json`:
 | SQLite | WAL mode, appropriate page size |
 | PostgreSQL | Connection pool, prepared statements |
 | RocksDB | Block cache, write buffer size |
+
+---
+
+## Appendix: System Internals
+
+### Memory Management in Kuber
+
+Kuber employs a **Hybrid Memory Architecture** inspired by Aerospike:
+
+1. **KeyIndex (Always in Memory)**
+   - Every key ever written is tracked in the KeyIndex
+   - ~100-150 bytes per key (key string, metadata, pointers)
+   - Never evicted under memory pressure
+   - Enables O(1) EXISTS and O(n) KEYS operations without disk I/O
+
+2. **Value Cache (Caffeine, LRU Eviction)**
+   - Hot values kept in memory
+   - Configurable per-region size limits
+   - When full, LRU eviction to disk
+
+3. **Memory Watcher Service**
+   - Monitors JVM heap every 5 seconds
+   - When heap > 85% (high watermark), starts eviction
+   - Evicts values (not keys) in batches of 1000
+   - Continues until heap < 50% (low watermark)
+   - **Guarantee**: No OOM crashes in 24x7 operation
+
+**Value Retrieval Flow (when value not in memory):**
+```
+GET key
+  └── Check KeyIndex (O(1), always in memory)
+        ├── Key NOT found → Return NULL immediately (no disk I/O)
+        └── Key found
+              └── Check Value Cache
+                    ├── Value in cache → Return immediately
+                    └── Value NOT in cache (cold)
+                          └── Load from persistence store
+                                ├── Found → Promote to cache, return value
+                                └── Not found → Cleanup index, return NULL
+```
+
+### Thread Model
+
+| Thread Pool | Purpose |
+|-------------|---------|
+| main | Spring Boot startup |
+| kuber-startup-orchestrator | Startup sequence coordination |
+| NioProcessor-[N] | MINA I/O processing |
+| pool-[N]-thread-[M] | Redis command handlers |
+| scheduling-1 | @Scheduled tasks (TTL, memory, compaction) |
+| kuber-autoload | File scanning/processing |
+| ForkJoinPool.commonPool | Async persistence writes |
+| http-nio-8080-exec-[N] | REST API handlers |
+
+### Data Safety Guarantees
+
+1. **Write Durability**
+   - KeyIndex update: Synchronous
+   - Value Cache update: Synchronous
+   - Persistence write: Asynchronous (queued immediately)
+
+2. **Crash Recovery**
+   - RocksDB: WAL (Write-Ahead Log) for recovery
+   - LMDB: Full ACID, copy-on-write
+   - SQLite: Journal mode (WAL or rollback)
+
+3. **Startup Recovery**
+   - All data recovered from persistence
+   - Keys loaded into KeyIndex
+   - Hot values loaded into cache (up to memory limit)
+   - Redis server starts AFTER recovery complete
 
 ---
 

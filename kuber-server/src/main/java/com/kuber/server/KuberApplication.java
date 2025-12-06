@@ -28,16 +28,19 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * - Automatic replication with primary/secondary failover
  * - Event subscription for cache operations
  * 
- * Startup sequence:
- * 1. Print banner
- * 2. Run pre-startup database maintenance (compaction/vacuum)
- * 3. Initialize Spring context
+ * Startup sequence is managed by StartupOrchestrator:
+ * 1. Spring context initialization
+ * 2. Wait for stabilization (10 seconds)
+ * 3. Persistence maintenance (compaction/vacuum)
+ * 4. Cache service initialization
+ * 5. Redis protocol server start
+ * 6. Autoload service start
  * 
  * MongoDB auto-configuration is excluded because we handle MongoDB initialization
  * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
  * 
  * @author Ashutosh Sinha
- * @version 1.2.4
+ * @version 1.2.6
  */
 @SpringBootApplication(exclude = {
     MongoAutoConfiguration.class,
@@ -48,15 +51,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class KuberApplication {
     
     public static void main(String[] args) {
-        // Step 1: Print banner
+        // Print banner
         printBanner();
         
-        // Step 2: Run pre-startup database maintenance
-        // This compacts RocksDB or vacuums SQLite BEFORE Spring context starts
-        // Ensures databases are optimized before any web requests
-        PreStartupCompaction.run();
-        
-        // Step 3: Start Spring context
+        // Start Spring context - startup orchestration handled by StartupOrchestrator
         SpringApplication.run(KuberApplication.class, args);
     }
     
@@ -72,7 +70,7 @@ public class KuberApplication {
         System.out.println("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                       ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   High-Performance Distributed Cache                              ║");
-        System.out.println("║   Version 1.2.4                                                  ║");
+        System.out.println("║   Version 1.2.6                                                  ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   Copyright © 2025-2030 Ashutosh Sinha                            ║");
         System.out.println("║   All Rights Reserved                                             ║");

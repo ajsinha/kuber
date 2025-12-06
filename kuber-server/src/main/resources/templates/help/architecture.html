@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.2.4</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.2.6</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -170,7 +170,7 @@
                         </tbody>
                     </table>
                     
-                    <h4 class="mt-4">Startup Sequence (v1.2.4)</h4>
+                    <h4 class="mt-4">Startup Sequence (v1.2.6)</h4>
                     <pre class="bg-dark text-white p-3 rounded">
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         STARTUP SEQUENCE                                     │
@@ -192,28 +192,42 @@
 │                                    │                                         │
 │                                    ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 1: Cache Service Initialization                                │   │
+│  │ PHASE 1: Persistence Maintenance                                     │   │
+│  │ • RocksDB: Full compaction of all region databases                   │   │
+│  │ • SQLite: VACUUM on all region database files                        │   │
+│  │ • LMDB/Other: Skip (not required)                                    │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼ (2 second wait)                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ PHASE 2: Cache Service Initialization                                │   │
 │  │ • Load regions from persistence store                                │   │
 │  │ • Recover all cached data from disk/database                         │   │
 │  │ • Build KeyIndex for each region (all keys in memory)                │   │
 │  │ • Mark CacheService as initialized                                   │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
-│                                    ▼                                         │
+│                                    ▼ (2 second wait)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 2: Redis Protocol Server                                       │   │
+│  │ PHASE 3: Redis Protocol Server                                       │   │
 │  │ • Bind to configured port (default: 6380)                            │   │
 │  │ • Start accepting client connections                                 │   │
 │  │ • Clients can now safely connect with full data available            │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
-│                                    ▼                                         │
+│                                    ▼ (2 second wait)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 3: Autoload Service                                            │   │
+│  │ PHASE 4: Autoload Service                                            │   │
 │  │ • Initialize inbox/outbox directories                                │   │
 │  │ • Start file watcher for new data files                              │   │
 │  │ • Process any pending files in inbox                                 │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼ (2 second wait)                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ SYSTEM READY: Final Announcement                                     │   │
 │  │ • Mark startup as complete                                           │   │
+│  │ • Log system ready message                                           │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘</pre>
@@ -241,24 +255,33 @@
 Waiting 10 seconds for Spring context stabilization...
 
 ╔════════════════════════════════════════════════════════════════════╗
-║  Phase 1: Starting cache service initialization...                 ║
+║  Phase 1: Persistence Maintenance                                  ║
+║           Running database compaction/vacuum...                    ║
+╚════════════════════════════════════════════════════════════════════╝
+Persistence maintenance completed successfully in 523 ms
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Phase 2: Cache Service Initialization                             ║
 ║           Recovering data from persistence store...                ║
 ╚════════════════════════════════════════════════════════════════════╝
 Cache service initialization completed in 1234 ms
 
 ╔════════════════════════════════════════════════════════════════════╗
-║  Phase 2: Starting Redis protocol server...                        ║
+║  Phase 3: Redis Protocol Server                                    ║
+║           Starting server to accept client connections...          ║
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║  Phase 3: Starting autoload service...                             ║
+║  Phase 4: Autoload Service                                         ║
+║           Starting file monitoring and processing...               ║
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║  Startup sequence completed successfully!                          ║
-║  - Cache service: initialized (data recovered)                     ║
-║  - Redis server: accepting connections                             ║
-║  - Autoload service: started                                       ║
+║   SYSTEM READY - Version 1.2.6                                     ║
+║   ✓ Persistence maintenance: complete                              ║
+║   ✓ Cache service: initialized                                     ║
+║   ✓ Redis server: accepting connections                            ║
+║   ✓ Autoload service: running                                      ║
 ╚════════════════════════════════════════════════════════════════════╝</pre>
                 </section>
 
@@ -449,38 +472,72 @@ Cache service initialization completed in 1234 ms
                 <!-- 8. Security Architecture -->
                 <section id="security" class="mb-5">
                     <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-shield-alt me-2 text-success"></i>9. Security Architecture</h2>
-                    <p><strong>All access requires authentication.</strong> Both Redis protocol and REST API require valid credentials.</p>
+                    <p><strong>All access requires authentication.</strong> Kuber supports multiple authentication methods for different use cases.</p>
                     
+                    <h4 class="mt-4">Authentication Methods</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Method</th><th>Use Case</th><th>Protocol</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Username/Password</strong></td><td>Web UI, interactive use</td><td>Form login, HTTP Basic</td></tr>
+                            <tr><td><strong>API Key</strong></td><td>Programmatic access, CI/CD, services</td><td>Header, query param</td></tr>
+                            <tr><td><strong>Redis AUTH</strong></td><td>Redis protocol clients</td><td>AUTH command</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4">API Key Authentication (v1.2.5)</h4>
+                    <p>API keys provide secure, revocable access for applications and services.</p>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="card">
-                                <div class="card-header">Redis Protocol Auth</div>
+                                <div class="card-header bg-primary text-white">REST API</div>
                                 <div class="card-body">
-                                    <pre class="bg-light p-2 rounded mb-0"><code>AUTH password
-# or for ACL-style:
-AUTH username password</code></pre>
+                                    <pre class="bg-light p-2 rounded mb-0"><code># X-API-Key header
+curl -H "X-API-Key: kub_xxx..." /api/cache/key
+
+# Authorization header
+curl -H "Authorization: ApiKey kub_xxx..." /api/cache/key
+
+# Query parameter
+curl "/api/cache/key?api_key=kub_xxx..."</code></pre>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="card">
-                                <div class="card-header">REST API Auth</div>
+                                <div class="card-header bg-success text-white">Redis Protocol</div>
                                 <div class="card-body">
-                                    <pre class="bg-light p-2 rounded mb-0"><code>Authorization: Basic base64(user:pass)
-# All /api/* endpoints require auth</code></pre>
+                                    <pre class="bg-light p-2 rounded mb-0"><code># API Key authentication
+AUTH APIKEY kub_xxx...
+
+# Direct API key
+AUTH kub_xxx...
+
+# Traditional password
+AUTH password</code></pre>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
+                    <h4 class="mt-4">API Key Features</h4>
+                    <ul>
+                        <li><strong>Secure Generation</strong>: 64-character cryptographically random keys</li>
+                        <li><strong>Role-Based</strong>: Keys inherit roles (USER, OPERATOR, ADMIN)</li>
+                        <li><strong>Expiration</strong>: Optional expiration dates for temporary access</li>
+                        <li><strong>Revocation</strong>: Instantly disable compromised keys</li>
+                        <li><strong>Audit</strong>: Track last-used timestamps</li>
+                    </ul>
+                    
                     <h4 class="mt-4">User Configuration (users.json)</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>{
   "users": [
     {
-      "username": "admin",
-      "password": "hashed_password",
-      "roles": ["ADMIN", "USER"],
-      "enabled": true
+      "userId": "admin",
+      "password": "admin123",
+      "fullName": "Administrator",
+      "roles": ["ADMIN", "OPERATOR", "USER"]
     }
   ]
 }</code></pre>
@@ -563,10 +620,45 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
                     </div>
                 </section>
 
+                <!-- Deep Dive -->
+                <section class="mb-5">
+                    <div class="card shadow-sm border-secondary">
+                        <div class="card-header bg-secondary text-white">
+                            <h2 class="mb-0"><i class="fas fa-microscope me-2"></i>Deep Dive: System Internals</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>For detailed documentation on operational mechanics, see the <a href="/help/internals" class="fw-bold">System Internals</a> page:</p>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <ul class="mb-0">
+                                        <li><a href="/help/internals#memory-management">Memory Management</a></li>
+                                        <li><a href="/help/internals#key-management">Key Management</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <ul class="mb-0">
+                                        <li><a href="/help/internals#persistence-management">Persistence Management</a></li>
+                                        <li><a href="/help/internals#compaction">Compaction &amp; Optimization</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <ul class="mb-0">
+                                        <li><a href="/help/internals#thread-management">Thread Management</a></li>
+                                        <li><a href="/help/internals#data-safety">Data Safety &amp; Recovery</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Back to Help -->
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary">
                         <i class="fas fa-arrow-left me-2"></i>Back to Help Index
+                    </a>
+                    <a href="/help/internals" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-cogs me-2"></i>System Internals
                     </a>
                 </div>
             </div>
@@ -577,7 +669,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.4</p>
+                    <p class="text-muted small mb-0">Version 1.2.6</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">
