@@ -16,7 +16,7 @@
                 <h1 class="display-5 mb-4"><i class="fas fa-bolt me-3 text-warning"></i>Quick Start</h1>
                 
                 <h3 class="mt-4">1. Start the Server</h3>
-                <pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server-1.2.6.jar</code></pre>
+                <pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server-1.2.8.jar</code></pre>
                 
                 <h3 class="mt-4">2. Connect with Redis CLI</h3>
                 <pre class="bg-dark text-light p-3 rounded"><code>redis-cli -p 6380 -a admin123
@@ -112,12 +112,29 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100" style="border-color: #f59e0b;">
+                            <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
+                                <i class="fas fa-broadcast-tower me-2"></i>Event Publishing <span class="badge bg-light text-dark">v1.2.8</span>
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    <li><strong>5 Publishers:</strong> Kafka, ActiveMQ, RabbitMQ, IBM MQ, File</li>
+                                    <li><strong>Pluggable:</strong> Interface-driven, easy to extend</li>
+                                    <li><strong>Async:</strong> Non-blocking, fire-and-forget</li>
+                                    <li><strong>Per-Region:</strong> Different destinations per region</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="alert alert-success mt-4">
                     <i class="fas fa-book me-2"></i>
                     <strong>Learn More:</strong> See <a href="/help/internals" class="alert-link">System Internals</a> for detailed 
-                    documentation on memory management, persistence, thread model, and data safety.
+                    documentation on memory management, persistence, thread model, and data safety. 
+                    See <a href="/help/publishing" class="alert-link">Event Publishing</a> for Kafka, ActiveMQ, RabbitMQ, IBM MQ, and File integration.
                 </div>
                 
                 <div class="mt-5 text-center">
@@ -128,7 +145,7 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.2.6</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.2.8</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

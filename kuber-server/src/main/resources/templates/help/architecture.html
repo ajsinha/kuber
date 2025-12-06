@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.2.6</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.2.8</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -52,6 +52,7 @@
                                 <ol start="7">
                                     <li><a href="#protocol">Protocol Design</a></li>
                                     <li><a href="#replication">Replication Architecture</a></li>
+                                    <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">v1.2.8</span></li>
                                     <li><a href="#security">Security Architecture</a></li>
                                     <li><a href="#data-flow">Data Flow</a></li>
                                     <li><a href="#deployment">Deployment Patterns</a></li>
@@ -277,7 +278,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.2.6                                     ║
+║   SYSTEM READY - Version 1.2.8                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -469,9 +470,88 @@ Cache service initialization completed in 1234 ms
         └─────────────────────────┘</pre>
                 </section>
 
-                <!-- 8. Security Architecture -->
+                <!-- 9. Event Publishing -->
+                <section id="event-publishing" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-broadcast-tower me-2 text-warning"></i>9. Event Publishing <span class="badge bg-warning text-dark">v1.2.8</span></h2>
+                    <p>Kuber can stream cache events to external messaging systems for real-time integrations, analytics, and event-driven architectures.</p>
+                    
+                    <h4 class="mt-4">Publishing Architecture</h4>
+                    <pre class="bg-dark text-light p-3 rounded" style="font-size: 0.8rem;">
+CacheService.set() / delete()
+         │
+         │ Submit to async queue (non-blocking)
+         ▼
+┌─────────────────────────────┐
+│  Publishing Thread Pool     │ (configurable, default: 4 threads)
+└────────────┬────────────────┘
+             │
+             ▼
+      PublisherRegistry
+             │
+    ┌────┬───┴───┬────┬────┐
+    ▼    ▼       ▼    ▼    ▼
+ Kafka  AMQ  RabbitMQ IBM  File
+                      MQ</pre>
+                    
+                    <h4 class="mt-4">Supported Publishers</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Publisher</th><th>Type</th><th>Features</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Apache Kafka</strong></td><td>kafka</td><td>High throughput, auto topic creation, producer pooling</td></tr>
+                            <tr><td><strong>RabbitMQ</strong></td><td>rabbitmq</td><td>AMQP messaging, exchange routing, channel pooling</td></tr>
+                            <tr><td><strong>IBM MQ</strong></td><td>ibmmq</td><td>Enterprise messaging, SSL/TLS, queue manager integration</td></tr>
+                            <tr><td><strong>Apache ActiveMQ</strong></td><td>activemq</td><td>JMS messaging, connection pooling, queue/topic support</td></tr>
+                            <tr><td><strong>File System</strong></td><td>file</td><td>JSON Lines format, date/size rotation, network share support</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4">Configuration Model (v1.2.8)</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">Centralized Brokers</div>
+                                <div class="card-body">
+                                    <pre class="bg-light p-2 rounded mb-0"><code>kuber.publishing.brokers:
+  prod-kafka:
+    type: kafka
+    kafka:
+      bootstrapServers: kafka1:9092
+  
+  backup-file:
+    type: file
+    file:
+      directory: ./events</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">Region Destinations</div>
+                                <div class="card-body">
+                                    <pre class="bg-light p-2 rounded mb-0"><code>kuber.publishing.regions:
+  customers:
+    destinations:
+      - broker: prod-kafka
+        topic: customer-events
+      - broker: backup-file
+        prefix: customers</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-4">
+                        <strong><i class="fas fa-info-circle me-2"></i>Full Documentation:</strong> 
+                        See <a href="/help/publishing" class="alert-link">Event Publishing Guide</a> for complete configuration options, 
+                        message formats, and examples.
+                    </div>
+                </section>
+
+                <!-- 10. Security Architecture -->
                 <section id="security" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-shield-alt me-2 text-success"></i>9. Security Architecture</h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-shield-alt me-2 text-success"></i>10. Security Architecture</h2>
                     <p><strong>All access requires authentication.</strong> Kuber supports multiple authentication methods for different use cases.</p>
                     
                     <h4 class="mt-4">Authentication Methods</h4>
@@ -543,9 +623,9 @@ AUTH password</code></pre>
 }</code></pre>
                 </section>
 
-                <!-- 9. Data Flow -->
+                <!-- 11. Data Flow -->
                 <section id="data-flow" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-exchange-alt me-2 text-primary"></i>10. Data Flow</h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-exchange-alt me-2 text-primary"></i>11. Data Flow</h2>
                     
                     <h4>Write Operation Flow</h4>
                     <pre class="bg-dark text-light p-3 rounded" style="font-size: 0.8rem;">
@@ -584,9 +664,9 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
    │◄─────────────────│◄────────────────────│                   │                  │</pre>
                 </section>
 
-                <!-- 11. Deployment Patterns -->
+                <!-- 12. Deployment Patterns -->
                 <section id="deployment" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-server me-2 text-secondary"></i>11. Deployment Patterns</h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-server me-2 text-secondary"></i>12. Deployment Patterns</h2>
                     
                     <div class="row">
                         <div class="col-md-6">
@@ -629,22 +709,28 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
                         <div class="card-body">
                             <p>For detailed documentation on operational mechanics, see the <a href="/help/internals" class="fw-bold">System Internals</a> page:</p>
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <ul class="mb-0">
                                         <li><a href="/help/internals#memory-management">Memory Management</a></li>
                                         <li><a href="/help/internals#key-management">Key Management</a></li>
                                     </ul>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <ul class="mb-0">
                                         <li><a href="/help/internals#persistence-management">Persistence Management</a></li>
                                         <li><a href="/help/internals#compaction">Compaction &amp; Optimization</a></li>
                                     </ul>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <ul class="mb-0">
                                         <li><a href="/help/internals#thread-management">Thread Management</a></li>
                                         <li><a href="/help/internals#data-safety">Data Safety &amp; Recovery</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-3">
+                                    <ul class="mb-0">
+                                        <li><a href="/help/internals#event-publishing">Event Publishing</a></li>
+                                        <li><a href="/help/publishing">Publishing Guide</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -669,7 +755,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.6</p>
+                    <p class="text-muted small mb-0">Version 1.2.8</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

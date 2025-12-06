@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
  * 
  * Thread-safe using ReadWriteLock for buffer operations.
  * 
- * @version 1.2.6
+ * @version 1.2.8
  */
 @Slf4j
 public class OffHeapKeyIndex implements KeyIndexInterface {

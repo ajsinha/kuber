@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.2.6**
+**Version 1.2.8**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -19,9 +19,10 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 6. [Protocol Design](#6-protocol-design)
 7. [Persistence Layer](#7-persistence-layer)
 8. [Replication Architecture](#8-replication-architecture)
-9. [Security Architecture](#9-security-architecture)
-10. [Data Flow](#10-data-flow)
-11. [Deployment Patterns](#11-deployment-patterns)
+9. [Event Publishing](#9-event-publishing)
+10. [Security Architecture](#10-security-architecture)
+11. [Data Flow](#11-data-flow)
+12. [Deployment Patterns](#12-deployment-patterns)
 
 ---
 
@@ -34,11 +35,12 @@ Kuber is an enterprise-grade distributed caching system designed for high-perfor
 | Principle | Description |
 |-----------|-------------|
 | **Protocol Compatibility** | Full Redis RESP protocol support for drop-in replacement |
-| **Pluggable Persistence** | Configurable backends (MongoDB, SQLite, PostgreSQL, RocksDB, Memory) |
+| **Pluggable Persistence** | Configurable backends (MongoDB, SQLite, PostgreSQL, RocksDB, LMDB, Memory) |
 | **Region Isolation** | Logical namespaces for multi-tenant data organization |
 | **High Availability** | Primary/Secondary replication via ZooKeeper |
-| **Mandatory Security** | All clients must authenticate with username and password |
-| **Extensibility** | Modular design allowing custom persistence and protocol handlers |
+| **Mandatory Security** | All clients must authenticate with username/password or API key |
+| **Event Publishing** | Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
+| **Extensibility** | Modular design allowing custom persistence, publishers, and protocol handlers |
 
 ---
 
@@ -134,20 +136,34 @@ kuber/
 │
 ├── kuber-server/                  # Server implementation
 │   ├── cache/
-│   │   └── CacheService.java     # Primary cache operations
+│   │   ├── CacheService.java     # Primary cache operations
+│   │   ├── KeyIndex.java         # In-memory key index
+│   │   └── OffHeapKeyIndex.java  # Off-heap key storage
 │   ├── persistence/
 │   │   ├── PersistenceStore.java # Persistence interface
+│   │   ├── RocksDbStore.java     # RocksDB implementation
+│   │   ├── LmdbStore.java        # LMDB implementation
 │   │   ├── MongoDBStore.java     # MongoDB implementation
 │   │   ├── SQLiteStore.java      # SQLite implementation
 │   │   ├── PostgreSQLStore.java  # PostgreSQL implementation
-│   │   ├── RocksDBStore.java     # RocksDB implementation
 │   │   └── InMemoryStore.java    # In-memory implementation
+│   ├── publishing/               # Event Publishing (v1.2.8)
+│   │   ├── EventPublisher.java   # Publisher interface
+│   │   ├── PublisherRegistry.java # Central publisher registry
+│   │   ├── KafkaEventPublisher.java
+│   │   ├── RabbitMqEventPublisher.java
+│   │   ├── IbmMqEventPublisher.java
+│   │   ├── ActiveMqEventPublisher.java
+│   │   └── FileEventPublisher.java
 │   ├── protocol/
 │   │   └── RedisProtocolHandler.java  # RESP protocol handler
 │   ├── api/
 │   │   └── RestApiController.java     # REST endpoints
 │   ├── replication/
 │   │   └── ReplicationService.java    # ZooKeeper replication
+│   ├── security/
+│   │   ├── ApiKeyService.java    # API key management
+│   │   └── ApiKeyFilter.java     # API key authentication
 │   └── autoload/
 │       └── AutoloadService.java       # CSV/JSON bulk import
 │
@@ -190,7 +206,7 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STARTUP SEQUENCE (v1.2.6)                            │
+│                         STARTUP SEQUENCE (v1.2.8)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -1052,6 +1068,96 @@ GET key
    - Keys loaded into KeyIndex
    - Hot values loaded into cache (up to memory limit)
    - Redis server starts AFTER recovery complete
+
+---
+
+## Appendix B: Event Publishing (v1.2.8)
+
+Kuber can publish cache events to external messaging systems for real-time integrations using a pluggable publisher architecture.
+
+### Supported Publishers
+
+| Publisher | Type | Features |
+|-----------|------|----------|
+| **Apache Kafka** | kafka | High throughput streaming, configurable retention, auto topic creation |
+| **Apache ActiveMQ** | activemq | Enterprise JMS messaging, configurable TTL, queue/topic support |
+| **RabbitMQ** | rabbitmq | AMQP messaging, flexible routing, exchange types, auto recovery |
+| **IBM MQ** | ibmmq | Enterprise messaging, SSL/TLS support, queue manager integration |
+| **File System** | file | JSON Lines format, auto rotation, network share support |
+
+### EventPublisher Interface
+
+All publishers implement a common interface, making it easy to add new destinations:
+
+```java
+public interface EventPublisher {
+    String getType();                               // "kafka", "rabbitmq", "file"
+    String getDisplayName();                        // "Apache Kafka", "RabbitMQ"
+    void initialize();                              // Setup connections at startup
+    void onStartupOrchestration();                  // Create topics/queues
+    boolean isEnabledForRegion(String region);      // Check if enabled
+    void publish(String region, CachePublishingEvent event);  // Publish event
+    void shutdown();                                // Cleanup
+}
+```
+
+### Event Message Format
+
+```json
+// Insert/Update Events
+{
+  "key": "user:1001",
+  "action": "inserted",  // or "updated"
+  "region": "customers",
+  "payload": { "name": "John", "email": "john@example.com" },
+  "timestamp": "2025-12-06T12:00:00Z",
+  "nodeId": "kuber-01"
+}
+
+// Delete Events
+{
+  "key": "user:1001",
+  "action": "deleted",
+  "region": "customers",
+  "timestamp": "2025-12-06T12:05:00Z",
+  "nodeId": "kuber-01"
+}
+```
+
+### Publishing Architecture
+
+```
+CacheService.set() / delete()
+         │
+         │ Submit to async queue (non-blocking)
+         ▼
+┌─────────────────────────────┐
+│  Publishing Thread Pool     │ (configurable, default: 4 threads)
+└────────────┬────────────────┘
+             │
+             ▼
+      PublisherRegistry
+             │
+    ┌────┬───┴───┬────┬────┐
+    ▼    ▼       ▼    ▼    ▼
+ Kafka  AMQ  RabbitMQ IBM  File
+                      MQ
+```
+
+### Key Design Principles
+
+1. **Interface-driven**: Easy to add new publisher implementations
+2. **Non-blocking**: Main cache operations never wait for publishing
+3. **Multi-destination**: One region can publish to multiple destinations simultaneously
+4. **Isolated failures**: One publisher failing doesn't affect others
+5. **Per-region config**: Each region can have different brokers/topics/files
+6. **Fire-and-forget**: Publishing failures don't affect cache operations
+
+### Thread Model Update (v1.2.7)
+
+| Thread Pool | Purpose |
+|-------------|---------|
+| kuber-event-publisher-[N] | Async event publishing to all configured destinations |
 
 ---
 

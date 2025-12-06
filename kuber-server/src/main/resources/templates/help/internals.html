@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.2.6</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
+                    <strong>Version 1.2.8</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
                     architecture and operational mechanics.
                 </div>
 
@@ -44,13 +44,14 @@
                                     <li><a href="#memory-management">Memory Management</a></li>
                                     <li><a href="#key-management">Key Management</a></li>
                                     <li><a href="#persistence-management">Persistence Management</a></li>
+                                    <li><a href="#compaction">Compaction &amp; Optimization</a></li>
                                 </ol>
                             </div>
                             <div class="col-md-6">
-                                <ol start="4">
-                                    <li><a href="#compaction">Compaction &amp; Optimization</a></li>
+                                <ol start="5">
                                     <li><a href="#thread-management">Thread Management</a></li>
                                     <li><a href="#data-safety">Data Safety &amp; Recovery</a></li>
+                                    <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">NEW</span></li>
                                 </ol>
                             </div>
                         </div>
@@ -561,6 +562,11 @@ kuber.persistence.rocksdb.compaction-cron=0 0 2 * * ?</code></pre>
 │  ForkJoinPool.commonPool    Async persistence writes               │
 │  (CompletableFuture.runAsync)                                       │
 │                                                                      │
+│  EVENT PUBLISHING                                                   │
+│  ────────────────────────────────────────────────────               │
+│  kuber-event-publisher-[N]  Async event publishing to destinations │
+│  (Kafka, ActiveMQ, RabbitMQ, IBM MQ, File)                         │
+│                                                                      │
 │  HTTP SERVER (Spring/Tomcat)                                        │
 │  ────────────────────────────────────────────────────               │
 │  http-nio-8080-exec-[N]     REST API request handlers              │
@@ -804,6 +810,69 @@ SYSTEM RESTART
                     </div>
                 </section>
 
+                <!-- 7. Event Publishing -->
+                <section id="event-publishing" class="mb-5">
+                    <div class="card shadow-sm">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
+                            <h2 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>7. Event Publishing (v1.2.8)</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>Kuber can publish cache events (insert, update, delete) to external messaging systems asynchronously via a pluggable publisher architecture.</p>
+                            
+                            <h4>7.1 Supported Publishers</h4>
+                            <div class="row">
+                                <div class="col-md-4 mb-2"><span class="badge bg-success me-2">Kafka</span> High-throughput streaming</div>
+                                <div class="col-md-4 mb-2"><span class="badge bg-warning text-dark me-2">ActiveMQ</span> Enterprise JMS</div>
+                                <div class="col-md-4 mb-2"><span class="badge bg-info me-2">RabbitMQ</span> AMQP messaging</div>
+                                <div class="col-md-4 mb-2"><span class="badge bg-primary me-2">IBM MQ</span> Enterprise MQ</div>
+                                <div class="col-md-4 mb-2"><span class="badge bg-secondary me-2">File</span> JSON Lines output</div>
+                            </div>
+                            
+                            <h4 class="mt-4">7.2 Publishing Architecture</h4>
+                            <pre class="bg-dark text-white p-3 rounded">
+CacheService.set() / delete()
+         │
+         │ Submit to async queue (non-blocking)
+         ▼
+┌─────────────────────────────┐
+│  Publishing Thread Pool     │
+│  (kuber-event-publisher-N)  │
+└────────────┬────────────────┘
+             │
+             ▼
+      PublisherRegistry
+             │
+    ┌────┬───┴───┬────┬────┐
+    ▼    ▼       ▼    ▼    ▼
+ Kafka  AMQ  RabbitMQ IBM  File
+                      MQ</pre>
+
+                            <h4 class="mt-4">7.3 EventPublisher Interface</h4>
+                            <pre class="bg-light p-2 rounded small"><code>public interface EventPublisher {
+    String getType();        // "kafka", "rabbitmq", "file"
+    void initialize();       // Setup at startup
+    boolean isEnabledForRegion(String region);
+    void publish(String region, CachePublishingEvent event);
+}</code></pre>
+
+                            <h4 class="mt-4">7.4 Key Design Principles</h4>
+                            <ul>
+                                <li><strong>Interface-driven:</strong> Easy to add new publisher implementations</li>
+                                <li><strong>Non-blocking:</strong> Cache operations never wait for publishing</li>
+                                <li><strong>Multi-destination:</strong> One region can publish to multiple destinations</li>
+                                <li><strong>Isolated failures:</strong> One publisher failing doesn't affect others</li>
+                                <li><strong>Per-region config:</strong> Different destinations per region</li>
+                            </ul>
+
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-book me-2"></i>
+                                <strong>Full Documentation:</strong> See <a href="/help/publishing" class="alert-link">Event Publishing Guide</a> 
+                                for complete configuration reference and examples.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Navigation -->
                 <div class="mt-5 text-center">
                     <a href="/help/architecture" class="btn btn-outline-primary">
@@ -812,8 +881,8 @@ SYSTEM RESTART
                     <a href="/help" class="btn btn-outline-secondary ms-2">
                         <i class="fas fa-home me-2"></i>Help Home
                     </a>
-                    <a href="/help/quickstart" class="btn btn-outline-primary ms-2">
-                        Quickstart<i class="fas fa-arrow-right ms-2"></i>
+                    <a href="/help/publishing" class="btn btn-outline-warning ms-2">
+                        Event Publishing<i class="fas fa-arrow-right ms-2"></i>
                     </a>
                 </div>
             </div>
@@ -824,7 +893,7 @@ SYSTEM RESTART
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.6</p>
+                    <p class="text-muted small mb-0">Version 1.2.8</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

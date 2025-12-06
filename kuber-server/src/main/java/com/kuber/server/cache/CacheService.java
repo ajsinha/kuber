@@ -62,7 +62,7 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.2.6
+ * @version 1.2.8
  */
 @Slf4j
 @Service
@@ -97,6 +97,9 @@ public class CacheService {
     
     // Initialization state - prevents operations before recovery is complete
     private final AtomicBoolean initialized = new AtomicBoolean(false);
+    
+    @Autowired(required = false)
+    private com.kuber.server.publishing.RegionEventPublishingService publishingService;
     
     public CacheService(KuberProperties properties, 
                         PersistenceStore persistenceStore,
@@ -800,6 +803,9 @@ public class CacheService {
         checkWriteAccess();
         ensureRegionExists(region);
         
+        // Check if key exists (for insert vs update detection)
+        boolean isUpdate = exists(region, key);
+        
         Instant now = Instant.now();
         Instant expiresAt = ttlSeconds > 0 ? now.plusSeconds(ttlSeconds) : null;
         
@@ -825,6 +831,15 @@ public class CacheService {
         putEntry(region, key, entry);
         
         eventPublisher.publish(CacheEvent.entrySet(region, key, finalValue, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ)
+        if (publishingService != null) {
+            if (isUpdate) {
+                publishingService.publishUpdate(region, key, finalValue, properties.getNodeId());
+            } else {
+                publishingService.publishInsert(region, key, finalValue, properties.getNodeId());
+            }
+        }
     }
     
     public boolean setNx(String region, String key, String value) {
@@ -1049,6 +1064,12 @@ public class CacheService {
             recordStatistic(region, KuberConstants.STAT_DELETES);
             metricsService.recordDelete(region);
             eventPublisher.publish(CacheEvent.entryDeleted(region, key, properties.getNodeId()));
+            
+            // Trigger async event publishing (Kafka/ActiveMQ)
+            if (publishingService != null) {
+                publishingService.publishDelete(region, key, properties.getNodeId());
+            }
+            
             return true;
         }
         

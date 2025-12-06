@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Event Publishing')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Event Publishing</li>
+            </ol>
+        </nav>
+
+        <!-- Content -->
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <!-- Header -->
+                <h1 class="display-5 mb-4"><i class="fas fa-broadcast-tower me-3 text-primary"></i>Event Publishing</h1>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Version 1.2.8</strong> - Publish cache events to Kafka and/or ActiveMQ for real-time integrations.
+                </div>
+
+                <!-- Overview -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-info-circle me-2"></i>Overview</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Kuber can publish cache events to external messaging systems when data changes. This enables:</p>
+                        <ul>
+                            <li><strong>Real-time integrations</strong> - Other systems can react immediately to cache updates</li>
+                            <li><strong>Event sourcing</strong> - Build audit logs or event stores from cache operations</li>
+                            <li><strong>Microservices communication</strong> - Notify downstream services of data changes</li>
+                            <li><strong>Analytics pipelines</strong> - Stream cache events to data processing systems</li>
+                        </ul>
+                        
+                        <h5 class="mt-4">Supported Destinations</h5>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-success h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <i class="fas fa-stream me-2"></i>Apache Kafka
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li>High throughput streaming</li>
+                                            <li>Configurable retention</li>
+                                            <li>Auto topic creation</li>
+                                            <li>Partitioned for scale</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-warning h-100">
+                                    <div class="card-header bg-warning text-dark">
+                                        <i class="fas fa-envelope me-2"></i>Apache ActiveMQ
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li>Enterprise JMS</li>
+                                            <li>Configurable TTL</li>
+                                            <li>Queue or topic</li>
+                                            <li>Connection pooling</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-info h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <i class="fas fa-rabbit me-2"></i>RabbitMQ
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li>AMQP messaging</li>
+                                            <li>Flexible routing</li>
+                                            <li>Exchange types</li>
+                                            <li>Auto recovery</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-primary h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <i class="fab fa-ibm me-2"></i>IBM MQ
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li>Enterprise messaging</li>
+                                            <li>SSL/TLS support</li>
+                                            <li>Queue manager</li>
+                                            <li>Channel security</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-secondary h-100">
+                                    <div class="card-header bg-secondary text-white">
+                                        <i class="fas fa-file-alt me-2"></i>File System
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li>JSON Lines format</li>
+                                            <li>Auto rotation</li>
+                                            <li>Network shares</li>
+                                            <li>Retention policy</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-success mt-3">
+                            <i class="fas fa-plug me-2"></i>
+                            <strong>Extensible Architecture:</strong> Publishers implement the <code>EventPublisher</code> interface. 
+                            New destinations can be added without modifying core code.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Format -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0"><i class="fas fa-code me-2"></i>Event Message Format</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Events are published as JSON messages with the following structure:</p>
+                        
+                        <h5>Insert/Update Events</h5>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "key": "user:1001",
+  "action": "inserted",  // or "updated"
+  "region": "customers",
+  "payload": {
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "timestamp": "2025-12-06T12:00:00Z",
+  "nodeId": "kuber-01"
+}</code></pre>
+
+                        <h5 class="mt-4">Delete Events</h5>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "key": "user:1001",
+  "action": "deleted",
+  "region": "customers",
+  "timestamp": "2025-12-06T12:05:00Z",
+  "nodeId": "kuber-01"
+}</code></pre>
+
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            <strong>Note:</strong> The <code>payload</code> field contains the full value. If the value is valid JSON, 
+                            it's included as a nested object. Otherwise, it's included as a string.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Kuber v1.2.8 introduces a <strong>centralized configuration</strong> approach for managing event destinations:</p>
+                        
+                        <div class="alert alert-success">
+                            <h5><i class="fas fa-star me-2"></i>Recommended: Centralized Broker Definitions</h5>
+                            <ol>
+                                <li><strong>Define brokers once</strong> in <code>kuber.publishing.brokers.*</code></li>
+                                <li><strong>Reference brokers by name</strong> from region configurations</li>
+                                <li><strong>Specify topic/queue</strong> per region for each destination</li>
+                            </ol>
+                            <p class="mb-0">This approach enables easy reuse of broker configurations across multiple regions.</p>
+                        </div>
+                        
+                        <h5>Global Settings</h5>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>kuber.publishing.thread-pool-size</code></td><td>4</td><td>Threads for async publishing</td></tr>
+                                <tr><td><code>kuber.publishing.queue-capacity</code></td><td>10000</td><td>Max queued events</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-4">Broker Definition Properties</h5>
+                        <p>Define brokers under <code>kuber.publishing.brokers.{broker-name}.*</code></p>
+                        
+                        <!-- Nav tabs for broker configs -->
+                        <ul class="nav nav-tabs mt-3" id="brokerTabs" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#kafkaBrokerTab">Kafka</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#activemqBrokerTab">ActiveMQ</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#rabbitmqBrokerTab">RabbitMQ</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ibmmqBrokerTab">IBM MQ</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#fileBrokerTab">File</a></li>
+                        </ul>
+                        
+                        <div class="tab-content border border-top-0 p-3">
+                            <!-- Kafka Broker Tab -->
+                            <div class="tab-pane fade show active" id="kafkaBrokerTab">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-success"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>enabled</code></td><td>false</td><td><strong>Enable this broker</strong> (required to initialize)</td></tr>
+                                        <tr><td><code>type</code></td><td>-</td><td><strong>kafka</strong> (required)</td></tr>
+                                        <tr><td><code>bootstrap-servers</code></td><td>localhost:9092</td><td>Broker addresses</td></tr>
+                                        <tr><td><code>partitions</code></td><td>3</td><td>Topic partitions</td></tr>
+                                        <tr><td><code>replication-factor</code></td><td>1</td><td>Replication factor</td></tr>
+                                        <tr><td><code>retention-hours</code></td><td>168</td><td>Message retention</td></tr>
+                                        <tr><td><code>acks</code></td><td>1</td><td>Producer acks (all, 1, 0)</td></tr>
+                                        <tr><td><code>batch-size</code></td><td>16384</td><td>Batch size in bytes</td></tr>
+                                        <tr><td><code>linger-ms</code></td><td>5</td><td>Linger time</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- ActiveMQ Broker Tab -->
+                            <div class="tab-pane fade" id="activemqBrokerTab">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-warning"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>enabled</code></td><td>false</td><td><strong>Enable this broker</strong> (required to initialize)</td></tr>
+                                        <tr><td><code>type</code></td><td>-</td><td><strong>activemq</strong> (required)</td></tr>
+                                        <tr><td><code>broker-url</code></td><td>tcp://localhost:61616</td><td>Broker URL</td></tr>
+                                        <tr><td><code>username</code></td><td>(empty)</td><td>Username</td></tr>
+                                        <tr><td><code>password</code></td><td>(empty)</td><td>Password</td></tr>
+                                        <tr><td><code>use-topic</code></td><td>false</td><td>true=Topic, false=Queue</td></tr>
+                                        <tr><td><code>ttl-seconds</code></td><td>86400</td><td>Message TTL</td></tr>
+                                        <tr><td><code>persistent</code></td><td>true</td><td>Persistent mode</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- RabbitMQ Broker Tab -->
+                            <div class="tab-pane fade" id="rabbitmqBrokerTab">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-info"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>enabled</code></td><td>false</td><td><strong>Enable this broker</strong> (required to initialize)</td></tr>
+                                        <tr><td><code>type</code></td><td>-</td><td><strong>rabbitmq</strong> (required)</td></tr>
+                                        <tr><td><code>host</code></td><td>localhost</td><td>Host</td></tr>
+                                        <tr><td><code>port</code></td><td>5672</td><td>Port</td></tr>
+                                        <tr><td><code>virtual-host</code></td><td>/</td><td>Virtual host</td></tr>
+                                        <tr><td><code>username</code></td><td>guest</td><td>Username</td></tr>
+                                        <tr><td><code>password</code></td><td>guest</td><td>Password</td></tr>
+                                        <tr><td><code>exchange-type</code></td><td>topic</td><td>direct/fanout/topic</td></tr>
+                                        <tr><td><code>durable</code></td><td>true</td><td>Durable exchange/queue</td></tr>
+                                        <tr><td><code>ttl-seconds</code></td><td>86400</td><td>Message TTL</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- IBM MQ Broker Tab -->
+                            <div class="tab-pane fade" id="ibmmqBrokerTab">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-primary"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>enabled</code></td><td>false</td><td><strong>Enable this broker</strong> (required to initialize)</td></tr>
+                                        <tr><td><code>type</code></td><td>-</td><td><strong>ibmmq</strong> (required)</td></tr>
+                                        <tr><td><code>host</code></td><td>localhost</td><td>Host</td></tr>
+                                        <tr><td><code>port</code></td><td>1414</td><td>Port</td></tr>
+                                        <tr><td><code>queue-manager</code></td><td>QM1</td><td>Queue manager</td></tr>
+                                        <tr><td><code>channel</code></td><td>DEV.APP.SVRCONN</td><td>Channel</td></tr>
+                                        <tr><td><code>username</code></td><td>(empty)</td><td>Username</td></tr>
+                                        <tr><td><code>password</code></td><td>(empty)</td><td>Password</td></tr>
+                                        <tr><td><code>ssl-cipher-suite</code></td><td>(empty)</td><td>SSL cipher</td></tr>
+                                        <tr><td><code>ttl-seconds</code></td><td>86400</td><td>Message TTL</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- File Broker Tab -->
+                            <div class="tab-pane fade" id="fileBrokerTab">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-secondary"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>enabled</code></td><td>false</td><td><strong>Enable this broker</strong> (required to initialize)</td></tr>
+                                        <tr><td><code>type</code></td><td>-</td><td><strong>file</strong> (required)</td></tr>
+                                        <tr><td><code>directory</code></td><td>./events</td><td>Output directory</td></tr>
+                                        <tr><td><code>max-file-size-mb</code></td><td>100</td><td>Max file size</td></tr>
+                                        <tr><td><code>rotation-policy</code></td><td>daily</td><td>size/daily/hourly</td></tr>
+                                        <tr><td><code>format</code></td><td>jsonl</td><td>File format</td></tr>
+                                        <tr><td><code>compress</code></td><td>false</td><td>Compress rotated</td></tr>
+                                        <tr><td><code>retention-days</code></td><td>30</td><td>Days to retain</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <h5 class="mt-4">Region Destination Properties</h5>
+                        <p>Define region destinations under <code>kuber.publishing.regions.{region}.destinations[N].*</code></p>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light"><tr><th>Property</th><th>Description</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>broker</code></td><td>Reference to broker name (required)</td></tr>
+                                <tr><td><code>topic</code></td><td>Topic/queue/exchange name for this region</td></tr>
+                                <tr><td><code>routing-key</code></td><td>RabbitMQ routing key (optional)</td></tr>
+                                <tr><td><code>queue</code></td><td>RabbitMQ queue name (optional)</td></tr>
+                                <tr><td><code>ttl-seconds</code></td><td>Override broker TTL (optional)</td></tr>
+                                <tr><td><code>persistent</code></td><td>Override broker persistence (optional)</td></tr>
+                            </tbody>
+                        </table>
+                        
+                        <div class="alert alert-secondary mt-4">
+                            <h6><i class="fas fa-history me-2"></i>Legacy Configuration (Still Supported)</h6>
+                            <p class="mb-0 small">You can still configure publishers directly per-region using <code>kuber.publishing.regions.{region}.kafka.*</code>, etc. See the legacy tabs below for property reference.</p>
+                        </div>
+                        
+                        <!-- Legacy Nav tabs for publisher configs -->
+                        <details class="mt-3">
+                            <summary class="btn btn-outline-secondary btn-sm">Show Legacy Configuration Reference</summary>
+                            <div class="mt-3">
+                                <ul class="nav nav-tabs" id="publisherTabs" role="tablist">
+                                    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#kafkaTab">Kafka</a></li>
+                                    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#activemqTab">ActiveMQ</a></li>
+                                    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#rabbitmqTab">RabbitMQ</a></li>
+                                    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ibmmqTab">IBM MQ</a></li>
+                                    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#fileTab">File</a></li>
+                                </ul>
+                                
+                                <div class="tab-content border border-top-0 p-3">
+                                    <!-- Kafka Tab -->
+                                    <div class="tab-pane fade show active" id="kafkaTab">
+                                        <table class="table table-bordered table-sm">
+                                            <thead class="table-success"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                            <tbody>
+                                                <tr><td><code>...kafka.enabled</code></td><td>false</td><td>Enable Kafka</td></tr>
+                                                <tr><td><code>...kafka.bootstrap-servers</code></td><td>localhost:9092</td><td>Broker addresses</td></tr>
+                                                <tr><td><code>...kafka.topic</code></td><td>kuber-{region}-events</td><td>Topic name</td></tr>
+                                                <tr><td><code>...kafka.partitions</code></td><td>3</td><td>Topic partitions</td></tr>
+                                                <tr><td><code>...kafka.replication-factor</code></td><td>1</td><td>Replication factor</td></tr>
+                                                <tr><td><code>...kafka.retention-hours</code></td><td>168</td><td>Message retention</td></tr>
+                                                <tr><td><code>...kafka.acks</code></td><td>1</td><td>Producer acks</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- ActiveMQ Tab -->
+                                    <div class="tab-pane fade" id="activemqTab">
+                                        <table class="table table-bordered table-sm">
+                                            <thead class="table-warning"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                            <tbody>
+                                                <tr><td><code>...activemq.enabled</code></td><td>false</td><td>Enable ActiveMQ</td></tr>
+                                                <tr><td><code>...activemq.broker-url</code></td><td>tcp://localhost:61616</td><td>Broker URL</td></tr>
+                                                <tr><td><code>...activemq.username</code></td><td>(empty)</td><td>Username</td></tr>
+                                                <tr><td><code>...activemq.password</code></td><td>(empty)</td><td>Password</td></tr>
+                                                <tr><td><code>...activemq.destination</code></td><td>kuber.{region}.events</td><td>Queue/topic name</td></tr>
+                                                <tr><td><code>...activemq.use-topic</code></td><td>false</td><td>true=Topic, false=Queue</td></tr>
+                                                <tr><td><code>...activemq.ttl-seconds</code></td><td>86400</td><td>Message TTL</td></tr>
+                                                <tr><td><code>...activemq.persistent</code></td><td>true</td><td>Persistent mode</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- RabbitMQ Tab -->
+                                    <div class="tab-pane fade" id="rabbitmqTab">
+                                        <table class="table table-bordered table-sm">
+                                            <thead class="table-info"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                            <tbody>
+                                                <tr><td><code>...rabbitmq.enabled</code></td><td>false</td><td>Enable RabbitMQ</td></tr>
+                                                <tr><td><code>...rabbitmq.host</code></td><td>localhost</td><td>Host</td></tr>
+                                                <tr><td><code>...rabbitmq.port</code></td><td>5672</td><td>Port</td></tr>
+                                                <tr><td><code>...rabbitmq.virtual-host</code></td><td>/</td><td>Virtual host</td></tr>
+                                                <tr><td><code>...rabbitmq.username</code></td><td>guest</td><td>Username</td></tr>
+                                                <tr><td><code>...rabbitmq.password</code></td><td>guest</td><td>Password</td></tr>
+                                                <tr><td><code>...rabbitmq.exchange</code></td><td>kuber.{region}.events</td><td>Exchange name</td></tr>
+                                                <tr><td><code>...rabbitmq.exchange-type</code></td><td>topic</td><td>direct/fanout/topic</td></tr>
+                                                <tr><td><code>...rabbitmq.queue</code></td><td>(empty)</td><td>Queue (optional)</td></tr>
+                                                <tr><td><code>...rabbitmq.routing-key</code></td><td>{region}.#</td><td>Routing key</td></tr>
+                                                <tr><td><code>...rabbitmq.ttl-seconds</code></td><td>86400</td><td>Message TTL</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- IBM MQ Tab -->
+                                    <div class="tab-pane fade" id="ibmmqTab">
+                                        <table class="table table-bordered table-sm">
+                                            <thead class="table-primary"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                            <tbody>
+                                                <tr><td><code>...ibmmq.enabled</code></td><td>false</td><td>Enable IBM MQ</td></tr>
+                                                <tr><td><code>...ibmmq.host</code></td><td>localhost</td><td>Host</td></tr>
+                                                <tr><td><code>...ibmmq.port</code></td><td>1414</td><td>Port</td></tr>
+                                                <tr><td><code>...ibmmq.queue-manager</code></td><td>QM1</td><td>Queue manager</td></tr>
+                                                <tr><td><code>...ibmmq.channel</code></td><td>DEV.APP.SVRCONN</td><td>Channel</td></tr>
+                                                <tr><td><code>...ibmmq.queue</code></td><td>KUBER.{REGION}.EVENTS</td><td>Queue name</td></tr>
+                                                <tr><td><code>...ibmmq.username</code></td><td>(empty)</td><td>Username</td></tr>
+                                                <tr><td><code>...ibmmq.password</code></td><td>(empty)</td><td>Password</td></tr>
+                                                <tr><td><code>...ibmmq.ssl-cipher-suite</code></td><td>(empty)</td><td>SSL cipher</td></tr>
+                                                <tr><td><code>...ibmmq.ttl-seconds</code></td><td>86400</td><td>Message TTL</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- File Tab -->
+                                    <div class="tab-pane fade" id="fileTab">
+                                        <table class="table table-bordered table-sm">
+                                            <thead class="table-secondary"><tr><th>Property</th><th>Default</th><th>Description</th></tr></thead>
+                                            <tbody>
+                                                <tr><td><code>...file.enabled</code></td><td>false</td><td>Enable file publishing</td></tr>
+                                                <tr><td><code>...file.directory</code></td><td>./events/{region}</td><td>Output directory</td></tr>
+                                                <tr><td><code>...file.max-file-size-mb</code></td><td>100</td><td>Max file size</td></tr>
+                                                <tr><td><code>...file.rotation-policy</code></td><td>daily</td><td>size/daily/hourly</td></tr>
+                                                <tr><td><code>...file.format</code></td><td>jsonl</td><td>File format</td></tr>
+                                                <tr><td><code>...file.compress</code></td><td>false</td><td>Compress rotated</td></tr>
+                                                <tr><td><code>...file.retention-days</code></td><td>30</td><td>Days to retain</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Examples -->
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0"><i class="fas fa-file-code me-2"></i>Configuration Examples</h4>
+                    </div>
+                    <div class="card-body">
+                        <h5><i class="fas fa-star text-warning me-2"></i>Example 1: Centralized Multi-Destination (Recommended)</h5>
+                        <p class="text-muted">Define brokers once, reference them from multiple regions with different topics.</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code># ===== STEP 1: Define brokers centrally =====
+# Production Kafka cluster
+kuber.publishing.brokers.kafka-prod.enabled=true
+kuber.publishing.brokers.kafka-prod.type=kafka
+kuber.publishing.brokers.kafka-prod.bootstrap-servers=kafka1:9092,kafka2:9092,kafka3:9092
+kuber.publishing.brokers.kafka-prod.partitions=6
+kuber.publishing.brokers.kafka-prod.replication-factor=3
+
+# Audit file destination
+kuber.publishing.brokers.audit-files.enabled=true
+kuber.publishing.brokers.audit-files.type=file
+kuber.publishing.brokers.audit-files.directory=./log/kuber/audit
+kuber.publishing.brokers.audit-files.retention-days=365
+
+# ===== STEP 2: Configure regions to use brokers =====
+# Customers region → Kafka + File (audit)
+kuber.publishing.regions.customers.enabled=true
+kuber.publishing.regions.customers.destinations[0].broker=kafka-prod
+kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
+kuber.publishing.regions.customers.destinations[1].broker=audit-files
+kuber.publishing.regions.customers.destinations[1].topic=customers
+
+# Orders region → Same Kafka cluster, different topic + audit
+kuber.publishing.regions.orders.enabled=true
+kuber.publishing.regions.orders.destinations[0].broker=kafka-prod
+kuber.publishing.regions.orders.destinations[0].topic=kuber.orders.events
+kuber.publishing.regions.orders.destinations[1].broker=audit-files
+kuber.publishing.regions.orders.destinations[1].topic=orders</code></pre>
+
+                        <h5 class="mt-4"><i class="fas fa-star text-warning me-2"></i>Example 2: Enterprise Multi-System Integration</h5>
+                        <p class="text-muted">Transactions published to IBM MQ (finance) + Kafka (analytics) + File (compliance).</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code># Define all destination brokers
+kuber.publishing.brokers.ibm-finance.enabled=true
+kuber.publishing.brokers.ibm-finance.type=ibmmq
+kuber.publishing.brokers.ibm-finance.host=mq.finance.corp
+kuber.publishing.brokers.ibm-finance.port=1414
+kuber.publishing.brokers.ibm-finance.queue-manager=FINANCE.QM
+kuber.publishing.brokers.ibm-finance.channel=KUBER.SVRCONN
+kuber.publishing.brokers.ibm-finance.ssl-cipher-suite=TLS_RSA_WITH_AES_256_CBC_SHA256
+
+kuber.publishing.brokers.kafka-analytics.enabled=true
+kuber.publishing.brokers.kafka-analytics.type=kafka
+kuber.publishing.brokers.kafka-analytics.bootstrap-servers=kafka-analytics:9092
+kuber.publishing.brokers.kafka-analytics.partitions=12
+
+kuber.publishing.brokers.compliance-archive.enabled=true
+kuber.publishing.brokers.compliance-archive.type=file
+kuber.publishing.brokers.compliance-archive.directory=./archive/compliance/transactions
+kuber.publishing.brokers.compliance-archive.retention-days=2555
+
+# Transaction region publishes to all three
+kuber.publishing.regions.transactions.enabled=true
+kuber.publishing.regions.transactions.destinations[0].broker=ibm-finance
+kuber.publishing.regions.transactions.destinations[0].topic=KUBER.TXN.QUEUE
+kuber.publishing.regions.transactions.destinations[1].broker=kafka-analytics
+kuber.publishing.regions.transactions.destinations[1].topic=transactions-stream
+kuber.publishing.regions.transactions.destinations[2].broker=compliance-archive
+kuber.publishing.regions.transactions.destinations[2].topic=transactions</code></pre>
+
+                        <h5 class="mt-4"><i class="fas fa-star text-warning me-2"></i>Example 3: RabbitMQ with Routing</h5>
+                        <p class="text-muted">Orders published to RabbitMQ with topic exchange and queue binding.</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code># RabbitMQ broker with topic exchange
+kuber.publishing.brokers.rabbitmq-main.enabled=true
+kuber.publishing.brokers.rabbitmq-main.type=rabbitmq
+kuber.publishing.brokers.rabbitmq-main.host=rabbitmq.internal
+kuber.publishing.brokers.rabbitmq-main.port=5672
+kuber.publishing.brokers.rabbitmq-main.virtual-host=/kuber
+kuber.publishing.brokers.rabbitmq-main.username=kuber_publisher
+kuber.publishing.brokers.rabbitmq-main.password=secret
+kuber.publishing.brokers.rabbitmq-main.exchange-type=topic
+kuber.publishing.brokers.rabbitmq-main.durable=true
+
+# Orders region with exchange, routing key, and queue
+kuber.publishing.regions.orders.enabled=true
+kuber.publishing.regions.orders.destinations[0].broker=rabbitmq-main
+kuber.publishing.regions.orders.destinations[0].topic=orders.exchange
+kuber.publishing.regions.orders.destinations[0].routing-key=orders.#
+kuber.publishing.regions.orders.destinations[0].queue=orders-events-queue</code></pre>
+
+                        <div class="alert alert-secondary mt-4">
+                            <h6><i class="fas fa-history me-2"></i>Legacy Configuration Examples</h6>
+                            <p class="small mb-2">The following examples use the legacy per-region configuration style (still fully supported):</p>
+                        </div>
+
+                        <h5 class="mt-3">Legacy Example: Simple Kafka</h5>
+                        <pre class="bg-light text-dark p-3 rounded"><code>kuber.publishing.regions.customers.enabled=true
+kuber.publishing.regions.customers.kafka.enabled=true
+kuber.publishing.regions.customers.kafka.bootstrap-servers=kafka1:9092,kafka2:9092
+kuber.publishing.regions.customers.kafka.topic=customer-events
+kuber.publishing.regions.customers.kafka.retention-hours=720</code></pre>
+
+                        <h5 class="mt-3">Legacy Example: Simple ActiveMQ</h5>
+                        <pre class="bg-light text-dark p-3 rounded"><code>kuber.publishing.regions.orders.enabled=true
+kuber.publishing.regions.orders.activemq.enabled=true
+kuber.publishing.regions.orders.activemq.broker-url=tcp://activemq:61616
+kuber.publishing.regions.orders.activemq.destination=orders.events.queue
+kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
+                    </div>
+                </div>
+
+                <!-- Architecture -->
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h4 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Architecture</h4>
+                    </div>
+                    <div class="card-body">
+                        <h5>Extensible Publisher Interface</h5>
+                        <p>All publishers implement the <code>EventPublisher</code> interface, making it easy to add new destinations:</p>
+                        <pre class="bg-light p-3 rounded"><code>public interface EventPublisher {
+    String getType();           // "kafka", "rabbitmq", "file", etc.
+    String getDisplayName();    // "Apache Kafka", "RabbitMQ", etc.
+    void initialize();          // Setup connections
+    boolean isEnabledForRegion(String region);
+    void publish(String region, CachePublishingEvent event);
+    void shutdown();
+}</code></pre>
+
+                        <h5 class="mt-4">Event Flow</h5>
+                        <pre class="bg-dark text-white p-3 rounded">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     PLUGGABLE EVENT PUBLISHING ARCHITECTURE                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Redis Client ──▶ CacheService ──▶ RegionEventPublishingService             │
+│                        │                       │                             │
+│                        │ (sync)                │ (async submit)              │
+│                        ▼                       ▼                             │
+│                   OK Response         ThreadPoolExecutor                     │
+│                                               │                              │
+│                                               ▼                              │
+│                                      PublisherRegistry                       │
+│                                               │                              │
+│                         ┌─────────────────────┼─────────────────────┐        │
+│                         │           │         │         │           │        │
+│                         ▼           ▼         ▼         ▼           ▼        │
+│                    ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│                    │  Kafka  │ │ActiveMQ │ │RabbitMQ │ │ IBM MQ  │ │  File   │
+│                    │Publisher│ │Publisher│ │Publisher│ │Publisher│ │Publisher│
+│                    └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘
+│                         │           │           │           │           │    │
+│                         ▼           ▼           ▼           ▼           ▼    │
+│                    ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│                    │  Kafka  │ │ActiveMQ │ │RabbitMQ │ │  IBM   │ │  JSON   │
+│                    │  Topic  │ │Queue/Top│ │Exchange │ │  Queue │ │  Files  │
+│                    └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+│                                                                              │
+│  KEY DESIGN PRINCIPLES:                                                      │
+│  • Interface-driven: Easy to add new publishers                             │
+│  • Non-blocking: Cache operations never wait for publishing                 │
+│  • Per-region config: Each region can use different destinations            │
+│  • Multi-destination: A region can publish to multiple destinations         │
+│  • Fire-and-forget: Publishing failures don't affect cache                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘</pre>
+                    </div>
+                </div>
+                    </div>
+                </div>
+
+                <!-- Startup Sequence -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0"><i class="fas fa-rocket me-2"></i>Startup Sequence</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Publishers are initialized during the startup orchestration sequence:</p>
+                        <ol>
+                            <li><strong>Phase 1:</strong> Persistence Maintenance (compaction)</li>
+                            <li><strong>Phase 2:</strong> Cache Service Initialization (data recovery)</li>
+                            <li><strong>Phase 3:</strong> Event Publishing Setup <span class="badge bg-success">NEW</span>
+                                <ul>
+                                    <li>PublisherRegistry discovers all EventPublisher beans</li>
+                                    <li>Kafka: Create topics with configured retention</li>
+                                    <li>RabbitMQ: Declare exchanges and queues</li>
+                                    <li>File: Create output directories</li>
+                                    <li>All: Initialize connection pools</li>
+                                </ul>
+                            </li>
+                            <li><strong>Phase 4:</strong> Redis Protocol Server</li>
+                            <li><strong>Phase 5:</strong> Autoload Service</li>
+                        </ol>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            All publishers are initialized <strong>before</strong> the Redis server starts, 
+                            ensuring no events are lost due to uninitialized destinations.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Handling -->
+                <div class="card mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Error Handling</h4>
+                    </div>
+                    <div class="card-body">
+                        <h5>Publishing Failures</h5>
+                        <p>If publishing to any destination fails:</p>
+                        <ul>
+                            <li>The error is <strong>logged</strong> with full details</li>
+                            <li>The cache operation is <strong>NOT affected</strong> - data is still stored</li>
+                            <li>Other publishers continue normally (isolated failures)</li>
+                            <li>Monitor logs for <code>ERROR ... Failed to publish event</code> messages</li>
+                        </ul>
+                        
+                        <h5 class="mt-4">Queue Overflow</h5>
+                        <p>If the publishing queue is full (exceeds <code>queue-capacity</code>):</p>
+                        <ul>
+                            <li>New events are <strong>dropped</strong> with a warning log</li>
+                            <li>The cache operation continues normally</li>
+                            <li>Consider increasing <code>queue-capacity</code> or <code>thread-pool-size</code></li>
+                        </ul>
+                        
+                        <h5 class="mt-4">Destination Unavailable</h5>
+                        <p>If a message broker or file system is unavailable:</p>
+                        <ul>
+                            <li>At startup: Initialization continues with warnings, system starts</li>
+                            <li>At runtime: Publishing fails for that destination, others continue</li>
+                            <li>When destination recovers: Publishing resumes automatically</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Best Practices -->
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0"><i class="fas fa-check-circle me-2"></i>Best Practices</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5><i class="fas fa-thumbs-up text-success me-2"></i>Do</h5>
+                                <ul>
+                                    <li>Set appropriate retention/TTL for each destination</li>
+                                    <li>Monitor publishing queue size and errors</li>
+                                    <li>Use different destinations per region when needed</li>
+                                    <li>Configure replication for production brokers</li>
+                                    <li>Use file publishing for audit trails</li>
+                                    <li>Size thread pool based on throughput needs</li>
+                                    <li>Size thread pool based on expected throughput</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5><i class="fas fa-thumbs-down text-danger me-2"></i>Don't</h5>
+                                <ul>
+                                    <li>Rely on publishing for critical business logic</li>
+                                    <li>Set infinite retention without monitoring</li>
+                                    <li>Ignore publishing error logs</li>
+                                    <li>Use same broker for different regions if unnecessary</li>
+                                    <li>Set queue capacity too low for high-traffic regions</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="mt-5 text-center">
+                    <a href="/help/internals" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-2"></i>System Internals
+                    </a>
+                    <a href="/help" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-home me-2"></i>Help Home
+                    </a>
+                    <a href="/help/configuration" class="btn btn-outline-primary ms-2">
+                        Configuration<i class="fas fa-arrow-right ms-2"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="py-4 mt-5 border-top">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                    <p class="text-muted small mb-0">Version 1.2.8</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="text-muted small mb-0">
+                        Copyright &copy; 2025-2030, All Rights Reserved<br>
+                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                        <span class="badge bg-warning text-dark">Patent Pending</span>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</main>
+
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

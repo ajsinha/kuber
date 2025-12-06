@@ -35,7 +35,7 @@ import java.sql.Statement;
  * - RocksDB: Full compaction of all region databases
  * - SQLite: VACUUM on all region database files
  * 
- * @version 1.2.6
+ * @version 1.2.8
  */
 @Service
 @RequiredArgsConstructor

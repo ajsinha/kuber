@@ -2,6 +2,74 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.8] - 2025-12-06 - CENTRALIZED EVENT PUBLISHING CONFIGURATION
+
+### Added
+- **Centralized Broker Definitions**: Define brokers once, reference from multiple regions
+  - New `kuber.publishing.brokers.<name>.*` configuration section
+  - Supports Kafka, ActiveMQ, RabbitMQ, IBM MQ, and File destinations
+  - Each broker defined once with full connection details
+  - Regions reference brokers by name with specific topics/queues
+
+- **Multi-Destination Publishing**: Each region can publish to multiple destinations
+  - New `destinations[]` array in region configuration
+  - Example: orders region → Kafka + RabbitMQ + File simultaneously
+  - Per-destination TTL and persistence overrides
+
+- **BrokerDefinition Class**: Centralized broker configuration
+  - Kafka: bootstrapServers, partitions, replicationFactor, retentionHours, acks, batchSize, lingerMs
+  - ActiveMQ: brokerUrl, username, password, useTopic, ttlSeconds, persistent
+  - RabbitMQ: host, port, virtualHost, exchangeType, durable, username, password
+  - IBM MQ: host, port, queueManager, channel, ccsid, sslCipherSuite, username, password
+  - File: directory, maxFileSizeMb, rotationPolicy, format, compress, retentionDays
+
+- **DestinationConfig Class**: Region-to-broker linking
+  - broker: Reference to centralized broker definition
+  - topic: Topic/queue/exchange name
+  - routingKey: For RabbitMQ topic exchanges
+  - queue: For RabbitMQ queue binding
+  - ttlSeconds/persistent: Per-destination overrides
+
+### Changed
+- **All Event Publishers Refactored**: Support both centralized and legacy configuration
+  - KafkaEventPublisher: Multi-destination with producer pooling by bootstrap server
+  - ActiveMqEventPublisher: Multi-destination with connection pooling by broker URL
+  - RabbitMqEventPublisher: Multi-destination with channel pooling by exchange
+  - IbmMqEventPublisher: Multi-destination with connection pooling by queue manager
+  - FileEventPublisher: Multi-destination with writer pooling by directory
+
+### Fixed
+- **JMS Compatibility**: ActiveMQ and IBM MQ now use javax.jms (not jakarta.jms)
+  - ActiveMQ 5.x requires javax.jms namespace
+  - IBM MQ client requires javax.jms namespace
+  - Updated imports in ActiveMqEventPublisher and IbmMqEventPublisher
+
+### Documentation
+- Updated publishing.html with centralized configuration examples
+- New tabbed interface for broker type properties
+- Legacy configuration moved to collapsible section
+- Comprehensive multi-destination examples
+
+## [1.2.7] - 2025-12-06 - EVENT PUBLISHING FOUNDATION
+
+### Added
+- **Event Publishing Framework**: Pluggable publisher architecture
+  - EventPublisher interface with lifecycle methods
+  - PublisherRegistry for automatic discovery
+  - RegionEventPublishingService for async publishing
+
+- **Multiple Publisher Support**:
+  - KafkaEventPublisher: Apache Kafka integration
+  - ActiveMqEventPublisher: Apache ActiveMQ integration  
+  - RabbitMqEventPublisher: RabbitMQ AMQP integration
+  - IbmMqEventPublisher: IBM MQ integration
+  - FileEventPublisher: Local/network file publishing
+
+- **Publishing Documentation**: New /help/publishing page
+  - Configuration reference for all publishers
+  - Architecture diagrams
+  - Example configurations
+
 ## [1.2.6] - 2025-12-06 - STARTUP ORCHESTRATION & CONFIGURABLE API KEYS PATH
 
 ### Added

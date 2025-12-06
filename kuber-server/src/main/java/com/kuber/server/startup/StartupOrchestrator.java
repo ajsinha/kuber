@@ -15,8 +15,9 @@ import com.kuber.server.autoload.AutoloadService;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.network.RedisProtocolServer;
 import com.kuber.server.persistence.PersistenceMaintenanceService;
-import lombok.RequiredArgsConstructor;
+import com.kuber.server.publishing.RegionEventPublishingService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -35,6 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Wait 2 seconds</li>
  *   <li>Initialize CacheService (recover data from persistence)</li>
  *   <li>Wait 2 seconds</li>
+ *   <li>Create Kafka topics for event publishing (if configured)</li>
+ *   <li>Wait 2 seconds</li>
  *   <li>Start Redis Protocol Server (accept client connections)</li>
  *   <li>Wait 2 seconds</li>
  *   <li>Start AutoloadService (process inbox files)</li>
@@ -46,14 +49,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <ul>
  *   <li>Compaction runs concurrently with data recovery</li>
  *   <li>Data recovery starts before Spring is fully loaded</li>
+ *   <li>Kafka topics don't exist when publishing starts</li>
  *   <li>Redis server accepts connections before data is recovered</li>
  *   <li>Autoload files are processed before persistence recovery completes</li>
  * </ul>
  * 
- * @version 1.2.6
+ * @version 1.2.8
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class StartupOrchestrator {
     
@@ -65,8 +68,21 @@ public class StartupOrchestrator {
     private final AutoloadService autoloadService;
     private final RedisProtocolServer redisProtocolServer;
     
+    @Autowired(required = false)
+    private RegionEventPublishingService publishingService;
+    
     private final AtomicBoolean startupComplete = new AtomicBoolean(false);
     private final AtomicBoolean cacheReady = new AtomicBoolean(false);
+    
+    public StartupOrchestrator(PersistenceMaintenanceService persistenceMaintenanceService,
+                               CacheService cacheService,
+                               AutoloadService autoloadService,
+                               RedisProtocolServer redisProtocolServer) {
+        this.persistenceMaintenanceService = persistenceMaintenanceService;
+        this.cacheService = cacheService;
+        this.autoloadService = autoloadService;
+        this.redisProtocolServer = redisProtocolServer;
+    }
     
     /**
      * Listen for ApplicationReadyEvent and orchestrate startup.
@@ -130,12 +146,33 @@ public class StartupOrchestrator {
             log.info("Cache service initialization completed in {} ms", cacheElapsed);
             
             // Wait between phases
+            log.info("Waiting {} seconds before event publishing setup...", PHASE_DELAY_SECONDS);
+            Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
+            
+            // Phase 3: Create Kafka topics (if publishing is configured)
+            log.info("╔════════════════════════════════════════════════════════════════════╗");
+            log.info("║  Phase 3: Event Publishing Setup                                   ║");
+            log.info("║           Initializing publishers and creating topics/queues...    ║");
+            log.info("╚════════════════════════════════════════════════════════════════════╝");
+            
+            if (publishingService != null) {
+                try {
+                    publishingService.executeStartupOrchestration();
+                    log.info("Event publishing setup completed");
+                } catch (Exception e) {
+                    log.warn("Event publishing setup completed with warnings: {}", e.getMessage());
+                }
+            } else {
+                log.info("Event publishing service not configured - skipping");
+            }
+            
+            // Wait between phases
             log.info("Waiting {} seconds before starting Redis server...", PHASE_DELAY_SECONDS);
             Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
             
-            // Phase 3: Start Redis Protocol Server
+            // Phase 4: Start Redis Protocol Server
             log.info("╔════════════════════════════════════════════════════════════════════╗");
-            log.info("║  Phase 3: Redis Protocol Server                                    ║");
+            log.info("║  Phase 4: Redis Protocol Server                                    ║");
             log.info("║           Starting server to accept client connections...          ║");
             log.info("╚════════════════════════════════════════════════════════════════════╝");
             
@@ -145,9 +182,9 @@ public class StartupOrchestrator {
             log.info("Waiting {} seconds before starting autoload service...", PHASE_DELAY_SECONDS);
             Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
             
-            // Phase 4: Start AutoloadService
+            // Phase 5: Start AutoloadService
             log.info("╔════════════════════════════════════════════════════════════════════╗");
-            log.info("║  Phase 4: Autoload Service                                         ║");
+            log.info("║  Phase 5: Autoload Service                                         ║");
             log.info("║           Starting file monitoring and processing...               ║");
             log.info("╚════════════════════════════════════════════════════════════════════╝");
             
@@ -170,10 +207,12 @@ public class StartupOrchestrator {
             log.info("║   ██║  ██╗╚██████╔╝██████╔╝███████╗██║  ██║                        ║");
             log.info("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                        ║");
             log.info("║                                                                    ║");
-            log.info("║   SYSTEM READY - Version 1.2.6                                     ║");
+            log.info("║   SYSTEM READY - Version 1.2.8                                     ║");
             log.info("║                                                                    ║");
             log.info("║   ✓ Persistence maintenance: complete                              ║");
             log.info("║   ✓ Cache service: initialized                                     ║");
+            log.info("║   ✓ Event publishing: {}                              ║", 
+                    publishingService != null ? "configured    " : "not configured");
             log.info("║   ✓ Redis server: accepting connections                            ║");
             log.info("║   ✓ Autoload service: running                                      ║");
             log.info("║                                                                    ║");

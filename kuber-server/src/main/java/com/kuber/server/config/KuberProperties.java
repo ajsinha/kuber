@@ -21,6 +21,11 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Configuration properties for Kuber distributed cache.
  */
@@ -433,6 +438,436 @@ public class KuberProperties {
          */
         private String fileEncoding = "UTF-8";
     }
+    
+    // ==================== EVENT PUBLISHING CONFIGURATION ====================
+    
+    /**
+     * Centralized broker/destination definitions.
+     * Regions reference these by name.
+     */
+    @Data
+    public static class BrokerDefinition {
+        /**
+         * Whether this broker is enabled.
+         * Broker connections are only initialized if enabled=true.
+         */
+        private boolean enabled = false;
+        
+        /**
+         * Broker type: kafka, activemq, rabbitmq, ibmmq, file
+         */
+        private String type;
+        
+        // ---- Kafka settings ----
+        private String bootstrapServers = "localhost:9092";
+        private int partitions = 3;
+        private short replicationFactor = 1;
+        private int retentionHours = 168;
+        private String acks = "1";
+        private int batchSize = 16384;
+        private int lingerMs = 5;
+        
+        // ---- ActiveMQ settings ----
+        private String brokerUrl = "tcp://localhost:61616";
+        
+        // ---- RabbitMQ settings ----
+        private String host = "localhost";
+        private int port = 5672;
+        private String virtualHost = "/";
+        private String exchangeType = "topic";
+        private boolean durable = true;
+        
+        // ---- IBM MQ settings ----
+        private String queueManager = "QM1";
+        private String channel = "DEV.APP.SVRCONN";
+        private int ccsid = 0;
+        private String sslCipherSuite = "";
+        
+        // ---- File settings ----
+        private String directory = "./events";
+        private int maxFileSizeMb = 100;
+        private String rotationPolicy = "daily";
+        private String format = "jsonl";
+        private boolean compress = false;
+        private int retentionDays = 30;
+        
+        // ---- Common settings ----
+        private String username = "";
+        private String password = "";
+        private int ttlSeconds = 86400;
+        private boolean persistent = true;
+        private boolean useTopic = false;
+    }
+    
+    /**
+     * Region publishing configuration - references centralized brokers.
+     */
+    @Data
+    public static class RegionPublishingConfig {
+        /**
+         * Whether publishing is enabled for this region
+         */
+        private boolean enabled = false;
+        
+        /**
+         * List of destinations for this region.
+         * Each destination references a broker and specifies topic/queue.
+         */
+        private List<DestinationConfig> destinations = new ArrayList<>();
+        
+        // Legacy support - direct configuration (deprecated but still works)
+        private KafkaConfig kafka = new KafkaConfig();
+        private ActiveMqConfig activemq = new ActiveMqConfig();
+        private RabbitMqConfig rabbitmq = new RabbitMqConfig();
+        private IbmMqConfig ibmmq = new IbmMqConfig();
+        private FilePublisherConfig file = new FilePublisherConfig();
+    }
+    
+    /**
+     * Destination configuration - links a region to a broker with specific topic/queue.
+     */
+    @Data
+    public static class DestinationConfig {
+        /**
+         * Reference to a broker defined in kuber.publishing.brokers
+         */
+        private String broker;
+        
+        /**
+         * Topic/queue/exchange name for this destination
+         */
+        private String topic = "";
+        
+        /**
+         * Routing key (for RabbitMQ topic exchanges)
+         */
+        private String routingKey = "";
+        
+        /**
+         * Queue name (for RabbitMQ - binds to exchange)
+         */
+        private String queue = "";
+        
+        /**
+         * Override TTL for this specific destination (0 = use broker default)
+         */
+        private int ttlSeconds = 0;
+        
+        /**
+         * Override persistence for this destination
+         */
+        private Boolean persistent = null;
+    }
+    
+    @Data
+    public static class KafkaConfig {
+        /**
+         * Whether Kafka publishing is enabled
+         */
+        private boolean enabled = false;
+        
+        /**
+         * Kafka bootstrap servers (comma-separated)
+         */
+        private String bootstrapServers = "localhost:9092";
+        
+        /**
+         * Topic name for this region's events
+         */
+        private String topic = "";
+        
+        /**
+         * Number of partitions for auto-created topic
+         */
+        @Min(1)
+        private int partitions = 3;
+        
+        /**
+         * Replication factor for auto-created topic
+         */
+        @Min(1)
+        private short replicationFactor = 1;
+        
+        /**
+         * Retention period in hours for the topic
+         */
+        @Min(1)
+        private int retentionHours = 168; // 7 days
+        
+        /**
+         * Producer acks configuration: all, 1, or 0
+         */
+        private String acks = "1";
+        
+        /**
+         * Producer batch size in bytes
+         */
+        @Min(1)
+        private int batchSize = 16384;
+        
+        /**
+         * Producer linger time in milliseconds
+         */
+        @Min(0)
+        private int lingerMs = 5;
+    }
+    
+    @Data
+    public static class ActiveMqConfig {
+        /**
+         * Whether ActiveMQ publishing is enabled
+         */
+        private boolean enabled = false;
+        
+        /**
+         * ActiveMQ broker URL
+         */
+        private String brokerUrl = "tcp://localhost:61616";
+        
+        /**
+         * Username for ActiveMQ connection (optional)
+         */
+        private String username = "";
+        
+        /**
+         * Password for ActiveMQ connection (optional)
+         */
+        private String password = "";
+        
+        /**
+         * Queue or topic name for this region's events
+         */
+        private String destination = "";
+        
+        /**
+         * Whether destination is a topic (true) or queue (false)
+         */
+        private boolean useTopic = false;
+        
+        /**
+         * Time-to-live for messages in seconds
+         */
+        @Min(0)
+        private int ttlSeconds = 86400; // 24 hours
+        
+        /**
+         * Delivery mode: persistent (true) or non-persistent (false)
+         */
+        private boolean persistent = true;
+    }
+    
+    @Data
+    public static class RabbitMqConfig {
+        /**
+         * Whether RabbitMQ publishing is enabled
+         */
+        private boolean enabled = false;
+        
+        /**
+         * RabbitMQ host
+         */
+        private String host = "localhost";
+        
+        /**
+         * RabbitMQ port
+         */
+        @Min(1)
+        private int port = 5672;
+        
+        /**
+         * Virtual host
+         */
+        private String virtualHost = "/";
+        
+        /**
+         * Username for RabbitMQ connection
+         */
+        private String username = "guest";
+        
+        /**
+         * Password for RabbitMQ connection
+         */
+        private String password = "guest";
+        
+        /**
+         * Exchange name
+         */
+        private String exchange = "";
+        
+        /**
+         * Exchange type: direct, fanout, topic, headers
+         */
+        private String exchangeType = "topic";
+        
+        /**
+         * Queue name (optional - if set, will be declared and bound)
+         */
+        private String queue = "";
+        
+        /**
+         * Routing key pattern
+         */
+        private String routingKey = "";
+        
+        /**
+         * Whether exchange/queue should be durable
+         */
+        private boolean durable = true;
+        
+        /**
+         * Whether messages should be persistent
+         */
+        private boolean persistent = true;
+        
+        /**
+         * Message TTL in seconds (0 = no expiration)
+         */
+        @Min(0)
+        private int ttlSeconds = 86400; // 24 hours
+    }
+    
+    @Data
+    public static class IbmMqConfig {
+        /**
+         * Whether IBM MQ publishing is enabled
+         */
+        private boolean enabled = false;
+        
+        /**
+         * IBM MQ host
+         */
+        private String host = "localhost";
+        
+        /**
+         * IBM MQ port
+         */
+        @Min(1)
+        private int port = 1414;
+        
+        /**
+         * Queue manager name
+         */
+        private String queueManager = "QM1";
+        
+        /**
+         * Channel name
+         */
+        private String channel = "DEV.APP.SVRCONN";
+        
+        /**
+         * Queue name for events
+         */
+        private String queue = "";
+        
+        /**
+         * Whether destination is a topic (true) or queue (false)
+         */
+        private boolean useTopic = false;
+        
+        /**
+         * Username for connection (optional)
+         */
+        private String username = "";
+        
+        /**
+         * Password for connection (optional)
+         */
+        private String password = "";
+        
+        /**
+         * CCSID (Coded Character Set Identifier). 0 = use default
+         */
+        @Min(0)
+        private int ccsid = 0;
+        
+        /**
+         * SSL cipher suite for encrypted connections (optional)
+         */
+        private String sslCipherSuite = "";
+        
+        /**
+         * Message TTL in seconds (0 = no expiration)
+         */
+        @Min(0)
+        private int ttlSeconds = 86400; // 24 hours
+        
+        /**
+         * Whether messages should be persistent
+         */
+        private boolean persistent = true;
+    }
+    
+    @Data
+    public static class FilePublisherConfig {
+        /**
+         * Whether file publishing is enabled
+         */
+        private boolean enabled = false;
+        
+        /**
+         * Output directory for event files
+         */
+        private String directory = "";
+        
+        /**
+         * Maximum file size in MB before rotation
+         */
+        @Min(1)
+        private int maxFileSizeMb = 100;
+        
+        /**
+         * Rotation policy: size, daily, hourly
+         */
+        private String rotationPolicy = "daily";
+        
+        /**
+         * File format: jsonl (JSON Lines)
+         */
+        private String format = "jsonl";
+        
+        /**
+         * Whether to compress rotated files
+         */
+        private boolean compress = false;
+        
+        /**
+         * Number of days to retain files (0 = forever)
+         */
+        @Min(0)
+        private int retentionDays = 30;
+    }
+    
+    @Data
+    public static class Publishing {
+        /**
+         * Thread pool size for async publishing
+         */
+        @Min(1)
+        private int threadPoolSize = 4;
+        
+        /**
+         * Queue capacity for pending events
+         */
+        @Min(100)
+        private int queueCapacity = 10000;
+        
+        /**
+         * Centralized broker definitions.
+         * Key is broker name, value is broker configuration.
+         */
+        private Map<String, BrokerDefinition> brokers = new HashMap<>();
+        
+        /**
+         * Region-specific publishing configuration.
+         * Key is region name, value is publishing config.
+         */
+        private Map<String, RegionPublishingConfig> regions = new HashMap<>();
+    }
+    
+    /**
+     * Publishing configuration
+     */
+    private Publishing publishing = new Publishing();
     
     @Data
     public static class Persistence {
