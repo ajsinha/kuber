@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.3.10</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.4.1</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -165,7 +165,7 @@
                             Sequential startup compaction and data loading for guaranteed data integrity.
                             Disk writes complete before key index updates.
                         </p>
-                        <span class="badge bg-light text-dark">Updated in v1.3.10</span>
+                        <span class="badge bg-light text-dark">Updated in v1.4.1</span>
                     </div>
                 </div>
             </div>
@@ -365,14 +365,26 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.3.10</span>
-                                    <span class="text-muted small">Current - Async Individual Writes (Default)</span>
+                                    <span class="badge bg-primary me-2">v1.4.1</span>
+                                    <span class="text-muted small">Current - Cron-Based Backup</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Cron Scheduling</strong>: Backup at configurable cron schedule (default: 11 PM daily)</li>
+                                    <li><strong>Auto Restore</strong>: Place backup file in ./restore to trigger restore</li>
+                                    <li><strong>Region Locking</strong>: Operations blocked during restore</li>
+                                    <li><strong>Admin Dashboard</strong>: Region selector + Backup button for manual trigger</li>
+                                    <li><strong>Compression</strong>: Gzip compression enabled by default</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.10</span>
+                                    <span class="text-muted small">Async Individual Writes (Default)</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>ASYNC Mode (default)</strong>: Memory updated first, disk write in background - 10-100x faster</li>
                                     <li><strong>Configurable</strong>: kuber.persistence.sync-individual-writes (false=async, true=sync)</li>
                                     <li><strong>Eventually Consistent</strong>: Data readable immediately, persisted asynchronously</li>
-                                    <li><strong>Trade-off</strong>: If crash before async write completes, that entry is lost</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
@@ -384,7 +396,6 @@
                                     <li><strong>Batch Writes</strong>: Records written in batches (default 8192) for 10-50x faster autoload</li>
                                     <li><strong>Progress Logging</strong>: INFO logs after each batch showing records processed</li>
                                     <li><strong>Configurable</strong>: kuber.autoload.batch-size setting</li>
-                                    <li><strong>putEntriesBatch()</strong>: New CacheService method for bulk writes</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
@@ -473,7 +484,7 @@
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Autoload Service</strong>: Enhanced file processing for bulk data import</li>
                                     <li>Thread pool for autoload scan processing</li>
-                                    <li>Note: Parallel processing removed in v1.3.10 for stability</li>
+                                    <li>Note: Parallel processing removed in v1.4.1 for stability</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
@@ -483,7 +494,7 @@
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Bug Fix</strong>: Fixed integer overflow in off-heap key index</li>
-                                    <li>Note: Concurrent startup removed in v1.3.10 for stability</li>
+                                    <li>Note: Concurrent startup removed in v1.4.1 for stability</li>
                                 </ul>
                             </div>
                             <div class="mb-4">

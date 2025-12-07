@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.3.10
+Version 1.4.0
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -1098,6 +1098,98 @@ After processing, files are moved to outbox with timestamp and status:
 ### Replication
 
 Data loaded via autoload is automatically replicated to secondary nodes when replication is enabled.
+
+## Backup and Restore (v1.4.1)
+
+Kuber provides automatic scheduled backup of all regions and automatic restore when backup files are placed in the restore directory. This feature supports RocksDB and LMDB persistence stores only (SQL databases have their own backup mechanisms).
+
+### Configuration
+
+```yaml
+kuber:
+  backup:
+    enabled: true                    # Enable backup/restore service
+    backup-directory: ./backup       # Where backup files are stored
+    restore-directory: ./restore     # Monitor this for restore files
+    cron: "0 0 23 * * *"            # Schedule: 11:00 PM daily (default)
+    max-backups-per-region: 10       # Keep last 10 backups per region
+    compress: true                   # Gzip compression (recommended)
+    batch-size: 10000               # Entries per batch during backup/restore
+```
+
+### Cron Expression Examples
+
+| Expression | Description |
+|------------|-------------|
+| `0 0 23 * * *` | 11:00 PM daily (default) |
+| `0 0 2 * * *` | 2:00 AM daily |
+| `0 0 */6 * * *` | Every 6 hours |
+| `0 30 1 * * SUN` | 1:30 AM every Sunday |
+
+### Backup
+
+Backups run automatically according to the cron schedule. Each region is backed up to a separate file:
+
+```
+./backup/
+├── customers.20251207_230000.backup.gz
+├── products.20251207_230003.backup.gz
+└── default.20251207_230005.backup.gz
+```
+
+File format is JSONL (one CacheEntry per line) with optional gzip compression.
+
+#### Manual Backup
+
+Trigger immediate backup via:
+
+1. **Admin Dashboard**: Select a region (or "All Regions") and click the "Backup" button
+2. **REST API**:
+```bash
+# Backup all regions
+curl -X POST http://localhost:8080/api/admin/backup -H "X-API-Key: your-key"
+
+# Backup single region
+curl -X POST http://localhost:8080/api/admin/backup/customers -H "X-API-Key: your-key"
+```
+
+### Restore
+
+To restore a region:
+
+1. Place backup file in `./restore` directory
+2. Service detects file within 30 seconds
+3. Region name inferred from file name
+4. **Region is LOCKED** - all operations blocked
+5. Existing data purged
+6. Backup data restored in batches
+7. Region unlocked
+8. Processed file moved to backup directory
+
+```bash
+# Restore a region
+cp ./backup/customers.20251207_143022.backup.gz ./restore/
+
+# Watch logs for progress
+tail -f logs/kuber.log
+```
+
+### Region Locking During Restore
+
+During restore, all GET, SET, DELETE operations on the region return an error:
+```
+"Region 'customers' is currently being restored. Please wait for restore to complete."
+```
+
+### Supported Stores
+
+| Store | Supported | Notes |
+|-------|-----------|-------|
+| RocksDB | ✓ | Full support |
+| LMDB | ✓ | Full support |
+| SQLite | ✗ | Use `.backup` command |
+| PostgreSQL | ✗ | Use `pg_dump` |
+| MongoDB | ✗ | Use `mongodump` |
 
 ## Security
 

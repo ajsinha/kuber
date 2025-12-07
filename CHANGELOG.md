@@ -2,6 +2,105 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.1] - 2025-12-07 - CRON-BASED BACKUP SCHEDULING
+
+### Changed
+- **Cron-Based Backup Scheduling**: Replaced fixed interval with cron expressions
+  - Default schedule: 11:00 PM daily (`0 0 23 * * *`)
+  - Supports standard cron format (second minute hour day-of-month month day-of-week)
+  - Examples: daily at 2 AM, every 6 hours, weekly on Sunday
+
+### Added
+- **Admin Dashboard Region Selector**: Backup individual regions or all regions
+  - Dropdown to select specific region or "All Regions"
+  - Immediate feedback on backup completion
+  - Region count displayed for "All Regions" backup
+
+### Configuration
+```yaml
+kuber:
+  backup:
+    enabled: true
+    backup-directory: ./backup
+    restore-directory: ./restore
+    cron: "0 0 23 * * *"           # 11:00 PM daily (default)
+    max-backups-per-region: 10
+    compress: true
+    batch-size: 10000
+```
+
+### Cron Expression Examples
+| Expression | Description |
+|------------|-------------|
+| `0 0 23 * * *` | 11:00 PM daily (default) |
+| `0 0 2 * * *` | 2:00 AM daily |
+| `0 0 */6 * * *` | Every 6 hours |
+| `0 30 1 * * SUN` | 1:30 AM every Sunday |
+
+---
+
+## [1.4.0] - 2025-12-07 - BACKUP AND RESTORE
+
+### Added
+- **Backup Service**: Automatic scheduled backup of all regions
+  - Backup files: `<region>.<timestamp>.backup.gz`
+  - Optional gzip compression (enabled by default)
+  - Automatic cleanup of old backups (configurable retention)
+  - Works with RocksDB and LMDB persistence stores
+
+- **Restore Service**: Automatic restore from backup files
+  - Place backup file in `./restore` directory
+  - Region name inferred from file name
+  - Region locked during restore (no read/write operations)
+  - Processed files moved to backup directory
+
+- **Region Locking**: During restore, all operations on the region are blocked
+  - Prevents data corruption during restore
+  - Clear error message to clients
+
+- **BackupRestoreService**: New service class
+  - Scheduled backup using Spring TaskScheduler
+  - Watches restore directory for files
+  - Statistics tracking (total backups, restores, bytes)
+
+- **Admin Dashboard Backup Card**: Manual backup trigger from UI
+  - Backup & Restore card with statistics
+  - Shows backup statistics and recent backup list
+  - Real-time status updates
+
+- **Region-Partitioned Async Executors**: Improved async write architecture
+  - 4 single-thread executors for async saves
+  - Region name hash determines which executor handles writes
+  - All writes for same region are sequential (no race conditions)
+  - Different regions can write in parallel (up to 4 concurrent)
+
+### Backup File Format
+- JSONL format (one CacheEntry per line)
+- Header line with metadata (version, region, timestamp)
+- Optional gzip compression
+
+### Restore Process
+1. Place backup file in `./restore` directory
+2. Service detects file and parses region name
+3. Region is locked (operations blocked)
+4. Existing data purged
+5. Backup data restored in batches
+6. Region unlocked
+7. Processed file moved to backup directory
+
+### Startup Sequence
+Added Phase 6 for BackupRestoreService after AutoloadService.
+
+### New Methods
+- `CacheService.getRegionNames()` - Get all region names
+- `CacheService.clearRegionCaches(region)` - Clear memory caches for restore
+- `CacheService.loadEntriesIntoCache(region, entries)` - Load entries into memory
+- `CacheService.isRegionBeingRestored(region)` - Check if region is locked
+
+### Notes
+- Only RocksDB and LMDB are supported (SQL databases have their own backup mechanisms)
+- MongoDB uses mongodump/mongorestore instead
+
 ## [1.3.10] - 2025-12-07 - ASYNC INDIVIDUAL WRITES (DEFAULT)
 
 ### Added

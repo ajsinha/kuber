@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * - {basePath}/{regionName}/data.mdb - LMDB data file
  * - {basePath}/{regionName}/lock.mdb - LMDB lock file
  * 
- * @version 1.3.10
+ * @version 1.4.1
  */
 @Slf4j
 public class LmdbPersistenceStore extends AbstractPersistenceStore {
@@ -55,6 +55,9 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     private static final String REGION_METADATA_FILE = "_region.json";
     private static final String ENTRIES_DB_NAME = "entries";
     private static final long DEFAULT_MAP_SIZE = 1024L * 1024L * 1024L; // 1GB default
+    
+    // Reusable TypeReference to avoid creating new anonymous classes in loops (memory leak prevention)
+    private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<Map<String, Object>>() {};
     
     private final KuberProperties properties;
     private final String basePath;
@@ -357,8 +360,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                     if (metadataFile.exists()) {
                         try {
                             String json = Files.readString(metadataFile.toPath(), StandardCharsets.UTF_8);
-                            Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                                    new TypeReference<Map<String, Object>>() {});
+                            Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                             CacheRegion region = mapToRegion(map);
                             regions.add(region);
                         } catch (Exception e) {
@@ -383,8 +385,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
         
         try {
             String json = Files.readString(metadataFile.toPath(), StandardCharsets.UTF_8);
-            Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
             return mapToRegion(map);
         } catch (Exception e) {
             log.error("Failed to load region '{}': {}", name, e.getMessage(), e);
@@ -538,8 +539,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                     byte[] valueBytes = new byte[valueBuffer.remaining()];
                     valueBuffer.get(valueBytes);
                     String json = new String(valueBytes, StandardCharsets.UTF_8);
-                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                            new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                     return mapToEntry(map, region);
                 }
             }
@@ -569,8 +569,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                     byte[] valueBytes = new byte[valueBuffer.remaining()];
                     valueBuffer.get(valueBytes);
                     String json = new String(valueBytes, StandardCharsets.UTF_8);
-                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                            new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                     result.put(key, mapToEntry(map, region));
                 }
             }
@@ -599,8 +598,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                 byte[] valueBytes = new byte[kv.val().remaining()];
                 kv.val().get(valueBytes);
                 String json = new String(valueBytes, StandardCharsets.UTF_8);
-                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                        new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                 entries.add(mapToEntry(map, region));
                 count++;
             }
@@ -673,6 +671,47 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
         return countEntries(region);
     }
     
+    /**
+     * Iterate through all entries in a region without loading all into memory.
+     * Memory-efficient for backup operations on large regions.
+     */
+    @Override
+    public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
+        Env<ByteBuffer> env = regionEnvironments.get(region);
+        Dbi<ByteBuffer> dbi = regionDatabases.get(region);
+        
+        if (env == null || dbi == null) {
+            log.warn("forEachEntry: Region '{}' environment/database not found (env={}, dbi={})", 
+                    region, env != null ? "OK" : "NULL", dbi != null ? "OK" : "NULL");
+            return 0;
+        }
+        
+        long count = 0;
+        try (Txn<ByteBuffer> txn = env.txnRead();
+             CursorIterable<ByteBuffer> cursor = dbi.iterate(txn)) {
+            
+            for (CursorIterable.KeyVal<ByteBuffer> kv : cursor) {
+                try {
+                    byte[] valueBytes = new byte[kv.val().remaining()];
+                    kv.val().get(valueBytes);
+                    String json = new String(valueBytes, StandardCharsets.UTF_8);
+                    Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
+                    CacheEntry entry = mapToEntry(map, region);
+                    if (!entry.isExpired()) {
+                        consumer.accept(entry);
+                        count++;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse entry during iteration: {}", e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to iterate entries in region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return count;
+    }
+    
     @Override
     public List<String> getKeys(String region, String pattern, int limit) {
         List<String> keys = new ArrayList<>();
@@ -730,8 +769,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                 byte[] valueBytes = new byte[kv.val().remaining()];
                 kv.val().get(valueBytes);
                 String json = new String(valueBytes, StandardCharsets.UTF_8);
-                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                        new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                 
                 Object expiresAtObj = map.get("expiresAt");
                 if (expiresAtObj != null) {
@@ -781,8 +819,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                 byte[] valueBytes = new byte[kv.val().remaining()];
                 kv.val().get(valueBytes);
                 String json = new String(valueBytes, StandardCharsets.UTF_8);
-                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                        new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                 
                 Object expiresAtObj = map.get("expiresAt");
                 if (expiresAtObj == null) {
@@ -824,8 +861,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                 byte[] valueBytes = new byte[kv.val().remaining()];
                 kv.val().get(valueBytes);
                 String json = new String(valueBytes, StandardCharsets.UTF_8);
-                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, 
-                        new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> map = JsonUtils.getObjectMapper().readValue(json, MAP_TYPE_REF);
                 
                 Object expiresAtObj = map.get("expiresAt");
                 boolean expired = false;

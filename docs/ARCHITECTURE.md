@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.3.10**
+**Version 1.4.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -1101,6 +1101,161 @@ Disk write completes before returning. Maximum durability.
 
 ---
 
+## 12. Backup and Restore (v1.4.0)
+
+Kuber provides automatic periodic backup of all regions and automatic restore when backup files are placed in the restore directory.
+
+### 12.1 Supported Persistence Stores
+
+| Store | Supported | Reason |
+|-------|-----------|--------|
+| RocksDB | ✓ | Full support via BackupRestoreService |
+| LMDB | ✓ | Full support via BackupRestoreService |
+| SQLite | ✗ | Use SQLite's `.backup` command |
+| PostgreSQL | ✗ | Use `pg_dump` / `pg_restore` |
+| MongoDB | ✗ | Use `mongodump` / `mongorestore` |
+
+### 12.2 Backup Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BackupRestoreService                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ┌───────────────────────┐    ┌───────────────────────┐                 │
+│  │   Backup Scheduler    │    │   Restore Watcher     │                 │
+│  │   (cron: 11 PM daily) │    │   (every 30 sec)      │                 │
+│  └──────────┬────────────┘    └──────────┬────────────┘                 │
+│             │                            │                              │
+│             ▼                            ▼                              │
+│  ┌───────────────────────┐    ┌───────────────────────┐                 │
+│  │  For each region:     │    │  For each file in     │                 │
+│  │  - loadEntries()      │    │  ./restore:           │                 │
+│  │  - Write to JSONL     │    │  - Parse region name  │                 │
+│  │  - Gzip compress      │    │  - Lock region        │                 │
+│  │  - Save to ./backup   │    │  - Purge existing     │                 │
+│  └───────────────────────┘    │  - Restore in batches │                 │
+│                               │  - Unlock region      │                 │
+│                               │  - Move to ./backup   │                 │
+│                               └───────────────────────┘                 │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 12.3 Backup File Format
+
+```
+# KUBER_BACKUP_HEADER: {"version":"1.4.0","region":"customers","timestamp":"2025-12-07T14:30:22Z"}
+{"id":"uuid1","key":"cust001","region":"customers","valueType":"JSON","jsonValue":{...}}
+{"id":"uuid2","key":"cust002","region":"customers","valueType":"JSON","jsonValue":{...}}
+...
+```
+
+- **Format**: JSONL (one CacheEntry per line)
+- **Compression**: Gzip (optional, enabled by default)
+- **Naming**: `<region>.<timestamp>.backup[.gz]`
+- **Timestamp**: `yyyyMMdd_HHmmss`
+
+### 12.4 Region Locking During Restore
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                      Region Lock State                          │
+├────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Normal State:          Restore in Progress:                   │
+│  ┌──────────────┐       ┌──────────────┐                       │
+│  │   Region X   │       │   Region X   │                       │
+│  │  ┌────────┐  │       │  ┌────────┐  │                       │
+│  │  │ OPEN   │  │  ──►  │  │ LOCKED │  │                       │
+│  │  └────────┘  │       │  └────────┘  │                       │
+│  │              │       │              │                       │
+│  │  GET ✓       │       │  GET ✗       │                       │
+│  │  SET ✓       │       │  SET ✗       │                       │
+│  │  DEL ✓       │       │  DEL ✗       │                       │
+│  └──────────────┘       └──────────────┘                       │
+│                                                                 │
+│  Error Response: "Region 'X' is currently being restored.      │
+│                   Please wait for restore to complete."         │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 12.5 Restore Data Flow
+
+```
+1. File Detection
+   ./restore/customers.20251207_143022.backup.gz
+        │
+        ▼
+2. Parse Region Name
+   "customers" extracted from filename
+        │
+        ▼
+3. Lock Region
+   regionsBeingRestored.put("customers", true)
+        │
+        ▼
+4. Purge Existing Data
+   persistenceStore.purgeRegion("customers")
+   cacheService.clearRegionCaches("customers")
+        │
+        ▼
+5. Restore in Batches (batch-size: 10000)
+   ┌─────────────────────────────────────────┐
+   │  Read JSONL  ──►  saveEntries()         │
+   │              ──►  loadEntriesIntoCache()│
+   │  (repeat until EOF)                     │
+   └─────────────────────────────────────────┘
+        │
+        ▼
+6. Unlock Region
+   regionsBeingRestored.put("customers", false)
+        │
+        ▼
+7. Move Processed File
+   ./restore/... ──► ./backup/restored_<timestamp>_...
+```
+
+### 12.6 Configuration
+
+```yaml
+kuber:
+  backup:
+    enabled: true                    # Enable backup/restore service
+    backup-directory: ./backup       # Where backup files are stored
+    restore-directory: ./restore     # Monitor this for restore files
+    cron: "0 0 23 * * *"            # Schedule: 11:00 PM daily (default)
+    max-backups-per-region: 10       # Retention policy (0 = keep all)
+    compress: true                   # Gzip compression
+    batch-size: 10000               # Entries per batch
+    file-encoding: UTF-8
+    create-directories: true
+```
+
+#### Cron Expression Examples
+
+| Expression | Description |
+|------------|-------------|
+| `0 0 23 * * *` | 11:00 PM daily (default) |
+| `0 0 2 * * *` | 2:00 AM daily |
+| `0 0 */6 * * *` | Every 6 hours |
+| `0 30 1 * * SUN` | 1:30 AM every Sunday |
+
+### 12.7 Integration with Startup Sequence
+
+BackupRestoreService is started in Phase 6 of the startup sequence:
+
+```
+Phase 1: Wait 10 seconds for stabilization
+Phase 2: Persistence maintenance (compaction)
+Phase 3: Cache service initialization (recovery)
+Phase 4: Redis protocol server
+Phase 5: Autoload service
+Phase 6: Backup/Restore service  ← NEW
+Phase 7: System ready
+```
+
+---
+
 ## Appendix: Performance Considerations
 
 ### Memory Management
@@ -1248,8 +1403,32 @@ GET key
 | pool-[N]-thread-[M] | Redis command handlers |
 | scheduling-1 | @Scheduled tasks (TTL, memory, compaction) |
 | kuber-autoload | File scanning/processing |
-| ForkJoinPool.commonPool | Async persistence writes |
+| kuber-backup | Backup scheduler |
+| kuber-restore-watcher | Restore file monitoring |
+| persistence-async-save-[0-3] | Region-partitioned async writes (v1.4.0) |
 | http-nio-8080-exec-[N] | REST API handlers |
+
+### Region-Partitioned Async Executors (v1.4.0)
+
+Async writes use 4 single-thread executors with hash-based partitioning:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Region-Partitioned Async Writes                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Region "customers"  ──► hash % 4 = 2 ──► persistence-async-save-2      │
+│  Region "products"   ──► hash % 4 = 0 ──► persistence-async-save-0      │
+│  Region "orders"     ──► hash % 4 = 1 ──► persistence-async-save-1      │
+│  Region "inventory"  ──► hash % 4 = 3 ──► persistence-async-save-3      │
+│                                                                          │
+│  Benefits:                                                               │
+│  • All writes for same region are SEQUENTIAL (no race conditions)       │
+│  • Different regions can write in PARALLEL (up to 4 concurrent)         │
+│  • Consistent mapping: same region always uses same executor            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Data Safety Guarantees
 

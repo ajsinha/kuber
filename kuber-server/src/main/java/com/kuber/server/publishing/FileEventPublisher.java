@@ -47,7 +47,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * 
  * This publisher only initializes for brokers where enabled=true.
  * 
- * @version 1.3.10
+ * @version 1.4.1
  */
 @Slf4j
 @Service

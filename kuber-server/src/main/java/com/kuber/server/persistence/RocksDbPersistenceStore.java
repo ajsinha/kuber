@@ -44,12 +44,15 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>ReadWriteLock protects against concurrent close/write races</li>
  * </ul>
  * 
- * @version 1.3.10
+ * @version 1.4.1
  */
 @Slf4j
 public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     
     private static final String REGION_METADATA_FILE = "_region.json";
+    
+    // Reusable TypeReference to avoid creating new anonymous classes in loops (memory leak prevention)
+    private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<Map<String, Object>>() {};
     
     private final KuberProperties properties;
     private final String basePath;
@@ -630,7 +633,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             
             if (metadataFile.exists()) {
                 String json = java.nio.file.Files.readString(metadataFile.toPath(), StandardCharsets.UTF_8);
-                Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                 CacheRegion region = mapToRegion(map);
                 log.debug("Loaded region metadata for '{}' from file", regionName);
                 return region;
@@ -686,7 +689,9 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                 String regionPath = basePath + File.separator + name;
                 deleteDirectory(new File(regionPath));
                 
-                openRegionDatabase(name);
+                // Reopen and put back into map
+                RocksDB newDb = openRegionDatabase(name);
+                regionDatabases.put(name, newDb);
             }
             
             log.info("Purged region '{}' in RocksDB", name);
@@ -790,7 +795,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             byte[] value = regionDb.get(key.getBytes(StandardCharsets.UTF_8));
             if (value != null) {
                 String json = new String(value, StandardCharsets.UTF_8);
-                Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                 return mapToEntry(map, region);
             }
         } catch (Exception e) {
@@ -821,7 +826,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                 if (value != null) {
                     try {
                         String json = new String(value, StandardCharsets.UTF_8);
-                        Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                        Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                         CacheEntry entry = mapToEntry(map, region);
                         if (entry != null) {
                             result.put(keys.get(i), entry);
@@ -856,7 +861,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                 try {
                     String json = new String(iterator.value(), StandardCharsets.UTF_8);
-                    Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                     CacheEntry entry = mapToEntry(map, region);
                     if (!entry.isExpired()) {
                         allEntries.add(entry);
@@ -950,6 +955,37 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     }
     
     /**
+     * Iterate through all entries in a region without loading all into memory.
+     * Memory-efficient for backup operations on large regions.
+     */
+    @Override
+    public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
+        RocksDB regionDb = regionDatabases.get(region);
+        if (regionDb == null) {
+            log.warn("forEachEntry: Region '{}' database not found (not opened yet or doesn't exist)", region);
+            return 0;
+        }
+        
+        long count = 0;
+        try (RocksIterator iterator = regionDb.newIterator()) {
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                try {
+                    String json = new String(iterator.value(), StandardCharsets.UTF_8);
+                    Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
+                    CacheEntry entry = mapToEntry(map, region);
+                    if (!entry.isExpired()) {
+                        consumer.accept(entry);
+                        count++;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse entry during iteration: {}", e.getMessage());
+                }
+            }
+        }
+        return count;
+    }
+    
+    /**
      * Fast estimate of entry count using RocksDB native property.
      * This is approximate but O(1) - suitable for dashboard display.
      */
@@ -993,7 +1029,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                 try {
                     String json = new String(iterator.value(), StandardCharsets.UTF_8);
-                    Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                     Object expiresAt = map.get("expiresAt");
                     if (expiresAt != null && ((Number) expiresAt).longValue() < now) {
                         expiredKeys.add(new String(iterator.key(), StandardCharsets.UTF_8));
@@ -1030,7 +1066,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                 try {
                     String json = new String(iterator.value(), StandardCharsets.UTF_8);
-                    Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                     Object expiresAt = map.get("expiresAt");
                     if (expiresAt == null || ((Number) expiresAt).longValue() >= now) {
                         count++;
@@ -1055,7 +1091,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
             for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                 try {
                     String json = new String(iterator.value(), StandardCharsets.UTF_8);
-                    Map<String, Object> map = JsonUtils.fromJson(json, new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> map = JsonUtils.fromJson(json, MAP_TYPE_REF);
                     Object expiresAt = map.get("expiresAt");
                     if (expiresAt == null || ((Number) expiresAt).longValue() >= now) {
                         keys.add(new String(iterator.key(), StandardCharsets.UTF_8));

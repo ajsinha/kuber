@@ -63,13 +63,13 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.3.10
+ * @version 1.4.1
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.3.10";
+    private static final String VERSION = "1.4.1";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -79,6 +79,9 @@ public class CacheService {
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
+    
+    // BackupRestoreService for region lock checking during restore
+    private com.kuber.server.backup.BackupRestoreService backupRestoreService;
     
     // ==================== HYBRID MEMORY ARCHITECTURE ====================
     // Key Index: ALL keys always in memory for O(1) lookups (per region)
@@ -852,6 +855,7 @@ public class CacheService {
     // ==================== String Operations ====================
     
     public String get(String region, String key) {
+        checkRegionNotBeingRestored(region);
         CacheEntry entry = getEntry(region, key);
         if (entry == null) {
             return null;
@@ -865,6 +869,7 @@ public class CacheService {
     
     public void set(String region, String key, String value, long ttlSeconds) {
         checkWriteAccess();
+        checkRegionNotBeingRestored(region);
         ensureRegionExists(region);
         
         // Check if key exists (for insert vs update detection)
@@ -1780,9 +1785,105 @@ public class CacheService {
         ensureRegionExists(region);
     }
     
+    /**
+     * Get all region names.
+     * 
+     * @return Set of region names
+     */
+    public Set<String> getRegionNames() {
+        return new HashSet<>(regions.keySet());
+    }
+    
+    /**
+     * Clear the in-memory caches for a region (KeyIndex and ValueCache).
+     * Used during restore to purge memory before loading backup data.
+     * 
+     * @param region Region name
+     */
+    public void clearRegionCaches(String region) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex != null) {
+            keyIndex.clear();
+            log.debug("Cleared KeyIndex for region '{}'", region);
+        }
+        
+        if (valueCache != null) {
+            valueCache.invalidateAll();
+            log.debug("Cleared ValueCache for region '{}'", region);
+        }
+    }
+    
+    /**
+     * Load entries into the in-memory caches (KeyIndex and ValueCache).
+     * Used during restore to populate memory from backup data.
+     * 
+     * @param region Region name
+     * @param entries List of entries to load
+     */
+    public void loadEntriesIntoCache(String region, List<CacheEntry> entries) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex == null || valueCache == null) {
+            log.warn("Region '{}' caches not initialized, skipping cache loading", region);
+            return;
+        }
+        
+        for (CacheEntry entry : entries) {
+            keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
+            valueCache.put(entry.getKey(), entry);
+        }
+    }
+    
+    /**
+     * Check if a region is currently being restored.
+     * Operations on the region should be blocked during restore.
+     * 
+     * @param region Region name
+     * @return true if region is being restored
+     */
+    public boolean isRegionBeingRestored(String region) {
+        // Delegate to BackupRestoreService if available
+        if (backupRestoreService != null) {
+            return backupRestoreService.isRegionBeingRestored(region);
+        }
+        return false;
+    }
+    
+    /**
+     * Check if a region is currently being loaded during startup.
+     * Backup operations should wait until loading completes.
+     * 
+     * @param region Region name
+     * @return true if region is being loaded
+     */
+    public boolean isRegionLoading(String region) {
+        return operationLock.isRegionLoading(region);
+    }
+    
+    /**
+     * Set the BackupRestoreService reference for region lock checking.
+     */
+    public void setBackupRestoreService(Object backupRestoreService) {
+        this.backupRestoreService = (com.kuber.server.backup.BackupRestoreService) backupRestoreService;
+    }
+    
     private void checkWriteAccess() {
         if (replicationManager != null && !replicationManager.isPrimary()) {
             throw new ReadOnlyException();
+        }
+    }
+    
+    /**
+     * Check if a region is being restored and throw exception if so.
+     * Both read and write operations should be blocked during restore.
+     */
+    private void checkRegionNotBeingRestored(String region) {
+        if (backupRestoreService != null && backupRestoreService.isRegionBeingRestored(region)) {
+            throw new IllegalStateException("Region '" + region + "' is currently being restored. " +
+                    "Please wait for restore to complete.");
         }
     }
     
@@ -1977,6 +2078,10 @@ public class CacheService {
         stats.put("keysInMemory", totalKeys);         // All keys are always in memory
         stats.put("valuesInMemory", memoryValues);    // Hot values in cache
         stats.put("valuesOnDiskOnly", diskOnlyKeys);  // Cold values (key in index, value on disk)
+        
+        // Chart-compatible fields (for admin dashboard Region Population chart)
+        stats.put("memoryEntries", memoryValues);     // For chart: values in memory cache
+        stats.put("persistenceEntries", totalKeys);   // For chart: total keys (all persisted)
         
         // Index statistics
         if (keyIndex != null) {

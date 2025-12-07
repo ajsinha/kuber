@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 1.3.10
+ * @version 1.4.1
  */
 @Slf4j
 @Service

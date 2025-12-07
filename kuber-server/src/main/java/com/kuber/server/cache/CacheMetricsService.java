@@ -13,6 +13,7 @@ package com.kuber.server.cache;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +28,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * Service for tracking cache metrics and activities for monitoring.
  * Maintains time-series data for cache operations per region.
  * 
- * @version 1.3.10
+ * <p>Skips metric rotation when:
+ * <ul>
+ *   <li>Cache service is not yet initialized (during startup/loading)</li>
+ *   <li>System is shutting down</li>
+ * </ul>
+ * 
+ * @version 1.4.1
  */
 @Slf4j
 @Service
@@ -51,6 +58,13 @@ public class CacheMetricsService {
     
     // Shutdown flag to stop scheduled tasks
     private volatile boolean shuttingDown = false;
+    
+    // Reference to cache service to check initialization status
+    private final CacheService cacheService;
+    
+    public CacheMetricsService(@Lazy CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
     
     /**
      * Record a GET operation
@@ -111,10 +125,11 @@ public class CacheMetricsService {
      */
     public void shutdown() {
         log.info("Shutting down CacheMetricsService...");
-        shuttingDown = true;
         
-        // Perform final metric rotation to capture any remaining data
-        rotateMetrics();
+        // Perform final metric rotation to capture any remaining data BEFORE setting shuttingDown
+        doRotateMetrics();
+        
+        shuttingDown = true;
         
         log.info("CacheMetricsService shutdown complete");
     }
@@ -127,15 +142,31 @@ public class CacheMetricsService {
     }
     
     /**
-     * Scheduled task to rotate metrics every minute
+     * Scheduled task to rotate metrics every minute.
+     * Skips execution when cache is loading or system is shutting down.
      */
     @Scheduled(cron = "0 * * * * *") // Every minute at :00
     public void rotateMetrics() {
-        // Skip if shutting down (except for final rotation called from shutdown())
+        // Skip if shutting down
         if (shuttingDown) {
+            log.debug("System is shutting down, skipping metrics rotation");
             return;
         }
         
+        // Skip if cache service is not yet initialized (during startup/loading)
+        if (cacheService == null || !cacheService.isInitialized()) {
+            log.debug("Cache service not yet initialized, skipping metrics rotation");
+            return;
+        }
+        
+        doRotateMetrics();
+    }
+    
+    /**
+     * Internal method to perform the actual metric rotation.
+     * Called by scheduled task and during shutdown.
+     */
+    private void doRotateMetrics() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MINUTES);
         
         for (Map.Entry<String, RegionMetrics> entry : currentMetrics.entrySet()) {

@@ -145,6 +145,22 @@ public interface PersistenceStore {
     long countEntries(String region);
     
     /**
+     * Iterate through all entries in a region without loading all into memory.
+     * This is more memory-efficient than loadEntries for large datasets.
+     * Used for backup operations.
+     * 
+     * @param region Region name
+     * @param consumer Consumer to process each entry
+     * @return Number of entries processed
+     */
+    default long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
+        // Default implementation uses loadEntries - implementations should override for efficiency
+        List<CacheEntry> entries = loadEntries(region, Integer.MAX_VALUE);
+        entries.forEach(consumer);
+        return entries.size();
+    }
+    
+    /**
      * Get all keys in a region.
      */
     List<String> getKeys(String region, String pattern, int limit);

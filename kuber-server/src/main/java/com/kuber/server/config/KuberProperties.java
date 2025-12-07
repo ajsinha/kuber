@@ -81,6 +81,11 @@ public class KuberProperties {
     private Autoload autoload = new Autoload();
     
     /**
+     * Backup and restore configuration
+     */
+    private Backup backup = new Backup();
+    
+    /**
      * Shutdown configuration
      */
     private Shutdown shutdown = new Shutdown();
@@ -451,6 +456,75 @@ public class KuberProperties {
          */
         @Min(1)
         private int batchSize = 8192;
+    }
+    
+    // ==================== BACKUP AND RESTORE CONFIGURATION ====================
+    
+    /**
+     * Backup and restore configuration for RocksDB and LMDB persistence stores.
+     * SQL databases (SQLite, PostgreSQL) have their own backup mechanisms.
+     */
+    @Data
+    public static class Backup {
+        /**
+         * Whether backup is enabled.
+         * When enabled, regions are periodically backed up to the backup directory.
+         */
+        private boolean enabled = true;
+        
+        /**
+         * Directory where backup files are stored.
+         * Each backup file is named: &lt;region&gt;.&lt;timestamp&gt;.backup
+         */
+        private String backupDirectory = "./backup";
+        
+        /**
+         * Directory to monitor for restore files.
+         * Place backup files here to trigger automatic restore.
+         * Files are moved to backupDirectory after restore completes.
+         */
+        private String restoreDirectory = "./restore";
+        
+        /**
+         * Cron expression for scheduled backups.
+         * Default: "0 0 23 * * *" (11:00 PM daily)
+         * Format: second minute hour day-of-month month day-of-week
+         * Examples:
+         *   "0 0 23 * * *" - 11:00 PM daily
+         *   "0 0 2 * * *"  - 2:00 AM daily
+         *   "0 0 0/6 * * *" - Every 6 hours (starting at midnight)
+         *   "0 30 1 * * SUN" - 1:30 AM every Sunday
+         */
+        private String cron = "0 0 23 * * *";
+        
+        /**
+         * Maximum number of backup files to keep per region.
+         * Older backups are deleted when this limit is exceeded.
+         * Set to 0 to keep all backups (no automatic cleanup).
+         */
+        @Min(0)
+        private int maxBackupsPerRegion = 10;
+        
+        /**
+         * Whether to create directories if they don't exist.
+         */
+        private boolean createDirectories = true;
+        
+        /**
+         * Batch size for reading/writing entries during backup/restore.
+         */
+        @Min(100)
+        private int batchSize = 10000;
+        
+        /**
+         * File encoding for backup files.
+         */
+        private String fileEncoding = "UTF-8";
+        
+        /**
+         * Whether to compress backup files (gzip).
+         */
+        private boolean compress = true;
     }
     
     // ==================== EVENT PUBLISHING CONFIGURATION ====================

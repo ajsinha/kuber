@@ -180,6 +180,64 @@
             </div>
         </div>
         
+        <!-- Backup/Restore Row -->
+        <div class="row g-4 mb-4">
+            <!-- Backup Card -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0">
+                                <i class="fas fa-database me-2 text-info"></i>
+                                Backup &amp; Restore
+                            </h5>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="backupRegionSelect" style="max-width: 150px;">
+                                <option value="">All Regions</option>
+                            </select>
+                            <button class="btn btn-sm btn-info text-white" onclick="triggerBackup()" id="backupButton">
+                                <i class="fas fa-download me-1"></i>Backup
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="backupInfo">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Backups Card -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-history me-2 text-secondary"></i>
+                            Recent Backups
+                        </h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshBackupList()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="backupList" style="max-height: 200px; overflow-y: auto;">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Charts Row -->
         <div class="row g-4 mb-4">
             <!-- Cache Activity Line Chart -->
@@ -453,6 +511,9 @@
         refreshMemoryInfo();
         refreshMemoryWatcherInfo();
         refreshAutoloadInfo();
+        refreshBackupInfo();
+        refreshBackupList();
+        loadRegionsForBackup();
         loadExpirationInfo();
         if (persistenceType === 'ROCKSDB') {
             refreshCompactionInfo();
@@ -471,6 +532,12 @@
                 refreshCompactionInfo();
             }
         }, 10000);
+        
+        // Refresh backup info every 30 seconds
+        setInterval(function() {
+            refreshBackupInfo();
+            refreshBackupList();
+        }, 30000);
         
         // Refresh charts every 30 seconds
         setInterval(function() {
@@ -1013,6 +1080,180 @@
                 regionChart.update();
             })
             .catch(err => console.error('Failed to load region stats:', err));
+    }
+    
+    // Backup/Restore Functions
+    function refreshBackupInfo() {
+        fetch('/api/admin/backup/stats')
+            .then(response => response.json())
+            .then(data => {
+                const div = document.getElementById('backupInfo');
+                
+                if (!data.enabled) {
+                    div.innerHTML = '<p class="text-muted mb-0">Backup service is disabled</p>';
+                    return;
+                }
+                
+                const lastBackup = data.totals && data.totals.lastBackupTime 
+                    ? new Date(data.totals.lastBackupTime).toLocaleString()
+                    : 'Never';
+                
+                const regionsRestoring = data.regionsBeingRestored && data.regionsBeingRestored.length > 0
+                    ? '<span class="badge bg-warning">' + data.regionsBeingRestored.join(', ') + '</span>'
+                    : '<span class="badge bg-success">None</span>';
+                
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Status</span>
+                        <span class="badge bg-success">Active</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Schedule</span>
+                        <span class="badge bg-info" title="${data.cron}">${describeCron(data.cron)}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Backups</span>
+                        <span class="badge bg-primary">${data.totals ? data.totals.backups : 0}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Restores</span>
+                        <span class="badge bg-secondary">${data.totals ? data.totals.restores : 0}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Last Backup</span>
+                        <span class="text-muted small">${lastBackup}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Restoring</span>
+                        ${regionsRestoring}
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Compression</span>
+                        <span class="badge ${data.compression ? 'bg-success' : 'bg-secondary'}">${data.compression ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                `;
+            })
+            .catch(err => {
+                document.getElementById('backupInfo').innerHTML = 
+                    '<p class="text-danger mb-0"><i class="fas fa-exclamation-triangle me-1"></i>Failed to load backup info</p>';
+            });
+    }
+    
+    // Simple cron description helper
+    function describeCron(cron) {
+        if (!cron) return 'Not set';
+        const parts = cron.split(' ');
+        if (parts.length >= 6) {
+            const hour = parts[2];
+            const minute = parts[1];
+            if (parts[3] === '*' && parts[4] === '*' && parts[5] === '*') {
+                return `Daily at ${hour}:${minute.padStart(2, '0')}`;
+            }
+        }
+        return cron;
+    }
+    
+    function refreshBackupList() {
+        fetch('/api/admin/backup/list')
+            .then(response => response.json())
+            .then(data => {
+                const div = document.getElementById('backupList');
+                
+                if (!data || data.length === 0) {
+                    div.innerHTML = '<p class="text-muted mb-0 text-center">No backups found</p>';
+                    return;
+                }
+                
+                // Show only first 10
+                const backups = data.slice(0, 10);
+                
+                let html = '<table class="table table-sm table-hover mb-0 small">';
+                html += '<thead><tr><th>Region</th><th>Timestamp</th><th>Size</th><th>Compressed</th></tr></thead>';
+                html += '<tbody>';
+                
+                backups.forEach(backup => {
+                    const size = backup.size > 1048576 
+                        ? (backup.size / 1048576).toFixed(1) + ' MB'
+                        : (backup.size / 1024).toFixed(1) + ' KB';
+                    const compressed = backup.compressed 
+                        ? '<i class="fas fa-check text-success"></i>' 
+                        : '<i class="fas fa-times text-muted"></i>';
+                    
+                    html += `<tr>
+                        <td><span class="badge bg-primary">${backup.region}</span></td>
+                        <td class="text-muted">${backup.timestamp}</td>
+                        <td>${size}</td>
+                        <td class="text-center">${compressed}</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table>';
+                
+                if (data.length > 10) {
+                    html += `<p class="text-muted small mt-2 mb-0 text-center">Showing 10 of ${data.length} backups</p>`;
+                }
+                
+                div.innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('backupList').innerHTML = 
+                    '<p class="text-danger mb-0"><i class="fas fa-exclamation-triangle me-1"></i>Failed to load backup list</p>';
+            });
+    }
+    
+    function loadRegionsForBackup() {
+        fetch('/api/monitoring/metrics/regions')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('backupRegionSelect');
+                // Keep first option (All Regions)
+                select.innerHTML = '<option value="">All Regions</option>';
+                data.forEach(r => {
+                    const option = document.createElement('option');
+                    option.value = r.region;
+                    option.textContent = r.region;
+                    select.appendChild(option);
+                });
+            })
+            .catch(err => console.error('Failed to load regions:', err));
+    }
+    
+    function triggerBackup() {
+        const btn = document.getElementById('backupButton');
+        const regionSelect = document.getElementById('backupRegionSelect');
+        const selectedRegion = regionSelect.value;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Backing up...';
+        
+        // Build URL based on selected region
+        const url = selectedRegion 
+            ? '/api/admin/backup/' + encodeURIComponent(selectedRegion)
+            : '/api/admin/backup';
+        
+        fetch(url, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-download me-1"></i>Backup';
+                
+                // Show success message
+                if (selectedRegion) {
+                    alert('Backup completed for region: ' + selectedRegion);
+                } else {
+                    const count = Object.keys(data.regions || {}).length;
+                    alert('Backup completed! ' + count + ' region(s) backed up.');
+                }
+                
+                // Refresh backup info and list
+                refreshBackupInfo();
+                refreshBackupList();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-download me-1"></i>Backup';
+                alert('Backup failed: ' + err.message);
+            });
     }
 </script>
 

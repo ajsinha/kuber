@@ -12,6 +12,7 @@
 package com.kuber.server.startup;
 
 import com.kuber.server.autoload.AutoloadService;
+import com.kuber.server.backup.BackupRestoreService;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.network.RedisProtocolServer;
 import com.kuber.server.persistence.PersistenceMaintenanceService;
@@ -42,6 +43,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Wait 2 seconds</li>
  *   <li>Start AutoloadService (process inbox files)</li>
  *   <li>Wait 2 seconds</li>
+ *   <li>Start BackupRestoreService (periodic backup, restore monitoring)</li>
+ *   <li>Wait 2 seconds</li>
  *   <li>Final system ready announcement</li>
  * </ol>
  * 
@@ -52,9 +55,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Kafka topics don't exist when publishing starts</li>
  *   <li>Redis server accepts connections before data is recovered</li>
  *   <li>Autoload files are processed before persistence recovery completes</li>
+ *   <li>Backups run before data is fully loaded</li>
  * </ul>
  * 
- * @version 1.3.10
+ * @version 1.4.1
  */
 @Service
 @Slf4j
@@ -67,6 +71,7 @@ public class StartupOrchestrator {
     private final CacheService cacheService;
     private final AutoloadService autoloadService;
     private final RedisProtocolServer redisProtocolServer;
+    private final BackupRestoreService backupRestoreService;
     
     @Autowired(required = false)
     private RegionEventPublishingService publishingService;
@@ -77,11 +82,13 @@ public class StartupOrchestrator {
     public StartupOrchestrator(PersistenceMaintenanceService persistenceMaintenanceService,
                                CacheService cacheService,
                                AutoloadService autoloadService,
-                               RedisProtocolServer redisProtocolServer) {
+                               RedisProtocolServer redisProtocolServer,
+                               BackupRestoreService backupRestoreService) {
         this.persistenceMaintenanceService = persistenceMaintenanceService;
         this.cacheService = cacheService;
         this.autoloadService = autoloadService;
         this.redisProtocolServer = redisProtocolServer;
+        this.backupRestoreService = backupRestoreService;
     }
     
     /**
@@ -190,6 +197,20 @@ public class StartupOrchestrator {
             
             autoloadService.startAfterRecovery();
             
+            // Wait between phases
+            log.info("Waiting {} seconds before starting backup/restore service...", PHASE_DELAY_SECONDS);
+            Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
+            
+            // Phase 6: Start BackupRestoreService
+            log.info("╔════════════════════════════════════════════════════════════════════╗");
+            log.info("║  Phase 6: Backup/Restore Service                                   ║");
+            log.info("║           Starting backup scheduler and restore watcher...         ║");
+            log.info("╚════════════════════════════════════════════════════════════════════╝");
+            
+            // Wire BackupRestoreService to CacheService for region lock checking
+            cacheService.setBackupRestoreService(backupRestoreService);
+            backupRestoreService.start();
+            
             // Wait before final announcement
             log.info("Waiting {} seconds before final announcement...", PHASE_DELAY_SECONDS);
             Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
@@ -207,7 +228,7 @@ public class StartupOrchestrator {
             log.info("║   ██║  ██╗╚██████╔╝██████╔╝███████╗██║  ██║                        ║");
             log.info("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                        ║");
             log.info("║                                                                    ║");
-            log.info("║   SYSTEM READY - Version 1.3.10                                     ║");
+            log.info("║   SYSTEM READY - Version 1.4.1                                     ║");
             log.info("║                                                                    ║");
             log.info("║   ✓ Persistence maintenance: complete                              ║");
             log.info("║   ✓ Cache service: initialized                                     ║");
@@ -215,6 +236,7 @@ public class StartupOrchestrator {
                     publishingService != null ? "configured    " : "not configured");
             log.info("║   ✓ Redis server: accepting connections                            ║");
             log.info("║   ✓ Autoload service: running                                      ║");
+            log.info("║   ✓ Backup/restore: running                                        ║");
             log.info("║                                                                    ║");
             log.info("╚════════════════════════════════════════════════════════════════════╝");
             

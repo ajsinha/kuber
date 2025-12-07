@@ -96,7 +96,7 @@ REM Print banner
 echo.
 echo ========================================================================
 echo                      KUBER STARTUP UTILITY
-echo                         Version 1.3.10
+echo                         Version 1.4.0
 echo ========================================================================
 echo.
 
@@ -202,7 +202,7 @@ goto :end
 echo.
 echo ========================================================================
 echo                      KUBER STARTUP UTILITY
-echo                         Version 1.3.10
+echo                         Version 1.4.0
 echo ========================================================================
 echo.
 echo Usage: kuber-start.bat [options]

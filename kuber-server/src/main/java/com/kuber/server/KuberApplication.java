@@ -40,7 +40,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
  * 
  * @author Ashutosh Sinha
- * @version 1.3.10
+ * @version 1.4.1
  */
 @SpringBootApplication(exclude = {
     MongoAutoConfiguration.class,

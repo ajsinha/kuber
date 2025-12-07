@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.3.10</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
+                    <strong>Version 1.4.1</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
                     architecture and operational mechanics.
                 </div>
 
@@ -411,7 +411,7 @@ DELETE key
                                 </tbody>
                             </table>
 
-                            <h4 class="mt-4">3.2 Write Path (v1.3.10)</h4>
+                            <h4 class="mt-4">3.2 Write Path (v1.4.1)</h4>
                             <p>Individual writes support two modes configured via <code>kuber.persistence.sync-individual-writes</code>:</p>
                             
                             <div class="alert alert-info mb-3">
@@ -617,7 +617,7 @@ kuber.persistence.rocksdb.compaction-cron=0 0 2 * * ?</code></pre>
                             
                             <div class="alert alert-info mt-3">
                                 <i class="fas fa-bolt me-2"></i>
-                                <strong>Sequential Processing (v1.3.10):</strong>
+                                <strong>Sequential Processing (v1.4.1):</strong>
                                 Region databases are compacted/vacuumed sequentially during startup for data consistency.
                                 This ensures no concurrent operations that could cause corruption.
                             </div>
@@ -643,7 +643,7 @@ kuber.persistence.rocksdb.compaction-cron=0 0 2 * * ?</code></pre>
 │  main                       Spring Boot startup                     │
 │  kuber-startup-orchestrator Startup sequence coordination          │
 │                                                                      │
-│  SEQUENTIAL STARTUP (v1.3.10)                                        │
+│  SEQUENTIAL STARTUP (v1.4.1)                                        │
 │  ────────────────────────────────────────────────────               │
 │  All startup operations (compaction, loading) run sequentially      │
 │  in the main startup thread for data consistency.                   │
@@ -667,10 +667,17 @@ kuber.persistence.rocksdb.compaction-cron=0 0 2 * * ?</code></pre>
 │  ────────────────────────────────────────────────────               │
 │  kuber-autoload             File scanning and processing           │
 │                                                                      │
-│  ASYNC PERSISTENCE                                                  │
+│  BACKUP/RESTORE (v1.4.1)                                            │
 │  ────────────────────────────────────────────────────               │
-│  ForkJoinPool.commonPool    Async persistence writes               │
-│  (CompletableFuture.runAsync)                                       │
+│  kuber-backup               Periodic backup of all regions         │
+│  kuber-restore-watcher      Monitors ./restore for backup files    │
+│                                                                      │
+│  ASYNC PERSISTENCE (v1.4.1)                                         │
+│  ────────────────────────────────────────────────────               │
+│  persistence-async-save-0   Region-partitioned async writes        │
+│  persistence-async-save-1   (hash of region name mod 4)            │
+│  persistence-async-save-2   All writes for same region are         │
+│  persistence-async-save-3   sequential, different regions parallel │
 │                                                                      │
 │  EVENT PUBLISHING                                                   │
 │  ────────────────────────────────────────────────────               │
@@ -845,6 +852,14 @@ SYSTEM RESTART
 │ Phase 5: Autoload Service                                          │
 │ • Resume file monitoring                                           │
 │ • Process any files added during downtime                         │
+└───────────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌───────────────────────────────────────────────────────────────────┐
+│ Phase 6: Backup/Restore Service (v1.4.1)                           │
+│ • Start backup scheduler (every 30 min default)                   │
+│ • Start restore watcher (monitors ./restore directory)            │
+│ • Wire to CacheService for region locking                         │
 └───────────────────────────────────────────────────────────────────┘
       │
       ▼
@@ -1282,7 +1297,7 @@ CacheService.set() / delete()
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.3.10</p>
+                    <p class="text-muted small mb-0">Version 1.4.1</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">
