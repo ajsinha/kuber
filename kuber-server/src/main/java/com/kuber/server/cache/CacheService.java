@@ -63,13 +63,13 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.4.1";
+    private static final String VERSION = "1.4.2";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -152,6 +152,8 @@ public class CacheService {
         // Create key indices and value caches with calculated limits
         for (String regionName : regions.keySet()) {
             createCacheForRegion(regionName);
+            // Register region for metrics tracking
+            metricsService.registerRegion(regionName);
         }
         
         // Prime cache: load ALL keys into index, hot values into cache
@@ -563,6 +565,9 @@ public class CacheService {
         
         createCacheForRegion(name);
         
+        // Register region for metrics tracking
+        metricsService.registerRegion(name);
+        
         // Always persist region metadata (regardless of persistentMode)
         try {
             log.info("Persisting region '{}' to {} persistence store", name, persistenceStore.getType());
@@ -696,6 +701,7 @@ public class CacheService {
             region.setPersistenceEntryCount(keyCount); // KeyIndex = source of truth
             region.setEntryCount(keyCount);
         }
+        log.debug("getAllRegions returning {} regions: {}", regions.size(), regions.keySet());
         return Collections.unmodifiableCollection(regions.values());
     }
     
@@ -2098,6 +2104,79 @@ public class CacheService {
         List<Map<String, Object>> allStats = new ArrayList<>();
         for (String regionName : regions.keySet()) {
             allStats.add(getDetailedRegionStats(regionName));
+        }
+        return allStats;
+    }
+    
+    /**
+     * Refresh stats for a specific region.
+     * Recalculates entry counts from KeyIndex (source of truth) and updates CacheRegion.
+     * Also verifies consistency with persistence store.
+     * 
+     * @param regionName Region name
+     * @return Updated stats for the region
+     */
+    public Map<String, Object> refreshRegionStats(String regionName) {
+        CacheRegion region = regions.get(regionName);
+        if (region == null) {
+            throw RegionException.notFound(regionName);
+        }
+        
+        KeyIndexInterface keyIndex = keyIndices.get(regionName);
+        Cache<String, CacheEntry> valueCache = regionCaches.get(regionName);
+        
+        // Get counts from sources of truth
+        long keyIndexCount = keyIndex != null ? keyIndex.size() : 0;
+        long valueCacheCount = valueCache != null ? valueCache.estimatedSize() : 0;
+        long persistenceEstimate = persistenceStore.estimateEntryCount(regionName);
+        
+        // Update CacheRegion with accurate counts
+        region.setEntryCount(keyIndexCount);
+        region.setMemoryEntryCount(valueCacheCount);
+        region.setPersistenceEntryCount(keyIndexCount); // KeyIndex = source of truth
+        region.setUpdatedAt(Instant.now());
+        
+        // Build result
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("region", regionName);
+        stats.put("entryCount", keyIndexCount);
+        stats.put("memoryEntries", valueCacheCount);
+        stats.put("persistenceEntries", keyIndexCount);
+        stats.put("persistenceEstimate", persistenceEstimate);
+        stats.put("keyIndexAvailable", keyIndex != null);
+        stats.put("valueCacheAvailable", valueCache != null);
+        stats.put("updatedAt", region.getUpdatedAt());
+        
+        // Check for discrepancy (for diagnostics)
+        if (persistenceEstimate > 0 && keyIndexCount == 0) {
+            stats.put("warning", "KeyIndex is empty but persistence store reports entries. " +
+                    "Region may need to be reloaded from persistence.");
+            log.warn("[{}] Stats discrepancy: KeyIndex={}, PersistenceEstimate={}", 
+                    regionName, keyIndexCount, persistenceEstimate);
+        }
+        
+        log.info("[{}] Stats refreshed: KeyIndex={}, ValueCache={}, PersistenceEstimate={}", 
+                regionName, keyIndexCount, valueCacheCount, persistenceEstimate);
+        
+        return stats;
+    }
+    
+    /**
+     * Refresh stats for all regions.
+     * 
+     * @return List of stats for all regions
+     */
+    public List<Map<String, Object>> refreshAllRegionStats() {
+        List<Map<String, Object>> allStats = new ArrayList<>();
+        for (String regionName : regions.keySet()) {
+            try {
+                allStats.add(refreshRegionStats(regionName));
+            } catch (Exception e) {
+                Map<String, Object> errorStats = new LinkedHashMap<>();
+                errorStats.put("region", regionName);
+                errorStats.put("error", e.getMessage());
+                allStats.add(errorStats);
+            }
         }
         return allStats;
     }

@@ -36,7 +36,7 @@ import java.util.*;
  * - Performs compaction/vacuum on all region databases
  * 
  * @author Ashutosh Sinha
- * @version 1.4.1
+ * @version 1.4.2
  * @deprecated Use {@link PersistenceMaintenanceService} instead for in-context maintenance
  */
 @Deprecated(since = "1.2.6", forRemoval = false)

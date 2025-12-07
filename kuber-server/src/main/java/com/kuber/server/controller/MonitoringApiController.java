@@ -585,4 +585,48 @@ public class MonitoringApiController {
         
         return ResponseEntity.ok(result);
     }
+    
+    /**
+     * Refresh stats for a specific region.
+     * Recalculates entry counts from KeyIndex (source of truth).
+     */
+    @PostMapping("/stats/refresh/{region}")
+    public ResponseEntity<Map<String, Object>> refreshRegionStats(@PathVariable String region) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        try {
+            Map<String, Object> stats = cacheService.refreshRegionStats(region);
+            result.put("success", true);
+            result.put("region", region);
+            result.putAll(stats);
+            log.info("Refreshed stats for region '{}': entryCount={}, memoryEntries={}", 
+                    region, stats.get("entryCount"), stats.get("memoryEntries"));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(result);
+        }
+    }
+    
+    /**
+     * Refresh stats for all regions.
+     */
+    @PostMapping("/stats/refresh")
+    public ResponseEntity<Map<String, Object>> refreshAllRegionStats() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        try {
+            List<Map<String, Object>> allStats = cacheService.refreshAllRegionStats();
+            result.put("success", true);
+            result.put("regionsRefreshed", allStats.size());
+            result.put("regions", allStats);
+            log.info("Refreshed stats for {} regions", allStats.size());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(result);
+        }
+    }
 }

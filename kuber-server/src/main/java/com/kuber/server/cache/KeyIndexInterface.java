@@ -15,6 +15,7 @@ import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.KeyIndexEntry;
 import com.kuber.core.model.KeyIndexEntry.ValueLocation;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,9 +25,9 @@ import java.util.Set;
  * 
  * Supports both on-heap (KeyIndex) and off-heap (OffHeapKeyIndex) implementations.
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
-public interface KeyIndexInterface {
+public interface KeyIndexInterface extends Serializable {
     
     /**
      * Get the region name.

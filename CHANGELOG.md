@@ -2,6 +2,60 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.2] - 2025-12-07 - BUG FIXES & STATS REFRESH
+
+### Fixed
+- **Memory Leak**: Fixed TypeReference anonymous class instantiation inside iteration loops
+  - RocksDbPersistenceStore: Added static `MAP_TYPE_REF` constant
+  - LmdbPersistenceStore: Added static `MAP_TYPE_REF` constant
+  - Reduces heap pressure during backup of large regions
+  - Added periodic flush every 50,000 entries during backup
+
+- **RocksDB Restore Lock Error**: Fixed "lock hold by current process" error during restore
+  - purgeRegion() now properly stores reopened database handle in regionDatabases map
+  - Caused by openRegionDatabase() not returning handle to map after purge
+
+- **Empty Backup Prevention**: Backup now validates region state before proceeding
+  - Checks if cache service is initialized
+  - Checks if region is still being loaded during startup
+  - Checks if region exists
+  - Deletes empty backup files and throws error if no entries found
+
+- **CacheMetricsService**: Skip metrics rotation during cache loading and shutdown
+  - Added check for cacheService.isInitialized()
+  - Added shuttingDown flag check with proper final rotation
+
+- **Metrics Tracking**: All regions now properly registered for metrics tracking
+  - Regions registered during initialization and when created
+  - Added `initializeRegionMetrics()` to ensure all regions tracked during rotation
+  - Fixed "Rotated metrics for 0 regions" issue
+
+- **Thymeleaf Template**: Fixed regions.html data attribute rendering
+  - Changed `th:data-region` to `th:attr="data-region=..."` to fix template error
+  - Thymeleaf security restrictions prevented string expressions in data attributes
+
+### Added
+- **Refresh Stats Button**: Region cards now include "Refresh Stats" button
+  - Recalculates entry counts from KeyIndex (source of truth)
+  - Updates CacheRegion object with accurate counts
+  - Shows warning if KeyIndex is empty but persistence has entries
+
+- **Stats Refresh API Endpoints**:
+  - `POST /api/monitoring/stats/refresh/{region}` - Refresh single region
+  - `POST /api/monitoring/stats/refresh` - Refresh all regions
+
+- **CacheService.isRegionLoading()**: Exposed method to check if region is loading
+
+- **CacheMetricsService.registerRegion()**: Register region for metrics tracking
+
+- **Diagnostic Logging**: Added warnings in forEachEntry when database not found
+
+### Changed
+- Scheduled backup now skips regions that are still loading
+- Scheduled backup logs count of skipped regions
+
+---
+
 ## [1.4.1] - 2025-12-07 - CRON-BASED BACKUP SCHEDULING
 
 ### Changed

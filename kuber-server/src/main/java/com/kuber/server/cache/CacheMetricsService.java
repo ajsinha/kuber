@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>System is shutting down</li>
  * </ul>
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Slf4j
 @Service
@@ -159,7 +159,34 @@ public class CacheMetricsService {
             return;
         }
         
+        // Ensure all existing regions are being tracked (even if no activity)
+        initializeRegionMetrics();
+        
         doRotateMetrics();
+    }
+    
+    /**
+     * Initialize metrics tracking for all existing regions.
+     * Called during rotation to ensure all regions appear in metrics.
+     */
+    private void initializeRegionMetrics() {
+        try {
+            Set<String> regionNames = cacheService.getRegionNames();
+            for (String region : regionNames) {
+                currentMetrics.computeIfAbsent(region, k -> new RegionMetrics());
+            }
+        } catch (Exception e) {
+            log.debug("Could not initialize region metrics: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Register a region for metrics tracking.
+     * Called when a new region is created.
+     */
+    public void registerRegion(String region) {
+        currentMetrics.computeIfAbsent(region, k -> new RegionMetrics());
+        log.debug("Registered region '{}' for metrics tracking", region);
     }
     
     /**

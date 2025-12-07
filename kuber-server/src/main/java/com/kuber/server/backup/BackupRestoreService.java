@@ -67,7 +67,7 @@ import java.util.zip.GZIPOutputStream;
  *   <li>Processed files moved to backup directory after restore</li>
  * </ul>
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Service
 @Slf4j
@@ -336,7 +336,7 @@ public class BackupRestoreService {
             
             // Write header with metadata
             Map<String, Object> header = new LinkedHashMap<>();
-            header.put("version", "1.4.1");
+            header.put("version", "1.4.2");
             header.put("region", region);
             header.put("timestamp", Instant.now().toString());
             header.put("compressed", config.isCompress());

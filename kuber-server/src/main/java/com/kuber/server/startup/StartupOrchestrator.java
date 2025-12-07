@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Backups run before data is fully loaded</li>
  * </ul>
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Service
 @Slf4j
@@ -228,7 +228,7 @@ public class StartupOrchestrator {
             log.info("║   ██║  ██╗╚██████╔╝██████╔╝███████╗██║  ██║                        ║");
             log.info("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                        ║");
             log.info("║                                                                    ║");
-            log.info("║   SYSTEM READY - Version 1.4.1                                     ║");
+            log.info("║   SYSTEM READY - Version 1.4.2                                     ║");
             log.info("║                                                                    ║");
             log.info("║   ✓ Persistence maintenance: complete                              ║");
             log.info("║   ✓ Cache service: initialized                                     ║");

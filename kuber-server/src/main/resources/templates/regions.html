@@ -93,12 +93,19 @@
                                 <i class="fas fa-info-circle me-1"></i> Details
                             </a>
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 mb-2">
                             <a th:href="@{/api/export/region/{name}(name=${region.name})}" 
                                class="btn btn-outline-success btn-sm flex-fill"
                                th:title="'Download all ' + ${region.entryCount} + ' entries as CSV'">
                                 <i class="fas fa-download me-1"></i> Export CSV
                             </a>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-info btn-sm flex-fill refresh-stats-btn"
+                                    th:attr="data-region=${region.name}"
+                                    title="Refresh stats">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh Stats
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -148,6 +155,37 @@
 
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.refresh-stats-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const regionName = this.dataset.region;
+            const originalHtml = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Refreshing...';
+            
+            fetch('/api/monitoring/stats/refresh/' + encodeURIComponent(regionName), { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Failed to refresh stats: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    alert('Error refreshing stats: ' + err.message);
+                });
+        });
+    });
+});
+</script>
 
 </body>
 </html>

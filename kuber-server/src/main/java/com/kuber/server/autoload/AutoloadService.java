@@ -88,7 +88,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Uses PersistenceOperationLock to ensure autoload does not run concurrently
  * with compaction operations. Acquires region locks during file processing.
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Service
 @Slf4j

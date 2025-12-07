@@ -32,7 +32,7 @@ import java.util.*;
  * Controller for administrative operations.
  * Manages users (read-only from users.json) and API keys.
  *
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Controller
 @RequestMapping("/admin")

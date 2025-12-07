@@ -44,7 +44,7 @@ import java.time.Instant;
  *   "nodeId": "kuber-01"
  * }
  * 
- * @version 1.4.1
+ * @version 1.4.2
  */
 @Data
 @Builder

@@ -15,6 +15,7 @@ import com.kuber.core.model.CacheRegion;
 import com.kuber.server.cache.CacheService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,7 +27,10 @@ import java.util.Map;
 
 /**
  * Controller for region management operations.
+ * 
+ * @version 1.4.2
  */
+@Slf4j
 @Controller
 @RequestMapping("/regions")
 @RequiredArgsConstructor
@@ -42,6 +46,8 @@ public class RegionController {
     @GetMapping
     public String listRegions(Model model) {
         Collection<CacheRegion> regions = cacheService.getAllRegions();
+        log.debug("Listing {} regions: {}", regions.size(), 
+                regions.stream().map(CacheRegion::getName).toList());
         model.addAttribute("regions", regions);
         return "regions";
     }

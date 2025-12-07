@@ -1099,7 +1099,7 @@ After processing, files are moved to outbox with timestamp and status:
 
 Data loaded via autoload is automatically replicated to secondary nodes when replication is enabled.
 
-## Backup and Restore (v1.4.1)
+## Backup and Restore (v1.4.0)
 
 Kuber provides automatic scheduled backup of all regions and automatic restore when backup files are placed in the restore directory. This feature supports RocksDB and LMDB persistence stores only (SQL databases have their own backup mechanisms).
 
