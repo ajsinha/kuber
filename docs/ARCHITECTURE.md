@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.3.9**
+**Version 1.3.10**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -941,30 +941,88 @@ Users are configured in `users.json`:
 
 ## 10. Data Flow
 
-### 11.1 Write Operation Flow
+### 10.1 Write Operation Flow (v1.3.10)
+
+Kuber supports two write modes configured via `kuber.persistence.sync-individual-writes`:
+
+#### ASYNC Mode (Default) - `sync-individual-writes: false`
+
+Memory is updated first, disk write happens in background. Faster but eventual consistency.
 
 ```
 ┌──────────┐   ┌───────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
-│  Client  │   │ Protocol  │   │   Cache     │   │  Caffeine   │   │ Persistence  │
-│          │   │  Handler  │   │  Service    │   │   Cache     │   │    Store     │
+│  Client  │   │ Protocol  │   │   Cache     │   │  KeyIndex   │   │ Persistence  │
+│          │   │  Handler  │   │  Service    │   │ + ValueCache│   │    Store     │
 └────┬─────┘   └─────┬─────┘   └──────┬──────┘   └──────┬──────┘   └──────┬───────┘
      │               │                │                 │                 │
      │ SET key val   │                │                 │                 │
      │──────────────►│                │                 │                 │
      │               │ set(region,key)│                 │                 │
      │               │───────────────►│                 │                 │
-     │               │                │ put(key,entry)  │                 │
+     │               │                │                 │                 │
+     │               │                │ 1. keyIndex.put │                 │
+     │               │                │────────────────►│ (IMMEDIATE)     │
+     │               │                │                 │                 │
+     │               │                │ 2. valueCache   │                 │
+     │               │                │────────────────►│ (IMMEDIATE)     │
+     │               │                │                 │                 │
+     │               │                │ 3. saveEntryAsync ─ ─ ─ ─ ─ ─ ─ ─►│
+     │               │                │    (NON-BLOCKING)                 │ (BACKGROUND)
+     │               │ +OK            │                 │                 │
+     │◄──────────────│◄───────────────│                 │                 │
+     │               │                │                 │      ┌──────────┴──────────┐
+     │               │                │                 │      │ Eventually written  │
+     │               │                │                 │      │ to disk             │
+     │               │                │                 │      └─────────────────────┘
+```
+
+**Timing**: ~0.01-0.1ms (returns after memory update)
+
+#### SYNC Mode - `sync-individual-writes: true`
+
+Disk write completes before returning. Maximum durability.
+
+```
+┌──────────┐   ┌───────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
+│  Client  │   │ Protocol  │   │   Cache     │   │  KeyIndex   │   │ Persistence  │
+│          │   │  Handler  │   │  Service    │   │ + ValueCache│   │    Store     │
+└────┬─────┘   └─────┬─────┘   └──────┬──────┘   └──────┬──────┘   └──────┬───────┘
+     │               │                │                 │                 │
+     │ SET key val   │                │                 │                 │
+     │──────────────►│                │                 │                 │
+     │               │ set(region,key)│                 │                 │
+     │               │───────────────►│                 │                 │
+     │               │                │                 │                 │
+     │               │                │ 1. saveEntry    │                 │
+     │               │                │─────────────────┼────────────────►│
+     │               │                │                 │                 │ (SYNC WRITE)
+     │               │                │                 │                 │ fsync()
+     │               │                │                 │  WRITE CONFIRMED│
+     │               │                │◄────────────────┼─────────────────│
+     │               │                │                 │                 │
+     │               │                │ 2. keyIndex.put │                 │
      │               │                │────────────────►│                 │
      │               │                │                 │                 │
-     │               │                │ save(region,key)│                 │
-     │               │                │─────────────────┼────────────────►│
+     │               │                │ 3. valueCache   │                 │
+     │               │                │────────────────►│                 │
      │               │                │                 │                 │
      │               │ +OK            │                 │                 │
      │◄──────────────│◄───────────────│                 │                 │
-     │               │                │                 │                 │
 ```
 
-### 11.2 Read Operation Flow
+**Timing**: ~1-5ms (includes fsync)
+
+#### Write Mode Comparison
+
+| Aspect | ASYNC (default) | SYNC |
+|--------|-----------------|------|
+| Latency | ~0.01-0.1ms | ~1-5ms |
+| Throughput | 10,000-100,000 ops/sec | 200-1,000 ops/sec |
+| Durability | Eventually consistent | Immediate |
+| Crash Risk | Entry may be lost | No data loss |
+| Use Case | Performance critical | Durability critical |
+
+### 10.2 Read Operation Flow
 
 ```
 ┌──────────┐   ┌───────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐

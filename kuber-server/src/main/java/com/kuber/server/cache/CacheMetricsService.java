@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Service for tracking cache metrics and activities for monitoring.
  * Maintains time-series data for cache operations per region.
  * 
- * @version 1.3.9
+ * @version 1.3.10
  */
 @Slf4j
 @Service

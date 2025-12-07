@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.3.9
+Version 1.3.10
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -265,6 +265,7 @@ kuber:
   # Persistence (rocksdb, lmdb, mongodb, postgresql, sqlite, memory)
   persistence:
     type: rocksdb                       # Options: rocksdb, lmdb, mongodb, postgresql, sqlite, memory
+    sync-individual-writes: false       # false=ASYNC (fast), true=SYNC (durable) - v1.3.10
     rocksdb:
       path: ./data/rocksdb
       compaction-enabled: true
@@ -283,6 +284,32 @@ kuber:
     enabled: false
     connect-string: localhost:2181
 ```
+
+### Individual Write Modes (v1.3.10)
+
+Kuber supports two write modes for individual PUT/SET operations:
+
+| Mode | Config Value | Latency | Durability | Use Case |
+|------|--------------|---------|------------|----------|
+| **ASYNC** (default) | `false` | ~0.01-0.1ms | Eventually consistent | High throughput, performance critical |
+| **SYNC** | `true` | ~1-5ms | Immediate | Maximum durability required |
+
+**ASYNC Mode (default)**:
+```
+PUT key=X → Update Memory → Return Success → Background Disk Write
+```
+- Memory (KeyIndex + ValueCache) updated immediately
+- Disk write happens asynchronously in background
+- 10-100x faster than sync mode
+- Trade-off: If crash before async write completes, that entry is lost
+
+**SYNC Mode**:
+```
+PUT key=X → Write to Disk → Wait for fsync → Update Memory → Return Success
+```
+- Disk write completes before returning
+- Maximum durability - survives power loss
+- Slower due to fsync overhead
 
 ### Persistence Store Comparison
 
@@ -986,7 +1013,7 @@ kuber:
     enabled: true
     directory: ./autoload
     scan-interval-seconds: 60
-    batch-size: 2048          # Records per batch for bulk writes (v1.3.9)
+    batch-size: 8192          # Records per batch for bulk writes (v1.3.9)
     max-records-per-file: 0   # 0 = unlimited
     create-directories: true
     file-encoding: UTF-8

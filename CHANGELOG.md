@@ -2,11 +2,64 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.10] - 2025-12-07 - ASYNC INDIVIDUAL WRITES (DEFAULT)
+
+### Added
+- **Configurable Individual Write Mode**: New `kuber.persistence.sync-individual-writes` setting
+  - `false` (default): **ASYNC mode** - Memory updated first, disk write in background
+  - `true`: **SYNC mode** - Wait for disk write before returning
+
+### Performance Impact
+
+| Mode | Latency | Throughput | Durability |
+|------|---------|------------|------------|
+| ASYNC (default) | ~0.01-0.1ms | 10,000-100,000 ops/sec | Eventually consistent |
+| SYNC | ~1-5ms | 200-1,000 ops/sec | Immediate |
+
+### How ASYNC Mode Works
+
+```
+PUT key=X
+    │
+    ├─► Update KeyIndex (key → BOTH)     ◄── Immediate
+    ├─► Update ValueCache (key → entry)  ◄── Immediate (readable now)
+    └─► saveEntryAsync(entry)            ◄── Background thread
+              │
+              └─► Eventually written to disk
+```
+
+**Trade-off**: If crash occurs before async write completes, that specific entry is lost.
+This is acceptable for most use cases where performance is critical.
+
+### Configuration
+
+```yaml
+kuber:
+  persistence:
+    sync-individual-writes: false  # ASYNC (default, fast)
+    # sync-individual-writes: true  # SYNC (durable)
+```
+
+### Startup Log
+```
+Cache service initialized with 5 regions (HYBRID MODE, Individual writes: ASYNC (fast, eventually consistent))
+```
+
+### Changed
+- **putEntry() method**: Now checks `syncIndividualWrites` configuration
+  - ASYNC: Updates memory first, then async disk write
+  - SYNC: Disk write first, then memory update (v1.3.8 behavior)
+
+### Notes
+- Batch operations (autoload) always use async mode regardless of this setting
+- Batch writes already optimized in v1.3.9 with configurable batch size
+- This change makes individual interactive PUT/SET operations much faster
+
 ## [1.3.9] - 2025-12-06 - BATCH WRITES FOR AUTOLOAD
 
 ### Added
 - **Batch Writes for Autoload**: Records are now written in batches during autoload for significantly better performance
-  - New `kuber.autoload.batch-size` configuration (default: 2048)
+  - New `kuber.autoload.batch-size` configuration (default: 8192)
   - Records accumulated in memory and flushed to persistence store in batches
   - Works with ALL persistence stores (RocksDB, SQLite, LMDB, PostgreSQL, MongoDB)
   - RocksDB uses native WriteBatch for atomic batch writes
@@ -34,7 +87,7 @@ All notable changes to this project are documented in this file.
 ```yaml
 kuber:
   autoload:
-    batch-size: 2048  # Records per batch (default)
+    batch-size: 8192  # Records per batch (default)
 ```
 
 ### Performance Impact

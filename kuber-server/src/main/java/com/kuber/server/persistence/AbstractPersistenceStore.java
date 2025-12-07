@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  * <p>Uses a dedicated executor for async operations instead of ForkJoinPool.commonPool
  * to ensure proper shutdown control.
  * 
- * @version 1.3.9
+ * @version 1.3.10
  */
 @Slf4j
 public abstract class AbstractPersistenceStore implements PersistenceStore {

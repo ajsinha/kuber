@@ -450,7 +450,7 @@ public class KuberProperties {
          * Set to 1 to disable batching (write each record individually).
          */
         @Min(1)
-        private int batchSize = 2048;
+        private int batchSize = 8192;
     }
     
     // ==================== EVENT PUBLISHING CONFIGURATION ====================
@@ -891,6 +891,27 @@ public class KuberProperties {
          */
         @NotBlank
         private String type = "rocksdb";
+        
+        /**
+         * Whether to synchronously write individual PUT/SET operations to disk.
+         * 
+         * When false (default - async mode):
+         * - Individual writes are saved to memory immediately (value cache + key index)
+         * - Disk write happens asynchronously in background
+         * - Better performance (10-100x faster for individual writes)
+         * - Data is eventually consistent with disk
+         * - Risk: If crash occurs before async write completes, that entry is lost
+         * 
+         * When true (sync mode):
+         * - Each write waits for disk confirmation before returning
+         * - Maximum durability - data survives power loss
+         * - Slower performance (~1-5ms per write due to fsync)
+         * 
+         * Batch operations (autoload) always use async mode regardless of this setting.
+         * 
+         * Default: false (async for better performance)
+         */
+        private boolean syncIndividualWrites = false;
         
         /**
          * SQLite configuration

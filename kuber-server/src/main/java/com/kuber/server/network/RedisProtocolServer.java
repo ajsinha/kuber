@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * after the cache service has been initialized and data has been recovered from
  * persistence. This prevents clients from connecting before the cache is ready.
  * 
- * @version 1.3.9
+ * @version 1.3.10
  */
 @Slf4j
 @Component

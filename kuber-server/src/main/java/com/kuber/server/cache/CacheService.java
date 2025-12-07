@@ -63,13 +63,13 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.3.9
+ * @version 1.3.10
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.3.9";
+    private static final String VERSION = "1.3.10";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
@@ -157,7 +157,11 @@ public class CacheService {
         // Mark as initialized
         initialized.set(true);
         
-        log.info("Cache service initialized with {} regions (HYBRID MODE)", regions.size());
+        String writeMode = properties.getPersistence().isSyncIndividualWrites() 
+                ? "SYNC (durable)" 
+                : "ASYNC (fast, eventually consistent)";
+        log.info("Cache service initialized with {} regions (HYBRID MODE, Individual writes: {})", 
+                regions.size(), writeMode);
     }
     
     /**
@@ -1652,21 +1656,43 @@ public class CacheService {
      * Put entry using hybrid architecture:
      * 1. Update KeyIndex (always)
      * 2. Update value cache (always for new/updated values)
-     * 3. Persist to disk
+     * 3. Persist to disk (sync or async based on configuration)
+     * 
+     * Write Mode (kuber.persistence.sync-individual-writes):
+     * - false (default): Async mode - memory updated first, disk write in background (faster)
+     * - true: Sync mode - disk write completes before returning (more durable)
      */
     private void putEntry(String region, String key, CacheEntry entry) {
         KeyIndexInterface keyIndex = keyIndices.get(region);
         Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         
-        // CRITICAL: Save to disk FIRST (synchronously) before updating index
-        // This prevents the race condition where key is in index but not on disk
-        persistenceStore.saveEntry(entry);
+        boolean syncWrites = properties.getPersistence().isSyncIndividualWrites();
         
-        // Now update KeyIndex with value location = BOTH (confirmed on disk)
-        keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
-        
-        // Add to value cache
-        valueCache.put(key, entry);
+        if (syncWrites) {
+            // SYNC MODE: Save to disk FIRST (synchronously) before updating index
+            // This prevents race condition where key is in index but not on disk
+            // Slower but maximum durability
+            persistenceStore.saveEntry(entry);
+            
+            // Now update KeyIndex with value location = BOTH (confirmed on disk)
+            keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
+            
+            // Add to value cache
+            valueCache.put(key, entry);
+        } else {
+            // ASYNC MODE (default): Update memory first, disk write in background
+            // Faster performance, eventually consistent with disk
+            // Risk: If crash before async write completes, entry is lost
+            
+            // Update KeyIndex - mark as BOTH (will be on disk soon)
+            keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
+            
+            // Add to value cache - entry is immediately readable
+            valueCache.put(key, entry);
+            
+            // Save to disk asynchronously (non-blocking)
+            persistenceStore.saveEntryAsync(entry);
+        }
         
         recordStatistic(region, KuberConstants.STAT_SETS);
         metricsService.recordSet(region);
