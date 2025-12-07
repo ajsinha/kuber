@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.2.8</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
+                    <strong>Version 1.3.9</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
                     architecture and operational mechanics.
                 </div>
 
@@ -45,13 +45,15 @@
                                     <li><a href="#key-management">Key Management</a></li>
                                     <li><a href="#persistence-management">Persistence Management</a></li>
                                     <li><a href="#compaction">Compaction &amp; Optimization</a></li>
+                                    <li><a href="#thread-management">Thread Management</a></li>
                                 </ol>
                             </div>
                             <div class="col-md-6">
-                                <ol start="5">
-                                    <li><a href="#thread-management">Thread Management</a></li>
+                                <ol start="6">
                                     <li><a href="#data-safety">Data Safety &amp; Recovery</a></li>
-                                    <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">NEW</span></li>
+                                    <li><a href="#concurrency-safety">Concurrency Safety &amp; Shutdown</a></li>
+                                    <li><a href="#shutdown-utility">Shutdown Utility</a> <span class="badge bg-success">v1.3.6</span></li>
+                                    <li><a href="#event-publishing">Event Publishing</a></li>
                                 </ol>
                             </div>
                         </div>
@@ -255,21 +257,72 @@ GET key → KeyIndex Check
                                 </div>
                                 <div class="col-md-6">
                                     <div class="card h-100">
-                                        <div class="card-header bg-light">Off-Heap (Optional)</div>
+                                        <div class="card-header bg-success text-white">Off-Heap - Segmented (v1.3.2)</div>
                                         <div class="card-body">
                                             <p><code>kuber.cache.off-heap-key-index=true</code></p>
                                             <ul>
-                                                <li>Uses DirectByteBuffer</li>
+                                                <li>Multiple 1GB ByteBuffer segments</li>
                                                 <li>Zero GC pressure</li>
+                                                <li>Supports >2GB per region</li>
                                                 <li>Ideal for 10+ million keys</li>
-                                                <li>Auto-growing buffers</li>
+                                                <li>Auto-compaction at 30% fragmentation</li>
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                            
+                            <h4 class="mt-4">2.3 Off-Heap Segmented Buffer Architecture (v1.3.2)</h4>
+                            <div class="alert alert-info">
+                                <strong>Why Segmented?</strong> Java's ByteBuffer.allocateDirect() is limited to ~2GB per buffer. 
+                                Kuber uses multiple 1GB segments to support 8GB+ per region.
+                            </div>
+                            <pre class="bg-dark text-white p-3 rounded">
+┌─────────────────────────────────────────────────────────────────────┐
+│                    OFF-HEAP KEY INDEX                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│  │  Segment 0  │  │  Segment 1  │  │  Segment 2  │  ...             │
+│  │   (1 GB)    │  │   (1 GB)    │  │   (1 GB)    │                  │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                  │
+│         │                │                │                          │
+│         └────────────────┴────────────────┴──────────────────────────│
+│                             │                                        │
+│              Global Offset (long): position across segments          │
+├─────────────────────────────────────────────────────────────────────┤
+│  On-Heap Index:  ConcurrentHashMap&lt;String, Long&gt;  (key → offset)    │
+└─────────────────────────────────────────────────────────────────────┘</pre>
 
-                            <h4 class="mt-4">2.3 Key Operation Performance</h4>
+                            <h5 class="mt-3">Memory Layout Per Key Entry</h5>
+                            <table class="table table-bordered table-sm">
+                                <thead class="table-light">
+                                    <tr><th>Bytes</th><th>Field</th><th>Type</th><th>Description</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>2</td><td>keyLength</td><td>short</td><td>Length of key bytes</td></tr>
+                                    <tr><td>variable</td><td>keyBytes</td><td>byte[]</td><td>UTF-8 encoded key</td></tr>
+                                    <tr><td>8</td><td>expiresAt</td><td>long</td><td>TTL timestamp (-1 = never)</td></tr>
+                                    <tr><td>1</td><td>location</td><td>byte</td><td>0=MEMORY, 1=DISK, 2=BOTH</td></tr>
+                                    <tr><td>4</td><td>valueSize</td><td>int</td><td>Size of value in bytes</td></tr>
+                                    <tr><td>8</td><td>lastAccess</td><td>long</td><td>Last access timestamp</td></tr>
+                                    <tr><td>4</td><td>accessCount</td><td>int</td><td>Access counter for LFU</td></tr>
+                                </tbody>
+                            </table>
+                            <p class="small text-muted">Total metadata: 27 bytes + key length</p>
+
+                            <h5 class="mt-3">Off-Heap Configuration</h5>
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><code>kuber.cache.off-heap-key-index</code></td><td>false</td><td>Enable off-heap storage</td></tr>
+                                    <tr><td><code>kuber.cache.off-heap-key-index-initial-size-mb</code></td><td>16</td><td>Initial segment size (MB)</td></tr>
+                                    <tr><td><code>kuber.cache.off-heap-key-index-max-size-mb</code></td><td>8192</td><td>Max total size across all segments (MB)</td></tr>
+                                </tbody>
+                            </table>
+
+                            <h4 class="mt-4">2.4 Key Operation Performance</h4>
                             <table class="table table-bordered">
                                 <thead class="table-light">
                                     <tr><th>Operation</th><th>Complexity</th><th>Disk I/O</th><th>Notes</th></tr>
@@ -283,7 +336,7 @@ GET key → KeyIndex Check
                                 </tbody>
                             </table>
 
-                            <h4 class="mt-4">2.4 Key Lifecycle</h4>
+                            <h4 class="mt-4">2.5 Key Lifecycle</h4>
                             <pre class="bg-dark text-white p-3 rounded">
 SET key value
     │
@@ -516,6 +569,13 @@ kuber.persistence.rocksdb.compaction-enabled=true
 
 # Scheduled compaction cron (RocksDB only)
 kuber.persistence.rocksdb.compaction-cron=0 0 2 * * ?</code></pre>
+                            
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-bolt me-2"></i>
+                                <strong>Sequential Processing (v1.3.9):</strong>
+                                Region databases are compacted/vacuumed sequentially during startup for data consistency.
+                                This ensures no concurrent operations that could cause corruption.
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -537,6 +597,11 @@ kuber.persistence.rocksdb.compaction-cron=0 0 2 * * ?</code></pre>
 │  ────────────────────────────────────────────────────               │
 │  main                       Spring Boot startup                     │
 │  kuber-startup-orchestrator Startup sequence coordination          │
+│                                                                      │
+│  SEQUENTIAL STARTUP (v1.3.9)                                        │
+│  ────────────────────────────────────────────────────               │
+│  All startup operations (compaction, loading) run sequentially      │
+│  in the main startup thread for data consistency.                   │
 │                                                                      │
 │  REDIS PROTOCOL (Apache MINA)                                       │
 │  ────────────────────────────────────────────────────               │
@@ -810,16 +875,295 @@ SYSTEM RESTART
                     </div>
                 </section>
 
-                <!-- 7. Event Publishing -->
+                <!-- 7. Concurrency Safety & Shutdown (v1.3.3) -->
+                <section id="concurrency-safety" class="mb-5">
+                    <div class="card shadow-sm">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);">
+                            <h2 class="mb-0"><i class="fas fa-shield-alt me-2"></i>7. Concurrency Safety & Shutdown (v1.3.3)</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>Kuber v1.3.3 introduces comprehensive concurrency controls to prevent database corruption and ensure data integrity.</p>
+                            
+                            <h4>7.1 Persistence Operation Locking</h4>
+                            <p>A centralized <code>PersistenceOperationLock</code> coordinates all operations that affect the persistence store:</p>
+                            
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Operation</th><th>Lock Type</th><th>Blocks</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><strong>Compaction</strong></td><td><span class="badge bg-danger">Exclusive Global</span></td><td>All other operations</td></tr>
+                                    <tr><td><strong>Shutdown</strong></td><td><span class="badge bg-danger">Exclusive Global</span></td><td>All other operations</td></tr>
+                                    <tr><td><strong>Cleanup/Expiration</strong></td><td><span class="badge bg-warning text-dark">Shared Global</span></td><td>Only during exclusive ops</td></tr>
+                                    <tr><td><strong>Autoload</strong></td><td><span class="badge bg-info">Per-Region</span></td><td>Same-region operations</td></tr>
+                                    <tr><td><strong>Region Loading</strong></td><td><span class="badge bg-info">Per-Region</span></td><td>Queries to that region</td></tr>
+                                </tbody>
+                            </table>
+                            
+                            <h4 class="mt-4">7.2 Shutdown Orchestrator</h4>
+                            <p>The <code>ShutdownOrchestrator</code> ensures orderly shutdown in the <strong>exact reverse order</strong> of startup:</p>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">Startup Order</div>
+                                        <div class="card-body">
+                                            <ol class="mb-0">
+                                                <li>Persistence Maintenance</li>
+                                                <li>Cache Service (recovery)</li>
+                                                <li>Event Publishing</li>
+                                                <li>Redis Protocol Server</li>
+                                                <li>Autoload Service</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card border-success">
+                                        <div class="card-header bg-success text-white">Shutdown Order (Reverse)</div>
+                                        <div class="card-body">
+                                            <ol class="mb-0">
+                                                <li>Stop Autoload Service</li>
+                                                <li>Stop Redis Protocol Server</li>
+                                                <li>Stop Event Publishing</li>
+                                                <li>Persist Cache Data</li>
+                                                <li>Close Persistence Store</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-clock me-2"></i>
+                                Each shutdown phase has a <strong>5-second delay</strong> to ensure in-flight operations complete and buffers flush.
+                            </div>
+                            
+                            <h4 class="mt-4">8.3 Region Loading Guards</h4>
+                            <p>During startup, queries to a region that's still loading will <strong>wait</strong> until loading completes:</p>
+                            <pre class="bg-dark text-white p-3 rounded">
+GET key (region 'orders' is loading)
+    │
+    └── waitForRegionReady('orders', 30s timeout)
+            │
+            ├── Still loading? → Wait 100ms, check again
+            │
+            └── Loaded! → Proceed with GET operation</pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 8. Startup & Shutdown (v1.3.6) -->
+                <section id="shutdown-utility" class="mb-5">
+                    <div class="card shadow-sm">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                            <h2 class="mb-0"><i class="fas fa-power-off me-2"></i>8. Startup &amp; Shutdown (v1.3.6)</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>Kuber v1.3.6 provides comprehensive management scripts and orchestrated startup/shutdown sequences for reliable operation.</p>
+                            
+                            <h4>8.1 Management Scripts</h4>
+                            <p>Scripts are located in the <code>scripts/</code> folder:</p>
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Script</th><th>Platform</th><th>Description</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>kuber-start.sh</code></td>
+                                        <td><span class="badge bg-success">Linux/Mac</span></td>
+                                        <td>Start Kuber server with JVM options</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber-start.bat</code></td>
+                                        <td><span class="badge bg-primary">Windows</span></td>
+                                        <td>Start Kuber server on Windows</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber-shutdown.sh</code></td>
+                                        <td><span class="badge bg-success">Linux/Mac</span></td>
+                                        <td>Graceful shutdown via file or API</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber-shutdown.bat</code></td>
+                                        <td><span class="badge bg-primary">Windows</span></td>
+                                        <td>Graceful shutdown on Windows</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber-status.sh</code></td>
+                                        <td><span class="badge bg-success">Linux/Mac</span></td>
+                                        <td>Check server status</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            <h4 class="mt-4">8.2 Startup Script Usage</h4>
+                            <pre class="bg-dark text-white p-3 rounded">
+# Basic startup
+./scripts/kuber-start.sh
+
+# With options
+./scripts/kuber-start.sh -m 4g -p prod              # 4GB heap, prod profile
+./scripts/kuber-start.sh -d -l /var/log/kuber       # Daemon mode with log dir
+./scripts/kuber-start.sh --redis-port 6381          # Custom Redis port
+./scripts/kuber-start.sh --debug                     # Enable remote debugging</pre>
+                            
+                            <h4 class="mt-4">8.3 Startup Sequence</h4>
+                            <p>Kuber follows an orchestrated startup sequence managed by <code>StartupOrchestrator</code>:</p>
+                            <pre class="bg-dark text-white p-3 rounded">
+Application Start
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 1: Infrastructure Setup                               │
+│  • Initialize logging & configuration                        │
+│  • Connect to ZooKeeper (if replication enabled)            │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 2: Persistence Maintenance (Sequential)               │
+│  • Initialize RocksDB/SQLite stores per region              │
+│  • Run compaction sequentially (one region at a time)       │
+│  • Clean expired entries                                     │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 3: Cache Recovery (Sequential)                        │
+│  • Load persisted entries into memory (one region at a time)│
+│  • Build off-heap key indexes                                │
+│  • Prime negative cache                                      │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 4: Service Activation                                 │
+│  • Start Event Publishing (Kafka, RabbitMQ, etc.)           │
+│  • Start Redis Protocol Server (port 6380)                  │
+│  • Start HTTP/REST Server (port 8080)                       │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 5: Background Services                                │
+│  • Start Autoload Service (file monitoring)                 │
+│  • Start Scheduled Tasks (compaction, cleanup)              │
+│  • Start Shutdown File Watcher                              │
+│  • System Ready!                                             │
+└─────────────────────────────────────────────────────────────┘</pre>
+                            
+                            <h4 class="mt-4">8.4 Shutdown Methods</h4>
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Method</th><th>Command</th><th>Use Case</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="badge bg-success">File-based</span></td>
+                                        <td><code>touch kuber.shutdown</code></td>
+                                        <td>Local shutdown, scripted automation</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-primary">REST API</span></td>
+                                        <td><code>POST /api/admin/shutdown</code></td>
+                                        <td>Remote shutdown, CI/CD pipelines</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-warning text-dark">Signal</span></td>
+                                        <td><code>SIGTERM</code> / <code>Ctrl+C</code></td>
+                                        <td>Container orchestration (K8s, Docker)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-info">Script</span></td>
+                                        <td><code>./scripts/kuber-shutdown.sh</code></td>
+                                        <td>Convenient wrapper with options</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            <h4 class="mt-4">8.5 Shutdown Script Usage</h4>
+                            <pre class="bg-dark text-white p-3 rounded">
+# File-based shutdown (default)
+./scripts/kuber-shutdown.sh
+
+# With reason for logging
+./scripts/kuber-shutdown.sh -r "Maintenance window"
+
+# API-based shutdown
+./scripts/kuber-shutdown.sh -a -k your-api-key
+
+# REST API directly
+curl -X POST http://localhost:8080/api/admin/shutdown \
+  -H "X-API-Key: your-api-key"</pre>
+                            
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Kuber checks for the shutdown file every 5 seconds (configurable). When detected, it initiates graceful shutdown and deletes the file automatically.
+                            </div>
+                            
+                            <h4 class="mt-4">8.6 Shutdown Sequence</h4>
+                            <p>Shutdown proceeds in <strong>exact reverse order</strong> of startup with configurable delays:</p>
+                            <pre class="bg-dark text-white p-3 rounded">
+Shutdown Triggered (file/API/signal)
+         │
+         ▼
+┌─────────────────────────────────────────┐
+│  1. Signal Shutdown                      │
+│     Block new persistence operations     │
+├─────────────────────────────────────────┤
+│  ── Wait 5 seconds ──                   │
+├─────────────────────────────────────────┤
+│  2. Stop Autoload Service               │
+│     Stop file monitoring & processing    │
+├─────────────────────────────────────────┤
+│  ── Wait 5 seconds ──                   │
+├─────────────────────────────────────────┤
+│  3. Stop Redis Protocol Server          │
+│     Reject new client connections        │
+├─────────────────────────────────────────┤
+│  ── Wait 5 seconds ──                   │
+├─────────────────────────────────────────┤
+│  4. Stop Event Publishing               │
+│     Flush queues, close connections      │
+├─────────────────────────────────────────┤
+│  ── Wait 5 seconds ──                   │
+├─────────────────────────────────────────┤
+│  5. Persist Cache Data                  │
+│     Save all entries to persistence      │
+├─────────────────────────────────────────┤
+│  ── Wait 5 seconds ──                   │
+├─────────────────────────────────────────┤
+│  6. Close Persistence Store             │
+│     Close RocksDB/SQLite handles         │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    Application Exit (~30 seconds total)</pre>
+                            
+                            <h4 class="mt-4">8.7 Configuration</h4>
+                            <pre class="bg-light p-3 rounded">
+kuber:
+  shutdown:
+    file-enabled: true              # Enable file-based shutdown
+    file-path: kuber.shutdown       # Path to shutdown signal file
+    check-interval-ms: 5000         # Check interval (5 seconds)
+    api-enabled: true               # Enable REST API shutdown
+    phase-delay-seconds: 5          # Delay between shutdown phases</pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 9. Event Publishing -->
                 <section id="event-publishing" class="mb-5">
                     <div class="card shadow-sm">
                         <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
-                            <h2 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>7. Event Publishing (v1.2.8)</h2>
+                            <h2 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>9. Event Publishing (v1.3.2)</h2>
                         </div>
                         <div class="card-body">
                             <p>Kuber can publish cache events (insert, update, delete) to external messaging systems asynchronously via a pluggable publisher architecture.</p>
                             
-                            <h4>7.1 Supported Publishers</h4>
+                            <h4>9.1 Supported Publishers</h4>
                             <div class="row">
                                 <div class="col-md-4 mb-2"><span class="badge bg-success me-2">Kafka</span> High-throughput streaming</div>
                                 <div class="col-md-4 mb-2"><span class="badge bg-warning text-dark me-2">ActiveMQ</span> Enterprise JMS</div>
@@ -828,7 +1172,7 @@ SYSTEM RESTART
                                 <div class="col-md-4 mb-2"><span class="badge bg-secondary me-2">File</span> JSON Lines output</div>
                             </div>
                             
-                            <h4 class="mt-4">7.2 Publishing Architecture</h4>
+                            <h4 class="mt-4">9.2 Publishing Architecture</h4>
                             <pre class="bg-dark text-white p-3 rounded">
 CacheService.set() / delete()
          │
@@ -847,7 +1191,7 @@ CacheService.set() / delete()
  Kafka  AMQ  RabbitMQ IBM  File
                       MQ</pre>
 
-                            <h4 class="mt-4">7.3 EventPublisher Interface</h4>
+                            <h4 class="mt-4">8.3 EventPublisher Interface</h4>
                             <pre class="bg-light p-2 rounded small"><code>public interface EventPublisher {
     String getType();        // "kafka", "rabbitmq", "file"
     void initialize();       // Setup at startup
@@ -893,7 +1237,7 @@ CacheService.set() / delete()
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.8</p>
+                    <p class="text-muted small mb-0">Version 1.3.9</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

@@ -54,7 +54,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Autoload files are processed before persistence recovery completes</li>
  * </ul>
  * 
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Service
 @Slf4j
@@ -207,7 +207,7 @@ public class StartupOrchestrator {
             log.info("║   ██║  ██╗╚██████╔╝██████╔╝███████╗██║  ██║                        ║");
             log.info("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                        ║");
             log.info("║                                                                    ║");
-            log.info("║   SYSTEM READY - Version 1.2.8                                     ║");
+            log.info("║   SYSTEM READY - Version 1.3.9                                     ║");
             log.info("║                                                                    ║");
             log.info("║   ✓ Persistence maintenance: complete                              ║");
             log.info("║   ✓ Cache service: initialized                                     ║");

@@ -40,7 +40,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
  * 
  * @author Ashutosh Sinha
- * @version 1.2.8
+ * @version 1.3.9
  */
 @SpringBootApplication(exclude = {
     MongoAutoConfiguration.class,
@@ -70,7 +70,7 @@ public class KuberApplication {
         System.out.println("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                       ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   High-Performance Distributed Cache                              ║");
-        System.out.println("║   Version 1.2.6                                                  ║");
+        System.out.println("║   Version 1.3.7                                                  ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   Copyright © 2025-2030 Ashutosh Sinha                            ║");
         System.out.println("║   All Rights Reserved                                             ║");

@@ -14,11 +14,14 @@ package com.kuber.server.autoload;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.kuber.core.model.CacheEntry;
+import com.kuber.core.util.JsonUtils;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.persistence.PersistenceOperationLock;
+import com.kuber.server.persistence.PersistenceOperationLock.OperationType;
 import jakarta.annotation.PreDestroy;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -78,15 +81,33 @@ import java.util.concurrent.atomic.AtomicLong;
  * and the value from key_field is used as the cache key.
  * 
  * <p>After processing, both data and metadata files are moved to outbox.
+ * 
+ * <p>Files are processed sequentially (one at a time) for data consistency.
+ * 
+ * <p>CONCURRENCY SAFETY (v1.3.2):
+ * <p>Uses PersistenceOperationLock to ensure autoload does not run concurrently
+ * with compaction operations. Acquires region locks during file processing.
+ * 
+ * @version 1.3.9
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AutoloadService {
     
     private final CacheService cacheService;
     private final KuberProperties properties;
     private final ObjectMapper objectMapper;
+    private final PersistenceOperationLock operationLock;
+    
+    public AutoloadService(CacheService cacheService, 
+                           KuberProperties properties, 
+                           ObjectMapper objectMapper,
+                           PersistenceOperationLock operationLock) {
+        this.cacheService = cacheService;
+        this.properties = properties;
+        this.objectMapper = objectMapper;
+        this.operationLock = operationLock;
+    }
     
     private ScheduledExecutorService scheduler;
     private Path inboxPath;
@@ -159,6 +180,7 @@ public class AutoloadService {
     
     @PreDestroy
     public void shutdown() {
+        // Shutdown scheduler
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdown();
             try {
@@ -213,7 +235,8 @@ public class AutoloadService {
                 TimeUnit.SECONDS
         );
         
-        log.info("Autoload watcher scheduled with interval: {} seconds", intervalSeconds);
+        log.info("Autoload watcher scheduled with interval: {} seconds (sequential processing)", 
+                intervalSeconds);
     }
     
     /**
@@ -260,9 +283,10 @@ public class AutoloadService {
                 return;
             }
             
-            lastActivityMessage = String.format("Processing %d file(s)...", dataFiles.size());
-            log.info("Found {} file(s) to process", dataFiles.size());
+            lastActivityMessage = String.format("Processing %d file(s) sequentially...", dataFiles.size());
+            log.info("Found {} file(s) to process (sequential)", dataFiles.size());
             
+            // Process files sequentially (one at a time)
             for (Path dataFile : dataFiles) {
                 processFile(dataFile);
             }
@@ -285,9 +309,27 @@ public class AutoloadService {
         log.info("Processing file: {}", fileName);
         lastActivityMessage = "Processing: " + fileName;
         
+        // Check if system is shutting down
+        if (operationLock.isShuttingDown()) {
+            log.warn("System is shutting down - skipping file: {}", fileName);
+            return;
+        }
+        
+        String regionName = "default";
+        boolean lockAcquired = false;
+        
         try {
-            // Parse metadata
+            // Parse metadata first to get region name
             AutoloadMetadata metadata = parseMetadata(metadataPath);
+            regionName = metadata.getRegion();
+            
+            // Acquire region lock - this ensures no compaction or other operations on this region
+            if (!operationLock.acquireRegionLock(regionName, OperationType.AUTOLOAD, 
+                    "Processing " + fileName, 2, java.util.concurrent.TimeUnit.MINUTES)) {
+                log.warn("Could not acquire lock for region '{}' - skipping file: {}", regionName, fileName);
+                return;
+            }
+            lockAcquired = true;
             
             // Parse attribute mapping if present
             Map<String, String> attributeMapping = null;
@@ -346,6 +388,11 @@ public class AutoloadService {
             totalErrors.incrementAndGet();
             lastActivityMessage = "Error processing: " + fileName + " - " + e.getMessage();
             addActivityLogEntry(fileName, "unknown", 0, 1, startTime, "ERROR: " + e.getMessage());
+        } finally {
+            // Release region lock
+            if (lockAcquired) {
+                operationLock.releaseRegionLock(regionName);
+            }
         }
     }
     
@@ -432,12 +479,16 @@ public class AutoloadService {
     }
     
     /**
-     * Process a CSV file.
+     * Process a CSV file with batch writes for better performance.
      */
     private ProcessingResult processCsvFile(Path csvFile, AutoloadMetadata metadata) throws IOException {
         ProcessingResult result = new ProcessingResult();
         
         Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
+        int batchSize = properties.getAutoload().getBatchSize();
+        String fileName = csvFile.getFileName().toString();
+        
+        log.info("Processing CSV file '{}' with batch size: {}", fileName, batchSize);
         
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setDelimiter(metadata.getDelimiter())
@@ -453,7 +504,7 @@ public class AutoloadService {
             // Get headers
             List<String> headers = parser.getHeaderNames();
             if (headers.isEmpty()) {
-                log.error("CSV file has no headers: {}", csvFile.getFileName());
+                log.error("CSV file has no headers: {}", fileName);
                 result.setErrors(1);
                 return result;
             }
@@ -461,7 +512,7 @@ public class AutoloadService {
             // Get key fields (supports composite keys with "/" separator)
             List<String> keyFields = metadata.getKeyFields();
             if (keyFields.isEmpty()) {
-                log.error("No key fields specified in metadata for file: {}", csvFile.getFileName());
+                log.error("No key fields specified in metadata for file: {}", fileName);
                 result.setErrors(1);
                 return result;
             }
@@ -482,9 +533,20 @@ public class AutoloadService {
             
             int maxRecords = properties.getAutoload().getMaxRecordsPerFile();
             int recordCount = 0;
+            int batchNumber = 0;
             
             // Get attribute mapping if present
             Map<String, String> attrMapping = metadata.getAttributeMapping();
+            
+            // Batch accumulator
+            List<CacheEntry> batch = new ArrayList<>(batchSize);
+            String region = metadata.getRegion();
+            long ttl = metadata.getTtl();
+            
+            // Ensure region exists before processing
+            cacheService.ensureRegionExistsPublic(region);
+            
+            long startTime = System.currentTimeMillis();
             
             for (CSVRecord record : parser) {
                 if (maxRecords > 0 && recordCount >= maxRecords) {
@@ -515,24 +577,38 @@ public class AutoloadService {
                         continue;
                     }
                     
-                    // Save to cache (attribute mapping already applied above)
-                    // Use direct jsonSet without region mapping since we applied file mapping
-                    cacheService.jsonSet(
-                            metadata.getRegion(),
-                            keyValue,
-                            "$",
-                            jsonNode,
-                            metadata.getTtl()
-                    );
-                    
+                    // Create CacheEntry for batch
+                    CacheEntry entry = createCacheEntry(region, keyValue, jsonNode, ttl);
+                    batch.add(entry);
                     result.incrementLoaded();
                     recordCount++;
+                    
+                    // Flush batch when full
+                    if (batch.size() >= batchSize) {
+                        batchNumber++;
+                        int saved = cacheService.putEntriesBatch(batch);
+                        log.info("[{}] Batch #{}: Processed {} records so far ({} in this batch) -> region '{}'", 
+                                fileName, batchNumber, recordCount, saved, region);
+                        batch.clear();
+                    }
                     
                 } catch (Exception e) {
                     log.debug("Error processing record {}: {}", record.getRecordNumber(), e.getMessage());
                     result.incrementErrors();
                 }
             }
+            
+            // Flush remaining entries
+            if (!batch.isEmpty()) {
+                batchNumber++;
+                int saved = cacheService.putEntriesBatch(batch);
+                log.info("[{}] Batch #{} (final): Processed {} records so far ({} in this batch) -> region '{}'", 
+                        fileName, batchNumber, recordCount, saved, region);
+            }
+            
+            long elapsedMs = System.currentTimeMillis() - startTime;
+            log.info("[{}] COMPLETED: Total {} records processed in {} batches ({} ms) -> region '{}'", 
+                    fileName, recordCount, batchNumber, elapsedMs, region);
         }
         
         return result;
@@ -560,21 +636,26 @@ public class AutoloadService {
     }
     
     /**
-     * Process a JSON file (one JSON object per line - JSONL format).
+     * Process a JSON file (one JSON object per line - JSONL format) with batch writes.
      */
     private ProcessingResult processJsonFile(Path jsonFile, AutoloadMetadata metadata) throws IOException {
         ProcessingResult result = new ProcessingResult();
         
         Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
+        int batchSize = properties.getAutoload().getBatchSize();
+        String fileName = jsonFile.getFileName().toString();
+        
+        log.info("Processing JSON file '{}' with batch size: {}", fileName, batchSize);
         
         int maxRecords = properties.getAutoload().getMaxRecordsPerFile();
         int recordCount = 0;
         int lineNumber = 0;
+        int batchNumber = 0;
         
         // Get key fields (supports composite keys with "/" separator)
         List<String> keyFields = metadata.getKeyFields();
         if (keyFields.isEmpty()) {
-            log.error("No key fields specified in metadata for file: {}", jsonFile.getFileName());
+            log.error("No key fields specified in metadata for file: {}", fileName);
             result.setErrors(1);
             return result;
         }
@@ -586,6 +667,16 @@ public class AutoloadService {
         
         // Get attribute mapping if present
         Map<String, String> attrMapping = metadata.getAttributeMapping();
+        
+        // Batch accumulator
+        List<CacheEntry> batch = new ArrayList<>(batchSize);
+        String region = metadata.getRegion();
+        long ttl = metadata.getTtl();
+        
+        // Ensure region exists before processing
+        cacheService.ensureRegionExistsPublic(region);
+        
+        long startTime = System.currentTimeMillis();
         
         try (BufferedReader reader = Files.newBufferedReader(jsonFile, charset)) {
             String line;
@@ -626,17 +717,20 @@ public class AutoloadService {
                         finalNode = cacheService.applyAttributeMapping(jsonNode, attrMapping);
                     }
                     
-                    // Save to cache
-                    cacheService.jsonSet(
-                            metadata.getRegion(),
-                            keyValue,
-                            "$",
-                            finalNode,
-                            metadata.getTtl()
-                    );
-                    
+                    // Create CacheEntry for batch
+                    CacheEntry entry = createCacheEntry(region, keyValue, finalNode, ttl);
+                    batch.add(entry);
                     result.incrementLoaded();
                     recordCount++;
+                    
+                    // Flush batch when full
+                    if (batch.size() >= batchSize) {
+                        batchNumber++;
+                        int saved = cacheService.putEntriesBatch(batch);
+                        log.info("[{}] Batch #{}: Processed {} records so far ({} in this batch) -> region '{}'", 
+                                fileName, batchNumber, recordCount, saved, region);
+                        batch.clear();
+                    }
                     
                 } catch (Exception e) {
                     log.debug("Error processing line {}: {}", lineNumber, e.getMessage());
@@ -644,6 +738,18 @@ public class AutoloadService {
                 }
             }
         }
+        
+        // Flush remaining entries
+        if (!batch.isEmpty()) {
+            batchNumber++;
+            int saved = cacheService.putEntriesBatch(batch);
+            log.info("[{}] Batch #{} (final): Processed {} records so far ({} in this batch) -> region '{}'", 
+                    fileName, batchNumber, recordCount, saved, region);
+        }
+        
+        long elapsedMs = System.currentTimeMillis() - startTime;
+        log.info("[{}] COMPLETED: Total {} records processed in {} batches ({} ms) -> region '{}'", 
+                fileName, recordCount, batchNumber, elapsedMs, region);
         
         return result;
     }
@@ -671,6 +777,33 @@ public class AutoloadService {
             values.add(value.trim());
         }
         return String.join(delimiter, values);
+    }
+    
+    /**
+     * Create a CacheEntry from JSON data for batch processing.
+     * 
+     * @param region the cache region
+     * @param key the cache key
+     * @param jsonValue the JSON value
+     * @param ttlSeconds TTL in seconds (-1 for no expiry)
+     * @return CacheEntry ready for batch save
+     */
+    private CacheEntry createCacheEntry(String region, String key, JsonNode jsonValue, long ttlSeconds) {
+        Instant now = Instant.now();
+        Instant expiresAt = ttlSeconds > 0 ? now.plusSeconds(ttlSeconds) : null;
+        
+        return CacheEntry.builder()
+                .id(UUID.randomUUID().toString())
+                .key(key)
+                .region(region)
+                .valueType(CacheEntry.ValueType.JSON)
+                .jsonValue(jsonValue)
+                .stringValue(JsonUtils.toJson(jsonValue))
+                .ttlSeconds(ttlSeconds)
+                .createdAt(now)
+                .updatedAt(now)
+                .expiresAt(expiresAt)
+                .build();
     }
     
     /**
@@ -754,6 +887,8 @@ public class AutoloadService {
         stats.put("inboxPath", inboxPath != null ? inboxPath.toString() : null);
         stats.put("outboxPath", outboxPath != null ? outboxPath.toString() : null);
         stats.put("scanIntervalSeconds", properties.getAutoload().getScanIntervalSeconds());
+        stats.put("mode", "sequential");
+        stats.put("batchSize", properties.getAutoload().getBatchSize());
         stats.put("filesInInbox", filesInInbox);
         
         // Totals

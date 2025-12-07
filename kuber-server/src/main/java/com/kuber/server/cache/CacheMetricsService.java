@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Service for tracking cache metrics and activities for monitoring.
  * Maintains time-series data for cache operations per region.
+ * 
+ * @version 1.3.9
  */
 @Slf4j
 @Service
@@ -46,6 +48,9 @@ public class CacheMetricsService {
     private final AtomicLong totalDeletes = new AtomicLong(0);
     private final AtomicLong totalHits = new AtomicLong(0);
     private final AtomicLong totalMisses = new AtomicLong(0);
+    
+    // Shutdown flag to stop scheduled tasks
+    private volatile boolean shuttingDown = false;
     
     /**
      * Record a GET operation
@@ -74,6 +79,14 @@ public class CacheMetricsService {
     }
     
     /**
+     * Record multiple SET/PUT operations (for batch writes)
+     */
+    public void recordSets(String region, int count) {
+        totalSets.addAndGet(count);
+        getOrCreateMetrics(region).sets.addAndGet(count);
+    }
+    
+    /**
      * Record a DELETE operation
      */
     public void recordDelete(String region) {
@@ -93,10 +106,36 @@ public class CacheMetricsService {
     }
     
     /**
+     * Shutdown the metrics service.
+     * Stops scheduled tasks and performs final metric rotation.
+     */
+    public void shutdown() {
+        log.info("Shutting down CacheMetricsService...");
+        shuttingDown = true;
+        
+        // Perform final metric rotation to capture any remaining data
+        rotateMetrics();
+        
+        log.info("CacheMetricsService shutdown complete");
+    }
+    
+    /**
+     * Check if service is shutting down.
+     */
+    public boolean isShuttingDown() {
+        return shuttingDown;
+    }
+    
+    /**
      * Scheduled task to rotate metrics every minute
      */
     @Scheduled(cron = "0 * * * * *") // Every minute at :00
     public void rotateMetrics() {
+        // Skip if shutting down (except for final rotation called from shutdown())
+        if (shuttingDown) {
+            return;
+        }
+        
         Instant now = Instant.now().truncatedTo(ChronoUnit.MINUTES);
         
         for (Map.Entry<String, RegionMetrics> entry : currentMetrics.entrySet()) {

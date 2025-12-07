@@ -18,15 +18,33 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
  * Abstract base class for persistence stores with common functionality.
+ * 
+ * <p>Uses a dedicated executor for async operations instead of ForkJoinPool.commonPool
+ * to ensure proper shutdown control.
+ * 
+ * @version 1.3.9
  */
 @Slf4j
 public abstract class AbstractPersistenceStore implements PersistenceStore {
     
     protected volatile boolean available = false;
+    
+    // Dedicated executor for async saves - avoids ForkJoinPool.commonPool issues during shutdown
+    private final ExecutorService asyncSaveExecutor = Executors.newFixedThreadPool(2, r -> {
+        Thread t = new Thread(r, "persistence-async-save");
+        t.setDaemon(true);
+        return t;
+    });
+    
+    // Shutdown flag to reject new async saves
+    protected volatile boolean asyncShuttingDown = false;
     
     @Override
     public boolean isAvailable() {
@@ -35,7 +53,46 @@ public abstract class AbstractPersistenceStore implements PersistenceStore {
     
     @Override
     public CompletableFuture<Void> saveEntryAsync(CacheEntry entry) {
-        return CompletableFuture.runAsync(() -> saveEntry(entry));
+        // Reject new async saves during shutdown
+        if (asyncShuttingDown) {
+            log.debug("Rejecting async save during shutdown for key: {}", entry.getKey());
+            return CompletableFuture.completedFuture(null);
+        }
+        // Use dedicated executor instead of ForkJoinPool.commonPool
+        return CompletableFuture.runAsync(() -> saveEntry(entry), asyncSaveExecutor);
+    }
+    
+    /**
+     * Shutdown the async save executor and wait for all pending saves to complete.
+     * Called by subclass shutdown methods BEFORE closing database handles.
+     */
+    protected void shutdownAsyncExecutor() {
+        log.info("Shutting down async save executor...");
+        
+        // First, stop accepting new async saves
+        asyncShuttingDown = true;
+        
+        // Then shutdown the executor and wait for pending tasks
+        asyncSaveExecutor.shutdown();
+        try {
+            // Wait up to 30 seconds for pending saves to complete
+            if (!asyncSaveExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                log.warn("Async save executor did not terminate in 30s, forcing shutdown...");
+                List<Runnable> pending = asyncSaveExecutor.shutdownNow();
+                log.warn("Dropped {} pending async save tasks", pending.size());
+                
+                // Wait a bit more for tasks to respond to interruption
+                if (!asyncSaveExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    log.error("Async save executor did not terminate after force shutdown");
+                }
+            } else {
+                log.info("Async save executor shutdown complete - all pending saves finished");
+            }
+        } catch (InterruptedException e) {
+            log.warn("Interrupted while waiting for async executor, forcing shutdown");
+            asyncSaveExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
     
     /**

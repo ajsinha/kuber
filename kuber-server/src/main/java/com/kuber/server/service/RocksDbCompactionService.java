@@ -12,6 +12,8 @@
 package com.kuber.server.service;
 
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.persistence.PersistenceOperationLock;
+import com.kuber.server.persistence.PersistenceOperationLock.OperationType;
 import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.persistence.RocksDbPersistenceStore;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -29,8 +32,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * Service that performs scheduled compaction of RocksDB to reclaim disk space.
  * Only active when RocksDB persistence is enabled and compaction is configured.
  * 
- * Compaction removes deleted/expired entries from SST files, reclaiming disk space
+ * <p>CONCURRENCY SAFETY (v1.3.2):
+ * <p>Uses PersistenceOperationLock to ensure compaction does not run concurrently
+ * with cleanup, autoload, or region loading operations.
+ * 
+ * <p>Compaction removes deleted/expired entries from SST files, reclaiming disk space
  * that would otherwise accumulate over time.
+ * 
+ * @version 1.3.9
  */
 @Slf4j
 @Service
@@ -39,20 +48,44 @@ public class RocksDbCompactionService {
     
     private final PersistenceStore persistenceStore;
     private final KuberProperties properties;
+    private final PersistenceOperationLock operationLock;
     
     private final AtomicBoolean enabled = new AtomicBoolean(true);
     private final AtomicBoolean compactionInProgress = new AtomicBoolean(false);
     private final AtomicLong totalCompactions = new AtomicLong(0);
     private final AtomicLong totalReclaimedBytes = new AtomicLong(0);
     
+    // Shutdown flag
+    private volatile boolean shuttingDown = false;
+    
     private Instant lastCompactionTime;
     private Duration lastCompactionDuration;
     private long lastReclaimedBytes;
     private String lastCompactionMessage;
     
-    public RocksDbCompactionService(PersistenceStore persistenceStore, KuberProperties properties) {
+    public RocksDbCompactionService(PersistenceStore persistenceStore, 
+                                     KuberProperties properties,
+                                     PersistenceOperationLock operationLock) {
         this.persistenceStore = persistenceStore;
         this.properties = properties;
+        this.operationLock = operationLock;
+    }
+    
+    /**
+     * Shutdown the compaction service.
+     */
+    public void shutdown() {
+        log.info("Shutting down RocksDB compaction service...");
+        shuttingDown = true;
+        enabled.set(false);
+        log.info("RocksDB compaction service shutdown complete");
+    }
+    
+    /**
+     * Check if service is shutting down.
+     */
+    public boolean isShuttingDown() {
+        return shuttingDown;
     }
     
     @PostConstruct
@@ -82,6 +115,11 @@ public class RocksDbCompactionService {
      */
     @Scheduled(cron = "${kuber.persistence.rocksdb.compaction-cron:0 0 2 * * ?}")
     public void scheduledCompaction() {
+        // Skip if shutting down
+        if (shuttingDown) {
+            return;
+        }
+        
         if (!enabled.get()) {
             return;
         }
@@ -95,6 +133,7 @@ public class RocksDbCompactionService {
     
     /**
      * Manually trigger a compaction operation.
+     * Acquires exclusive global lock to prevent concurrent operations.
      * 
      * @return CompactionStats with results of the operation
      */
@@ -110,8 +149,18 @@ public class RocksDbCompactionService {
                     totalReclaimedBytes.get(), 0);
         }
         
+        // Acquire exclusive global lock - this blocks cleanup, autoload, and other operations
+        if (!operationLock.acquireExclusiveGlobalLock(OperationType.COMPACTION, 
+                "Scheduled RocksDB compaction", 5, TimeUnit.MINUTES)) {
+            compactionInProgress.set(false);
+            return new CompactionStats(false, 
+                    "Could not acquire lock - another operation in progress", 
+                    totalCompactions.get(), Duration.ZERO, 0, 
+                    totalReclaimedBytes.get(), 0);
+        }
+        
         try {
-            log.info("Starting scheduled RocksDB compaction...");
+            log.info("Starting scheduled RocksDB compaction (exclusive lock acquired)...");
             Instant startTime = Instant.now();
             
             RocksDbPersistenceStore.CompactionResult result = rocksDb.compact();
@@ -145,6 +194,7 @@ public class RocksDbCompactionService {
             );
             
         } finally {
+            operationLock.releaseExclusiveGlobalLock();
             compactionInProgress.set(false);
         }
     }

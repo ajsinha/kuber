@@ -32,10 +32,15 @@ import java.sql.Statement;
  * databases are in optimal state before cache recovery begins.
  * 
  * Supported operations:
- * - RocksDB: Full compaction of all region databases
- * - SQLite: VACUUM on all region database files
+ * - RocksDB: Full compaction of all region databases (sequential)
+ * - SQLite: VACUUM on all region database files (sequential)
  * 
- * @version 1.2.8
+ * SEQUENTIAL PROCESSING (v1.3.8):
+ * - Region databases are processed one at a time for data consistency
+ * - Avoids potential corruption from concurrent database operations
+ * - More predictable and stable behavior
+ * 
+ * @version 1.3.9
  */
 @Service
 @RequiredArgsConstructor
@@ -85,7 +90,7 @@ public class PersistenceMaintenanceService {
     }
     
     /**
-     * Execute RocksDB compaction on all region databases.
+     * Execute RocksDB compaction on all region databases concurrently.
      */
     private boolean executeRocksDbCompaction() {
         boolean compactionEnabled = properties.getPersistence().getRocksdb().isCompactionEnabled();
@@ -103,7 +108,7 @@ public class PersistenceMaintenanceService {
             return true;
         }
         
-        log.info("RocksDB compaction starting - path: {}", baseDir.getAbsolutePath());
+        log.info("RocksDB compaction starting - path: {} (sequential)", baseDir.getAbsolutePath());
         
         // Find all region directories (exclude hidden and metadata)
         File[] regionDirs = baseDir.listFiles(file -> 
@@ -118,6 +123,7 @@ public class PersistenceMaintenanceService {
         
         log.info("Found {} region database(s)", regionDirs.length);
         
+        // Sequential compaction
         int successCount = 0;
         int failCount = 0;
         long totalSizeBefore = 0;
@@ -151,7 +157,8 @@ public class PersistenceMaintenanceService {
         long duration = System.currentTimeMillis() - startTime;
         long totalSaved = totalSizeBefore - totalSizeAfter;
         
-        log.info("Compaction complete: {} succeeded, {} failed", successCount, failCount);
+        log.info("Compaction complete: {} succeeded, {} failed (sequential)", 
+                successCount, failCount);
         log.info("Total size: {} → {} (saved {})", 
                 formatSize(totalSizeBefore), formatSize(totalSizeAfter), formatSize(totalSaved));
         log.info("Duration: {}ms", duration);
@@ -173,7 +180,7 @@ public class PersistenceMaintenanceService {
     }
     
     /**
-     * Execute SQLite VACUUM on all region databases.
+     * Execute SQLite VACUUM on all region databases sequentially.
      */
     private boolean executeSqliteVacuum() {
         String basePath = properties.getPersistence().getSqlite().getPath();
@@ -187,7 +194,7 @@ public class PersistenceMaintenanceService {
             return true;
         }
         
-        log.info("SQLite vacuum starting - path: {}", baseDir.getAbsolutePath());
+        log.info("SQLite vacuum starting - path: {} (sequential)", baseDir.getAbsolutePath());
         
         // Find all .db files (region databases)
         File[] dbFiles = baseDir.listFiles(file -> 
@@ -200,6 +207,7 @@ public class PersistenceMaintenanceService {
         
         log.info("Found {} database(s)", dbFiles.length);
         
+        // Sequential vacuum
         int successCount = 0;
         int failCount = 0;
         long totalSizeBefore = 0;
@@ -233,7 +241,8 @@ public class PersistenceMaintenanceService {
         long duration = System.currentTimeMillis() - startTime;
         long totalSaved = totalSizeBefore - totalSizeAfter;
         
-        log.info("Vacuum complete: {} succeeded, {} failed", successCount, failCount);
+        log.info("Vacuum complete: {} succeeded, {} failed (sequential)", 
+                successCount, failCount);
         log.info("Total size: {} → {} (saved {})", 
                 formatSize(totalSizeBefore), formatSize(totalSizeAfter), formatSize(totalSaved));
         log.info("Duration: {}ms", duration);

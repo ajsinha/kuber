@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  * 2. Authorization header with "ApiKey" scheme: "Authorization: ApiKey kub_xxx"
  * 3. Query parameter: ?api_key=kub_xxx
  *
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Slf4j
 @Component

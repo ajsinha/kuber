@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
  * 1. Password: AUTH password
  * 2. API Key: AUTH APIKEY kub_xxx...
  *
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Slf4j
 @Component

@@ -32,6 +32,9 @@ public class MemoryPersistenceStore extends AbstractPersistenceStore {
     private final Map<String, CacheRegion> regions = new ConcurrentHashMap<>();
     private final Map<String, Map<String, CacheEntry>> entries = new ConcurrentHashMap<>();
     
+    // Guard against double shutdown
+    private volatile boolean alreadyShutdown = false;
+    
     @Override
     public PersistenceType getType() {
         return PersistenceType.MEMORY;
@@ -46,10 +49,44 @@ public class MemoryPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void shutdown() {
-        log.info("Shutting down in-memory persistence store...");
+        // Guard against double shutdown
+        if (alreadyShutdown) {
+            log.debug("Memory shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  MEMORY PERSISTENCE SHUTDOWN                                        ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+        
         available = false;
+        
+        // Step 1: Shutdown async save executor FIRST
+        log.info("Step 1: Shutting down async save executor...");
+        shutdownAsyncExecutor();
+        
+        int regionCount = regions.size();
+        int entryCount = entries.values().stream().mapToInt(Map::size).sum();
+        
+        log.info("Step 2: Clearing {} regions with {} entries from memory...", regionCount, entryCount);
         regions.clear();
         entries.clear();
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  MEMORY PERSISTENCE SHUTDOWN COMPLETE                               ║");
+        log.info("║  Note: All data has been lost (in-memory only)                      ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+    }
+    
+    /**
+     * Sync is a no-op for Memory persistence store.
+     * Data is volatile and not persisted to disk.
+     */
+    @Override
+    public void sync() {
+        log.debug("Memory sync called - no action needed (data is volatile)");
+        // No persistence, nothing to sync
     }
     
     // ==================== Region Operations ====================

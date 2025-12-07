@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.2.8**
+**Version 1.3.9**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -206,7 +206,7 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STARTUP SEQUENCE (v1.2.8)                            │
+│                         STARTUP SEQUENCE (v1.3.2)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -226,21 +226,21 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 │                                    │                                         │
 │                                    ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 1: Persistence Maintenance                                     │   │
-│  │ • RocksDB: Full compaction of all region databases                   │   │
-│  │ • SQLite: VACUUM on all region database files                        │   │
-│  │ • LMDB: Skip (B+ tree auto-balances)                                 │   │
-│  │ • Other backends: Skip                                               │   │
+│  │ PHASE 1: Persistence Maintenance (SEQUENTIAL - v1.3.8)              │   │
+│  │ • RocksDB: Full compaction of all region databases (sequential)     │   │
+│  │ • SQLite: VACUUM on all region database files (sequential)          │   │
+│  │ • LMDB: Skip (B+ tree auto-balances)                                │   │
+│  │ • All operations run one at a time for data consistency             │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    ▼ (2 second wait)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 2: Cache Service Initialization                                │   │
-│  │ • Load regions from persistence store                                │   │
-│  │ • Recover all cached data from disk/database                         │   │
-│  │ • Build KeyIndex for each region (all keys in memory)                │   │
-│  │ • Prime value cache with hot entries                                 │   │
-│  │ • Mark CacheService as initialized                                   │   │
+│  │ PHASE 2: Cache Service Initialization (SEQUENTIAL - v1.3.8)         │   │
+│  │ • Load regions from persistence store                               │   │
+│  │ • Recover all cached data from disk/database (sequential per region)│   │
+│  │ • Build KeyIndex for each region (all keys in memory)               │   │
+│  │ • Prime value cache with hot entries                                │   │
+│  │ • Mark CacheService as initialized                                  │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    ▼ (2 second wait)                         │
@@ -343,6 +343,74 @@ if (startupOrchestrator.isCacheReady()) {
 if (startupOrchestrator.isStartupComplete()) {
     // All services are ready
 }
+```
+
+### 3.5 Shutdown Utility (v1.3.5)
+
+Kuber provides multiple clean shutdown mechanisms:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     SHUTDOWN MECHANISMS                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌───────────────┐    ┌───────────────┐    ┌───────────────┐        │
+│  │  Shutdown     │    │   REST API    │    │    Signal     │        │
+│  │    File       │    │   Endpoint    │    │  (SIGTERM)    │        │
+│  │               │    │               │    │               │        │
+│  │ kuber.shutdown│    │ /api/admin/   │    │  kill <pid>   │        │
+│  │               │    │  shutdown     │    │   Ctrl+C      │        │
+│  └───────┬───────┘    └───────┬───────┘    └───────┬───────┘        │
+│          │                    │                    │                │
+│          └────────────────────┼────────────────────┘                │
+│                               │                                      │
+│                               ▼                                      │
+│                    ┌─────────────────────┐                          │
+│                    │  ShutdownOrchestrator│                          │
+│                    └──────────┬──────────┘                          │
+│                               │                                      │
+│                               ▼                                      │
+│          ┌─────────────────────────────────────────────┐            │
+│          │  Orderly Shutdown (reverse startup order)    │            │
+│          │  1. Stop Autoload         (wait 5s)         │            │
+│          │  2. Stop Redis Server     (wait 5s)         │            │
+│          │  3. Stop Event Publishing (wait 5s)         │            │
+│          │  4. Persist Cache Data    (wait 5s)         │            │
+│          │  5. Close Persistence     (wait 5s)         │            │
+│          └─────────────────────────────────────────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### File-Based Shutdown
+
+```bash
+# Linux/Mac
+touch kuber.shutdown
+
+# Windows
+echo. > kuber.shutdown
+
+# Using the provided script
+./kuber-shutdown.sh
+./kuber-shutdown.sh -r "Maintenance window"
+```
+
+#### REST API Shutdown
+
+```bash
+curl -X POST http://localhost:8080/api/admin/shutdown \
+  -H "X-API-Key: your-api-key"
+```
+
+#### Configuration
+
+```yaml
+kuber:
+  shutdown:
+    file-enabled: true              # Enable file-based shutdown
+    file-path: kuber.shutdown       # Path to shutdown signal file
+    check-interval-ms: 5000         # Check interval (5 seconds)
+    api-enabled: true               # Enable REST API shutdown
+    phase-delay-seconds: 5          # Delay between shutdown phases
 ```
 
 ---
@@ -1023,6 +1091,80 @@ Kuber employs a **Hybrid Memory Architecture** inspired by Aerospike:
    - Evicts values (not keys) in batches of 1000
    - Continues until heap < 50% (low watermark)
    - **Guarantee**: No OOM crashes in 24x7 operation
+
+### Off-Heap Key Index Architecture (v1.3.2)
+
+For systems with millions of keys, the on-heap KeyIndex can cause GC pressure. The **Off-Heap Key Index** stores keys in direct memory (DRAM) outside the Java heap.
+
+#### Segmented Buffer Design
+
+Since Java's `ByteBuffer.allocateDirect()` is limited to ~2GB per buffer, Kuber uses **multiple 1GB segments**:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    OFF-HEAP KEY INDEX                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│  │  Segment 0  │  │  Segment 1  │  │  Segment 2  │  ...             │
+│  │   (1 GB)    │  │   (1 GB)    │  │   (1 GB)    │                  │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                  │
+│         │                │                │                          │
+│         └────────────────┴────────────────┴──────────────────────────│
+│                             │                                        │
+│              Global Offset (long): position across segments          │
+├─────────────────────────────────────────────────────────────────────┤
+│  On-Heap Index:  ConcurrentHashMap<String, Long>  (key → offset)    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Memory Layout Per Entry
+
+Each key entry in off-heap memory uses this compact format:
+
+```
+┌──────────┬─────────────┬───────────────────────────────────────────────┐
+│ Bytes    │ Field       │ Description                                   │
+├──────────┼─────────────┼───────────────────────────────────────────────┤
+│ 2        │ keyLength   │ Length of key in bytes (short)                │
+│ variable │ keyBytes    │ UTF-8 encoded key string                      │
+│ 8        │ expiresAt   │ Expiration timestamp (-1 = no expiration)     │
+│ 1        │ location    │ Value location (MEMORY=0, DISK=1, BOTH=2)     │
+│ 4        │ valueSize   │ Size of value in bytes                        │
+│ 8        │ lastAccess  │ Last access timestamp                         │
+│ 4        │ accessCount │ Number of accesses                            │
+└──────────┴─────────────┴───────────────────────────────────────────────┘
+Total metadata: 25 bytes + 2 bytes (key length) + key bytes
+```
+
+#### Configuration
+
+```yaml
+kuber:
+  cache:
+    off-heap-key-index: true
+    off-heap-key-index-initial-size-mb: 16    # Initial segment size
+    off-heap-key-index-max-size-mb: 8192      # Max total size (8GB)
+```
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Zero GC Pressure** | Keys stored outside Java heap |
+| **>2GB Support** | Segmented architecture allows 8GB+ per region |
+| **Auto-Growth** | New segments allocated as data grows |
+| **Compaction** | Automatic defragmentation when >30% deleted |
+| **Thread-Safe** | ReentrantReadWriteLock for buffer access |
+
+#### When to Use Off-Heap
+
+| Scenario | Recommendation |
+|----------|----------------|
+| < 1 million keys | On-heap (default) is simpler |
+| 1-10 million keys | Off-heap recommended |
+| > 10 million keys | Off-heap required |
+| GC tuning problems | Off-heap helps |
+| Large key strings | Off-heap more efficient |
 
 **Value Retrieval Flow (when value not in memory):**
 ```

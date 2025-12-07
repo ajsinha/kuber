@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * - {basePath}/{regionName}/data.mdb - LMDB data file
  * - {basePath}/{regionName}/lock.mdb - LMDB lock file
  * 
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Slf4j
 public class LmdbPersistenceStore extends AbstractPersistenceStore {
@@ -66,6 +66,9 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     
     // Lock for environment creation to prevent race conditions
     private final Object envCreationLock = new Object();
+    
+    // Guard against double shutdown
+    private volatile boolean alreadyShutdown = false;
     
     public LmdbPersistenceStore(KuberProperties properties) {
         this.properties = properties;
@@ -202,26 +205,114 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void shutdown() {
-        log.info("Shutting down LMDB persistence store...");
+        // Guard against double shutdown
+        if (alreadyShutdown) {
+            log.debug("LMDB shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  LMDB GRACEFUL SHUTDOWN INITIATED                                   ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+        
+        // Mark as unavailable to prevent new operations
         available = false;
+        
+        // Step 1: Shutdown async save executor FIRST and wait for all pending saves
+        log.info("Step 1: Shutting down async save executor...");
+        shutdownAsyncExecutor();
+        
+        // Step 2: Give any remaining in-flight operations time to complete
+        try {
+            log.info("Step 2: Waiting for in-flight operations to complete...");
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        int totalRegions = regionEnvironments.size();
+        int successCount = 0;
+        int failCount = 0;
+        
+        log.info("Step 3: Closing {} region environment(s)...", totalRegions);
         
         // Close all region environments
         for (Map.Entry<String, Env<ByteBuffer>> entry : regionEnvironments.entrySet()) {
+            String regionName = entry.getKey();
             try {
-                Dbi<ByteBuffer> dbi = regionDatabases.remove(entry.getKey());
-                if (dbi != null) {
-                    dbi.close();
-                }
-                entry.getValue().close();
-                log.debug("Closed LMDB environment for region: {}", entry.getKey());
+                gracefulCloseEnvironment(regionName, entry.getValue());
+                successCount++;
             } catch (Exception e) {
-                log.warn("Error closing LMDB environment for region '{}': {}", entry.getKey(), e.getMessage());
+                log.error("Failed to gracefully close region '{}': {}", regionName, e.getMessage(), e);
+                failCount++;
+                // Still try to close even if graceful shutdown failed
+                try {
+                    Dbi<ByteBuffer> dbi = regionDatabases.remove(regionName);
+                    if (dbi != null) dbi.close();
+                    entry.getValue().close();
+                } catch (Exception closeEx) {
+                    log.warn("Force close also failed for region '{}': {}", regionName, closeEx.getMessage());
+                }
             }
         }
         
         regionEnvironments.clear();
         regionDatabases.clear();
-        log.info("LMDB persistence store shut down");
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  LMDB SHUTDOWN COMPLETE                                             ║");
+        log.info("║  Regions closed: {} success, {} failed                              ║", 
+                String.format("%-3d", successCount), String.format("%-3d", failCount));
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+    }
+    
+    /**
+     * Gracefully close an LMDB environment with proper sync.
+     * 
+     * The sequence is:
+     * 1. Force sync to flush all pending writes to disk
+     * 2. Close the database handle (Dbi)
+     * 3. Wait for OS buffers to flush
+     * 4. Close the environment
+     * 
+     * @param regionName Name of the region for logging
+     * @param env The LMDB environment to close
+     */
+    private void gracefulCloseEnvironment(String regionName, Env<ByteBuffer> env) {
+        log.info("Gracefully closing region '{}'...", regionName);
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            // Step 1: Force sync to flush all pending writes
+            log.debug("  [{}] Syncing data to disk...", regionName);
+            env.sync(true);  // force=true for immediate sync
+            log.debug("  [{}] Data synced", regionName);
+            
+            // Step 2: Close the database handle
+            log.debug("  [{}] Closing database handle...", regionName);
+            Dbi<ByteBuffer> dbi = regionDatabases.remove(regionName);
+            if (dbi != null) {
+                dbi.close();
+            }
+            log.debug("  [{}] Database handle closed", regionName);
+            
+            // Step 3: Wait for OS buffers to flush
+            Thread.sleep(500);
+            
+            // Step 4: Close the environment
+            log.debug("  [{}] Closing environment...", regionName);
+            env.close();
+            
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("  [{}] Closed successfully in {}ms", regionName, elapsed);
+            
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during shutdown of region: " + regionName);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to gracefully close region: " + regionName, e);
+        }
     }
     
     // ==================== Region Operations ====================
@@ -874,17 +965,21 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     }
     
     /**
-     * Sync data to disk.
+     * Sync all data to disk.
      * LMDB auto-syncs with MDB_MAPASYNC, but this forces immediate sync.
      */
+    @Override
     public void sync() {
-        for (Env<ByteBuffer> env : regionEnvironments.values()) {
+        log.info("Syncing all LMDB environments to disk...");
+        for (Map.Entry<String, Env<ByteBuffer>> entry : regionEnvironments.entrySet()) {
             try {
-                env.sync(true);
+                entry.getValue().sync(true);
+                log.debug("Synced region '{}' to disk", entry.getKey());
             } catch (Exception e) {
-                log.warn("Failed to sync LMDB environment: {}", e.getMessage());
+                log.warn("Failed to sync LMDB environment for region '{}': {}", entry.getKey(), e.getMessage());
             }
         }
+        log.info("All LMDB environments synced to disk");
     }
     
     /**

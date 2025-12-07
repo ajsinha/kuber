@@ -36,7 +36,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * - {basePath}/{regionName}/ - Separate RocksDB instance for each region's entries
  * - {basePath}/{regionName}/_region.json - Region metadata file
  * 
- * @version 1.2.8
+ * <p>DURABILITY (v1.3.6):
+ * <ul>
+ *   <li>All writes use WriteOptions with sync=true for critical data</li>
+ *   <li>Shutdown gate prevents new writes during shutdown</li>
+ *   <li>Proper WAL flush and sync before close</li>
+ *   <li>ReadWriteLock protects against concurrent close/write races</li>
+ * </ul>
+ * 
+ * @version 1.3.9
  */
 @Slf4j
 public class RocksDbPersistenceStore extends AbstractPersistenceStore {
@@ -49,6 +57,17 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     // Separate RocksDB instance per region for entries
     private final Map<String, RocksDB> regionDatabases = new ConcurrentHashMap<>();
     private final Map<String, Options> regionOptions = new ConcurrentHashMap<>();
+    
+    // Shutdown gate - prevents new writes during shutdown
+    private volatile boolean shuttingDown = false;
+    
+    // Guard against double shutdown (ShutdownOrchestrator + Spring @PreDestroy)
+    private volatile boolean alreadyShutdown = false;
+    
+    // Read-write lock to protect against concurrent close/write races
+    // Multiple readers (writes) can proceed concurrently, but writer (shutdown) is exclusive
+    private final java.util.concurrent.locks.ReadWriteLock shutdownLock = 
+            new java.util.concurrent.locks.ReentrantReadWriteLock();
     
     static {
         RocksDB.loadLibrary();
@@ -170,6 +189,7 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                 regionDir.mkdirs();
             }
             
+            // Configure options for durability and performance
             Options options = new Options()
                     .setCreateIfMissing(true)
                     .setMaxBackgroundJobs(4)
@@ -177,41 +197,371 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                     .setCompressionType(CompressionType.LZ4_COMPRESSION)
                     .setWriteBufferSize(64 * 1024 * 1024)  // 64MB write buffer
                     .setMaxWriteBufferNumber(3)
-                    .setTargetFileSizeBase(64 * 1024 * 1024);  // 64MB SST files
+                    .setTargetFileSizeBase(64 * 1024 * 1024)  // 64MB SST files
+                    .setParanoidChecks(true)  // Enable paranoid checks for data integrity
+                    // WAL configuration for durability
+                    .setWalTtlSeconds(0)  // Keep WAL until explicitly cleaned
+                    .setWalSizeLimitMB(0)  // No size limit on WAL
+                    .setManualWalFlush(false)  // Let RocksDB manage WAL flushes
+                    // Avoid losing data on crash
+                    .setAvoidFlushDuringShutdown(false)  // Flush during shutdown
+                    .setAvoidFlushDuringRecovery(false);  // Flush during recovery
             
             regionOptions.put(region, options);
-            RocksDB db = RocksDB.open(options, regionPath);
+            
+            RocksDB db = null;
+            try {
+                db = RocksDB.open(options, regionPath);
+            } catch (RocksDBException e) {
+                // Check if this is a corruption error
+                String errorMsg = e.getMessage();
+                if (errorMsg != null && (
+                        errorMsg.contains("Corruption") || 
+                        errorMsg.contains("MANIFEST") ||
+                        (errorMsg.contains("No such file or directory") && errorMsg.contains(".sst")))) {
+                    
+                    log.warn("╔════════════════════════════════════════════════════════════════════╗");
+                    log.warn("║  DATABASE CORRUPTION DETECTED                                      ║");
+                    log.warn("║  Region: {}                                              ║", String.format("%-42s", region));
+                    log.warn("║  Attempting automatic repair...                                    ║");
+                    log.warn("╚════════════════════════════════════════════════════════════════════╝");
+                    
+                    // Try to repair the database
+                    db = attemptDatabaseRepair(region, regionPath, options);
+                    
+                    if (db == null) {
+                        log.error("Failed to repair database for region '{}'. Data may be lost.", region);
+                        regionOptions.remove(region);
+                        throw new RuntimeException("Failed to open or repair region database: " + region, e);
+                    }
+                } else {
+                    // Not a corruption error, rethrow
+                    throw e;
+                }
+            }
             
             log.info("Opened RocksDB instance for region '{}' at: {}", region, regionPath);
             return db;
             
         } catch (RocksDBException e) {
             log.error("Failed to open RocksDB for region '{}': {}", region, e.getMessage(), e);
+            regionOptions.remove(region);
             throw new RuntimeException("Failed to open region database", e);
+        }
+    }
+    
+    /**
+     * Attempt to repair a corrupted RocksDB database.
+     * 
+     * Steps:
+     * 1. Create a backup of the corrupted data
+     * 2. Try opening with error-tolerant options
+     * 3. If that fails, start fresh (data loss)
+     * 
+     * Note: RocksDB Java API does not expose repairDB directly, so we rely on
+     * tolerant open options and fresh start as recovery strategies.
+     * 
+     * @param region Region name
+     * @param regionPath Path to the region database
+     * @param options Original options
+     * @return Opened RocksDB instance, or null if repair failed
+     */
+    private RocksDB attemptDatabaseRepair(String region, String regionPath, Options options) {
+        // Step 1: Create backup of corrupted data
+        String backupPath = regionPath + "_corrupted_" + System.currentTimeMillis();
+        try {
+            File regionDir = new File(regionPath);
+            File backupDir = new File(backupPath);
+            
+            if (regionDir.exists()) {
+                log.info("Creating backup of corrupted data at: {}", backupPath);
+                copyDirectory(regionDir, backupDir);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create backup: {}", e.getMessage());
+        }
+        
+        // Step 2: Try opening with error-tolerant options (skip corrupt data)
+        log.info("Attempting to open with error-tolerant options for region '{}'...", region);
+        try {
+            Options tolerantOptions = new Options()
+                    .setCreateIfMissing(true)
+                    .setMaxBackgroundJobs(4)
+                    .setMaxOpenFiles(-1)
+                    .setCompressionType(CompressionType.LZ4_COMPRESSION)
+                    .setWriteBufferSize(64 * 1024 * 1024)
+                    .setMaxWriteBufferNumber(3)
+                    .setTargetFileSizeBase(64 * 1024 * 1024)
+                    .setParanoidChecks(false);  // Disable paranoid checks to skip corrupt data
+            
+            // Close old options and use new tolerant ones
+            regionOptions.put(region, tolerantOptions);
+            options.close();
+            
+            RocksDB db = RocksDB.open(tolerantOptions, regionPath);
+            log.warn("Opened database with tolerant options for region '{}' - some data may be missing", region);
+            return db;
+            
+        } catch (RocksDBException e) {
+            log.warn("Error-tolerant open failed for region '{}': {}", region, e.getMessage());
+        }
+        
+        // Step 3: Last resort - delete and start fresh
+        log.warn("All recovery attempts failed for region '{}'. Starting fresh (data loss!).", region);
+        try {
+            // Delete the corrupted directory
+            File regionDir = new File(regionPath);
+            deleteDirectory(regionDir);
+            
+            // Create fresh database
+            regionDir.mkdirs();
+            Options freshOptions = new Options()
+                    .setCreateIfMissing(true)
+                    .setMaxBackgroundJobs(4)
+                    .setMaxOpenFiles(-1)
+                    .setCompressionType(CompressionType.LZ4_COMPRESSION)
+                    .setWriteBufferSize(64 * 1024 * 1024)
+                    .setMaxWriteBufferNumber(3)
+                    .setTargetFileSizeBase(64 * 1024 * 1024)
+                    .setParanoidChecks(true);
+            
+            regionOptions.put(region, freshOptions);
+            
+            RocksDB db = RocksDB.open(freshOptions, regionPath);
+            log.warn("Created fresh database for region '{}'. Corrupted data backed up at: {}", region, backupPath);
+            return db;
+            
+        } catch (Exception e) {
+            log.error("Failed to create fresh database for region '{}': {}", region, e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Copy a directory recursively.
+     */
+    private void copyDirectory(File source, File destination) throws java.io.IOException {
+        if (source.isDirectory()) {
+            if (!destination.exists()) {
+                destination.mkdirs();
+            }
+            String[] children = source.list();
+            if (children != null) {
+                for (String child : children) {
+                    copyDirectory(new File(source, child), new File(destination, child));
+                }
+            }
+        } else {
+            java.nio.file.Files.copy(source.toPath(), destination.toPath(), 
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+    
+    /**
+     * Delete a directory recursively.
+     */
+    private void deleteDirectory(File directory) {
+        if (directory.exists()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        deleteDirectory(file);
+                    } else {
+                        file.delete();
+                    }
+                }
+            }
+            directory.delete();
         }
     }
     
     @Override
     public void shutdown() {
-        log.info("Shutting down RocksDB persistence store...");
+        // Guard against double shutdown (ShutdownOrchestrator calls us, then Spring @PreDestroy)
+        if (alreadyShutdown) {
+            log.debug("RocksDB shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  ROCKSDB GRACEFUL SHUTDOWN INITIATED                                ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+        
+        // Step 1: Signal shutdown to stop new write attempts
+        log.info("Step 1: Setting shutdown flag to reject new writes...");
+        shuttingDown = true;
         available = false;
         
-        for (Map.Entry<String, RocksDB> entry : regionDatabases.entrySet()) {
+        // Step 2: Shutdown async save executor FIRST and wait for all pending saves
+        // This ensures all async writes complete before we close databases
+        log.info("Step 2: Shutting down async save executor and waiting for pending saves...");
+        shutdownAsyncExecutor();
+        log.info("Step 2: Async save executor shutdown complete");
+        
+        // Step 3: Acquire WRITE lock to wait for any remaining in-flight operations
+        log.info("Step 3: Waiting for all in-flight write operations to complete...");
+        shutdownLock.writeLock().lock();
+        try {
+            log.info("Step 4: All in-flight writes completed, proceeding with database close...");
+            
+            // Additional safety wait
             try {
-                entry.getValue().close();
-                log.debug("Closed region database: {}", entry.getKey());
-            } catch (Exception e) {
-                log.warn("Error closing region database '{}': {}", entry.getKey(), e.getMessage());
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            int totalRegions = regionDatabases.size();
+            int successCount = 0;
+            int failCount = 0;
+            
+            log.info("Closing {} region database(s)...", totalRegions);
+            
+            for (Map.Entry<String, RocksDB> entry : regionDatabases.entrySet()) {
+                String regionName = entry.getKey();
+                RocksDB db = entry.getValue();
+                
+                try {
+                    gracefulCloseDatabase(regionName, db);
+                    successCount++;
+                } catch (Exception e) {
+                    log.error("Failed to gracefully close region '{}': {}", regionName, e.getMessage(), e);
+                    failCount++;
+                    // Still try to close even if graceful shutdown failed
+                    try {
+                        db.close();
+                    } catch (Exception closeEx) {
+                        log.warn("Force close also failed for region '{}': {}", regionName, closeEx.getMessage());
+                    }
+                }
+            }
+            regionDatabases.clear();
+            
+            // Close options after all databases are closed
+            for (Map.Entry<String, Options> entry : regionOptions.entrySet()) {
+                try {
+                    entry.getValue().close();
+                } catch (Exception e) {
+                    log.warn("Error closing options for region '{}': {}", entry.getKey(), e.getMessage());
+                }
+            }
+            regionOptions.clear();
+            
+            log.info("╔════════════════════════════════════════════════════════════════════╗");
+            log.info("║  ROCKSDB SHUTDOWN COMPLETE                                          ║");
+            log.info("║  Regions closed: {} success, {} failed                              ║", 
+                    String.format("%-3d", successCount), String.format("%-3d", failCount));
+            log.info("╚════════════════════════════════════════════════════════════════════╝");
+            
+        } finally {
+            shutdownLock.writeLock().unlock();
+        }
+    }
+    
+    /**
+     * Gracefully close a RocksDB database with proper flush and sync.
+     * This ensures all data is persisted to disk before closing.
+     * 
+     * The sequence is:
+     * 1. Pause background work to prevent new compactions
+     * 2. Cancel existing background work and wait for completion
+     * 3. Flush all memtables to SST files with sync
+     * 4. Sync the WAL (Write-Ahead Log)
+     * 5. Wait for OS buffers to flush
+     * 6. Close the database
+     * 
+     * @param regionName Name of the region for logging
+     * @param db The RocksDB instance to close
+     */
+    private void gracefulCloseDatabase(String regionName, RocksDB db) throws RocksDBException {
+        log.info("Gracefully closing region '{}'...", regionName);
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            // CRITICAL: The order matters! We must flush BEFORE canceling background work.
+            // cancelAllBackgroundWork(true) puts RocksDB in shutdown mode where flush() fails.
+            
+            // Step 1: Flush all memtables to SST files FIRST (while RocksDB is still active)
+            log.debug("  [{}] Flushing memtables to disk...", regionName);
+            try (FlushOptions flushOptions = new FlushOptions()) {
+                flushOptions.setWaitForFlush(true);  // Wait for flush to complete
+                flushOptions.setAllowWriteStall(true);  // Allow blocking if needed
+                db.flush(flushOptions);
+            }
+            log.debug("  [{}] Memtables flushed", regionName);
+            
+            // Step 2: Sync WAL to ensure all writes are durable
+            log.debug("  [{}] Syncing WAL...", regionName);
+            db.syncWal();
+            log.debug("  [{}] WAL synced", regionName);
+            
+            // Step 3: Flush and sync WAL one more time
+            log.debug("  [{}] Final WAL flush with sync...", regionName);
+            db.flushWal(true);  // true = sync
+            log.debug("  [{}] WAL flushed and synced", regionName);
+            
+            // Step 4: Small delay to ensure all I/O is complete
+            Thread.sleep(500);
+            
+            // Step 5: NOW cancel background work (after all data is safely on disk)
+            // The 'true' parameter means wait for background work to finish
+            log.debug("  [{}] Canceling background work...", regionName);
+            db.cancelAllBackgroundWork(true);
+            log.debug("  [{}] Background work canceled", regionName);
+            
+            // Step 6: Extended delay to ensure OS buffers are flushed
+            log.debug("  [{}] Waiting for OS buffers...", regionName);
+            Thread.sleep(500);
+            
+            // Step 7: Close the database
+            log.debug("  [{}] Closing database handle...", regionName);
+            db.close();
+            
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("  [{}] Closed successfully in {}ms", regionName, elapsed);
+            
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RocksDBException("Interrupted during shutdown of region: " + regionName);
+        }
+    }
+    
+    /**
+     * Force sync all region databases to disk.
+     * This can be called before shutdown to ensure data durability.
+     */
+    public void syncAllRegions() {
+        log.info("Syncing all region databases to disk...");
+        
+        for (Map.Entry<String, RocksDB> entry : regionDatabases.entrySet()) {
+            String regionName = entry.getKey();
+            RocksDB db = entry.getValue();
+            
+            try {
+                // Flush memtables
+                try (FlushOptions flushOptions = new FlushOptions()) {
+                    flushOptions.setWaitForFlush(true);
+                    db.flush(flushOptions);
+                }
+                
+                // Sync WAL
+                db.syncWal();
+                db.flushWal(true);
+                
+                log.debug("Synced region '{}' to disk", regionName);
+            } catch (RocksDBException e) {
+                log.warn("Failed to sync region '{}': {}", regionName, e.getMessage());
             }
         }
-        regionDatabases.clear();
         
-        for (Options options : regionOptions.values()) {
-            options.close();
-        }
-        regionOptions.clear();
-        
-        log.info("RocksDB persistence store shutdown complete");
+        log.info("All regions synced to disk");
+    }
+    
+    @Override
+    public void sync() {
+        syncAllRegions();
     }
     
     // ==================== Region Operations ====================
@@ -320,22 +670,6 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         }
     }
     
-    private void deleteDirectory(File dir) {
-        if (dir.exists()) {
-            File[] files = dir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isDirectory()) {
-                        deleteDirectory(file);
-                    } else {
-                        file.delete();
-                    }
-                }
-            }
-            dir.delete();
-        }
-    }
-    
     @Override
     public void purgeRegion(String name) {
         try {
@@ -364,19 +698,42 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     
     // ==================== Entry Operations ====================
     
+    /**
+     * Check if we can accept writes (not shutting down).
+     * @throws RuntimeException if shutting down
+     */
+    private void checkWriteAllowed() {
+        if (shuttingDown) {
+            throw new RuntimeException("Cannot write: RocksDB is shutting down");
+        }
+    }
+    
     @Override
     public void saveEntry(CacheEntry entry) {
-        RocksDB regionDb = getOrCreateRegionDatabase(entry.getRegion());
-        
+        // Acquire read lock (allows concurrent writes, blocks during shutdown)
+        shutdownLock.readLock().lock();
         try {
-            String json = JsonUtils.toJson(entryToMap(entry));
-            regionDb.put(
-                    entry.getKey().getBytes(StandardCharsets.UTF_8),
-                    json.getBytes(StandardCharsets.UTF_8));
-        } catch (RocksDBException e) {
-            log.error("Failed to save entry '{}' to region '{}': {}", 
-                    entry.getKey(), entry.getRegion(), e.getMessage(), e);
-            throw new RuntimeException("Failed to save entry", e);
+            checkWriteAllowed();
+            
+            RocksDB regionDb = getOrCreateRegionDatabase(entry.getRegion());
+            
+            // Use WriteOptions with sync for durability
+            try (WriteOptions writeOptions = new WriteOptions()) {
+                // Sync to disk for important single writes
+                writeOptions.setSync(true);
+                
+                String json = JsonUtils.toJson(entryToMap(entry));
+                regionDb.put(
+                        writeOptions,
+                        entry.getKey().getBytes(StandardCharsets.UTF_8),
+                        json.getBytes(StandardCharsets.UTF_8));
+            } catch (RocksDBException e) {
+                log.error("Failed to save entry '{}' to region '{}': {}", 
+                        entry.getKey(), entry.getRegion(), e.getMessage(), e);
+                throw new RuntimeException("Failed to save entry", e);
+            }
+        } finally {
+            shutdownLock.readLock().unlock();
         }
     }
     
@@ -384,30 +741,43 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     public void saveEntries(List<CacheEntry> entries) {
         if (entries.isEmpty()) return;
         
-        Map<String, List<CacheEntry>> entriesByRegion = new ConcurrentHashMap<>();
-        for (CacheEntry entry : entries) {
-            entriesByRegion.computeIfAbsent(entry.getRegion(), k -> new ArrayList<>()).add(entry);
-        }
-        
-        for (Map.Entry<String, List<CacheEntry>> regionEntries : entriesByRegion.entrySet()) {
-            String region = regionEntries.getKey();
-            RocksDB regionDb = getOrCreateRegionDatabase(region);
+        // Acquire read lock (allows concurrent writes, blocks during shutdown)
+        shutdownLock.readLock().lock();
+        try {
+            checkWriteAllowed();
             
-            try (WriteBatch batch = new WriteBatch();
-                 WriteOptions writeOptions = new WriteOptions()) {
-                
-                for (CacheEntry entry : regionEntries.getValue()) {
-                    String json = JsonUtils.toJson(entryToMap(entry));
-                    batch.put(
-                            entry.getKey().getBytes(StandardCharsets.UTF_8),
-                            json.getBytes(StandardCharsets.UTF_8));
-                }
-                
-                regionDb.write(writeOptions, batch);
-            } catch (RocksDBException e) {
-                log.error("Failed to batch save entries to region '{}': {}", region, e.getMessage(), e);
-                throw new RuntimeException("Failed to batch save entries", e);
+            Map<String, List<CacheEntry>> entriesByRegion = new ConcurrentHashMap<>();
+            for (CacheEntry entry : entries) {
+                entriesByRegion.computeIfAbsent(entry.getRegion(), k -> new ArrayList<>()).add(entry);
             }
+            
+            for (Map.Entry<String, List<CacheEntry>> regionEntries : entriesByRegion.entrySet()) {
+                String region = regionEntries.getKey();
+                RocksDB regionDb = getOrCreateRegionDatabase(region);
+                
+                try (WriteBatch batch = new WriteBatch();
+                     WriteOptions writeOptions = new WriteOptions()) {
+                    
+                    // For batch writes during shutdown persist, use sync
+                    // For normal batch writes, don't sync every batch (performance)
+                    // The shutdown process will sync everything at the end
+                    writeOptions.setSync(false);  // WAL is still written, just not synced per batch
+                    
+                    for (CacheEntry entry : regionEntries.getValue()) {
+                        String json = JsonUtils.toJson(entryToMap(entry));
+                        batch.put(
+                                entry.getKey().getBytes(StandardCharsets.UTF_8),
+                                json.getBytes(StandardCharsets.UTF_8));
+                    }
+                    
+                    regionDb.write(writeOptions, batch);
+                } catch (RocksDBException e) {
+                    log.error("Failed to batch save entries to region '{}': {}", region, e.getMessage(), e);
+                    throw new RuntimeException("Failed to batch save entries", e);
+                }
+            }
+        } finally {
+            shutdownLock.readLock().unlock();
         }
     }
     
@@ -514,14 +884,23 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void deleteEntry(String region, String key) {
-        RocksDB regionDb = regionDatabases.get(region);
-        if (regionDb == null) return;
-        
+        // Acquire read lock (allows concurrent operations, blocks during shutdown)
+        shutdownLock.readLock().lock();
         try {
-            regionDb.delete(key.getBytes(StandardCharsets.UTF_8));
-        } catch (RocksDBException e) {
-            log.error("Failed to delete entry '{}' from region '{}': {}", key, region, e.getMessage(), e);
-            throw new RuntimeException("Failed to delete entry", e);
+            checkWriteAllowed();
+            
+            RocksDB regionDb = regionDatabases.get(region);
+            if (regionDb == null) return;
+            
+            try (WriteOptions writeOptions = new WriteOptions()) {
+                writeOptions.setSync(true);  // Sync deletes for durability
+                regionDb.delete(writeOptions, key.getBytes(StandardCharsets.UTF_8));
+            } catch (RocksDBException e) {
+                log.error("Failed to delete entry '{}' from region '{}': {}", key, region, e.getMessage(), e);
+                throw new RuntimeException("Failed to delete entry", e);
+            }
+        } finally {
+            shutdownLock.readLock().unlock();
         }
     }
     
@@ -529,19 +908,30 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     public void deleteEntries(String region, List<String> keys) {
         if (keys.isEmpty()) return;
         
-        RocksDB regionDb = regionDatabases.get(region);
-        if (regionDb == null) return;
-        
-        try (WriteBatch batch = new WriteBatch();
-             WriteOptions writeOptions = new WriteOptions()) {
+        // Acquire read lock (allows concurrent operations, blocks during shutdown)
+        shutdownLock.readLock().lock();
+        try {
+            checkWriteAllowed();
             
-            for (String key : keys) {
-                batch.delete(key.getBytes(StandardCharsets.UTF_8));
+            RocksDB regionDb = regionDatabases.get(region);
+            if (regionDb == null) return;
+            
+            try (WriteBatch batch = new WriteBatch();
+                 WriteOptions writeOptions = new WriteOptions()) {
+                
+                // Batch deletes don't need sync per batch - WAL handles durability
+                writeOptions.setSync(false);
+                
+                for (String key : keys) {
+                    batch.delete(key.getBytes(StandardCharsets.UTF_8));
+                }
+                regionDb.write(writeOptions, batch);
+            } catch (RocksDBException e) {
+                log.error("Failed to batch delete entries from region '{}': {}", region, e.getMessage(), e);
+                throw new RuntimeException("Failed to batch delete entries", e);
             }
-            regionDb.write(writeOptions, batch);
-        } catch (RocksDBException e) {
-            log.error("Failed to batch delete entries from region '{}': {}", region, e.getMessage(), e);
-            throw new RuntimeException("Failed to batch delete entries", e);
+        } finally {
+            shutdownLock.readLock().unlock();
         }
     }
     

@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.2.8
+Version 1.3.9
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,13 +13,14 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
-- **Off-Heap Key Index (v1.2.2)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
+- **Off-Heap Key Index (v1.3.2 - segmented, >2GB)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
 - **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
 - **Redis Protocol Compatibility**: Connect using any Redis client
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
 - **Event Publishing (v1.2.8)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files
+- **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
 - **Pre-Startup Compaction**: RocksDB/SQLite optimized BEFORE Spring context loads
@@ -87,6 +88,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Multi-Backend Persistence | RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL, or in-memory |
 | LMDB Support (v1.2.0) | Lightning Memory-Mapped Database with zero-copy reads |
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
+| Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
 | Event Publishing (v1.2.8) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
@@ -570,6 +572,402 @@ kuber:
 }
 ```
 
+## Concurrency Safety & Graceful Shutdown (v1.3.3)
+
+Kuber v1.3.3 introduces comprehensive concurrency controls and graceful shutdown orchestration to prevent RocksDB corruption and ensure data integrity.
+
+### Persistence Operation Locking
+
+A centralized `PersistenceOperationLock` prevents concurrent operations that could corrupt the persistence store:
+
+| Operation | Lock Type | Blocks |
+|-----------|-----------|--------|
+| **Compaction** | Exclusive Global | All other operations |
+| **Shutdown** | Exclusive Global | All other operations |
+| **Cleanup/Expiration** | Shared Global | Only during exclusive operations |
+| **Autoload** | Per-Region | Only same-region operations |
+| **Region Loading** | Per-Region | Queries to that region |
+
+### Shutdown Orchestrator
+
+The `ShutdownOrchestrator` ensures orderly shutdown in the **exact reverse order** of startup with configurable delays between phases:
+
+```
+Startup Order:                    Shutdown Order (Reverse):
+1. Persistence Maintenance  →     5. Close Persistence Store
+2. Cache Service           →     4. Persist Cache Data
+3. Event Publishing        →     3. Stop Event Publishing
+4. Redis Server            →     2. Stop Redis Server
+5. Autoload Service        →     1. Stop Autoload Service
+```
+
+Each phase has a configurable delay (default: 5 seconds) to ensure:
+- In-flight operations complete
+- Buffers are flushed
+- File handles are properly closed
+- No corruption from concurrent shutdown
+
+### Region Loading Guards
+
+During startup, queries to a region that's still loading will **wait** until loading completes (30s timeout). This prevents:
+- Queries returning incomplete data
+- Race conditions during recovery
+
+## Management Scripts (v1.3.5)
+
+Kuber v1.3.5 provides comprehensive management scripts in the `scripts/` folder for startup, shutdown, and status monitoring.
+
+### Available Scripts
+
+| Script | Platform | Description |
+|--------|----------|-------------|
+| `kuber-start.sh` | Linux/Mac | Start Kuber server |
+| `kuber-start.bat` | Windows | Start Kuber server |
+| `kuber-shutdown.sh` | Linux/Mac | Graceful shutdown |
+| `kuber-shutdown.bat` | Windows | Graceful shutdown |
+| `kuber-status.sh` | Linux/Mac | Check server status |
+
+### Startup Scripts
+
+```bash
+# Basic startup
+./scripts/kuber-start.sh
+
+# With options
+./scripts/kuber-start.sh -m 4g -p prod              # 4GB heap, prod profile
+./scripts/kuber-start.sh -d -l /var/log/kuber       # Daemon mode with log dir
+./scripts/kuber-start.sh --redis-port 6381          # Custom Redis port
+./scripts/kuber-start.sh --debug                     # Enable remote debugging
+
+# Windows
+scripts\kuber-start.bat
+scripts\kuber-start.bat /memory:4g /profile:prod
+```
+
+### Shutdown Methods
+
+| Method | Command | Use Case |
+|--------|---------|----------|
+| **File-based** | `touch kuber.shutdown` | Local shutdown, scripted |
+| **REST API** | `POST /api/admin/shutdown` | Remote shutdown, automation |
+| **Signal** | `SIGTERM` / `Ctrl+C` | Container orchestration |
+| **Script** | `./scripts/kuber-shutdown.sh` | Convenient wrapper |
+
+### File-Based Shutdown (Recommended)
+
+The simplest way to shutdown Kuber cleanly:
+
+```bash
+# Linux/Mac
+touch kuber.shutdown
+
+# Windows
+echo. > kuber.shutdown
+
+# Or use the provided script
+./scripts/kuber-shutdown.sh
+```
+
+Kuber watches for this file every 5 seconds. When detected:
+1. Initiates graceful shutdown sequence
+2. Deletes the shutdown file
+3. Completes all phases in order
+
+### REST API Shutdown
+
+For remote or programmatic shutdown:
+
+```bash
+# Trigger shutdown
+curl -X POST http://localhost:8080/api/admin/shutdown \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json"
+
+# Check shutdown status
+curl http://localhost:8080/api/admin/shutdown/status \
+  -H "X-API-Key: your-api-key"
+
+# View shutdown configuration
+curl http://localhost:8080/api/admin/shutdown/config \
+  -H "X-API-Key: your-api-key"
+```
+
+### Shutdown Scripts
+
+Convenient wrapper scripts are provided:
+
+```bash
+# Linux/Mac
+./scripts/kuber-shutdown.sh                        # File-based (default)
+./scripts/kuber-shutdown.sh -a -k myapikey         # API-based
+./scripts/kuber-shutdown.sh -r "Maintenance"       # With reason
+
+# Windows
+scripts\kuber-shutdown.bat                         # File-based (default)
+scripts\kuber-shutdown.bat /api /key:myapikey      # API-based
+scripts\kuber-shutdown.bat /reason:"Maintenance"   # With reason
+```
+
+### Startup Sequence
+
+```
+Application Start
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 1: Infrastructure Setup                               │
+│  - Initialize logging & configuration                        │
+│  - Connect to ZooKeeper (if replication enabled)            │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 2: Persistence Maintenance (Concurrent)               │
+│  - Initialize RocksDB/SQLite stores per region              │
+│  - Run compaction in parallel                                │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 3: Cache Recovery (Concurrent)                        │
+│  - Load persisted entries into memory                        │
+│  - Build off-heap key indexes                                │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 4: Service Activation                                 │
+│  - Start Event Publishing, Redis Server, HTTP Server        │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Phase 5: Background Services - System Ready!                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Shutdown Sequence
+
+```
+Shutdown Triggered (file/API/signal)
+       │
+       ▼
+1. Signal Shutdown (block new operations) → Wait 5s
+       │
+2. Stop Autoload Service → Wait 5s
+       │
+3. Stop Redis Protocol Server → Wait 5s
+       │
+4. Stop Event Publishing → Wait 5s
+       │
+5. Persist Cache Data → Wait 5s
+       │
+6. Close Persistence Store → Wait 5s
+       │
+       └── Exit (total ~30 seconds)
+```
+
+### Configuration
+
+```yaml
+kuber:
+  shutdown:
+    file-enabled: true              # Enable file-based shutdown
+    file-path: kuber.shutdown       # Path to shutdown signal file
+    check-interval-ms: 5000         # Check interval (5 seconds)
+    api-enabled: true               # Enable REST API shutdown
+    phase-delay-seconds: 5          # Delay between shutdown phases
+```
+
+## Complete Shutdown Orchestration & RocksDB Durability (v1.3.6)
+
+Kuber v1.3.6 provides comprehensive shutdown orchestration and fixes RocksDB corruption issues.
+
+### Task Scheduler Shutdown
+
+All `@Scheduled` methods are now properly stopped during shutdown:
+
+- **TaskScheduler.shutdown()**: Immediately halts Spring's task scheduler
+- **Shutdown flags**: Each service checks `shuttingDown` before execution
+- **No more stray executions**: CacheMetricsService, MemoryWatcher, Expiration, Compaction all stop cleanly
+
+### RocksDB Write Protection
+
+Writes are now protected during shutdown using a ReadWriteLock:
+
+```
+Write Operation                    Shutdown Operation
+     │                                   │
+     ▼                                   ▼
+┌──────────────────┐            ┌──────────────────┐
+│ readLock.lock()  │            │ shuttingDown=true│
+│     │            │            │      │           │
+│     ▼            │            │      ▼           │
+│ checkWriteAllowed│            │ writeLock.lock() │ ← Blocks until all
+│     │            │            │      │           │   reads complete
+│     ▼            │            │      ▼           │
+│ db.put(...)      │            │ gracefulClose()  │
+│     │            │            │      │           │
+│     ▼            │            │      ▼           │
+│ readLock.unlock()│            │ db.close()       │
+└──────────────────┘            └──────────────────┘
+```
+
+### Enhanced WAL Configuration
+
+RocksDB now uses optimal WAL settings for durability:
+
+```java
+Options options = new Options()
+    .setWalTtlSeconds(0)              // Keep WAL until cleaned
+    .setWalSizeLimitMB(0)             // No size limit
+    .setManualWalFlush(false)         // Auto WAL management
+    .setAvoidFlushDuringShutdown(false) // Flush on shutdown
+    .setAvoidFlushDuringRecovery(false); // Flush on recovery
+```
+
+### WriteOptions Sync
+
+Critical writes now use `WriteOptions.setSync(true)`:
+
+```java
+try (WriteOptions writeOptions = new WriteOptions()) {
+    writeOptions.setSync(true);  // Sync to disk immediately
+    regionDb.put(writeOptions, key, value);
+}
+```
+
+## RocksDB Durability Improvements (v1.3.5)
+
+Kuber v1.3.5 includes critical improvements to RocksDB persistence to prevent data corruption and ensure reliable recovery.
+
+### Graceful Shutdown Sequence
+
+The shutdown process now properly handles RocksDB's background operations:
+
+1. **Cancel Background Work**: Stop all compaction and flush threads
+2. **Flush Memtables**: Write in-memory data to SST files
+3. **Sync WAL**: Ensure Write-Ahead Log is durable on disk
+4. **Final Sync**: Double-sync to ensure OS buffers are flushed
+5. **Close Database**: Release file handles
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  RocksDB Graceful Close Sequence                             │
+├─────────────────────────────────────────────────────────────┤
+│  1. cancelAllBackgroundWork(true)  ← Wait for completion    │
+│  2. flush(waitForFlush=true)       ← Memtable → SST         │
+│  3. syncWal()                      ← WAL to disk            │
+│  4. flushWal(sync=true)            ← Final WAL sync         │
+│  5. wait(500ms)                    ← OS buffer flush        │
+│  6. close()                        ← Release handles        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Corruption Detection and Recovery
+
+If corruption is detected on startup, Kuber automatically attempts recovery:
+
+1. **Backup**: Create backup of corrupted data
+2. **Tolerant Open**: Attempt opening with relaxed checks (may recover partial data)
+3. **Fresh Start**: As last resort, create fresh database (corrupted data backed up)
+
+```
+Corruption Detected on Startup
+         │
+         ▼
+┌─────────────────────────────────────────┐
+│  1. Create backup of corrupted data      │
+│     → {region}_corrupted_{timestamp}     │
+├─────────────────────────────────────────┤
+│  2. Open with paranoidChecks=false       │
+│     → May recover partial data           │
+├─────────────────────────────────────────┤
+│  3. Start fresh (data loss)              │
+│     → Corrupted data preserved in backup │
+└─────────────────────────────────────────┘
+```
+
+### All Persistence Stores - Graceful Shutdown
+
+v1.3.5 adds graceful shutdown to ALL persistence stores:
+
+| Store | Shutdown Sequence |
+|-------|-------------------|
+| **RocksDB** | Cancel background work → Flush memtables → Sync WAL → Close |
+| **LMDB** | Sync environments → Close DBI handles → Close environments |
+| **SQLite** | WAL checkpoint (TRUNCATE) → Close connections |
+| **PostgreSQL** | Wait for active connections → Close HikariCP pool |
+| **MongoDB** | Wait for in-flight ops → Spring manages MongoClient |
+| **Memory** | Clear maps (data is volatile) |
+
+### Pre/Post Sync During Shutdown
+
+The shutdown orchestrator now includes sync phases:
+
+- **Pre-Sync**: Sync existing data before cache persist
+- **Cache Persist**: Save all cache entries
+- **Post-Sync**: Sync newly written data
+- **Extended Wait**: Double delay before closing
+
+This ensures all data is safely written to disk before the database handles are closed.
+
+
+## Concurrent Region Processing (v1.3.2)
+
+Kuber v1.3.2 introduces parallel processing for startup operations, significantly reducing startup time for systems with multiple regions.
+
+### Off-Heap Key Index - Segmented Buffers (v1.3.2)
+
+The off-heap key index now supports buffer sizes **exceeding 2GB** using multiple 1GB segments:
+
+| Feature | v1.3.0 | v1.3.2 |
+|---------|--------|--------|
+| Max Size Per Region | 2047MB (capped) | **8GB+** (configurable) |
+| Buffer Architecture | Single ByteBuffer | Multiple 1GB segments |
+| Offset Type | int | **long** |
+
+Configuration:
+```yaml
+kuber:
+  cache:
+    off-heap-key-index: true
+    off-heap-key-index-initial-size-mb: 16
+    off-heap-key-index-max-size-mb: 8192  # Now supports >2GB!
+```
+
+Segments are allocated dynamically as data grows. Statistics now include `segmentCount` to track allocation.
+
+### What's Processed Concurrently
+
+| Operation | Description | When |
+|-----------|-------------|------|
+| **Startup Compaction** | RocksDB compactRange() or SQLite VACUUM | Before cache initialization |
+| **Data Loading** | Loading keys/values from persistence into memory | During cache priming |
+
+### Why It's Safe
+
+Each region has its own **isolated database instance**:
+- **RocksDB**: Separate directory per region (e.g., `./data/rocksdb/customers/`, `./data/rocksdb/orders/`)
+- **SQLite**: Separate file per region (e.g., `customers.db`, `orders.db`)
+
+No lock contention between regions - they're completely independent databases.
+
+### Configuration
+
+```yaml
+kuber:
+  persistence:
+    type: rocksdb
+    rocksdb:
+      path: ./data/rocksdb
+      compaction-enabled: true
+    
+    # Or for SQLite:
+    sqlite:
+      path: ./data
+```
+
 ## Autoload - Bulk Data Import
 
 Kuber can automatically load data from CSV and JSON files placed in a watched directory.
@@ -588,10 +986,14 @@ kuber:
     enabled: true
     directory: ./autoload
     scan-interval-seconds: 60
-    max-records-per-file: 0  # 0 = unlimited
+    batch-size: 2048          # Records per batch for bulk writes (v1.3.9)
+    max-records-per-file: 0   # 0 = unlimited
     create-directories: true
     file-encoding: UTF-8
 ```
+
+Files are processed sequentially with batch writes for optimal performance.
+Batch writes provide 10-50x faster loading compared to per-record writes.
 
 ### Metadata File Format
 

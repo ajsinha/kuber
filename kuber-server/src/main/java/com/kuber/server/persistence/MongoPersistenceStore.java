@@ -37,6 +37,9 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
     private final MongoDatabase database;
     private final KuberProperties properties;
     
+    // Guard against double shutdown
+    private volatile boolean alreadyShutdown = false;
+    
     public MongoPersistenceStore(MongoDatabase database, KuberProperties properties) {
         this.database = database;
         this.properties = properties;
@@ -66,9 +69,48 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void shutdown() {
-        log.info("Shutting down MongoDB persistence store...");
+        // Guard against double shutdown
+        if (alreadyShutdown) {
+            log.debug("MongoDB shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  MONGODB GRACEFUL SHUTDOWN INITIATED                                ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+        
+        // Mark as unavailable to prevent new operations
         available = false;
-        // MongoDatabase is managed by Spring, no explicit close needed
+        
+        // Step 1: Shutdown async save executor FIRST and wait for all pending saves
+        log.info("Step 1: Shutting down async save executor...");
+        shutdownAsyncExecutor();
+        
+        // Step 2: Give any remaining in-flight operations time to complete
+        try {
+            log.info("Step 2: Waiting for in-flight operations to complete...");
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        // MongoDB client lifecycle is managed by Spring/MongoConfig
+        // No explicit close needed here as MongoConfig handles it via @PreDestroy
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  MONGODB SHUTDOWN COMPLETE                                          ║");
+        log.info("║  Note: MongoClient is managed by Spring and will close separately   ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+    }
+    
+    /**
+     * Sync is a no-op for MongoDB as it handles durability based on write concern.
+     * With WriteConcern.ACKNOWLEDGED (default), writes are durable once acknowledged.
+     */
+    @Override
+    public void sync() {
+        log.debug("MongoDB sync called - no action needed (write concern handles durability)");
+        // MongoDB handles durability via write concern settings
     }
     
     private void createIndexes(String collectionName, Bson... indexes) {

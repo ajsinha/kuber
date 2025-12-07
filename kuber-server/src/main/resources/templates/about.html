@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.2.8</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.3.9</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -149,7 +149,23 @@
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
                             Multi-destination support with centralized broker configuration.
                         </p>
-                        <span class="badge bg-light text-dark">New in v1.2.8</span>
+                        <span class="badge bg-light text-dark">v1.2.8</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);">
+                    <div class="card-body text-center p-4 text-white">
+                        <div class="rounded-circle bg-white bg-opacity-25 p-3 d-inline-block mb-3">
+                            <i class="fas fa-layer-group fa-2x"></i>
+                        </div>
+                        <h5 class="card-title">Synchronous Data Consistency</h5>
+                        <p class="card-text opacity-75">
+                            Sequential startup compaction and data loading for guaranteed data integrity.
+                            Disk writes complete before key index updates.
+                        </p>
+                        <span class="badge bg-light text-dark">Updated in v1.3.9</span>
                     </div>
                 </div>
             </div>
@@ -349,8 +365,119 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.2.8</span>
-                                    <span class="text-muted small">Current - Centralized Event Publishing</span>
+                                    <span class="badge bg-primary me-2">v1.3.9</span>
+                                    <span class="text-muted small">Current - Batch Writes for Autoload</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Batch Writes</strong>: Records written in batches (default 2048) for 10-50x faster autoload</li>
+                                    <li><strong>Configurable</strong>: kuber.autoload.batch-size setting</li>
+                                    <li><strong>All Persistence Stores</strong>: Works with RocksDB, SQLite, LMDB, PostgreSQL, MongoDB</li>
+                                    <li><strong>putEntriesBatch()</strong>: New CacheService method for bulk writes</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.8</span>
+                                    <span class="text-muted small">Synchronous Saves & Parallelism Removed</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Sync Saves First</strong>: Disk write now happens BEFORE KeyIndex update - fixes "key in index but not on disk"</li>
+                                    <li><strong>Parallelism Removed</strong>: All parallel processing removed for stability</li>
+                                    <li><strong>Sequential Only</strong>: Autoload and region loading are now strictly sequential</li>
+                                    <li><strong>Data Consistency</strong>: No more race conditions between index and persistence</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.7</span>
+                                    <span class="text-muted small">RocksDB Shutdown Fix & Double Shutdown Guard</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>ShutdownInProgress Fix</strong>: Fixed RocksDB flush() failing - now flushes BEFORE canceling background work</li>
+                                    <li><strong>Async Executor Order</strong>: Shutdown async executor FIRST in all persistence stores</li>
+                                    <li><strong>Double Shutdown Guard</strong>: Added alreadyShutdown flag to prevent duplicate calls</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.6</span>
+                                    <span class="text-muted small">Complete Shutdown Orchestration & RocksDB Durability</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Task Scheduler Shutdown</strong>: Immediately stops Spring TaskScheduler to halt all @Scheduled methods</li>
+                                    <li><strong>RocksDB Write Protection</strong>: ReadWriteLock prevents concurrent writes during database close</li>
+                                    <li><strong>WriteOptions Sync</strong>: Critical writes use sync=true for immediate durability</li>
+                                    <li><strong>Caffeine Synchronous Executor</strong>: Prevents ForkJoinPool.commonPool issues during shutdown</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.5</span>
+                                    <span class="text-muted small">RocksDB Durability & Management Scripts</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>RocksDB Graceful Shutdown</strong>: Proper background work cancellation, memtable flush, WAL sync before close</li>
+                                    <li><strong>Corruption Detection &amp; Repair</strong>: Automatic backup and recovery on startup corruption</li>
+                                    <li><strong>Pre/Post Sync Phases</strong>: Shutdown orchestrator syncs before and after cache persist</li>
+                                    <li><strong>Startup Scripts</strong>: kuber-start.sh/bat with JVM options, daemon mode, custom ports</li>
+                                    <li><strong>Shutdown Scripts</strong>: kuber-shutdown.sh/bat with file/API methods</li>
+                                    <li><strong>Status Script</strong>: kuber-status.sh to check server health</li>
+                                    <li><strong>Scripts Folder</strong>: All scripts organized in scripts/ directory</li>
+                                    <li>Configurable phase delays and extended wait before persistence close</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.3</span>
+                                    <span class="text-muted small">Concurrency Safety & Graceful Shutdown</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Persistence Operation Lock</strong>: Centralized lock prevents concurrent compaction, cleanup, and autoload</li>
+                                    <li><strong>Shutdown Orchestrator</strong>: Orderly shutdown in reverse startup order with delays</li>
+                                    <li><strong>Region Loading Guards</strong>: Queries wait for regions to finish loading</li>
+                                    <li><strong>RocksDB Corruption Fix</strong>: Proper database closure prevents file corruption</li>
+                                    <li>Exclusive global lock for compaction/shutdown operations</li>
+                                    <li>Per-region locks for autoload file processing</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.2</span>
+                                    <span class="text-muted small">Segmented Off-Heap Buffers (>2GB support)</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Segmented Buffers</strong>: Off-heap key index now supports >2GB using multiple 1GB segments</li>
+                                    <li><strong>No Size Cap</strong>: Removed 2047MB limit - configure up to 8GB+ per region</li>
+                                    <li><strong>Long Offsets</strong>: All offset calculations use long arithmetic</li>
+                                    <li><strong>Dynamic Segments</strong>: New segments allocated automatically as data grows</li>
+                                    <li>Full property support: kuber.cache.off-heap-key-index-max-size-mb=8192</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.1</span>
+                                    <span class="text-muted small">Autoload Improvements</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Autoload Service</strong>: Enhanced file processing for bulk data import</li>
+                                    <li>Thread pool for autoload scan processing</li>
+                                    <li>Note: Parallel processing removed in v1.3.9 for stability</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.3.0</span>
+                                    <span class="text-muted small">Off-Heap Fix</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Bug Fix</strong>: Fixed integer overflow in off-heap key index</li>
+                                    <li>Note: Concurrent startup removed in v1.3.9 for stability</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.2.8</span>
+                                    <span class="text-muted small">Centralized Event Publishing</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Centralized Broker Definitions</strong>: Define brokers once, reference from multiple regions</li>
@@ -715,7 +842,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.2.8
+                                <strong>Version:</strong> 1.3.6
                             </li>
                         </ul>
                     </div>

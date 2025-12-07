@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.2.8</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.3.9</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -52,7 +52,7 @@
                                 <ol start="7">
                                     <li><a href="#protocol">Protocol Design</a></li>
                                     <li><a href="#replication">Replication Architecture</a></li>
-                                    <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">v1.2.8</span></li>
+                                    <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">v1.3.2</span></li>
                                     <li><a href="#security">Security Architecture</a></li>
                                     <li><a href="#data-flow">Data Flow</a></li>
                                     <li><a href="#deployment">Deployment Patterns</a></li>
@@ -171,10 +171,15 @@
                         </tbody>
                     </table>
                     
-                    <h4 class="mt-4">Startup Sequence (v1.2.6)</h4>
+                    <h4 class="mt-4">Startup Sequence (v1.3.9)</h4>
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-bolt me-2"></i>
+                        <strong>v1.3.9:</strong> All startup operations (compaction, loading) run sequentially for data consistency.
+                        This ensures no concurrent operations that could cause corruption.
+                    </div>
                     <pre class="bg-dark text-white p-3 rounded">
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STARTUP SEQUENCE                                     │
+│                         STARTUP SEQUENCE (v1.3.9)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -193,16 +198,16 @@
 │                                    │                                         │
 │                                    ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 1: Persistence Maintenance                                     │   │
-│  │ • RocksDB: Full compaction of all region databases                   │   │
-│  │ • SQLite: VACUUM on all region database files                        │   │
+│  │ PHASE 1: Persistence Maintenance (CONCURRENT)                        │   │
+│  │ • RocksDB: Full compaction of all region databases (parallel)        │   │
+│  │ • SQLite: VACUUM on all region database files (parallel)             │   │
 │  │ • LMDB/Other: Skip (not required)                                    │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    ▼ (2 second wait)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ PHASE 2: Cache Service Initialization                                │   │
-│  │ • Load regions from persistence store                                │   │
+│  │ PHASE 2: Cache Service Initialization (CONCURRENT)                   │   │
+│  │ • Load regions from persistence store (parallel per region)          │   │
 │  │ • Recover all cached data from disk/database                         │   │
 │  │ • Build KeyIndex for each region (all keys in memory)                │   │
 │  │ • Mark CacheService as initialized                                   │   │
@@ -278,7 +283,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.2.8                                     ║
+║   SYSTEM READY - Version 1.3.9                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -323,11 +328,44 @@ Cache service initialization completed in 1234 ms
                         </div>
                     </div>
                     
-                    <div class="alert alert-warning mt-4">
-                        <h5><i class="fas fa-microchip me-2"></i>Off-Heap Key Index (v1.2.2)</h5>
-                        <p class="mb-0">Optional feature to store keys in direct memory (DRAM) outside Java heap. 
-                        Eliminates GC pressure for key storage. Enable with <code>kuber.cache.off-heap-key-index=true</code>.</p>
+                    <div class="alert alert-info mt-4">
+                        <h5><i class="fas fa-microchip me-2"></i>Off-Heap Key Index - Segmented Buffers (v1.3.2)</h5>
+                        <p>Store keys in direct memory (DRAM) outside Java heap for zero GC pressure.</p>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <strong>Architecture:</strong>
+                                <ul class="mb-0">
+                                    <li>Multiple 1GB ByteBuffer segments</li>
+                                    <li>Supports >2GB total per region</li>
+                                    <li>Auto-growth as data increases</li>
+                                    <li>Automatic compaction when fragmented</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Configuration:</strong>
+                                <pre class="bg-dark text-light p-2 rounded small mb-0">kuber.cache.off-heap-key-index=true
+kuber.cache.off-heap-key-index-initial-size-mb=16
+kuber.cache.off-heap-key-index-max-size-mb=8192</pre>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <h4 class="mt-4">Off-Heap Memory Layout</h4>
+                    <p>Each key entry uses a compact binary format in off-heap memory:</p>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr><th>Bytes</th><th>Field</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>2</td><td>keyLength</td><td>Length of key in bytes (short)</td></tr>
+                            <tr><td>variable</td><td>keyBytes</td><td>UTF-8 encoded key string</td></tr>
+                            <tr><td>8</td><td>expiresAt</td><td>Expiration timestamp (long, -1 = never)</td></tr>
+                            <tr><td>1</td><td>location</td><td>Value location (0=MEMORY, 1=DISK, 2=BOTH)</td></tr>
+                            <tr><td>4</td><td>valueSize</td><td>Size of value in bytes (int)</td></tr>
+                            <tr><td>8</td><td>lastAccess</td><td>Last access timestamp (long)</td></tr>
+                            <tr><td>4</td><td>accessCount</td><td>Number of accesses (int)</td></tr>
+                        </tbody>
+                    </table>
                     
                     <h4 class="mt-4">Performance Comparison</h4>
                     <table class="table table-bordered">
@@ -472,7 +510,7 @@ Cache service initialization completed in 1234 ms
 
                 <!-- 9. Event Publishing -->
                 <section id="event-publishing" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-broadcast-tower me-2 text-warning"></i>9. Event Publishing <span class="badge bg-warning text-dark">v1.2.8</span></h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-broadcast-tower me-2 text-warning"></i>9. Event Publishing <span class="badge bg-warning text-dark">v1.3.2</span></h2>
                     <p>Kuber can stream cache events to external messaging systems for real-time integrations, analytics, and event-driven architectures.</p>
                     
                     <h4 class="mt-4">Publishing Architecture</h4>
@@ -507,7 +545,7 @@ CacheService.set() / delete()
                         </tbody>
                     </table>
                     
-                    <h4 class="mt-4">Configuration Model (v1.2.8)</h4>
+                    <h4 class="mt-4">Configuration Model (v1.3.2)</h4>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="card">
@@ -755,7 +793,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.2.8</p>
+                    <p class="text-muted small mb-0">Version 1.3.9</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

@@ -36,7 +36,7 @@ import java.time.Instant;
  * - ttl/size/version: ~24 bytes (3 x long)
  * - Total: ~104 bytes per key (vs ~500+ bytes for full CacheEntry with value)
  * 
- * @version 1.2.8
+ * @version 1.3.6
  */
 @Data
 @Builder

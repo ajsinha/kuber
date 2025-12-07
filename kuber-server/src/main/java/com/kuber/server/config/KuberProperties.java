@@ -80,6 +80,11 @@ public class KuberProperties {
      */
     private Autoload autoload = new Autoload();
     
+    /**
+     * Shutdown configuration
+     */
+    private Shutdown shutdown = new Shutdown();
+    
     @Data
     public static class Network {
         /**
@@ -437,6 +442,15 @@ public class KuberProperties {
          * File encoding
          */
         private String fileEncoding = "UTF-8";
+        
+        /**
+         * Batch size for bulk writes to persistence store.
+         * Records are accumulated and written in batches for better performance.
+         * Default: 2048 records per batch.
+         * Set to 1 to disable batching (write each record individually).
+         */
+        @Min(1)
+        private int batchSize = 2048;
     }
     
     // ==================== EVENT PUBLISHING CONFIGURATION ====================
@@ -1008,5 +1022,57 @@ public class KuberProperties {
          * false = faster but risk of data loss on crash (MDB_NOSYNC enabled)
          */
         private boolean syncWrites = true;
+    }
+    
+    /**
+     * Shutdown configuration for graceful application termination.
+     * 
+     * <p>Kuber supports multiple shutdown mechanisms:
+     * <ul>
+     *   <li><b>File-based</b>: Touch a shutdown file (default: kuber.shutdown)</li>
+     *   <li><b>REST API</b>: POST /api/admin/shutdown with API key</li>
+     *   <li><b>Signal</b>: SIGTERM/SIGINT (standard Spring Boot handling)</li>
+     * </ul>
+     */
+    @Data
+    public static class Shutdown {
+        /**
+         * Enable file-based shutdown monitoring.
+         * When enabled, Kuber watches for a shutdown file and initiates
+         * graceful shutdown when the file is detected.
+         */
+        private boolean fileEnabled = true;
+        
+        /**
+         * Path to the shutdown signal file.
+         * Create this file to trigger graceful shutdown.
+         * The file is deleted after shutdown is initiated.
+         * 
+         * Default: kuber.shutdown (in working directory)
+         */
+        private String filePath = "kuber.shutdown";
+        
+        /**
+         * How often to check for shutdown file (in milliseconds).
+         * Default: 5000ms (5 seconds)
+         */
+        @Min(1000)
+        private long checkIntervalMs = 5000;
+        
+        /**
+         * Enable REST API shutdown endpoint.
+         * When enabled, POST /api/admin/shutdown triggers graceful shutdown.
+         * Requires valid API key authentication.
+         */
+        private boolean apiEnabled = true;
+        
+        /**
+         * Delay between shutdown phases in seconds.
+         * Each phase waits this long before proceeding to ensure
+         * clean resource release.
+         * Default: 5 seconds
+         */
+        @Min(1)
+        private int phaseDelaySeconds = 5;
     }
 }

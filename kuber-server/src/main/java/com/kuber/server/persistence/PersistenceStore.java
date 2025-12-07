@@ -41,6 +41,16 @@ public interface PersistenceStore {
     void shutdown();
     
     /**
+     * Sync all data to disk.
+     * This ensures all pending writes are flushed and durable.
+     * Called before shutdown to ensure data safety.
+     */
+    default void sync() {
+        // Default implementation does nothing
+        // Implementations like RocksDB should override this
+    }
+    
+    /**
      * Check if the persistence store is available and connected.
      */
     boolean isAvailable();

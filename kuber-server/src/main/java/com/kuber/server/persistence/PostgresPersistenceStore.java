@@ -34,6 +34,9 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
     private final KuberProperties properties;
     private HikariDataSource dataSource;
     
+    // Guard against double shutdown
+    private volatile boolean alreadyShutdown = false;
+    
     public PostgresPersistenceStore(KuberProperties properties) {
         this.properties = properties;
     }
@@ -76,12 +79,78 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void shutdown() {
-        log.info("Shutting down PostgreSQL persistence store...");
+        // Guard against double shutdown
+        if (alreadyShutdown) {
+            log.debug("PostgreSQL shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  POSTGRESQL GRACEFUL SHUTDOWN INITIATED                             ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+        
+        // Mark as unavailable to prevent new operations
         available = false;
         
-        if (dataSource != null && !dataSource.isClosed()) {
-            dataSource.close();
+        // Step 1: Shutdown async save executor FIRST and wait for all pending saves
+        log.info("Step 1: Shutting down async save executor...");
+        shutdownAsyncExecutor();
+        
+        // Step 2: Give any remaining in-flight operations time to complete
+        try {
+            log.info("Step 2: Waiting for in-flight operations to complete...");
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
+        
+        if (dataSource != null && !dataSource.isClosed()) {
+            try {
+                // Log connection pool status before closing
+                log.info("Active connections: {}, Idle connections: {}, Total connections: {}",
+                        dataSource.getHikariPoolMXBean().getActiveConnections(),
+                        dataSource.getHikariPoolMXBean().getIdleConnections(),
+                        dataSource.getHikariPoolMXBean().getTotalConnections());
+                
+                // Wait for active connections to complete (up to 30 seconds)
+                int waitCount = 0;
+                while (dataSource.getHikariPoolMXBean().getActiveConnections() > 0 && waitCount < 30) {
+                    log.info("Waiting for {} active connections to complete...", 
+                            dataSource.getHikariPoolMXBean().getActiveConnections());
+                    Thread.sleep(1000);
+                    waitCount++;
+                }
+                
+                // Close the connection pool
+                log.info("Closing HikariCP connection pool...");
+                dataSource.close();
+                log.info("Connection pool closed");
+                
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Interrupted while waiting for connections to close");
+            } catch (Exception e) {
+                log.warn("Error during graceful shutdown: {}", e.getMessage());
+                // Force close
+                dataSource.close();
+            }
+        }
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  POSTGRESQL SHUTDOWN COMPLETE                                       ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+    }
+    
+    /**
+     * Sync is a no-op for PostgreSQL as it handles durability automatically.
+     * PostgreSQL uses WAL (Write-Ahead Logging) and transactions are durable
+     * once committed.
+     */
+    @Override
+    public void sync() {
+        log.debug("PostgreSQL sync called - no action needed (WAL handles durability)");
+        // PostgreSQL handles durability via WAL and fsync automatically
     }
     
     private Connection getConnection() throws SQLException {

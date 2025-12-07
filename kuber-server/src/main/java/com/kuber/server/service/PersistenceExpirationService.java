@@ -13,6 +13,8 @@ package com.kuber.server.service;
 
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.persistence.PersistenceOperationLock;
+import com.kuber.server.persistence.PersistenceOperationLock.OperationType;
 import com.kuber.server.persistence.PersistenceStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,12 +23,19 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Service that periodically cleans up expired entries from the persistence store.
  * This ensures that TTL-expired entries are removed from durable storage,
  * not just from the in-memory cache.
+ * 
+ * <p>CONCURRENCY SAFETY (v1.3.2):
+ * <p>Uses PersistenceOperationLock to ensure cleanup does not run concurrently
+ * with compaction, autoload, or region loading operations.
+ * 
+ * @version 1.3.9
  */
 @Slf4j
 @Service
@@ -35,6 +44,7 @@ public class PersistenceExpirationService {
     private final PersistenceStore persistenceStore;
     private final KuberProperties properties;
     private final CacheService cacheService;
+    private final PersistenceOperationLock operationLock;
     
     // Statistics
     private final AtomicLong totalExpiredDeleted = new AtomicLong(0);
@@ -43,12 +53,34 @@ public class PersistenceExpirationService {
     private volatile Duration lastRunDuration;
     private volatile boolean enabled = true;
     
+    // Shutdown flag
+    private volatile boolean shuttingDown = false;
+    
     public PersistenceExpirationService(PersistenceStore persistenceStore, 
                                         KuberProperties properties,
-                                        CacheService cacheService) {
+                                        CacheService cacheService,
+                                        PersistenceOperationLock operationLock) {
         this.persistenceStore = persistenceStore;
         this.properties = properties;
         this.cacheService = cacheService;
+        this.operationLock = operationLock;
+    }
+    
+    /**
+     * Shutdown the expiration service.
+     */
+    public void shutdown() {
+        log.info("Shutting down Persistence Expiration Service...");
+        shuttingDown = true;
+        enabled = false;
+        log.info("Persistence Expiration Service shutdown complete");
+    }
+    
+    /**
+     * Check if service is shutting down.
+     */
+    public boolean isShuttingDown() {
+        return shuttingDown;
     }
     
     @PostConstruct
@@ -61,9 +93,15 @@ public class PersistenceExpirationService {
     /**
      * Scheduled task to clean up expired entries from persistence.
      * Runs every 60 seconds by default (configurable).
+     * Uses shared lock to avoid conflicts with exclusive operations.
      */
     @Scheduled(fixedDelayString = "${kuber.expiration.cleanup-interval-ms:60000}")
     public void cleanupExpiredEntries() {
+        // Skip if shutting down
+        if (shuttingDown) {
+            return;
+        }
+        
         if (!enabled) {
             return;
         }
@@ -76,6 +114,19 @@ public class PersistenceExpirationService {
         
         if (!persistenceStore.isAvailable()) {
             log.debug("Persistence store not available, skipping expiration cleanup");
+            return;
+        }
+        
+        // Check if shutting down
+        if (operationLock.isShuttingDown()) {
+            log.debug("System is shutting down, skipping expiration cleanup");
+            return;
+        }
+        
+        // Acquire shared lock - this ensures no exclusive operation (compaction) is running
+        if (!operationLock.acquireSharedGlobalLock(OperationType.CLEANUP, 
+                "Expiration cleanup", 30, TimeUnit.SECONDS)) {
+            log.debug("Could not acquire lock for cleanup - exclusive operation in progress");
             return;
         }
         
@@ -98,6 +149,8 @@ public class PersistenceExpirationService {
             
         } catch (Exception e) {
             log.error("Error during persistence expiration cleanup: {}", e.getMessage(), e);
+        } finally {
+            operationLock.releaseSharedGlobalLock();
         }
     }
     

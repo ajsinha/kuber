@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - {basePath}/_metadata.db - SQLite database for region metadata
  * - {basePath}/{regionName}.db - Separate SQLite database for each region's entries
  * 
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Slf4j
 public class SqlitePersistenceStore extends AbstractPersistenceStore {
@@ -49,6 +49,9 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
     
     // Separate SQLite connection per region for entries
     private final Map<String, Connection> regionConnections = new ConcurrentHashMap<>();
+    
+    // Guard against double shutdown
+    private volatile boolean alreadyShutdown = false;
     
     public SqlitePersistenceStore(KuberProperties properties) {
         this.properties = properties;
@@ -254,30 +257,149 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void shutdown() {
-        log.info("Shutting down SQLite persistence store...");
+        // Guard against double shutdown
+        if (alreadyShutdown) {
+            log.debug("SQLite shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  SQLITE GRACEFUL SHUTDOWN INITIATED                                 ║");
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+        
+        // Mark as unavailable to prevent new operations
         available = false;
         
-        // Close all region connections
+        // Step 1: Shutdown async save executor FIRST and wait for all pending saves
+        log.info("Step 1: Shutting down async save executor...");
+        shutdownAsyncExecutor();
+        
+        // Step 2: Give any remaining in-flight operations time to complete
+        try {
+            log.info("Step 2: Waiting for in-flight operations to complete...");
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        int totalRegions = regionConnections.size();
+        int successCount = 0;
+        int failCount = 0;
+        
+        log.info("Step 3: Closing {} region database(s)...", totalRegions);
+        
+        // Close all region connections with checkpoint
         for (Map.Entry<String, Connection> entry : regionConnections.entrySet()) {
+            String regionName = entry.getKey();
             try {
-                entry.getValue().close();
-                log.debug("Closed region database: {}", entry.getKey());
-            } catch (SQLException e) {
-                log.warn("Error closing region database '{}': {}", entry.getKey(), e.getMessage());
+                gracefulCloseConnection(regionName, entry.getValue());
+                successCount++;
+            } catch (Exception e) {
+                log.error("Failed to gracefully close region '{}': {}", regionName, e.getMessage(), e);
+                failCount++;
+                // Still try to close
+                try {
+                    entry.getValue().close();
+                } catch (SQLException closeEx) {
+                    log.warn("Force close also failed for region '{}': {}", regionName, closeEx.getMessage());
+                }
             }
         }
         regionConnections.clear();
         
-        // Close metadata connection
+        // Close metadata connection with checkpoint
         if (metadataConnection != null) {
             try {
-                metadataConnection.close();
-            } catch (SQLException e) {
+                gracefulCloseConnection("_metadata", metadataConnection);
+            } catch (Exception e) {
                 log.warn("Error closing metadata connection: {}", e.getMessage());
+                try {
+                    metadataConnection.close();
+                } catch (SQLException closeEx) {
+                    log.warn("Force close also failed for metadata: {}", closeEx.getMessage());
+                }
             }
         }
         
-        log.info("SQLite persistence store shutdown complete");
+        log.info("╔════════════════════════════════════════════════════════════════════╗");
+        log.info("║  SQLITE SHUTDOWN COMPLETE                                           ║");
+        log.info("║  Regions closed: {} success, {} failed                              ║", 
+                String.format("%-3d", successCount), String.format("%-3d", failCount));
+        log.info("╚════════════════════════════════════════════════════════════════════╝");
+    }
+    
+    /**
+     * Gracefully close a SQLite connection with proper checkpoint.
+     * 
+     * The sequence is:
+     * 1. Run PRAGMA wal_checkpoint(TRUNCATE) to flush WAL to database
+     * 2. Wait for any pending I/O
+     * 3. Close the connection
+     * 
+     * @param name Name for logging
+     * @param conn The connection to close
+     */
+    private void gracefulCloseConnection(String name, Connection conn) throws SQLException {
+        log.info("Gracefully closing database '{}'...", name);
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            // Step 1: Checkpoint the WAL file
+            log.debug("  [{}] Running WAL checkpoint...", name);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+            }
+            log.debug("  [{}] WAL checkpoint complete", name);
+            
+            // Step 2: Wait for OS buffers to flush
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Step 3: Close the connection
+            log.debug("  [{}] Closing connection...", name);
+            conn.close();
+            
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("  [{}] Closed successfully in {}ms", name, elapsed);
+            
+        } catch (SQLException e) {
+            throw new SQLException("Failed to gracefully close database: " + name, e);
+        }
+    }
+    
+    /**
+     * Sync all SQLite databases to disk.
+     * Runs WAL checkpoint on all connections to ensure durability.
+     */
+    @Override
+    public void sync() {
+        log.info("Syncing all SQLite databases to disk...");
+        
+        // Checkpoint all region databases
+        for (Map.Entry<String, Connection> entry : regionConnections.entrySet()) {
+            try (Statement stmt = entry.getValue().createStatement()) {
+                stmt.execute("PRAGMA wal_checkpoint(PASSIVE)");
+                log.debug("Synced region '{}' to disk", entry.getKey());
+            } catch (SQLException e) {
+                log.warn("Failed to sync region '{}': {}", entry.getKey(), e.getMessage());
+            }
+        }
+        
+        // Checkpoint metadata database
+        if (metadataConnection != null) {
+            try (Statement stmt = metadataConnection.createStatement()) {
+                stmt.execute("PRAGMA wal_checkpoint(PASSIVE)");
+                log.debug("Synced metadata database to disk");
+            } catch (SQLException e) {
+                log.warn("Failed to sync metadata database: {}", e.getMessage());
+            }
+        }
+        
+        log.info("All SQLite databases synced to disk");
     }
     
     // ==================== Region Operations ====================

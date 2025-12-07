@@ -62,6 +62,9 @@ public class ReplicationManager implements LeaderLatchListener {
     
     private boolean zkConnected = false;
     
+    // Shutdown flag to stop scheduled tasks
+    private volatile boolean shuttingDown = false;
+    
     public ReplicationManager(KuberProperties properties, EventPublisher eventPublisher) {
         this.properties = properties;
         this.eventPublisher = eventPublisher;
@@ -253,6 +256,11 @@ public class ReplicationManager implements LeaderLatchListener {
      */
     @Scheduled(fixedRateString = "${kuber.replication.heartbeat-interval-ms:5000}")
     public void healthCheck() {
+        // Skip if shutting down
+        if (shuttingDown) {
+            return;
+        }
+        
         if (!zkConnected || zkClient == null) {
             return;
         }
@@ -277,6 +285,9 @@ public class ReplicationManager implements LeaderLatchListener {
     public void shutdown() {
         log.info("Shutting down replication manager...");
         
+        // Set shutdown flag to stop scheduled tasks
+        shuttingDown = true;
+        
         try {
             if (leaderLatch != null) {
                 leaderLatch.close();
@@ -287,5 +298,7 @@ public class ReplicationManager implements LeaderLatchListener {
         } catch (Exception e) {
             log.error("Error during shutdown: {}", e.getMessage());
         }
+        
+        log.info("Replication manager shutdown complete");
     }
 }

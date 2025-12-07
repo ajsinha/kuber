@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
@@ -30,24 +31,38 @@ import java.util.stream.Collectors;
 /**
  * Off-Heap Key Index for a single region.
  * 
- * Stores keys in direct memory (DRAM) outside the Java heap, providing:
- * - Zero GC pressure for key storage
- * - O(1) key existence checks
- * - O(n) key pattern matching
- * - Immediate negative lookups
- * - Exact entry counts
+ * <p>Stores keys in direct memory (DRAM) outside the Java heap, providing:
+ * <ul>
+ *   <li>Zero GC pressure for key storage</li>
+ *   <li>O(1) key existence checks</li>
+ *   <li>O(n) key pattern matching</li>
+ *   <li>Immediate negative lookups</li>
+ *   <li>Exact entry counts</li>
+ * </ul>
  * 
- * Architecture:
- * - Keys stored in off-heap ByteBuffer (direct memory)
- * - Metadata kept in compact off-heap structures
- * - Small on-heap hash index for key → offset mapping
+ * <h3>SEGMENTED BUFFER ARCHITECTURE (v1.3.2)</h3>
+ * <ul>
+ *   <li>Supports buffer sizes exceeding 2GB using multiple ByteBuffer segments</li>
+ *   <li>Each segment is up to 1GB (SEGMENT_SIZE)</li>
+ *   <li>Offsets are stored as long values spanning across segments</li>
+ *   <li>Automatic segment allocation as data grows</li>
+ * </ul>
  * 
- * Memory Layout per entry in keyBuffer:
+ * <h3>Architecture</h3>
+ * <ul>
+ *   <li>Keys stored in off-heap ByteBuffer segments (direct memory)</li>
+ *   <li>Metadata kept in compact off-heap structures</li>
+ *   <li>Small on-heap hash index for key → offset mapping</li>
+ * </ul>
+ * 
+ * <h3>Memory Layout per entry in keyBuffer</h3>
+ * <pre>
  * [keyLength:2][keyBytes:variable][expiresAt:8][valueLocation:1][valueSize:4][lastAccess:8][accessCount:4]
+ * </pre>
  * 
- * Thread-safe using ReadWriteLock for buffer operations.
+ * <p>Thread-safe using ReadWriteLock for buffer operations.
  * 
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Slf4j
 public class OffHeapKeyIndex implements KeyIndexInterface {
@@ -55,19 +70,23 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     // Entry metadata size: expiresAt(8) + valueLocation(1) + valueSize(4) + lastAccess(8) + accessCount(4) = 25 bytes
     private static final int METADATA_SIZE = 25;
     private static final int KEY_LENGTH_SIZE = 2; // short for key length
-    private static final int DEFAULT_INITIAL_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB initial
-    private static final int DEFAULT_MAX_BUFFER_SIZE = 1024 * 1024 * 1024; // 1GB max
+    
+    // Segment size: 1GB per segment (safe, well under 2GB ByteBuffer limit)
+    private static final int SEGMENT_SIZE = 1024 * 1024 * 1024; // 1GB
+    private static final long DEFAULT_INITIAL_SIZE = 16L * 1024L * 1024L; // 16MB initial
+    private static final long DEFAULT_MAX_SIZE = 8L * 1024L * 1024L * 1024L; // 8GB max
     private static final float GROW_FACTOR = 1.5f;
     
     private final String region;
-    private final int maxBufferSize;
+    private final long maxTotalSize;  // Maximum total size across all segments
     
-    // On-heap hash index: key hash → offset in keyBuffer
+    // On-heap hash index: key hash → offset across all segments
     // This is small: 8 bytes per entry (long offset)
     private final ConcurrentHashMap<String, Long> keyOffsets;
     
-    // Off-heap storage for keys and metadata
-    private ByteBuffer keyBuffer;
+    // Off-heap storage: multiple ByteBuffer segments for >2GB support
+    private final CopyOnWriteArrayList<ByteBuffer> segments;
+    private final AtomicLong totalAllocatedSize;  // Total bytes allocated across segments
     private final AtomicLong writePosition;
     
     // Statistics (small, kept on heap)
@@ -85,14 +104,35 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     private static final float COMPACTION_THRESHOLD = 0.3f; // Compact when 30% is deleted
     
     public OffHeapKeyIndex(String region) {
-        this(region, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE);
+        this(region, DEFAULT_INITIAL_SIZE, DEFAULT_MAX_SIZE);
     }
     
-    public OffHeapKeyIndex(String region, int initialBufferSize, int maxBufferSize) {
+    /**
+     * Create off-heap key index with specified sizes.
+     * 
+     * @param region Region name
+     * @param initialSize Initial buffer size in bytes
+     * @param maxSize Maximum total size in bytes (can exceed 2GB with segmented buffers)
+     */
+    public OffHeapKeyIndex(String region, long initialSize, long maxSize) {
         this.region = region;
-        this.maxBufferSize = maxBufferSize;
+        
+        // Validate sizes
+        if (initialSize < 1024 * 1024) {
+            log.warn("Off-heap initial size {} too small for region '{}', using 16MB", 
+                    formatBytes(initialSize), region);
+            initialSize = 16L * 1024L * 1024L; // 16MB minimum
+        }
+        if (maxSize < initialSize) {
+            log.warn("Off-heap max size {} less than initial {} for region '{}', using initial * 4", 
+                    formatBytes(maxSize), formatBytes(initialSize), region);
+            maxSize = initialSize * 4;
+        }
+        
+        this.maxTotalSize = maxSize;
         this.keyOffsets = new ConcurrentHashMap<>();
-        this.keyBuffer = ByteBuffer.allocateDirect(initialBufferSize);
+        this.segments = new CopyOnWriteArrayList<>();
+        this.totalAllocatedSize = new AtomicLong(0);
         this.writePosition = new AtomicLong(0);
         this.totalValueSize = new AtomicLong(0);
         this.memoryValueSize = new AtomicLong(0);
@@ -102,8 +142,22 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
         this.deletedBytes = new AtomicLong(0);
         this.bufferLock = new ReentrantReadWriteLock();
         
-        log.info("Created off-heap key index for region '{}' with {}MB initial, {}MB max direct memory", 
-                region, initialBufferSize / (1024 * 1024), maxBufferSize / (1024 * 1024));
+        // Allocate initial segment
+        int initialSegmentSize = (int) Math.min(initialSize, SEGMENT_SIZE);
+        ByteBuffer initialSegment = ByteBuffer.allocateDirect(initialSegmentSize);
+        segments.add(initialSegment);
+        totalAllocatedSize.set(initialSegmentSize);
+        
+        log.info("Created off-heap key index for region '{}' with {} initial, {} max (segmented)", 
+                region, formatBytes(initialSize), formatBytes(maxSize));
+    }
+    
+    /**
+     * Legacy constructor for backward compatibility.
+     * Converts int parameters to long.
+     */
+    public OffHeapKeyIndex(String region, int initialBufferSize, int maxBufferSize) {
+        this(region, (long) initialBufferSize, (long) maxBufferSize);
     }
     
     /**
@@ -172,21 +226,107 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     }
     
     /**
+     * Get segment index for a given offset.
+     */
+    private int getSegmentIndex(long offset) {
+        return (int) (offset / SEGMENT_SIZE);
+    }
+    
+    /**
+     * Get position within segment for a given offset.
+     */
+    private int getPositionInSegment(long offset) {
+        return (int) (offset % SEGMENT_SIZE);
+    }
+    
+    /**
+     * Read a byte from the given absolute offset.
+     */
+    private byte readByte(long offset) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        return segments.get(segIdx).get(pos);
+    }
+    
+    /**
+     * Read a short from the given absolute offset.
+     */
+    private short readShort(long offset) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        return segments.get(segIdx).getShort(pos);
+    }
+    
+    /**
+     * Read an int from the given absolute offset.
+     */
+    private int readInt(long offset) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        return segments.get(segIdx).getInt(pos);
+    }
+    
+    /**
+     * Read a long from the given absolute offset.
+     */
+    private long readLong(long offset) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        return segments.get(segIdx).getLong(pos);
+    }
+    
+    /**
+     * Write a byte at the given absolute offset.
+     */
+    private void writeByte(long offset, byte value) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        segments.get(segIdx).put(pos, value);
+    }
+    
+    /**
+     * Write a short at the given absolute offset.
+     */
+    private void writeShort(long offset, short value) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        segments.get(segIdx).putShort(pos, value);
+    }
+    
+    /**
+     * Write an int at the given absolute offset.
+     */
+    private void writeInt(long offset, int value) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        segments.get(segIdx).putInt(pos, value);
+    }
+    
+    /**
+     * Write a long at the given absolute offset.
+     */
+    private void writeLong(long offset, long value) {
+        int segIdx = getSegmentIndex(offset);
+        int pos = getPositionInSegment(offset);
+        segments.get(segIdx).putLong(pos, value);
+    }
+    
+    /**
      * Read entry from off-heap buffer.
      */
     private KeyIndexEntry readEntry(String key, long offset) {
         bufferLock.readLock().lock();
         try {
             // Read key length
-            int keyLen = keyBuffer.getShort((int) offset) & 0xFFFF;
-            int metadataOffset = (int) offset + KEY_LENGTH_SIZE + keyLen;
+            int keyLen = readShort(offset) & 0xFFFF;
+            long metadataOffset = offset + KEY_LENGTH_SIZE + keyLen;
             
             // Read metadata
-            long expiresAt = keyBuffer.getLong(metadataOffset);
-            byte valueLoc = keyBuffer.get(metadataOffset + 8);
-            int valueSize = keyBuffer.getInt(metadataOffset + 9);
-            long lastAccess = keyBuffer.getLong(metadataOffset + 13);
-            int accessCount = keyBuffer.getInt(metadataOffset + 21);
+            long expiresAt = readLong(metadataOffset);
+            byte valueLoc = readByte(metadataOffset + 8);
+            int valueSize = readInt(metadataOffset + 9);
+            long lastAccess = readLong(metadataOffset + 13);
+            int accessCount = readInt(metadataOffset + 21);
             
             ValueLocation location = ValueLocation.values()[valueLoc];
             Instant expiresAtInstant = expiresAt == -1 ? null : Instant.ofEpochMilli(expiresAt);
@@ -221,10 +361,10 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             Long existingOffset = keyOffsets.get(key);
             if (existingOffset != null) {
                 // Update existing entry in place if same key length
-                int existingKeyLen = keyBuffer.getShort(existingOffset.intValue()) & 0xFFFF;
+                int existingKeyLen = readShort(existingOffset) & 0xFFFF;
                 if (existingKeyLen == keyBytes.length) {
                     // Same size - update in place
-                    writeMetadata(existingOffset.intValue() + KEY_LENGTH_SIZE + keyBytes.length, entry);
+                    writeMetadata(existingOffset + KEY_LENGTH_SIZE + keyBytes.length, entry);
                     return;
                 } else {
                     // Different size - mark old as deleted
@@ -238,15 +378,15 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             long offset = writePosition.get();
             
             // Write key length
-            keyBuffer.putShort((int) offset, (short) keyBytes.length);
+            writeShort(offset, (short) keyBytes.length);
             
             // Write key bytes
             for (int i = 0; i < keyBytes.length; i++) {
-                keyBuffer.put((int) offset + KEY_LENGTH_SIZE + i, keyBytes[i]);
+                writeByte(offset + KEY_LENGTH_SIZE + i, keyBytes[i]);
             }
             
             // Write metadata
-            writeMetadata((int) offset + KEY_LENGTH_SIZE + keyBytes.length, entry);
+            writeMetadata(offset + KEY_LENGTH_SIZE + keyBytes.length, entry);
             
             // Update position and index
             writePosition.addAndGet(entrySize);
@@ -267,18 +407,18 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
         maybeCompact();
     }
     
-    private void writeMetadata(int offset, KeyIndexEntry entry) {
+    private void writeMetadata(long offset, KeyIndexEntry entry) {
         long expiresAt = entry.getExpiresAt() != null ? entry.getExpiresAt().toEpochMilli() : -1;
         byte valueLoc = (byte) entry.getValueLocation().ordinal();
         int valueSize = (int) entry.getValueSize();
         long lastAccess = entry.getLastAccessedAt() != null ? entry.getLastAccessedAt().toEpochMilli() : 0;
         int accessCount = (int) entry.getAccessCount();
         
-        keyBuffer.putLong(offset, expiresAt);
-        keyBuffer.put(offset + 8, valueLoc);
-        keyBuffer.putInt(offset + 9, valueSize);
-        keyBuffer.putLong(offset + 13, lastAccess);
-        keyBuffer.putInt(offset + 21, accessCount);
+        writeLong(offset, expiresAt);
+        writeByte(offset + 8, valueLoc);
+        writeInt(offset + 9, valueSize);
+        writeLong(offset + 13, lastAccess);
+        writeInt(offset + 21, accessCount);
     }
     
     /**
@@ -300,15 +440,15 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
         
         bufferLock.writeLock().lock();
         try {
-            int keyLen = keyBuffer.getShort(offset.intValue()) & 0xFFFF;
-            int metadataOffset = offset.intValue() + KEY_LENGTH_SIZE + keyLen;
+            int keyLen = readShort(offset) & 0xFFFF;
+            long metadataOffset = offset + KEY_LENGTH_SIZE + keyLen;
             
-            byte oldLoc = keyBuffer.get(metadataOffset + 8);
-            int valueSize = keyBuffer.getInt(metadataOffset + 9);
+            byte oldLoc = readByte(metadataOffset + 8);
+            int valueSize = readInt(metadataOffset + 9);
             
             ValueLocation oldLocation = ValueLocation.values()[oldLoc];
             
-            // Update memory size tracking
+            // Update memory value size tracking
             if (oldLocation != ValueLocation.DISK && newLocation == ValueLocation.DISK) {
                 memoryValueSize.addAndGet(-valueSize);
             } else if (oldLocation == ValueLocation.DISK && newLocation != ValueLocation.DISK) {
@@ -316,14 +456,15 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             }
             
             // Write new location
-            keyBuffer.put(metadataOffset + 8, (byte) newLocation.ordinal());
+            writeByte(metadataOffset + 8, (byte) newLocation.ordinal());
+            
         } finally {
             bufferLock.writeLock().unlock();
         }
     }
     
     /**
-     * Record access to a key (updates last access time and count).
+     * Update access statistics for a key.
      */
     public void recordAccess(String key) {
         Long offset = keyOffsets.get(key);
@@ -331,15 +472,16 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
         
         bufferLock.writeLock().lock();
         try {
-            int keyLen = keyBuffer.getShort(offset.intValue()) & 0xFFFF;
-            int metadataOffset = offset.intValue() + KEY_LENGTH_SIZE + keyLen;
+            int keyLen = readShort(offset) & 0xFFFF;
+            long metadataOffset = offset + KEY_LENGTH_SIZE + keyLen;
             
             // Update last access time
-            keyBuffer.putLong(metadataOffset + 13, System.currentTimeMillis());
+            writeLong(metadataOffset + 13, System.currentTimeMillis());
             
             // Increment access count
-            int count = keyBuffer.getInt(metadataOffset + 21);
-            keyBuffer.putInt(metadataOffset + 21, count + 1);
+            int currentCount = readInt(metadataOffset + 21);
+            writeInt(metadataOffset + 21, currentCount + 1);
+            
         } finally {
             bufferLock.writeLock().unlock();
         }
@@ -351,52 +493,72 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     @Override
     public KeyIndexEntry remove(String key) {
         Long offset = keyOffsets.remove(key);
-        if (offset == null) return null;
-        
-        KeyIndexEntry entry = readEntry(key, offset);
+        if (offset == null) {
+            return null;
+        }
         
         bufferLock.writeLock().lock();
         try {
-            int keyLen = keyBuffer.getShort(offset.intValue()) & 0xFFFF;
+            KeyIndexEntry entry = readEntry(key, offset);
+            
+            // Mark space as deleted
+            int keyLen = readShort(offset) & 0xFFFF;
             int entrySize = KEY_LENGTH_SIZE + keyLen + METADATA_SIZE;
             deletedBytes.addAndGet(entrySize);
             
             // Update size tracking
-            if (entry.getValueLocation() != ValueLocation.DISK) {
-                memoryValueSize.addAndGet(-entry.getValueSize());
+            if (entry != null) {
+                totalValueSize.addAndGet(-entry.getValueSize());
+                if (entry.getValueLocation() != ValueLocation.DISK) {
+                    memoryValueSize.addAndGet(-entry.getValueSize());
+                }
             }
-            totalValueSize.addAndGet(-entry.getValueSize());
+            
+            return entry;
         } finally {
             bufferLock.writeLock().unlock();
         }
-        
-        maybeCompact();
-        return entry;
     }
     
     /**
-     * Get all keys - O(n).
-     */
-    @Override
-    public Set<String> getAllKeys() {
-        return new HashSet<>(keyOffsets.keySet());
-    }
-    
-    /**
-     * Find keys matching a glob pattern.
+     * Find all keys matching a glob pattern - O(n) memory scan.
      */
     @Override
     public List<String> findKeysByPattern(String pattern) {
         if (pattern == null || pattern.equals("*")) {
-            return new ArrayList<>(keyOffsets.keySet());
+            // Return all non-expired keys
+            return keyOffsets.keySet().stream()
+                    .filter(key -> {
+                        KeyIndexEntry entry = getWithoutTracking(key);
+                        return entry != null && !entry.isExpired();
+                    })
+                    .collect(Collectors.toList());
         }
         
+        // Convert glob pattern to regex
         String regex = globToRegex(pattern);
         Pattern compiledPattern = Pattern.compile(regex);
         
         return keyOffsets.keySet().stream()
-                .filter(k -> compiledPattern.matcher(k).matches())
+                .filter(key -> compiledPattern.matcher(key).matches())
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
+                    return entry != null && !entry.isExpired();
+                })
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get all keys in this region.
+     */
+    @Override
+    public Set<String> getAllKeys() {
+        return keyOffsets.keySet().stream()
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
+                    return entry != null && !entry.isExpired();
+                })
+                .collect(Collectors.toSet());
     }
     
     /**
@@ -404,12 +566,11 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
      */
     @Override
     public List<String> getKeysInMemory() {
-        return keyOffsets.entrySet().stream()
-                .filter(e -> {
-                    KeyIndexEntry entry = readEntry(e.getKey(), e.getValue());
+        return keyOffsets.keySet().stream()
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
                     return entry != null && !entry.isExpired() && entry.isValueInMemory();
                 })
-                .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
     
@@ -418,32 +579,30 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
      */
     @Override
     public List<String> getKeysOnDiskOnly() {
-        return keyOffsets.entrySet().stream()
-                .filter(e -> {
-                    KeyIndexEntry entry = readEntry(e.getKey(), e.getValue());
+        return keyOffsets.keySet().stream()
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
                     return entry != null && !entry.isExpired() 
                             && entry.getValueLocation() == ValueLocation.DISK;
                 })
-                .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
     
     /**
-     * Find expired keys.
+     * Find expired keys for cleanup.
      */
     @Override
     public List<String> findExpiredKeys() {
-        return keyOffsets.entrySet().stream()
-                .filter(e -> {
-                    KeyIndexEntry entry = readEntry(e.getKey(), e.getValue());
+        return keyOffsets.keySet().stream()
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
                     return entry != null && entry.isExpired();
                 })
-                .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
     
     /**
-     * Clear all entries and release off-heap memory.
+     * Clear all entries.
      */
     @Override
     public void clear() {
@@ -451,56 +610,60 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
         try {
             keyOffsets.clear();
             writePosition.set(0);
+            offHeapBytesUsed.set(0);
+            deletedBytes.set(0);
             totalValueSize.set(0);
             memoryValueSize.set(0);
-            deletedBytes.set(0);
-            offHeapBytesUsed.set(0);
             
-            // Clear buffer content
-            keyBuffer.clear();
+            // Keep first segment, release others
+            while (segments.size() > 1) {
+                ByteBuffer removed = segments.remove(segments.size() - 1);
+                cleanDirectBuffer(removed);
+            }
+            totalAllocatedSize.set(segments.get(0).capacity());
+            
+            log.debug("Cleared off-heap key index for region '{}'", region);
         } finally {
             bufferLock.writeLock().unlock();
         }
     }
     
     /**
-     * Ensure buffer has enough capacity.
+     * Ensure capacity for additional bytes, allocating new segments if needed.
      */
     private void ensureCapacity(int additionalBytes) {
         long requiredPosition = writePosition.get() + additionalBytes;
-        if (requiredPosition <= keyBuffer.capacity()) {
+        long currentAllocated = totalAllocatedSize.get();
+        
+        if (requiredPosition <= currentAllocated) {
             return;
         }
         
         // Need to grow
-        int newCapacity = (int) Math.min(
-                keyBuffer.capacity() * GROW_FACTOR,
-                maxBufferSize
-        );
-        
-        if (newCapacity < requiredPosition) {
-            newCapacity = (int) Math.min(requiredPosition * GROW_FACTOR, maxBufferSize);
+        if (currentAllocated >= maxTotalSize) {
+            throw new OutOfMemoryError("Off-heap key index exceeded maximum size: current=" + 
+                    formatBytes(currentAllocated) + ", max=" + formatBytes(maxTotalSize) + 
+                    " for region: " + region);
         }
         
-        if (newCapacity > maxBufferSize) {
-            throw new OutOfMemoryError("Off-heap key index exceeded maximum size of " + 
-                    maxBufferSize / (1024 * 1024) + "MB for region: " + region);
+        // Calculate how much to grow
+        long neededBytes = requiredPosition - currentAllocated;
+        long growSize = Math.max(neededBytes, (long) (currentAllocated * (GROW_FACTOR - 1)));
+        growSize = Math.min(growSize, maxTotalSize - currentAllocated);
+        
+        // Allocate new segment(s)
+        while (growSize > 0) {
+            int segmentSize = (int) Math.min(growSize, SEGMENT_SIZE);
+            
+            log.info("Allocating new off-heap segment for region '{}': {} (total: {})", 
+                    region, formatBytes(segmentSize), formatBytes(currentAllocated + segmentSize));
+            
+            ByteBuffer newSegment = ByteBuffer.allocateDirect(segmentSize);
+            segments.add(newSegment);
+            totalAllocatedSize.addAndGet(segmentSize);
+            currentAllocated += segmentSize;
+            growSize -= segmentSize;
         }
-        
-        log.info("Growing off-heap buffer for region '{}' from {}MB to {}MB",
-                region, keyBuffer.capacity() / (1024 * 1024), newCapacity / (1024 * 1024));
-        
-        ByteBuffer newBuffer = ByteBuffer.allocateDirect(newCapacity);
-        
-        // Copy existing data
-        keyBuffer.position(0);
-        keyBuffer.limit((int) writePosition.get());
-        newBuffer.put(keyBuffer);
-        
-        // Clean up old buffer
-        cleanDirectBuffer(keyBuffer);
-        
-        keyBuffer = newBuffer;
     }
     
     /**
@@ -530,8 +693,13 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             
             long startSize = writePosition.get();
             
-            // Create new compacted buffer
-            ByteBuffer newBuffer = ByteBuffer.allocateDirect(keyBuffer.capacity());
+            // Create temporary storage for compacted data
+            long dataSize = offHeapBytesUsed.get() - deletedBytes.get();
+            int tempSegmentSize = (int) Math.min(dataSize + 1024 * 1024, SEGMENT_SIZE);
+            List<ByteBuffer> tempSegments = new ArrayList<>();
+            tempSegments.add(ByteBuffer.allocateDirect(tempSegmentSize));
+            long tempAllocated = tempSegmentSize;
+            
             long newPosition = 0;
             Map<String, Long> newOffsets = new HashMap<>();
             
@@ -540,21 +708,38 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
                 String key = entry.getKey();
                 long oldOffset = entry.getValue();
                 
-                int keyLen = keyBuffer.getShort((int) oldOffset) & 0xFFFF;
+                int keyLen = readShort(oldOffset) & 0xFFFF;
                 int entrySize = KEY_LENGTH_SIZE + keyLen + METADATA_SIZE;
                 
-                // Copy entry to new buffer
+                // Ensure temp buffer has space
+                while (newPosition + entrySize > tempAllocated) {
+                    int newSegSize = (int) Math.min(SEGMENT_SIZE, maxTotalSize - tempAllocated);
+                    tempSegments.add(ByteBuffer.allocateDirect(newSegSize));
+                    tempAllocated += newSegSize;
+                }
+                
+                // Copy entry to temp buffer
                 for (int i = 0; i < entrySize; i++) {
-                    newBuffer.put((int) newPosition + i, keyBuffer.get((int) oldOffset + i));
+                    byte b = readByte(oldOffset + i);
+                    int segIdx = (int) ((newPosition + i) / SEGMENT_SIZE);
+                    int pos = (int) ((newPosition + i) % SEGMENT_SIZE);
+                    tempSegments.get(segIdx).put(pos, b);
                 }
                 
                 newOffsets.put(key, newPosition);
                 newPosition += entrySize;
             }
             
-            // Update state
-            cleanDirectBuffer(keyBuffer);
-            keyBuffer = newBuffer;
+            // Clean up old segments
+            for (ByteBuffer segment : segments) {
+                cleanDirectBuffer(segment);
+            }
+            segments.clear();
+            
+            // Use new segments
+            segments.addAll(tempSegments);
+            totalAllocatedSize.set(tempAllocated);
+            
             keyOffsets.clear();
             keyOffsets.putAll(newOffsets);
             writePosition.set(newPosition);
@@ -562,8 +747,9 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             deletedBytes.set(0);
             
             long reclaimed = startSize - newPosition;
-            log.info("Compacted off-heap index for region '{}': reclaimed {} bytes ({}KB)",
-                    region, reclaimed, reclaimed / 1024);
+            log.info("Compacted off-heap index for region '{}': reclaimed {} ({})",
+                    region, formatBytes(reclaimed), 
+                    String.format("%.1f%%", (reclaimed * 100.0) / startSize));
             
         } finally {
             bufferLock.writeLock().unlock();
@@ -593,6 +779,39 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     }
     
     /**
+     * Format bytes as human-readable string.
+     */
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + "B";
+        if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format("%.1fMB", bytes / (1024.0 * 1024.0));
+        return String.format("%.2fGB", bytes / (1024.0 * 1024.0 * 1024.0));
+    }
+    
+    /**
+     * Convert glob pattern to regex.
+     */
+    private String globToRegex(String glob) {
+        StringBuilder regex = new StringBuilder("^");
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            switch (c) {
+                case '*' -> regex.append(".*");
+                case '?' -> regex.append(".");
+                case '.', '(', ')', '+', '|', '^', '$', '@', '%' -> regex.append("\\").append(c);
+                case '\\' -> regex.append("\\\\");
+                case '[' -> regex.append("\\[");
+                case ']' -> regex.append("\\]");
+                case '{' -> regex.append("\\{");
+                case '}' -> regex.append("\\}");
+                default -> regex.append(c);
+            }
+        }
+        regex.append("$");
+        return regex.toString();
+    }
+    
+    /**
      * Get statistics about this index.
      */
     @Override
@@ -601,9 +820,10 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
         stats.put("region", region);
         stats.put("storageType", "OFF_HEAP");
         stats.put("totalKeys", size());
+        stats.put("segmentCount", segments.size());
         stats.put("offHeapBytesUsed", offHeapBytesUsed.get());
-        stats.put("offHeapBytesAllocated", keyBuffer.capacity());
-        stats.put("offHeapMaxBytes", maxBufferSize);
+        stats.put("offHeapBytesAllocated", totalAllocatedSize.get());
+        stats.put("offHeapMaxBytes", maxTotalSize);
         stats.put("deletedBytes", deletedBytes.get());
         stats.put("fragmentationRatio", String.format("%.2f%%", 
                 (offHeapBytesUsed.get() > 0 ? (deletedBytes.get() * 100.0 / offHeapBytesUsed.get()) : 0)));
@@ -646,7 +866,7 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
      * Get total off-heap bytes allocated.
      */
     public long getOffHeapBytesAllocated() {
-        return keyBuffer.capacity();
+        return totalAllocatedSize.get();
     }
     
     /**
@@ -662,9 +882,9 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
      */
     @Override
     public long getMemoryEntryCount() {
-        return keyOffsets.entrySet().stream()
-                .filter(e -> {
-                    KeyIndexEntry entry = readEntry(e.getKey(), e.getValue());
+        return keyOffsets.keySet().stream()
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
                     return entry != null && !entry.isExpired() && entry.isValueInMemory();
                 })
                 .count();
@@ -675,36 +895,13 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
      */
     @Override
     public long getDiskOnlyEntryCount() {
-        return keyOffsets.entrySet().stream()
-                .filter(e -> {
-                    KeyIndexEntry entry = readEntry(e.getKey(), e.getValue());
+        return keyOffsets.keySet().stream()
+                .filter(key -> {
+                    KeyIndexEntry entry = getWithoutTracking(key);
                     return entry != null && !entry.isExpired() 
                             && entry.getValueLocation() == ValueLocation.DISK;
                 })
                 .count();
-    }
-    
-    /**
-     * Convert glob pattern to regex.
-     */
-    private String globToRegex(String glob) {
-        StringBuilder regex = new StringBuilder("^");
-        for (int i = 0; i < glob.length(); i++) {
-            char c = glob.charAt(i);
-            switch (c) {
-                case '*' -> regex.append(".*");
-                case '?' -> regex.append(".");
-                case '.', '(', ')', '+', '|', '^', '$', '@', '%' -> regex.append("\\").append(c);
-                case '\\' -> regex.append("\\\\");
-                case '[' -> regex.append("\\[");
-                case ']' -> regex.append("\\]");
-                case '{' -> regex.append("\\{");
-                case '}' -> regex.append("\\}");
-                default -> regex.append(c);
-            }
-        }
-        regex.append("$");
-        return regex.toString();
     }
     
     /**
@@ -714,10 +911,14 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     public void shutdown() {
         bufferLock.writeLock().lock();
         try {
+            int segmentCount = segments.size();
             keyOffsets.clear();
-            cleanDirectBuffer(keyBuffer);
-            keyBuffer = null;
-            log.info("Shut down off-heap key index for region '{}'", region);
+            for (ByteBuffer segment : segments) {
+                cleanDirectBuffer(segment);
+            }
+            segments.clear();
+            totalAllocatedSize.set(0);
+            log.info("Shut down off-heap key index for region '{}' (released {} segments)", region, segmentCount);
         } finally {
             bufferLock.writeLock().unlock();
         }

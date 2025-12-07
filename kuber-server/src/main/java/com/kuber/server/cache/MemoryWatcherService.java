@@ -61,6 +61,9 @@ public class MemoryWatcherService {
     private final AtomicLong evictionCycles = new AtomicLong(0);
     private final AtomicLong totalChecks = new AtomicLong(0);
     
+    // Shutdown flag
+    private volatile boolean shuttingDown = false;
+    
     // Last activity tracking
     private volatile Instant lastCheckTime = null;
     private volatile double lastCheckHeapPercent = 0;
@@ -75,6 +78,23 @@ public class MemoryWatcherService {
         this.properties = properties;
         this.cacheService = cacheService;
         this.memoryBean = ManagementFactory.getMemoryMXBean();
+    }
+    
+    /**
+     * Shutdown the memory watcher service.
+     * Stops all scheduled memory checks.
+     */
+    public void shutdown() {
+        log.info("Shutting down Memory Watcher Service...");
+        shuttingDown = true;
+        log.info("Memory Watcher Service shutdown complete");
+    }
+    
+    /**
+     * Check if service is shutting down.
+     */
+    public boolean isShuttingDown() {
+        return shuttingDown;
     }
     
     @PostConstruct
@@ -94,6 +114,11 @@ public class MemoryWatcherService {
      */
     @Scheduled(fixedDelayString = "${kuber.cache.memory-watcher-interval-ms:5000}")
     public void checkMemoryUsage() {
+        // Skip if shutting down
+        if (shuttingDown) {
+            return;
+        }
+        
         // Skip if cache service not yet initialized
         if (!cacheService.isInitialized()) {
             return;

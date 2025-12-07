@@ -29,6 +29,7 @@ import com.kuber.core.model.KeyIndexEntry.ValueLocation;
 import com.kuber.core.util.JsonUtils;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.event.EventPublisher;
+import com.kuber.server.persistence.PersistenceOperationLock;
 import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
 import lombok.extern.slf4j.Slf4j;
@@ -62,18 +63,19 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 1.2.8
+ * @version 1.3.9
  */
 @Slf4j
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.2.6";
+    private static final String VERSION = "1.3.9";
     
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
     private final EventPublisher eventPublisher;
     private final CacheMetricsService metricsService;
+    private final PersistenceOperationLock operationLock;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -98,17 +100,25 @@ public class CacheService {
     // Initialization state - prevents operations before recovery is complete
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     
+    // Shutdown flag to stop scheduled tasks
+    private volatile boolean shuttingDown = false;
+    
+    // Guard against double shutdown
+    private volatile boolean alreadyShutdown = false;
+    
     @Autowired(required = false)
     private com.kuber.server.publishing.RegionEventPublishingService publishingService;
     
     public CacheService(KuberProperties properties, 
                         PersistenceStore persistenceStore,
                         EventPublisher eventPublisher,
-                        CacheMetricsService metricsService) {
+                        CacheMetricsService metricsService,
+                        PersistenceOperationLock operationLock) {
         this.properties = properties;
         this.persistenceStore = persistenceStore;
         this.eventPublisher = eventPublisher;
         this.metricsService = metricsService;
+        this.operationLock = operationLock;
     }
     
     /**
@@ -338,7 +348,23 @@ public class CacheService {
         if (properties.getCache().isOffHeapKeyIndex()) {
             int initialSizeMb = properties.getCache().getOffHeapKeyIndexInitialSizeMb();
             int maxSizeMb = properties.getCache().getOffHeapKeyIndexMaxSizeMb();
-            keyIndex = new OffHeapKeyIndex(regionName, initialSizeMb * 1024 * 1024, maxSizeMb * 1024 * 1024);
+            
+            // Validate sizes
+            if (initialSizeMb < 1) {
+                log.warn("Off-heap initial size {}MB is too small, using 16MB", initialSizeMb);
+                initialSizeMb = 16;
+            }
+            if (maxSizeMb < initialSizeMb) {
+                log.warn("Off-heap max size {}MB is less than initial size {}MB, using {}MB", 
+                        maxSizeMb, initialSizeMb, initialSizeMb * 2);
+                maxSizeMb = initialSizeMb * 2;
+            }
+            
+            // Use long arithmetic to support sizes > 2GB (segmented buffers in OffHeapKeyIndex)
+            long initialBytes = (long) initialSizeMb * 1024L * 1024L;
+            long maxBytes = (long) maxSizeMb * 1024L * 1024L;
+            
+            keyIndex = new OffHeapKeyIndex(regionName, initialBytes, maxBytes);
             log.info("Created OFF-HEAP key index for region '{}' (initial: {}MB, max: {}MB)", 
                     regionName, initialSizeMb, maxSizeMb);
         } else {
@@ -348,10 +374,17 @@ public class CacheService {
         keyIndices.put(regionName, keyIndex);
         
         // Create value cache with eviction listener
+        // Use synchronous executor to avoid ForkJoinPool issues during shutdown
         Cache<String, CacheEntry> cache = Caffeine.newBuilder()
                 .maximumSize(memoryLimit)
                 .expireAfterWrite(24, TimeUnit.HOURS)
+                .executor(Runnable::run)  // Synchronous execution - no ForkJoinPool
                 .removalListener((String key, CacheEntry value, RemovalCause cause) -> {
+                    // Skip removal listener work during shutdown
+                    if (shuttingDown) {
+                        return;
+                    }
+                    
                     // When value is evicted from memory, update KeyIndex to mark as DISK only
                     if (cause == RemovalCause.SIZE || cause == RemovalCause.EXPIRED) {
                         KeyIndexInterface idx = keyIndices.get(regionName);
@@ -383,60 +416,87 @@ public class CacheService {
      * Prime cache with hybrid architecture:
      * 1. Load ALL keys into KeyIndex (regardless of memory limit)
      * 2. Load hot values (up to memory limit) into value cache
+     * 
+     * Note: Sequential loading only - parallel loading removed in v1.3.8 for stability.
      */
     private void primeCacheHybrid() {
         log.info("Priming HYBRID cache from {} persistence store...", persistenceStore.getType());
         log.info("  - ALL keys will be loaded into memory (KeyIndex)");
         log.info("  - Hot values will be loaded into value cache (up to memory limit per region)");
+        log.info("  - Sequential loading (one region at a time)");
         
         long totalKeysLoaded = 0;
         long totalValuesLoaded = 0;
         
         for (String regionName : regions.keySet()) {
-            try {
-                KeyIndexInterface keyIndex = keyIndices.get(regionName);
-                Cache<String, CacheEntry> valueCache = regionCaches.get(regionName);
-                int valueMemoryLimit = getEffectiveMemoryLimit(regionName);
-                
-                if (keyIndex == null || valueCache == null) {
-                    log.warn("KeyIndex or value cache not found for region '{}', skipping priming", regionName);
-                    continue;
-                }
-                
-                // Load ALL entries from persistence to populate KeyIndex
-                // For value cache, only load up to memory limit
-                List<CacheEntry> entries = persistenceStore.loadEntries(regionName, Integer.MAX_VALUE);
-                
-                int keysLoaded = 0;
-                int valuesLoaded = 0;
-                
-                for (CacheEntry entry : entries) {
-                    if (!entry.isExpired()) {
-                        // Always add key to index
-                        boolean valueInMemory = valuesLoaded < valueMemoryLimit;
-                        ValueLocation location = valueInMemory ? ValueLocation.BOTH : ValueLocation.DISK;
-                        keyIndex.putFromCacheEntry(entry, location);
-                        keysLoaded++;
-                        
-                        // Only add hot values to cache (up to limit)
-                        if (valueInMemory) {
-                            valueCache.put(entry.getKey(), entry);
-                            valuesLoaded++;
-                        }
-                    }
-                }
-                
-                totalKeysLoaded += keysLoaded;
-                totalValuesLoaded += valuesLoaded;
-                
-                log.info("Region '{}': loaded {} keys into index, {} values into cache (limit: {})", 
-                        regionName, keysLoaded, valuesLoaded, valueMemoryLimit);
-                
-            } catch (Exception e) {
-                log.warn("Failed to prime cache for region '{}': {}", regionName, e.getMessage());
-            }
+            long[] result = primeRegion(regionName);
+            totalKeysLoaded += result[0];
+            totalValuesLoaded += result[1];
         }
         
+        logPrimingComplete(totalKeysLoaded, totalValuesLoaded);
+    }
+    
+    /**
+     * Prime a single region's cache.
+     * Marks region as loading to block queries until complete.
+     * @return array of [keysLoaded, valuesLoaded]
+     */
+    private long[] primeRegion(String regionName) {
+        // Mark region as loading - queries should wait
+        operationLock.markRegionLoading(regionName);
+        
+        try {
+            KeyIndexInterface keyIndex = keyIndices.get(regionName);
+            Cache<String, CacheEntry> valueCache = regionCaches.get(regionName);
+            int valueMemoryLimit = getEffectiveMemoryLimit(regionName);
+            
+            if (keyIndex == null || valueCache == null) {
+                log.warn("KeyIndex or value cache not found for region '{}', skipping priming", regionName);
+                return new long[]{0, 0};
+            }
+            
+            // Load ALL entries from persistence to populate KeyIndex
+            // For value cache, only load up to memory limit
+            List<CacheEntry> entries = persistenceStore.loadEntries(regionName, Integer.MAX_VALUE);
+            
+            int keysLoaded = 0;
+            int valuesLoaded = 0;
+            
+            for (CacheEntry entry : entries) {
+                if (!entry.isExpired()) {
+                    // Always add key to index
+                    boolean valueInMemory = valuesLoaded < valueMemoryLimit;
+                    ValueLocation location = valueInMemory ? ValueLocation.BOTH : ValueLocation.DISK;
+                    keyIndex.putFromCacheEntry(entry, location);
+                    keysLoaded++;
+                    
+                    // Only add hot values to cache (up to limit)
+                    if (valueInMemory) {
+                        valueCache.put(entry.getKey(), entry);
+                        valuesLoaded++;
+                    }
+                }
+            }
+            
+            log.info("Region '{}': loaded {} keys into index, {} values into cache (limit: {})", 
+                    regionName, keysLoaded, valuesLoaded, valueMemoryLimit);
+            
+            return new long[]{keysLoaded, valuesLoaded};
+            
+        } catch (Exception e) {
+            log.warn("Failed to prime cache for region '{}': {}", regionName, e.getMessage());
+            return new long[]{0, 0};
+        } finally {
+            // Mark region as loaded - queries can proceed
+            operationLock.markRegionLoaded(regionName);
+        }
+    }
+    
+    /**
+     * Log cache priming completion.
+     */
+    private void logPrimingComplete(long totalKeysLoaded, long totalValuesLoaded) {
         log.info("HYBRID cache priming complete:");
         log.info("  - Total keys in memory (KeyIndex): {}", totalKeysLoaded);
         log.info("  - Total values in memory (cache): {}", totalValuesLoaded);
@@ -1501,6 +1561,15 @@ public class CacheService {
     private CacheEntry getEntry(String region, String key) {
         ensureRegionExists(region);
         
+        // Wait for region to finish loading if in progress
+        if (operationLock.isRegionLoading(region)) {
+            log.debug("Region '{}' is loading, waiting for completion before get...", region);
+            if (!operationLock.waitForRegionReady(region, 30, TimeUnit.SECONDS)) {
+                log.warn("Timeout waiting for region '{}' to load - returning null", region);
+                return null;
+            }
+        }
+        
         KeyIndexInterface keyIndex = keyIndices.get(region);
         Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         
@@ -1589,7 +1658,11 @@ public class CacheService {
         KeyIndexInterface keyIndex = keyIndices.get(region);
         Cache<String, CacheEntry> valueCache = regionCaches.get(region);
         
-        // Update KeyIndex with value location = BOTH (in memory and will be on disk)
+        // CRITICAL: Save to disk FIRST (synchronously) before updating index
+        // This prevents the race condition where key is in index but not on disk
+        persistenceStore.saveEntry(entry);
+        
+        // Now update KeyIndex with value location = BOTH (confirmed on disk)
         keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
         
         // Add to value cache
@@ -1597,13 +1670,71 @@ public class CacheService {
         
         recordStatistic(region, KuberConstants.STAT_SETS);
         metricsService.recordSet(region);
-        
-        // Persist to disk
-        if (properties.getCache().isPersistentMode()) {
-            persistenceStore.saveEntry(entry);
-        } else {
-            persistenceStore.saveEntryAsync(entry);
+    }
+    
+    /**
+     * Batch put entries for better performance during bulk operations like autoload.
+     * Entries are grouped by region and saved in batches to the persistence store.
+     * 
+     * @param entries list of cache entries to save
+     * @return number of entries successfully saved
+     */
+    public int putEntriesBatch(List<CacheEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return 0;
         }
+        
+        checkWriteAccess();
+        
+        // Group entries by region
+        Map<String, List<CacheEntry>> entriesByRegion = new LinkedHashMap<>();
+        for (CacheEntry entry : entries) {
+            entriesByRegion.computeIfAbsent(entry.getRegion(), k -> new ArrayList<>()).add(entry);
+        }
+        
+        int savedCount = 0;
+        
+        for (Map.Entry<String, List<CacheEntry>> regionGroup : entriesByRegion.entrySet()) {
+            String region = regionGroup.getKey();
+            List<CacheEntry> regionEntries = regionGroup.getValue();
+            
+            // Ensure region exists
+            ensureRegionExists(region);
+            
+            KeyIndexInterface keyIndex = keyIndices.get(region);
+            Cache<String, CacheEntry> valueCache = regionCaches.get(region);
+            
+            if (keyIndex == null || valueCache == null) {
+                log.warn("Region '{}' not properly initialized, skipping batch", region);
+                continue;
+            }
+            
+            try {
+                // CRITICAL: Save to disk FIRST (batch write) before updating index
+                persistenceStore.saveEntries(regionEntries);
+                
+                // Now update KeyIndex and value cache for all entries
+                for (CacheEntry entry : regionEntries) {
+                    keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
+                    valueCache.put(entry.getKey(), entry);
+                    savedCount++;
+                }
+                
+                // Record statistics
+                if (properties.getCache().isEnableStatistics()) {
+                    statistics.computeIfAbsent(region, k -> new ConcurrentHashMap<>())
+                            .merge(KuberConstants.STAT_SETS, (long) regionEntries.size(), Long::sum);
+                }
+                metricsService.recordSets(region, regionEntries.size());
+                
+            } catch (Exception e) {
+                log.error("Failed to batch save {} entries to region '{}': {}", 
+                        regionEntries.size(), region, e.getMessage(), e);
+                // Continue with other regions
+            }
+        }
+        
+        return savedCount;
     }
     
     private void ensureRegionExists(String region) {
@@ -1611,6 +1742,16 @@ public class CacheService {
             // Auto-create region
             createRegion(region, "Auto-created region");
         }
+    }
+    
+    /**
+     * Public method to ensure a region exists (for batch operations).
+     * Creates the region if it doesn't exist.
+     * 
+     * @param region the region name
+     */
+    public void ensureRegionExistsPublic(String region) {
+        ensureRegionExists(region);
     }
     
     private void checkWriteAccess() {
@@ -1933,6 +2074,11 @@ public class CacheService {
             return;
         }
         
+        // Skip if shutting down
+        if (shuttingDown) {
+            return;
+        }
+        
         for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
             String regionName = entry.getKey();
             Cache<String, CacheEntry> valueCache = entry.getValue();
@@ -1981,16 +2127,51 @@ public class CacheService {
     
     // ==================== Graceful Shutdown ====================
     
-    @jakarta.annotation.PreDestroy
+    /**
+     * Shutdown the cache service - persist all data and clean up resources.
+     * 
+     * <p>NOTE: This is called by ShutdownOrchestrator, NOT by @PreDestroy.
+     * This ensures proper shutdown order with delays between phases.
+     * 
+     * <p>Shutdown sequence:
+     * <ol>
+     *   <li>Set shutdown flag to stop scheduled tasks and removal listeners</li>
+     *   <li>Persist all regions metadata</li>
+     *   <li>Persist all cache entries to disk</li>
+     *   <li>Invalidate all Caffeine caches (no removal listener callbacks due to shutdown flag)</li>
+     *   <li>Shutdown key indices (releases off-heap memory)</li>
+     * </ol>
+     */
     public void shutdown() {
+        // Guard against double shutdown
+        if (alreadyShutdown) {
+            log.debug("CacheService shutdown already completed - skipping duplicate shutdown call");
+            return;
+        }
+        alreadyShutdown = true;
+        
         log.info("Shutting down Kuber cache service - persisting all data to {} persistence store...", 
                 persistenceStore.getType());
+        
+        // Step 1: Set shutdown flag FIRST to stop:
+        // - Scheduled tasks (cleanupExpiredEntries)
+        // - Caffeine removal listeners
+        // - Any new operations
+        shuttingDown = true;
+        
+        // Wait briefly for any in-flight operations to see the shutdown flag
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         
         long totalEntries = 0;
         long totalRegions = 0;
         
         try {
-            // Persist all regions
+            // Step 2: Persist all regions metadata
+            log.info("  Step 2: Persisting {} regions metadata...", regions.size());
             for (CacheRegion region : regions.values()) {
                 try {
                     region.setUpdatedAt(Instant.now());
@@ -2001,7 +2182,8 @@ public class CacheService {
                 }
             }
             
-            // Persist all cache entries from each region
+            // Step 3: Persist all cache entries from each region
+            log.info("  Step 3: Persisting cache entries from {} regions...", regionCaches.size());
             for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
                 String regionName = entry.getKey();
                 Cache<String, CacheEntry> cache = entry.getValue();
@@ -2020,7 +2202,7 @@ public class CacheService {
                         if (!validEntries.isEmpty()) {
                             persistenceStore.saveEntries(validEntries);
                             totalEntries += validEntries.size();
-                            log.info("Persisted {} entries from region '{}'", validEntries.size(), regionName);
+                            log.info("    Persisted {} entries from region '{}'", validEntries.size(), regionName);
                         }
                     }
                 } catch (Exception e) {
@@ -2028,12 +2210,26 @@ public class CacheService {
                 }
             }
             
-            // Shutdown key indices (releases off-heap memory if used)
+            // Step 4: Invalidate all Caffeine caches
+            // This won't trigger removal listeners because shuttingDown=true
+            log.info("  Step 4: Invalidating {} Caffeine caches...", regionCaches.size());
+            for (Map.Entry<String, Cache<String, CacheEntry>> entry : regionCaches.entrySet()) {
+                try {
+                    entry.getValue().invalidateAll();
+                    entry.getValue().cleanUp();  // Force synchronous cleanup
+                } catch (Exception e) {
+                    log.warn("Failed to invalidate cache for region '{}': {}", entry.getKey(), e.getMessage());
+                }
+            }
+            regionCaches.clear();
+            
+            // Step 5: Shutdown key indices (releases off-heap memory if used)
+            log.info("  Step 5: Shutting down {} key indices...", keyIndices.size());
             for (Map.Entry<String, KeyIndexInterface> entry : keyIndices.entrySet()) {
                 try {
                     KeyIndexInterface keyIndex = entry.getValue();
                     if (keyIndex.isOffHeap()) {
-                        log.info("Releasing off-heap memory for region '{}' ({} bytes)", 
+                        log.info("    Releasing off-heap memory for region '{}' ({} bytes)", 
                                 entry.getKey(), keyIndex.getOffHeapBytesUsed());
                     }
                     keyIndex.shutdown();
@@ -2042,6 +2238,7 @@ public class CacheService {
                             entry.getKey(), e.getMessage());
                 }
             }
+            keyIndices.clear();
             
             log.info("Shutdown complete - persisted {} regions and {} entries to {} persistence store", 
                     totalRegions, totalEntries, persistenceStore.getType());
