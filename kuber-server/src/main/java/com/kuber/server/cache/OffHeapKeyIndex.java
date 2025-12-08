@@ -62,7 +62,7 @@ import java.util.stream.Collectors;
  * 
  * <p>Thread-safe using ReadWriteLock for buffer operations.
  * 
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Slf4j
 public class OffHeapKeyIndex implements KeyIndexInterface {
@@ -393,8 +393,9 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             offHeapBytesUsed.addAndGet(entrySize);
             keyOffsets.put(key, offset);
             
-            // Update size tracking
-            if (entry.getValueLocation() != ValueLocation.DISK) {
+            // Update size tracking - only count as memory if in MEMORY or BOTH (not DISK or PERSISTENCE_ONLY)
+            ValueLocation loc = entry.getValueLocation();
+            if (loc == ValueLocation.MEMORY || loc == ValueLocation.BOTH) {
                 memoryValueSize.addAndGet(entry.getValueSize());
             }
             totalValueSize.addAndGet(entry.getValueSize());
@@ -449,9 +450,15 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             ValueLocation oldLocation = ValueLocation.values()[oldLoc];
             
             // Update memory value size tracking
-            if (oldLocation != ValueLocation.DISK && newLocation == ValueLocation.DISK) {
+            // PERSISTENCE_ONLY is treated like DISK (value not in memory)
+            boolean wasInMemory = (oldLocation == ValueLocation.MEMORY || oldLocation == ValueLocation.BOTH);
+            boolean isNowInMemory = (newLocation == ValueLocation.MEMORY || newLocation == ValueLocation.BOTH);
+            
+            if (wasInMemory && !isNowInMemory) {
+                // Moving from memory to disk/persistence-only
                 memoryValueSize.addAndGet(-valueSize);
-            } else if (oldLocation == ValueLocation.DISK && newLocation != ValueLocation.DISK) {
+            } else if (!wasInMemory && isNowInMemory) {
+                // Moving from disk/persistence-only to memory
                 memoryValueSize.addAndGet(valueSize);
             }
             
@@ -509,7 +516,9 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
             // Update size tracking
             if (entry != null) {
                 totalValueSize.addAndGet(-entry.getValueSize());
-                if (entry.getValueLocation() != ValueLocation.DISK) {
+                // Only decrement memory size if value was actually in memory (MEMORY or BOTH)
+                ValueLocation loc = entry.getValueLocation();
+                if (loc == ValueLocation.MEMORY || loc == ValueLocation.BOTH) {
                     memoryValueSize.addAndGet(-entry.getValueSize());
                 }
             }
@@ -575,15 +584,17 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     }
     
     /**
-     * Get keys with values only on disk.
+     * Get keys with values only on disk (not in memory cache).
+     * Includes both DISK and PERSISTENCE_ONLY locations.
      */
     @Override
     public List<String> getKeysOnDiskOnly() {
         return keyOffsets.keySet().stream()
                 .filter(key -> {
                     KeyIndexEntry entry = getWithoutTracking(key);
-                    return entry != null && !entry.isExpired() 
-                            && entry.getValueLocation() == ValueLocation.DISK;
+                    if (entry == null || entry.isExpired()) return false;
+                    ValueLocation loc = entry.getValueLocation();
+                    return loc == ValueLocation.DISK || loc == ValueLocation.PERSISTENCE_ONLY;
                 })
                 .collect(Collectors.toList());
     }
@@ -891,15 +902,17 @@ public class OffHeapKeyIndex implements KeyIndexInterface {
     }
     
     /**
-     * Get disk-only entry count.
+     * Get disk-only entry count (entries not in memory cache).
+     * Includes both DISK and PERSISTENCE_ONLY locations.
      */
     @Override
     public long getDiskOnlyEntryCount() {
         return keyOffsets.keySet().stream()
                 .filter(key -> {
                     KeyIndexEntry entry = getWithoutTracking(key);
-                    return entry != null && !entry.isExpired() 
-                            && entry.getValueLocation() == ValueLocation.DISK;
+                    if (entry == null || entry.isExpired()) return false;
+                    ValueLocation loc = entry.getValueLocation();
+                    return loc == ValueLocation.DISK || loc == ValueLocation.PERSISTENCE_ONLY;
                 })
                 .count();
     }

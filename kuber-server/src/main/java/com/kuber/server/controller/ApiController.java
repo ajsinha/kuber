@@ -98,6 +98,60 @@ public class ApiController {
         return ResponseEntity.ok().build();
     }
     
+    /**
+     * Reload a region's value cache from persistence.
+     * 
+     * <p>This operation:
+     * <ol>
+     *   <li>Evicts all entries from the value cache (memory)</li>
+     *   <li>Reloads entries from persistence up to max-memory-entries limit</li>
+     * </ol>
+     * 
+     * <p>Use this when:
+     * <ul>
+     *   <li>Value cache may have stale data</li>
+     *   <li>Memory needs refresh with current disk data</li>
+     *   <li>After direct database modifications</li>
+     * </ul>
+     * 
+     * @param name Region name
+     * @return Map with reload statistics
+     */
+    @PostMapping("/regions/{name}/reload")
+    public ResponseEntity<Map<String, Object>> reloadRegionFromPersistence(@PathVariable String name) {
+        int entriesLoaded = cacheService.reloadRegionFromPersistence(name);
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("region", name);
+        result.put("entriesLoaded", entriesLoaded);
+        result.put("message", "Cache reloaded from persistence");
+        result.put("timestamp", java.time.Instant.now().toString());
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Warm a region's cache by loading entries from persistence.
+     * 
+     * <p>Loads additional entries from persistence into memory without
+     * clearing existing cache entries. Use after bulk operations.
+     * 
+     * @param name Region name
+     * @return Map with warming statistics
+     */
+    @PostMapping("/regions/{name}/warm")
+    public ResponseEntity<Map<String, Object>> warmRegionCache(@PathVariable String name) {
+        int entriesWarmed = cacheService.warmRegionCache(name);
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("region", name);
+        result.put("entriesWarmed", entriesWarmed);
+        result.put("message", "Cache warmed from persistence");
+        result.put("timestamp", java.time.Instant.now().toString());
+        
+        return ResponseEntity.ok(result);
+    }
+    
     @GetMapping("/regions/{name}/stats")
     public ResponseEntity<Map<String, Object>> getRegionStats(@PathVariable String name) {
         return ResponseEntity.ok(cacheService.getStatistics(name));

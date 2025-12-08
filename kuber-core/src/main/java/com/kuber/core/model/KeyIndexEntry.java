@@ -53,7 +53,9 @@ public class KeyIndexEntry {
         /** Value is only on disk (cold data) */
         DISK,
         /** Value is in both memory and disk (recently written) */
-        BOTH
+        BOTH,
+        /** Value is only in persistence store, not in memory cache (used during bulk loads) */
+        PERSISTENCE_ONLY
     }
     
     /** The cache key */

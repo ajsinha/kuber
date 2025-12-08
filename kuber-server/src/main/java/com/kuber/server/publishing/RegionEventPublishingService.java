@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *                        │    ▼        ▼         ▼         ▼         ▼
  *                        │  Kafka   ActiveMQ  RabbitMQ  IBM MQ     File
  * 
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Slf4j
 @Service

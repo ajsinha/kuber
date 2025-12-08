@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  * 
  * For off-heap storage, use OffHeapKeyIndex instead.
  * 
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Slf4j
 public class KeyIndex implements KeyIndexInterface {
@@ -176,14 +176,16 @@ public class KeyIndex implements KeyIndexInterface {
             entry.setValueLocation(newLocation);
             
             // Update memory size tracking
-            if (oldLocation == ValueLocation.MEMORY || oldLocation == ValueLocation.BOTH) {
-                if (newLocation == ValueLocation.DISK) {
-                    memoryValueSize.addAndGet(-entry.getValueSize());
-                }
-            } else if (oldLocation == ValueLocation.DISK) {
-                if (newLocation == ValueLocation.MEMORY || newLocation == ValueLocation.BOTH) {
-                    memoryValueSize.addAndGet(entry.getValueSize());
-                }
+            // PERSISTENCE_ONLY is treated like DISK (value not in memory)
+            boolean wasInMemory = (oldLocation == ValueLocation.MEMORY || oldLocation == ValueLocation.BOTH);
+            boolean isNowInMemory = (newLocation == ValueLocation.MEMORY || newLocation == ValueLocation.BOTH);
+            
+            if (wasInMemory && !isNowInMemory) {
+                // Moving from memory to disk/persistence-only
+                memoryValueSize.addAndGet(-entry.getValueSize());
+            } else if (!wasInMemory && isNowInMemory) {
+                // Moving from disk/persistence-only to memory
+                memoryValueSize.addAndGet(entry.getValueSize());
             }
         }
     }
@@ -253,12 +255,16 @@ public class KeyIndex implements KeyIndexInterface {
     }
     
     /**
-     * Get keys with values only on disk.
+     * Get keys with values only on disk (not in memory cache).
+     * Includes both DISK and PERSISTENCE_ONLY locations.
      */
     public List<String> getKeysOnDiskOnly() {
         return index.entrySet().stream()
                 .filter(e -> !e.getValue().isExpired())
-                .filter(e -> e.getValue().getValueLocation() == ValueLocation.DISK)
+                .filter(e -> {
+                    ValueLocation loc = e.getValue().getValueLocation();
+                    return loc == ValueLocation.DISK || loc == ValueLocation.PERSISTENCE_ONLY;
+                })
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
@@ -349,12 +355,16 @@ public class KeyIndex implements KeyIndexInterface {
     }
     
     /**
-     * Get count of entries with values only on disk.
+     * Get count of entries with values only on disk (not in memory cache).
+     * Includes both DISK and PERSISTENCE_ONLY locations.
      */
     public long getDiskOnlyEntryCount() {
         return index.values().stream()
                 .filter(e -> !e.isExpired())
-                .filter(e -> e.getValueLocation() == ValueLocation.DISK)
+                .filter(e -> {
+                    ValueLocation loc = e.getValueLocation();
+                    return loc == ValueLocation.DISK || loc == ValueLocation.PERSISTENCE_ONLY;
+                })
                 .count();
     }
     

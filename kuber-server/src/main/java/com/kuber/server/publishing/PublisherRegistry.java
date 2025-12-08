@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Provides lookup methods for the orchestration service
  * - Handles graceful shutdown
  * 
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Slf4j
 @Service

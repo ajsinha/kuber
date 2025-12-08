@@ -102,7 +102,7 @@ Options:
   -k, --api-key KEY  API key for REST API shutdown
   -h, --host HOST    API host (default: localhost)
   -p, --port PORT    API port (default: 8080)
-  -d, --dir DIR      Directory containing kuber.shutdown file
+  -d, --dir DIR      Directory containing kuber.shutdown file (default: ./kuberdata)
   -r, --reason TEXT  Shutdown reason (for logging)
 
 Examples:
@@ -226,12 +226,14 @@ Shutdown timing can be configured in `application.yml`:
 
 ```yaml
 kuber:
+  base:
+    datadir: ./kuberdata              # Base directory for all data
   shutdown:
-    file-enabled: true              # Enable file-based shutdown
-    file-path: kuber.shutdown       # Path to shutdown signal file
-    check-interval-ms: 5000         # Check interval (5 seconds)
-    api-enabled: true               # Enable REST API shutdown
-    phase-delay-seconds: 5          # Delay between shutdown phases
+    file-enabled: true                # Enable file-based shutdown
+    file-path: ${kuber.base.datadir}/kuber.shutdown  # Path to shutdown signal file
+    check-interval-ms: 5000           # Check interval (5 seconds)
+    api-enabled: true                 # Enable REST API shutdown
+    phase-delay-seconds: 5            # Delay between shutdown phases
 ```
 
 ## Troubleshooting

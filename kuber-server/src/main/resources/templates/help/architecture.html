@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.4.2</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.5.0</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -171,15 +171,15 @@
                         </tbody>
                     </table>
                     
-                    <h4 class="mt-4">Startup Sequence (v1.4.2)</h4>
+                    <h4 class="mt-4">Startup Sequence (v1.5.0)</h4>
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-bolt me-2"></i>
-                        <strong>v1.4.2:</strong> All startup operations (compaction, loading) run sequentially for data consistency.
+                        <strong>v1.5.0:</strong> All startup operations (compaction, loading) run sequentially for data consistency.
                         This ensures no concurrent operations that could cause corruption.
                     </div>
                     <pre class="bg-dark text-white p-3 rounded">
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STARTUP SEQUENCE (v1.4.2)                            │
+│                         STARTUP SEQUENCE (v1.5.0)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -283,7 +283,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.4.2                                     ║
+║   SYSTEM READY - Version 1.5.0                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -793,7 +793,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.4.2</p>
+                    <p class="text-muted small mb-0">Version 1.5.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

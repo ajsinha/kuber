@@ -36,6 +36,14 @@ import java.util.Map;
 public class KuberProperties {
     
     /**
+     * Base data directory for all Kuber data files.
+     * All relative paths for persistence, autoload, backup, etc. are resolved from this directory.
+     * Default: ./kuberdata
+     * Override with -Dkuber.base.datadir=/path/to/data or environment variable KUBER_BASE_DATADIR
+     */
+    private Base base = new Base();
+    
+    /**
      * Unique node identifier
      */
     private String nodeId = java.util.UUID.randomUUID().toString().substring(0, 8);
@@ -89,6 +97,16 @@ public class KuberProperties {
      * Shutdown configuration
      */
     private Shutdown shutdown = new Shutdown();
+    
+    @Data
+    public static class Base {
+        /**
+         * Base data directory for all Kuber data files.
+         * All relative paths for persistence, autoload, backup, etc. are resolved from this directory.
+         * Default: ./kuberdata
+         */
+        private String datadir = "./kuberdata";
+    }
     
     @Data
     public static class Network {
@@ -197,6 +215,26 @@ public class KuberProperties {
          */
         @Min(16)
         private int offHeapKeyIndexMaxSizeMb = 1024;
+        
+        // ==================== Factory Configuration ====================
+        
+        /**
+         * Cache implementation to use for value caches.
+         * Supports: CAFFEINE (default), GUAVA, EHCACHE.
+         * The cache implementation can be changed without modifying code.
+         * 
+         * @since 1.5.0
+         */
+        private String cacheImplementation = "CAFFEINE";
+        
+        /**
+         * Collections implementation to use for internal collections (Map, List, Set, Queue, Deque).
+         * Supports: DEFAULT (uses Java concurrent collections).
+         * The collections implementation can be changed without modifying code.
+         * 
+         * @since 1.5.0
+         */
+        private String collectionsImplementation = "DEFAULT";
         
         /**
          * Whether to use persistent mode (sync writes to MongoDB)
@@ -451,11 +489,12 @@ public class KuberProperties {
         /**
          * Batch size for bulk writes to persistence store.
          * Records are accumulated and written in batches for better performance.
-         * Default: 2048 records per batch.
+         * Batch writes use async mode (WAL written but not synced per batch).
+         * Default: 32768 records per batch.
          * Set to 1 to disable batching (write each record individually).
          */
         @Min(1)
-        private int batchSize = 8192;
+        private int batchSize = 32768;
     }
     
     // ==================== BACKUP AND RESTORE CONFIGURATION ====================

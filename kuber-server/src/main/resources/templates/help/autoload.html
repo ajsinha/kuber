@@ -20,7 +20,7 @@
                 
                 <div class="alert alert-info mt-3">
                     <i class="fas fa-bolt me-2"></i>
-                    <strong>Batch Writes (v1.4.2):</strong>
+                    <strong>Batch Writes (v1.5.0):</strong>
                     Records are written in batches for 10-50x faster loading. Configure with <code>kuber.autoload.batch-size</code> (default: 2048).
                 </div>
                 
@@ -30,7 +30,7 @@
     enabled: true
     directory: ./autoload
     scan-interval-seconds: 60
-    batch-size: 8192        # Records per batch (v1.4.2)
+    batch-size: 8192        # Records per batch (v1.5.0)
     max-records-per-file: 0 # 0 = unlimited
     create-directories: true
     file-encoding: UTF-8</code></pre>
@@ -75,6 +75,16 @@ ttl:3600</code></pre>
 key_delimiter:-</code></pre>
                 <p>Result: <code>US-CA-Los Angeles</code></p>
                 
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i><strong>Empty Key Components (v1.5.0):</strong>
+                    One or more key components can be empty. Records are still processed:
+                    <ul class="mb-0 mt-2">
+                        <li><code>{"country":"US","state":"","city":"LA"}</code> → Key: <code>US//LA</code> ✓</li>
+                        <li><code>{"country":"","state":"CA","city":""}</code> → Key: <code>/CA/</code> ✓</li>
+                        <li><code>{"country":"","state":"","city":""}</code> → Key: <code>//</code> (skipped - all empty)</li>
+                    </ul>
+                </div>
+                
                 <h3 class="mt-4">Attribute Mapping</h3>
                 <p>Create <code>data.csv.metadata.attributemapping.json</code>:</p>
                 <pre class="bg-dark text-light p-3 rounded"><code>{
@@ -88,7 +98,7 @@ key_delimiter:-</code></pre>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.4.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.5.0</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

@@ -74,6 +74,16 @@ import java.util.concurrent.atomic.AtomicLong;
  * </pre>
  * <p>This would produce keys like "US-CA-Los Angeles".
  * 
+ * <p><b>Empty Key Components (v1.5.0):</b>
+ * <p>One or more components of a composite key can be empty/null. The record will still
+ * be processed with the empty component represented in the key. For example:
+ * <ul>
+ *   <li>country="US", state="", city="LA" → key="US//LA" (record processed)</li>
+ *   <li>country="", state="CA", city="" → key="/CA/" (record processed)</li>
+ *   <li>country="", state="", city="" → key="//" (record SKIPPED - all components empty)</li>
+ * </ul>
+ * <p>Records are only skipped when ALL key components are empty.
+ * 
  * <p>For CSV/TXT files, each row is converted to JSON using the header fields,
  * and the value from key_field column(s) is used as the cache key.
  * 
@@ -84,11 +94,34 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Files are processed sequentially (one at a time) for data consistency.
  * 
+ * <p><b>MEMORY MANAGEMENT (v1.5.0):</b>
+ * <p>Autoload uses "persistence-only" mode for efficient bulk loading:
+ * <ul>
+ *   <li>Data is written to KeyIndex and persistence store</li>
+ *   <li>Value cache is NOT populated during autoload (avoids eviction pressure)</li>
+ *   <li>Memory stays within configured limits during bulk loads</li>
+ *   <li>Data is loaded on-demand when accessed via GET (lazy loading)</li>
+ *   <li>This is the recommended approach for large datasets</li>
+ * </ul>
+ * 
+ * <p><b>CACHE WARMING:</b>
+ * <p>The value cache warms naturally through GET operations. Each GET:
+ * <ol>
+ *   <li>Checks KeyIndex - if key exists, continues</li>
+ *   <li>Checks value cache - if present, returns immediately</li>
+ *   <li>If not in cache, loads from persistence and puts in cache</li>
+ * </ol>
+ * <p>This lazy loading approach is memory-efficient and works well for large datasets.
+ * After autoload completes, 25% of the cache capacity is proactively warmed in a
+ * background thread to provide better initial performance without blocking operations.
+ * Manual warming via /api/regions/{name}/warm is also available.
+ * 
  * <p>CONCURRENCY SAFETY (v1.3.2):
  * <p>Uses PersistenceOperationLock to ensure autoload does not run concurrently
  * with compaction operations. Acquires region locks during file processing.
+ * Write operations wait for autoload to complete before proceeding.
  * 
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Service
 @Slf4j
@@ -361,6 +394,17 @@ public class AutoloadService {
             log.info("Processed {} - loaded: {}, skipped: {}, errors: {}", 
                     fileName, result.getLoaded(), result.getSkipped(), result.getErrors());
             
+            // Start background warming for 25% of cache capacity
+            // This proactively loads some data into memory without blocking operations
+            // Remaining data will load on-demand via GET operations (lazy loading)
+            if (result.getLoaded() > 0) {
+                log.info("Autoload complete for region '{}': {} records committed to persistence. " +
+                        "Starting background warming (25% of capacity)...", regionName, result.getLoaded());
+                cacheService.warmRegionCacheInBackground(regionName, 25);
+            } else {
+                log.info("Autoload complete for region '{}': no records loaded.", regionName);
+            }
+            
             // Move to outbox
             moveToOutbox(dataFile, metadataPath, attributeMappingPath, "SUCCESS");
             
@@ -571,8 +615,9 @@ public class AutoloadService {
                     
                     // Build key value (single or composite)
                     String keyValue = buildCompositeKeyFromCsvRecord(record, keyFields, metadata.getKeyDelimiter());
-                    if (keyValue == null || keyValue.isBlank()) {
-                        log.debug("Skipping record {} - empty key field(s)", record.getRecordNumber());
+                    // Skip only if ALL key components are empty (key is just delimiters or blank)
+                    if (keyValue == null || isKeyEffectivelyEmpty(keyValue, metadata.getKeyDelimiter())) {
+                        log.debug("Skipping record {} - all key field(s) are empty", record.getRecordNumber());
                         result.incrementSkipped();
                         continue;
                     }
@@ -586,7 +631,8 @@ public class AutoloadService {
                     // Flush batch when full
                     if (batch.size() >= batchSize) {
                         batchNumber++;
-                        int saved = cacheService.putEntriesBatch(batch);
+                        // Skip value cache to avoid eviction during autoload
+                        int saved = cacheService.putEntriesBatch(batch, true);
                         log.info("[{}] Batch #{}: Processed {} records so far ({} in this batch) -> region '{}'", 
                                 fileName, batchNumber, recordCount, saved, region);
                         batch.clear();
@@ -601,7 +647,8 @@ public class AutoloadService {
             // Flush remaining entries
             if (!batch.isEmpty()) {
                 batchNumber++;
-                int saved = cacheService.putEntriesBatch(batch);
+                // Skip value cache to avoid eviction during autoload
+                int saved = cacheService.putEntriesBatch(batch, true);
                 log.info("[{}] Batch #{} (final): Processed {} records so far ({} in this batch) -> region '{}'", 
                         fileName, batchNumber, recordCount, saved, region);
             }
@@ -627,10 +674,13 @@ public class AutoloadService {
         List<String> values = new ArrayList<>();
         for (String field : keyFields) {
             String value = record.get(field);
-            if (value == null || value.isBlank()) {
-                return null; // All parts of composite key must have values
+            // Allow empty/null values in composite key - use empty string
+            // Record will only be skipped if the ENTIRE key is blank (checked by caller)
+            if (value == null) {
+                values.add("");
+            } else {
+                values.add(value.trim());
             }
-            values.add(value.trim());
         }
         return String.join(delimiter, values);
     }
@@ -705,8 +755,9 @@ public class AutoloadService {
                     
                     // Build key value (single or composite)
                     String keyValue = buildCompositeKeyFromJsonNode(jsonNode, keyFields, metadata.getKeyDelimiter());
-                    if (keyValue == null || keyValue.isBlank()) {
-                        log.debug("Skipping line {} - missing or empty key field(s)", lineNumber);
+                    // Skip only if ALL key components are empty (key is just delimiters or blank)
+                    if (keyValue == null || isKeyEffectivelyEmpty(keyValue, metadata.getKeyDelimiter())) {
+                        log.debug("Skipping line {} - all key field(s) are empty", lineNumber);
                         result.incrementSkipped();
                         continue;
                     }
@@ -726,7 +777,8 @@ public class AutoloadService {
                     // Flush batch when full
                     if (batch.size() >= batchSize) {
                         batchNumber++;
-                        int saved = cacheService.putEntriesBatch(batch);
+                        // Skip value cache to avoid eviction during autoload
+                        int saved = cacheService.putEntriesBatch(batch, true);
                         log.info("[{}] Batch #{}: Processed {} records so far ({} in this batch) -> region '{}'", 
                                 fileName, batchNumber, recordCount, saved, region);
                         batch.clear();
@@ -742,7 +794,8 @@ public class AutoloadService {
         // Flush remaining entries
         if (!batch.isEmpty()) {
             batchNumber++;
-            int saved = cacheService.putEntriesBatch(batch);
+            // Skip value cache to avoid eviction during autoload
+            int saved = cacheService.putEntriesBatch(batch, true);
             log.info("[{}] Batch #{} (final): Processed {} records so far ({} in this batch) -> region '{}'", 
                     fileName, batchNumber, recordCount, saved, region);
         }
@@ -758,25 +811,58 @@ public class AutoloadService {
      * Build composite key from JSON node by extracting values for each key field
      * and joining them with the specified delimiter.
      * 
+     * <p>Empty or null field values are allowed - they will be included as empty strings
+     * in the composite key. The record will only be skipped if the ENTIRE key is blank
+     * (checked by the caller).
+     * 
      * @param jsonNode the JSON object
      * @param keyFields list of field names (e.g., ["country", "state", "city"])
      * @param delimiter the delimiter to join values (e.g., "/")
-     * @return composite key (e.g., "US/CA/Los Angeles") or null if any field is missing/empty
+     * @return composite key (e.g., "US/CA/Los Angeles" or "US//Los Angeles" if state is empty)
      */
     private String buildCompositeKeyFromJsonNode(JsonNode jsonNode, List<String> keyFields, String delimiter) {
         List<String> values = new ArrayList<>();
         for (String field : keyFields) {
             JsonNode fieldNode = jsonNode.get(field);
+            // Allow empty/null values in composite key - use empty string
+            // Record will only be skipped if the ENTIRE key is blank (checked by caller)
             if (fieldNode == null || fieldNode.isNull()) {
-                return null; // All parts of composite key must have values
+                values.add("");
+            } else {
+                String value = fieldNode.asText();
+                values.add(value != null ? value.trim() : "");
             }
-            String value = fieldNode.asText();
-            if (value == null || value.isBlank()) {
-                return null;
-            }
-            values.add(value.trim());
         }
         return String.join(delimiter, values);
+    }
+    
+    /**
+     * Check if a key is effectively empty (all components are empty).
+     * 
+     * <p>A key is effectively empty if after removing all delimiter characters,
+     * the remaining string is blank. This handles cases like "//" where all
+     * key components were empty.
+     * 
+     * <p>Examples (with "/" delimiter):
+     * <ul>
+     *   <li>"US/CA/LA" → NOT empty (has content)</li>
+     *   <li>"US//LA" → NOT empty (has content, one component empty)</li>
+     *   <li>"//" → EMPTY (all components empty)</li>
+     *   <li>"" → EMPTY (blank)</li>
+     *   <li>"  " → EMPTY (blank after trim)</li>
+     * </ul>
+     * 
+     * @param key the composite key to check
+     * @param delimiter the delimiter used in the key
+     * @return true if the key is effectively empty
+     */
+    private boolean isKeyEffectivelyEmpty(String key, String delimiter) {
+        if (key == null || key.isBlank()) {
+            return true;
+        }
+        // Remove all delimiter characters and check if anything remains
+        String withoutDelimiters = key.replace(delimiter, "");
+        return withoutDelimiters.isBlank();
     }
     
     /**

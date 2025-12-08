@@ -2,6 +2,162 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.5.0] - 2025-12-08 - FACTORY PATTERN FOR PLUGGABLE CACHE & COLLECTIONS
+
+### Added
+- **Cache Factory Pattern**: Pluggable cache implementation via Factory + Proxy pattern
+  - `CacheProxy<K,V>` interface: Abstraction for cache operations
+  - `CacheFactory` interface: Factory for creating cache instances
+  - `CaffeineCacheFactory`: Default implementation using Caffeine
+  - `CaffeineCacheProxy`: Caffeine-specific proxy implementation
+  - `CacheConfig`: Configuration object for cache creation
+
+- **Collections Factory Pattern**: Pluggable collections implementation
+  - `CollectionsFactory` interface: Factory for creating Map, List, Set, Queue, Deque, Stack
+  - `DefaultCollectionsFactory`: Default implementation using Java concurrent collections
+  - `CollectionsConfig`: Configuration for collection creation
+  - Supports: ConcurrentHashMap, CopyOnWriteArrayList, ConcurrentSkipListSet, ConcurrentLinkedQueue, ConcurrentLinkedDeque
+  - Thread-safe, ordered, and sorted variants supported via configuration
+
+- **Factory Provider**: Central access point for factories
+  - `FactoryProvider` component: Selects appropriate factory based on configuration
+  - Supports runtime selection of implementations
+
+- **New Configuration Options**:
+  ```yaml
+  kuber:
+    cache:
+      cache-implementation: CAFFEINE  # CAFFEINE (default)
+      collections-implementation: DEFAULT  # DEFAULT (default)
+  ```
+
+### Changed
+- **CacheService**: Now uses factory pattern for value caches
+  - Injected `FactoryProvider` for cache creation
+  - Uses `CacheProxy<String, CacheEntry>` instead of direct `Cache<String, CacheEntry>`
+  - Cache implementation can be swapped without code changes
+
+- **Server Info**: Now includes cache and collections implementation types
+  - `cacheImplementation`: Current cache type (e.g., "CAFFEINE")
+  - `collectionsImplementation`: Current collections type (e.g., "DEFAULT")
+
+- **Autoload Operation Blocking**: Write operations and stats now wait during autoload
+  - All write operations (SET, DELETE, EXPIRE, PERSIST, HSET, JSONSET) wait for autoload to complete
+  - Stats collection (getRegion, dbSize) waits for accurate counts
+  - Region management (deleteRegion, purgeRegion, clearRegionCaches) waits for safety
+  - Read operations can proceed during autoload (may return stale data)
+  - Added `waitForRegionLoadingIfNeeded()` helper method
+  - 60-second timeout with IllegalStateException on timeout
+
+### Architecture
+The Factory Pattern enables:
+- **Abstraction**: Code doesn't depend on specific cache/collection implementations
+- **Extensibility**: New providers can be added (Guava, EhCache, etc.)
+- **Testability**: Mock implementations can be injected for testing
+- **Configuration**: Implementation can be changed via configuration
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│  CacheService   │────>│  FactoryProvider│
+└─────────────────┘     └─────────────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    │                     │
+            ┌───────▼───────┐     ┌───────▼───────────┐
+            │  CacheFactory │     │CollectionsFactory │
+            └───────────────┘     └───────────────────┘
+                    │                     │
+            ┌───────▼───────────┐ ┌───────▼───────────────┐
+            │CaffeineCacheFactory│ │DefaultCollectionsFactory│
+            └───────────────────┘ └───────────────────────┘
+                    │                     │
+            ┌───────▼───────┐     ┌───────┴───────────────┐
+            │ CacheProxy<K,V>│     │ Map, List, Set,       │
+            └───────────────┘     │ Queue, Deque, Stack   │
+                    │             └───────────────────────┘
+            ┌───────▼───────────┐
+            │CaffeineCacheProxy │
+            └───────────────────┘
+```
+
+- **Autoload Composite Keys**: Allow empty key components
+  - One or more components in a composite key can now be empty/null
+  - Records are still processed with empty components (e.g., "US//LA" for empty state)
+  - Records only skipped when ALL key components are empty
+  - Updated `buildCompositeKeyFromCsvRecord` and `buildCompositeKeyFromJsonNode`
+  - Added `isKeyEffectivelyEmpty` helper method
+
+- **Autoload Persistence-Only Mode**: Skip value cache during bulk loading
+  - Autoload now writes ONLY to KeyIndex and persistence store
+  - Value cache is NOT populated during autoload (no eviction interference)
+  - Memory stays within configured limits during bulk loads
+  - Cache warms naturally through GET operations (lazy loading)
+  - No automatic warming after autoload - prevents OOM with large datasets
+  - Updated `putEntriesBatch(entries, skipValueCache)` with new boolean parameter
+  - Default batch size increased to 32768 records
+
+- **Cache Warming & Reload (Fixed in v1.5.0)**
+  - Fixed OOM issues with large datasets during warming/reload
+  - Added background warming after autoload (25% of cache capacity)
+  - Background warming runs in low-priority thread, doesn't block operations
+  - `warmRegionCache()` now uses batched loading (1000 entries per batch)
+  - `warmRegionCache()` respects `kuber.cache.max-memory-entries` config limit
+  - `warmRegionCacheInBackground()` - new method for async warming
+  - `reloadRegionFromPersistence()` simplified - no longer iterates all KeyIndex entries
+  - For large datasets, lazy loading via GET is the recommended approach
+  - API endpoints still available:
+    - `POST /api/regions/{name}/warm` - Warm cache up to config limit
+    - `POST /api/regions/{name}/reload` - Clear cache and warm
+  - New UI buttons on Regions page and Region Detail page:
+    - "Reload from Persistence" - Evict and reload
+    - "Warm Cache" - Load additional entries (detail page only)
+
+- **Query & Search Performance (Fixed in v1.5.0)**
+  - Fixed slow `searchKeysByRegex()` - now uses KeyIndex (in-memory) for key lookup
+  - Fixed slow `jsonSearch()` - now uses KeyIndex and batch loading
+  - Removed slow `getNonExpiredKeys()` calls that scanned entire persistence
+  - Added batch loading from persistence (`loadEntriesByKeys`) instead of individual gets
+  - Search results are cached for future access
+
+- **Base Data Directory Configuration**
+  - New `kuber.base.datadir` property (default: `./kuberdata`)
+  - All data paths now relative to base directory:
+    - `${kuber.base.datadir}/data/kuber.db` - SQLite database
+    - `${kuber.base.datadir}/data/rocksdb` - RocksDB data
+    - `${kuber.base.datadir}/data/lmdb` - LMDB data
+    - `${kuber.base.datadir}/autoload/inbox` - Autoload inbox
+    - `${kuber.base.datadir}/autoload/outbox` - Autoload outbox
+    - `${kuber.base.datadir}/backup` - Backup files
+    - `${kuber.base.datadir}/restore` - Restore files
+    - `${kuber.base.datadir}/log/kuber/audit` - Audit logs
+    - `${kuber.base.datadir}/archive/kuber-events` - Event archive
+    - `${kuber.base.datadir}/kuber.shutdown` - Shutdown signal file
+  - Override via command line: `-Dkuber.base.datadir=/your/path`
+  - Override via environment: `KUBER_BASE_DATADIR=/your/path`
+  - New `DataDirectoryInitializer` component creates directories at startup
+  - Updated shutdown scripts to use `./kuberdata` as default directory
+
+### New Files
+- `com.kuber.server.startup.DataDirectoryInitializer` - Creates data directories at startup
+- `com.kuber.server.factory.CacheProxy` - Cache abstraction interface
+- `com.kuber.server.factory.CacheFactory` - Factory interface
+- `com.kuber.server.factory.CacheConfig` - Cache configuration
+- `com.kuber.server.factory.CaffeineCacheProxy` - Caffeine implementation
+- `com.kuber.server.factory.CaffeineCacheFactory` - Caffeine factory
+- `com.kuber.server.factory.CollectionsFactory` - Collections factory interface
+- `com.kuber.server.factory.CollectionsConfig` - Collections configuration
+- `com.kuber.server.factory.DefaultCollectionsFactory` - Default collections factory
+- `com.kuber.server.factory.FactoryProvider` - Central factory provider
+
+### Documentation
+- **How to Start Kuber Server**: Comprehensive guide added
+  - `docs/HOW_TO_START_KUBER_SERVER.md` - Full markdown documentation
+  - `templates/help/server-startup.html` - Web UI help page
+  - Covers: Prerequisites, building, running methods, configuration, command-line overrides
+  - Includes: Environment variables, common examples, troubleshooting
+
+---
+
 ## [1.4.2] - 2025-12-07 - BUG FIXES & STATS REFRESH
 
 ### Fixed

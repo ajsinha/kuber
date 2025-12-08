@@ -16,7 +16,7 @@
 #   -k, --api-key KEY  API key for REST API shutdown
 #   -h, --host HOST    API host (default: localhost)
 #   -p, --port PORT    API port (default: 8080)
-#   -d, --dir DIR      Directory containing kuber.shutdown file
+#   -d, --dir DIR      Directory containing kuber.shutdown file (default: ./kuberdata)
 #   -r, --reason TEXT  Shutdown reason (for logging)
 #   --help             Show this help message
 #
@@ -35,7 +35,7 @@ SHUTDOWN_METHOD="file"
 API_HOST="localhost"
 API_PORT="8080"
 API_KEY=""
-SHUTDOWN_DIR="."
+SHUTDOWN_DIR="./kuberdata"
 SHUTDOWN_FILE="kuber.shutdown"
 REASON="Manual shutdown"
 
@@ -66,7 +66,7 @@ print_usage() {
     echo "  -k, --api-key KEY  API key for REST API shutdown"
     echo "  -h, --host HOST    API host (default: localhost)"
     echo "  -p, --port PORT    API port (default: 8080)"
-    echo "  -d, --dir DIR      Directory containing kuber.shutdown file"
+    echo "  -d, --dir DIR      Directory containing kuber.shutdown file (default: ./kuberdata)"
     echo "  -r, --reason TEXT  Shutdown reason (for logging)"
     echo "  --help             Show this help message"
     echo ""

@@ -34,7 +34,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
  * 2. HTTP Basic (REST API)
  * 3. API Key (X-API-Key header, Authorization: ApiKey, or api_key query param)
  *
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Configuration
 @EnableWebSecurity

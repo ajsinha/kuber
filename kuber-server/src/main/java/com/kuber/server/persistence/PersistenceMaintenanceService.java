@@ -40,7 +40,7 @@ import java.sql.Statement;
  * - Avoids potential corruption from concurrent database operations
  * - More predictable and stable behavior
  * 
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Service
 @RequiredArgsConstructor

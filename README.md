@@ -261,6 +261,10 @@ kuber:
       products: 200000
     persistent-mode: false
     eviction-policy: LRU
+    
+    # Factory configuration (v1.5.0)
+    cache-implementation: CAFFEINE       # Cache provider: CAFFEINE (default)
+    collections-implementation: DEFAULT  # Collections provider: DEFAULT (default)
   
   # Persistence (rocksdb, lmdb, mongodb, postgresql, sqlite, memory)
   persistence:
@@ -284,6 +288,19 @@ kuber:
     enabled: false
     connect-string: localhost:2181
 ```
+
+### Factory Pattern (v1.5.0)
+
+Kuber uses the Factory Pattern to allow pluggable cache and collections implementations. This enables changing the underlying cache provider or collection types without code changes:
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `cache-implementation` | `CAFFEINE` | Cache provider for value caches |
+| `collections-implementation` | `DEFAULT` | Collections provider for Map, List, Set, Queue, Deque |
+
+Current implementations:
+- **Cache**: CAFFEINE (default) - High-performance Java caching library
+- **Collections**: DEFAULT (default) - Uses Java concurrent collections (ConcurrentHashMap, CopyOnWriteArrayList, ConcurrentLinkedQueue, etc.)
 
 ### Individual Write Modes (v1.3.10)
 

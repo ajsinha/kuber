@@ -212,6 +212,35 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Cache Management (Admin/Operator only) -->
+                <div class="card border-0 shadow-sm mt-4" sec:authorize="hasAnyRole('ADMIN', 'OPERATOR')">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-memory me-2 text-info"></i>
+                            Cache Management
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-info" id="warm-cache-btn"
+                                    th:attr="data-region=${region.name}"
+                                    title="Load additional entries from persistence into memory">
+                                <i class="fas fa-fire me-1"></i> Warm Cache
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" id="reload-cache-btn"
+                                    th:attr="data-region=${region.name}"
+                                    title="Evict all entries from memory and reload from persistence">
+                                <i class="fas fa-database me-1"></i> Reload from Persistence
+                            </button>
+                        </div>
+                        <div class="small text-muted mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Warm:</strong> Adds entries to memory without clearing.<br>
+                            <strong>Reload:</strong> Clears memory first, then loads fresh data.
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -274,6 +303,75 @@
 
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Warm Cache button handler
+    const warmBtn = document.getElementById('warm-cache-btn');
+    if (warmBtn) {
+        warmBtn.addEventListener('click', function() {
+            const regionName = this.dataset.region;
+            const originalHtml = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Warming...';
+            
+            fetch('/api/regions/' + encodeURIComponent(regionName) + '/warm', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    
+                    if (data.entriesWarmed !== undefined) {
+                        alert('Cache warmed successfully!\n\nEntries loaded: ' + data.entriesWarmed);
+                        location.reload();
+                    } else if (data.error) {
+                        alert('Failed to warm cache: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    alert('Error warming cache: ' + err.message);
+                });
+        });
+    }
+    
+    // Reload from Persistence button handler
+    const reloadBtn = document.getElementById('reload-cache-btn');
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', function() {
+            const regionName = this.dataset.region;
+            
+            if (!confirm('This will evict all entries from memory cache for region "' + regionName + '" and reload from persistence.\n\nContinue?')) {
+                return;
+            }
+            
+            const originalHtml = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Reloading...';
+            
+            fetch('/api/regions/' + encodeURIComponent(regionName) + '/reload', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    
+                    if (data.entriesLoaded !== undefined) {
+                        alert('Cache reloaded successfully!\n\nEntries loaded: ' + data.entriesLoaded);
+                        location.reload();
+                    } else if (data.error) {
+                        alert('Failed to reload cache: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    alert('Error reloading cache: ' + err.message);
+                });
+        });
+    }
+});
+</script>
 
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.4.0**
+**Version 1.5.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,16 +13,17 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 1. [Overview](#1-overview)
 2. [System Architecture](#2-system-architecture)
-3. [Startup Orchestration](#3-startup-orchestration)
-4. [Core Components](#4-core-components)
-5. [Client Architecture](#5-client-architecture)
-6. [Protocol Design](#6-protocol-design)
-7. [Persistence Layer](#7-persistence-layer)
-8. [Replication Architecture](#8-replication-architecture)
-9. [Event Publishing](#9-event-publishing)
-10. [Security Architecture](#10-security-architecture)
-11. [Data Flow](#11-data-flow)
-12. [Deployment Patterns](#12-deployment-patterns)
+3. [Factory Pattern Architecture](#3-factory-pattern-architecture)
+4. [Startup Orchestration](#4-startup-orchestration)
+5. [Core Components](#5-core-components)
+6. [Client Architecture](#6-client-architecture)
+7. [Protocol Design](#7-protocol-design)
+8. [Persistence Layer](#8-persistence-layer)
+9. [Replication Architecture](#9-replication-architecture)
+10. [Event Publishing](#10-event-publishing)
+11. [Security Architecture](#11-security-architecture)
+12. [Data Flow](#12-data-flow)
+13. [Deployment Patterns](#13-deployment-patterns)
 
 ---
 
@@ -185,11 +186,191 @@ kuber/
 
 ---
 
-## 3. Startup Orchestration
+## 3. Factory Pattern Architecture
+
+**Added in v1.5.0**
+
+Kuber uses the Factory Pattern combined with the Proxy Pattern to allow pluggable cache and collection implementations. This enables changing the underlying cache provider (e.g., from Caffeine to EhCache) or collection implementation without modifying application code.
+
+### 3.1 Design Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CacheService                                       │
+│                                                                             │
+│  Uses FactoryProvider to create cache and collection instances              │
+└─────────────────────────────────────────────────────────┬───────────────────┘
+                                                          │
+                                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FactoryProvider                                      │
+│                                                                             │
+│  ┌─────────────────────────┐       ┌─────────────────────────┐              │
+│  │     CacheFactory        │       │  CollectionsFactory     │              │
+│  │  (returns CacheProxy)   │       │(returns Map,List,Set,..)│              │
+│  └────────────┬────────────┘       └───────────┬─────────────┘              │
+└───────────────┼────────────────────────────────┼────────────────────────────┘
+                │                                │
+        ┌───────┴───────┐                ┌───────┴───────┐
+        ▼               ▼                ▼               ▼
+┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+│   Caffeine    │ │    Guava      │ │   Default     │ │    Custom     │
+│  CacheFactory │ │ CacheFactory  │ │ Collections   │ │ Collections   │
+│   (default)   │ │   (future)    │ │   (default)   │ │   (future)    │
+└───────┬───────┘ └───────────────┘ └───────┬───────┘ └───────────────┘
+        │                                   │
+        ▼                                   ▼
+┌───────────────────────────┐ ┌─────────────────────────────────────────┐
+│    CacheProxy<K, V>       │ │ Collection Types:                       │
+│                           │ │ - Map<K,V> (ConcurrentHashMap, etc.)    │
+│  - get(K key): V          │ │ - List<E> (CopyOnWriteArrayList, etc.)  │
+│  - put(K key, V value)    │ │ - Set<E> (ConcurrentSkipListSet, etc.)  │
+│  - invalidate(K key)      │ │ - Queue<E> (ConcurrentLinkedQueue)      │
+│  - estimatedSize(): long  │ │ - Deque<E> (ConcurrentLinkedDeque)      │
+│  - stats(): CacheStats    │ │ - Stack<E> (via Deque interface)        │
+└───────────────────────────┘ └─────────────────────────────────────────┘
+```
+
+### 3.2 Key Interfaces
+
+#### CacheProxy<K, V>
+Abstraction for cache operations, allowing different implementations to be swapped.
+
+```java
+public interface CacheProxy<K, V> {
+    V get(K key);
+    V get(K key, Function<? super K, ? extends V> mappingFunction);
+    void put(K key, V value);
+    void invalidate(K key);
+    void invalidateAll();
+    long estimatedSize();
+    Map<K, V> asMap();
+    CacheStats stats();
+    String getType();  // e.g., "CAFFEINE", "GUAVA"
+}
+```
+
+#### CacheFactory
+Factory for creating cache instances.
+
+```java
+public interface CacheFactory {
+    <K, V> CacheProxy<K, V> createCache(String name, CacheConfig config);
+    String getType();
+}
+```
+
+#### CollectionsFactory
+Factory for creating thread-safe collection instances.
+
+```java
+public interface CollectionsFactory {
+    // Map creation
+    <K, V> Map<K, V> createMap(String name);
+    <K, V> Map<K, V> createMap(String name, CollectionsConfig config);
+    
+    // List creation
+    <E> List<E> createList(String name);
+    <E> List<E> createList(String name, CollectionsConfig config);
+    
+    // Set creation
+    <E> Set<E> createSet(String name);
+    <E> Set<E> createSet(String name, CollectionsConfig config);
+    
+    // Queue creation
+    <E> Queue<E> createQueue(String name);
+    <E> Queue<E> createQueue(String name, CollectionsConfig config);
+    
+    // Deque creation (also used for Stack)
+    <E> Deque<E> createDeque(String name);
+    <E> Deque<E> createDeque(String name, CollectionsConfig config);
+    
+    // Stack creation (returns Deque)
+    <E> Deque<E> createStack(String name);
+    
+    String getType();
+}
+```
+
+#### CollectionsConfig
+Configuration for collection creation with support for various options.
+
+```java
+CollectionsConfig config = CollectionsConfig.builder()
+    .initialCapacity(1000)
+    .concurrencyLevel(32)
+    .threadSafe(true)      // Use concurrent collections
+    .ordered(false)        // Use LinkedHashMap/LinkedHashSet
+    .sorted(false)         // Use TreeMap/TreeSet
+    .build();
+```
+
+### 3.3 Default Collection Implementations
+
+The `DefaultCollectionsFactory` uses Java concurrent collections:
+
+| Collection Type | Thread-Safe Implementation | Non-Thread-Safe | Ordered | Sorted |
+|-----------------|---------------------------|-----------------|---------|--------|
+| **Map** | ConcurrentHashMap | HashMap | LinkedHashMap | TreeMap/ConcurrentSkipListMap |
+| **List** | CopyOnWriteArrayList | ArrayList | - | - |
+| **Set** | ConcurrentHashMap.newKeySet() | HashSet | LinkedHashSet | TreeSet/ConcurrentSkipListSet |
+| **Queue** | ConcurrentLinkedQueue | LinkedList | - | - |
+| **Deque** | ConcurrentLinkedDeque | ArrayDeque | - | - |
+
+### 3.4 Configuration
+
+Configure cache and collection implementations in `application.yml`:
+
+```yaml
+kuber:
+  cache:
+    # Cache implementation for value caches
+    # Options: CAFFEINE (default)
+    # Future: GUAVA, EHCACHE
+    cache-implementation: CAFFEINE
+    
+    # Collections implementation for internal collections
+    # Options: DEFAULT (default)
+    # Future: CUSTOM
+    collections-implementation: DEFAULT
+```
+
+### 3.5 Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Abstraction** | Code doesn't depend on specific cache/collection implementations |
+| **Extensibility** | New providers can be added without changing existing code |
+| **Testability** | Mock implementations can be injected for unit testing |
+| **Configuration** | Implementation can be changed via configuration without code changes |
+| **Consistency** | All caches and collections use the same abstraction layer |
+| **Flexibility** | Collections can be configured for thread-safety, ordering, or sorting |
+
+### 3.6 Adding a New Cache Implementation
+
+To add a new cache implementation (e.g., EhCache):
+
+1. Create `EhCacheCacheProxy<K,V>` implementing `CacheProxy<K,V>`
+2. Create `EhCacheCacheFactory` implementing `CacheFactory`
+3. Update `FactoryProvider.selectCacheFactory()` to recognize the new type
+4. Add to configuration options
+
+### 3.7 Adding a New Collections Implementation
+
+To add a new collections implementation:
+
+1. Create `CustomCollectionsFactory` implementing `CollectionsFactory`
+2. Implement all methods (createMap, createList, createSet, createQueue, createDeque)
+3. Update `FactoryProvider.selectCollectionsFactory()` to recognize the new type
+4. Add to configuration options
+
+---
+
+## 4. Startup Orchestration
 
 Kuber uses a `StartupOrchestrator` to ensure correct initialization order and prevent race conditions during application startup. This is critical for data integrity and system stability.
 
-### 3.1 The Problem
+### 13.1 The Problem
 
 Without proper orchestration, several race conditions can occur:
 
@@ -200,7 +381,7 @@ Without proper orchestration, several race conditions can occur:
 | **Autoload Race** | Files processed before persistence recovery completes | Data overwrites, inconsistent state |
 | **Scheduled Task Conflicts** | @Scheduled methods run before initialization | Operations on uninitialized caches |
 
-### 11.2 Startup Sequence
+### 13.2 Startup Sequence
 
 The `StartupOrchestrator` guarantees this strict initialization order:
 
@@ -269,7 +450,7 @@ The `StartupOrchestrator` guarantees this strict initialization order:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 Scheduled Task Protection
+### 13.3 Scheduled Task Protection
 
 All `@Scheduled` methods check for cache initialization before executing:
 
@@ -293,7 +474,7 @@ Protected scheduled tasks include:
 | PersistenceExpirationService | cleanupExpiredEntries() | `cacheService.isInitialized()` |
 | RocksDbCompactionService | scheduledCompaction() | `enabled.get()` |
 
-### 4.4 Startup Logging
+### 13.4 Startup Logging
 
 The orchestrator provides clear visual logging of each phase:
 
@@ -326,7 +507,7 @@ Redis protocol server started on port 6380
 ╚════════════════════════════════════════════════════════════════════╝
 ```
 
-### 3.5 Checking Startup Status
+### 13.5 Checking Startup Status
 
 Services can query the orchestrator for startup status:
 
@@ -345,7 +526,7 @@ if (startupOrchestrator.isStartupComplete()) {
 }
 ```
 
-### 3.5 Shutdown Utility (v1.3.5)
+### 13.5 Shutdown Utility (v1.3.5)
 
 Kuber provides multiple clean shutdown mechanisms:
 
@@ -357,8 +538,8 @@ Kuber provides multiple clean shutdown mechanisms:
 │  │  Shutdown     │    │   REST API    │    │    Signal     │        │
 │  │    File       │    │   Endpoint    │    │  (SIGTERM)    │        │
 │  │               │    │               │    │               │        │
-│  │ kuber.shutdown│    │ /api/admin/   │    │  kill <pid>   │        │
-│  │               │    │  shutdown     │    │   Ctrl+C      │        │
+│  │ kuberdata/    │    │ /api/admin/   │    │  kill <pid>   │        │
+│  │ kuber.shutdown│    │  shutdown     │    │   Ctrl+C      │        │
 │  └───────┬───────┘    └───────┬───────┘    └───────┬───────┘        │
 │          │                    │                    │                │
 │          └────────────────────┼────────────────────┘                │
@@ -384,10 +565,10 @@ Kuber provides multiple clean shutdown mechanisms:
 
 ```bash
 # Linux/Mac
-touch kuber.shutdown
+touch ./kuberdata/kuber.shutdown
 
 # Windows
-echo. > kuber.shutdown
+echo. > kuberdata\kuber.shutdown
 
 # Using the provided script
 ./kuber-shutdown.sh
@@ -405,19 +586,21 @@ curl -X POST http://localhost:8080/api/admin/shutdown \
 
 ```yaml
 kuber:
+  base:
+    datadir: ./kuberdata              # Base directory for all data
   shutdown:
-    file-enabled: true              # Enable file-based shutdown
-    file-path: kuber.shutdown       # Path to shutdown signal file
-    check-interval-ms: 5000         # Check interval (5 seconds)
-    api-enabled: true               # Enable REST API shutdown
-    phase-delay-seconds: 5          # Delay between shutdown phases
+    file-enabled: true                # Enable file-based shutdown
+    file-path: ${kuber.base.datadir}/kuber.shutdown  # Path to shutdown signal file
+    check-interval-ms: 5000           # Check interval (5 seconds)
+    api-enabled: true                 # Enable REST API shutdown
+    phase-delay-seconds: 5            # Delay between shutdown phases
 ```
 
 ---
 
-## 4. Core Components
+## 5. Core Components
 
-### 11.1 Cache Service
+### 13.1 Cache Service
 
 The `CacheService` is the central component managing all cache operations:
 
@@ -454,7 +637,7 @@ The `CacheService` is the central component managing all cache operations:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 11.2 Region Manager
+### 13.2 Region Manager
 
 Regions provide logical isolation for cache entries:
 
@@ -482,7 +665,7 @@ Regions can have optional attribute mapping configuration that transforms JSON a
 
 Example: If region has mapping `{"firstName":"first_name"}`, storing `{"firstName":"John"}` saves as `{"first_name":"John"}`
 
-### 4.3 JSON Service
+### 13.3 JSON Service
 
 Native JSON document support with JSONPath queries:
 
@@ -519,9 +702,9 @@ Native JSON document support with JSONPath queries:
 
 ---
 
-## 5. Client Architecture
+## 6. Client Architecture
 
-### 11.1 Client Overview
+### 13.1 Client Overview
 
 **IMPORTANT: All clients require authentication with username and password.**
 
@@ -554,7 +737,7 @@ Native JSON document support with JSONPath queries:
 └─────────────────────────┴───────────────────────────────────────────────┘
 ```
 
-### 5.2 Authentication Methods
+### 13.2 Authentication Methods
 
 All client constructors support both password and API key authentication:
 
@@ -598,7 +781,7 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
 KuberRestClient client = new KuberRestClient(host, port, username, password);
 ```
 
-### 4.3 Client Connection Flow
+### 13.3 Client Connection Flow
 
 ```
 ┌──────────────┐     ┌───────────────────┐     ┌──────────────────┐
@@ -627,9 +810,9 @@ KuberRestClient client = new KuberRestClient(host, port, username, password);
 
 ---
 
-## 6. Protocol Design
+## 7. Protocol Design
 
-### 11.1 Redis RESP Protocol
+### 13.1 Redis RESP Protocol
 
 Kuber implements the Redis Serialization Protocol (RESP):
 
@@ -642,7 +825,7 @@ Kuber implements the Redis Serialization Protocol (RESP):
 | Array | `*` | `*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n` |
 | Null | `$-1` | `$-1\r\n` |
 
-### 11.2 Kuber Protocol Extensions
+### 13.2 Kuber Protocol Extensions
 
 Additional commands beyond standard Redis:
 
@@ -659,7 +842,7 @@ Additional commands beyond standard Redis:
 | `STATUS` | Server status | `STATUS` |
 | `REPLINFO` | Replication info | `REPLINFO` |
 
-### 7.3 REST API Endpoints
+### 13.3 REST API Endpoints
 
 ```
 Base URL: http://server:8080/api/v1
@@ -712,9 +895,9 @@ Bulk Operations:
 
 ---
 
-## 7. Persistence Layer
+## 8. Persistence Layer
 
-### 11.1 Pluggable Persistence Architecture
+### 13.1 Pluggable Persistence Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -741,7 +924,7 @@ Bulk Operations:
 └─────────┴─────────┴──────┴───────────┴─────────┴──────────┘
 ```
 
-### 11.2 Backend Comparison
+### 13.2 Backend Comparison
 
 | Backend | Use Case | Pros | Cons |
 |---------|----------|------|------|
@@ -752,7 +935,7 @@ Bulk Operations:
 | **PostgreSQL** | Enterprise | ACID, mature tooling | Requires separate server |
 | **InMemory** | Testing/Dev | Fastest, no I/O | No persistence |
 
-### 7.3 Configuration
+### 13.3 Configuration
 
 ```yaml
 kuber:
@@ -788,9 +971,9 @@ kuber:
 
 ---
 
-## 8. Replication Architecture
+## 9. Replication Architecture
 
-### 11.1 Primary/Secondary Replication
+### 13.1 Primary/Secondary Replication
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -819,7 +1002,7 @@ kuber:
 └───────────────┘           └───────────────┘
 ```
 
-### 11.2 Failover Process
+### 13.2 Failover Process
 
 1. **Primary Failure Detection**: ZooKeeper detects primary node is unresponsive
 2. **Leader Election**: Remaining nodes participate in leader election
@@ -829,9 +1012,9 @@ kuber:
 
 ---
 
-## 9. Security Architecture
+## 10. Security Architecture
 
-### 9.1 Authentication Methods
+### 13.1 Authentication Methods
 
 Kuber supports multiple authentication methods for different use cases (v1.2.5):
 
@@ -841,7 +1024,7 @@ Kuber supports multiple authentication methods for different use cases (v1.2.5):
 | **API Key** | Programmatic access, CI/CD, services | Header, query param |
 | **Redis AUTH** | Redis protocol clients | AUTH command |
 
-### 9.2 API Key Authentication (v1.2.5)
+### 13.2 API Key Authentication (v1.2.5)
 
 API keys provide secure, revocable authentication for programmatic access:
 
@@ -881,7 +1064,7 @@ API keys provide secure, revocable authentication for programmatic access:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 9.3 Password Authentication
+### 13.3 Password Authentication
 
 **All clients MUST provide credentials. This is enforced at the client level.**
 
@@ -914,7 +1097,7 @@ API keys provide secure, revocable authentication for programmatic access:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 9.4 User Configuration
+### 13.4 User Configuration
 
 Users are configured in `users.json`:
 
@@ -939,9 +1122,9 @@ Users are configured in `users.json`:
 
 ---
 
-## 10. Data Flow
+## 11. Data Flow
 
-### 10.1 Write Operation Flow (v1.3.10)
+### 13.1 Write Operation Flow (v1.3.10)
 
 Kuber supports two write modes configured via `kuber.persistence.sync-individual-writes`:
 
@@ -1022,7 +1205,7 @@ Disk write completes before returning. Maximum durability.
 | Crash Risk | Entry may be lost | No data loss |
 | Use Case | Performance critical | Durability critical |
 
-### 10.2 Read Operation Flow
+### 13.2 Read Operation Flow
 
 ```
 ┌──────────┐   ┌───────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
@@ -1047,9 +1230,9 @@ Disk write completes before returning. Maximum durability.
 
 ---
 
-## 11. Deployment Patterns
+## 12. Deployment Patterns
 
-### 11.1 Single Node (Development)
+### 13.1 Single Node (Development)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -1064,7 +1247,7 @@ Disk write completes before returning. Maximum durability.
 └─────────────────────────────────────────┘
 ```
 
-### 11.2 High Availability Cluster
+### 13.2 High Availability Cluster
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -1101,11 +1284,11 @@ Disk write completes before returning. Maximum durability.
 
 ---
 
-## 12. Backup and Restore (v1.4.0)
+## 13. Backup and Restore (v1.4.0)
 
 Kuber provides automatic periodic backup of all regions and automatic restore when backup files are placed in the restore directory.
 
-### 12.1 Supported Persistence Stores
+### 13.1 Supported Persistence Stores
 
 | Store | Supported | Reason |
 |-------|-----------|--------|
@@ -1115,7 +1298,7 @@ Kuber provides automatic periodic backup of all regions and automatic restore wh
 | PostgreSQL | ✗ | Use `pg_dump` / `pg_restore` |
 | MongoDB | ✗ | Use `mongodump` / `mongorestore` |
 
-### 12.2 Backup Architecture
+### 13.2 Backup Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1140,7 +1323,7 @@ Kuber provides automatic periodic backup of all regions and automatic restore wh
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 12.3 Backup File Format
+### 13.3 Backup File Format
 
 ```
 # KUBER_BACKUP_HEADER: {"version":"1.4.0","region":"customers","timestamp":"2025-12-07T14:30:22Z"}
@@ -1154,7 +1337,7 @@ Kuber provides automatic periodic backup of all regions and automatic restore wh
 - **Naming**: `<region>.<timestamp>.backup[.gz]`
 - **Timestamp**: `yyyyMMdd_HHmmss`
 
-### 12.4 Region Locking During Restore
+### 13.4 Region Locking During Restore
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -1179,7 +1362,7 @@ Kuber provides automatic periodic backup of all regions and automatic restore wh
 └────────────────────────────────────────────────────────────────┘
 ```
 
-### 12.5 Restore Data Flow
+### 13.5 Restore Data Flow
 
 ```
 1. File Detection
@@ -1215,7 +1398,7 @@ Kuber provides automatic periodic backup of all regions and automatic restore wh
    ./restore/... ──► ./backup/restored_<timestamp>_...
 ```
 
-### 12.6 Configuration
+### 13.6 Configuration
 
 ```yaml
 kuber:
@@ -1240,7 +1423,7 @@ kuber:
 | `0 0 */6 * * *` | Every 6 hours |
 | `0 30 1 * * SUN` | 1:30 AM every Sunday |
 
-### 12.7 Integration with Startup Sequence
+### 13.7 Integration with Startup Sequence
 
 BackupRestoreService is started in Phase 6 of the startup sequence:
 

@@ -16,7 +16,7 @@ REM   /api               Use REST API shutdown
 REM   /key:KEY           API key for REST API shutdown
 REM   /host:HOST         API host (default: localhost)
 REM   /port:PORT         API port (default: 8080)
-REM   /dir:DIR           Directory containing kuber.shutdown file
+REM   /dir:DIR           Directory containing kuber.shutdown file (default: .\kuberdata)
 REM   /reason:TEXT       Shutdown reason (for logging)
 REM   /help              Show this help message
 REM
@@ -35,7 +35,7 @@ set SHUTDOWN_METHOD=file
 set API_HOST=localhost
 set API_PORT=8080
 set API_KEY=
-set SHUTDOWN_DIR=.
+set SHUTDOWN_DIR=.\kuberdata
 set SHUTDOWN_FILE=kuber.shutdown
 set REASON=Manual shutdown
 
@@ -179,7 +179,7 @@ echo   /api               Use REST API shutdown
 echo   /key:KEY           API key for REST API shutdown
 echo   /host:HOST         API host (default: localhost)
 echo   /port:PORT         API port (default: 8080)
-echo   /dir:DIR           Directory containing kuber.shutdown file
+echo   /dir:DIR           Directory containing kuber.shutdown file (default: .\kuberdata)
 echo   /reason:TEXT       Shutdown reason (for logging)
 echo   /help              Show this help message
 echo.

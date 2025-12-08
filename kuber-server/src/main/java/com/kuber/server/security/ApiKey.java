@@ -24,7 +24,7 @@ import java.util.List;
  * API keys can be used by REST clients, Python clients, and Java clients
  * as an alternative to username/password authentication.
  *
- * @version 1.4.2
+ * @version 1.5.0
  */
 @Data
 @Builder
