@@ -100,6 +100,11 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
             // Discover and open existing region environments
             discoverExistingRegions();
             
+            // Configure batched async persistence (v1.6.2)
+            int batchSize = properties.getCache().getPersistenceBatchSize();
+            int flushIntervalMs = properties.getCache().getPersistenceIntervalMs();
+            configureBatching(batchSize, flushIntervalMs);
+            
             available = true;
             log.info("LMDB persistence store initialized successfully with {} region environments", 
                     regionEnvironments.size());

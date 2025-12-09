@@ -89,6 +89,11 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
             // Discover and open existing region databases
             discoverExistingRegions();
             
+            // Configure batched async persistence (v1.6.2)
+            int batchSize = properties.getCache().getPersistenceBatchSize();
+            int flushIntervalMs = properties.getCache().getPersistenceIntervalMs();
+            configureBatching(batchSize, flushIntervalMs);
+            
             // Note: Startup vacuum is now handled by PreStartupCompaction
             // which runs BEFORE Spring context initialization
             

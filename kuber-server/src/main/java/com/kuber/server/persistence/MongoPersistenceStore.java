@@ -59,6 +59,11 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
             createIndexes(KuberConstants.MONGO_REGIONS_COLLECTION,
                     Indexes.ascending("name"));
             
+            // Configure batched async persistence (v1.6.2)
+            int batchSize = properties.getCache().getPersistenceBatchSize();
+            int flushIntervalMs = properties.getCache().getPersistenceIntervalMs();
+            configureBatching(batchSize, flushIntervalMs);
+            
             available = true;
             log.info("MongoDB persistence store initialized successfully");
         } catch (Exception e) {

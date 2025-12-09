@@ -69,6 +69,11 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
             // Create tables
             createTables();
             
+            // Configure batched async persistence (v1.6.2)
+            int batchSize = properties.getCache().getPersistenceBatchSize();
+            int flushIntervalMs = properties.getCache().getPersistenceIntervalMs();
+            configureBatching(batchSize, flushIntervalMs);
+            
             available = true;
             log.info("PostgreSQL persistence store initialized successfully");
         } catch (Exception e) {
