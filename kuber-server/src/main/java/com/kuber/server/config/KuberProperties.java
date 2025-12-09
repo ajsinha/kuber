@@ -44,6 +44,14 @@ public class KuberProperties {
     private Base base = new Base();
     
     /**
+     * Application version.
+     * Read from application.properties: kuber.version
+     * Used for logging, API responses, and UI display.
+     * @since 1.6.1
+     */
+    private String version = "1.6.1";
+    
+    /**
      * Unique node identifier
      */
     private String nodeId = java.util.UUID.randomUUID().toString().substring(0, 8);
@@ -495,6 +503,23 @@ public class KuberProperties {
          */
         @Min(1)
         private int batchSize = 32768;
+        
+        /**
+         * Percentage of cache capacity to warm after autoload completes.
+         * This proactively loads data into memory in a background thread.
+         * Set to 0 to disable automatic warming (rely on lazy loading via GET).
+         * Default: 10 (load 10% of capacity).
+         * 
+         * This setting is also used for:
+         * - Startup loading from existing RocksDB database
+         * - Restore from backup
+         * - Manual reload from persistence
+         * 
+         * @since 1.6.1
+         */
+        @Min(0)
+        @Max(100)
+        private int warmPercentage = 10;
     }
     
     // ==================== BACKUP AND RESTORE CONFIGURATION ====================

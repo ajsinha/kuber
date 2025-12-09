@@ -253,6 +253,13 @@ public class ShutdownOrchestrator {
             log.info("╚════════════════════════════════════════════════════════════════════╝");
             
             try {
+                // DURABILITY FIX (v1.6.1): Signal shutdown to persistence store FIRST
+                // This ensures subsequent batch writes from CacheService use sync=true
+                if (persistenceStore instanceof com.kuber.server.persistence.RocksDbPersistenceStore) {
+                    ((com.kuber.server.persistence.RocksDbPersistenceStore) persistenceStore).prepareForShutdown();
+                    log.info("  ✓ RocksDB prepared for shutdown - subsequent writes will sync");
+                }
+                
                 persistenceStore.sync();
                 log.info("  ✓ Persistence store pre-synced");
             } catch (Exception e) {

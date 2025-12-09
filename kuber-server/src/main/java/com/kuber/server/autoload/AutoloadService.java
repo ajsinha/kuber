@@ -394,13 +394,18 @@ public class AutoloadService {
             log.info("Processed {} - loaded: {}, skipped: {}, errors: {}", 
                     fileName, result.getLoaded(), result.getSkipped(), result.getErrors());
             
-            // Start background warming for 25% of cache capacity
+            // Start background warming using configured percentage (default: 10%)
+            // Set warm-percentage to 0 to disable automatic warming (use lazy loading only)
             // This proactively loads some data into memory without blocking operations
             // Remaining data will load on-demand via GET operations (lazy loading)
-            if (result.getLoaded() > 0) {
+            int warmPercentage = properties.getAutoload().getWarmPercentage();
+            if (result.getLoaded() > 0 && warmPercentage > 0) {
                 log.info("Autoload complete for region '{}': {} records committed to persistence. " +
-                        "Starting background warming (25% of capacity)...", regionName, result.getLoaded());
-                cacheService.warmRegionCacheInBackground(regionName, 25);
+                        "Starting background warming ({}% of capacity)...", regionName, result.getLoaded(), warmPercentage);
+                cacheService.warmRegionCacheInBackground(regionName, warmPercentage);
+            } else if (result.getLoaded() > 0) {
+                log.info("Autoload complete for region '{}': {} records committed to persistence. " +
+                        "Background warming disabled (warm-percentage=0).", regionName, result.getLoaded());
             } else {
                 log.info("Autoload complete for region '{}': no records loaded.", regionName);
             }

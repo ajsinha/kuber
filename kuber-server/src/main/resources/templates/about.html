@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.5.0</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.6.1</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -149,7 +149,7 @@
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
                             Multi-destination support with centralized broker configuration.
                         </p>
-                        <span class="badge bg-light text-dark">v1.2.8</span>
+                        <span class="badge bg-light text-dark">v1.6.1</span>
                     </div>
                 </div>
             </div>
@@ -365,8 +365,20 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.5.0</span>
-                                    <span class="text-muted small">Current - Cron-Based Backup</span>
+                                    <span class="badge bg-primary me-2">v1.6.1</span>
+                                    <span class="text-muted small">Current - RocksDB Durability & Warm Percentage</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>RocksDB Durability Fix</strong>: User threads for async saves (not daemon threads), sync=true during shutdown</li>
+                                    <li><strong>Warm Percentage</strong>: Configurable cache pre-warming (default 10%), set to 0 for lazy-load only</li>
+                                    <li><strong>Memory Optimization</strong>: Startup/reload/restore respect warm percentage for reduced heap pressure</li>
+                                    <li><strong>Shutdown Safety</strong>: prepareForShutdown() ensures batch writes sync before close</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.5.0</span>
+                                    <span class="text-muted small">Cron-Based Backup</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Cron Scheduling</strong>: Backup at configurable cron schedule (default: 11 PM daily)</li>

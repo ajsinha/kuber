@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.4.0
+Version 1.6.1
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -134,7 +134,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 
 4. **Run Kuber**
    ```bash
-   java -jar kuber-server/target/kuber-server-1.0.0-SNAPSHOT.jar
+   java -jar kuber-server/target/kuber-server-1.6.1-SNAPSHOT.jar
    ```
 
 5. **Access the Web UI**
@@ -262,7 +262,7 @@ kuber:
     persistent-mode: false
     eviction-policy: LRU
     
-    # Factory configuration (v1.5.0)
+    # Factory configuration (v1.6.1)
     cache-implementation: CAFFEINE       # Cache provider: CAFFEINE (default)
     collections-implementation: DEFAULT  # Collections provider: DEFAULT (default)
   
@@ -289,7 +289,7 @@ kuber:
     connect-string: localhost:2181
 ```
 
-### Factory Pattern (v1.5.0)
+### Factory Pattern (v1.6.1)
 
 Kuber uses the Factory Pattern to allow pluggable cache and collections implementations. This enables changing the underlying cache provider or collection types without code changes:
 

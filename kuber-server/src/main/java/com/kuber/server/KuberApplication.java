@@ -18,6 +18,9 @@ import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.io.InputStream;
+import java.util.Properties;
+
 /**
  * Main entry point for the Kuber distributed cache server.
  * 
@@ -40,7 +43,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
  * 
  * @author Ashutosh Sinha
- * @version 1.5.0
+ * @version 1.6.1
  */
 @SpringBootApplication(exclude = {
     MongoAutoConfiguration.class,
@@ -50,6 +53,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class KuberApplication {
     
+    private static final String DEFAULT_VERSION = "1.6.1";
+    
     public static void main(String[] args) {
         // Print banner
         printBanner();
@@ -58,11 +63,35 @@ public class KuberApplication {
         SpringApplication.run(KuberApplication.class, args);
     }
     
+    /**
+     * Read version from application.properties.
+     * Falls back to DEFAULT_VERSION if not found.
+     * 
+     * @since 1.6.1
+     */
+    private static String getVersion() {
+        try (InputStream input = KuberApplication.class.getClassLoader()
+                .getResourceAsStream("application.properties")) {
+            if (input != null) {
+                Properties props = new Properties();
+                props.load(input);
+                return props.getProperty("kuber.version", DEFAULT_VERSION);
+            }
+        } catch (Exception e) {
+            // Ignore - use default
+        }
+        return DEFAULT_VERSION;
+    }
+    
     private static void printBanner() {
+        String version = getVersion();
+        // Pad version to fit in banner (need 57 chars total for the content area)
+        String versionLine = String.format("║   Version %-48s║", version);
+        
         System.out.println();
         System.out.println("╔═══════════════════════════════════════════════════════════════════╗");
         System.out.println("║                                                                   ║");
-        System.out.println("║   ██╗  ██╗██╗   ██╗██████╗ ███████╗██████╗                        ║");
+        System.out.println("║   ██╗  ██╗██╗   ██║██████╗ ███████╗██████╗                        ║");
         System.out.println("║   ██║ ██╔╝██║   ██║██╔══██╗██╔════╝██╔══██╗                       ║");
         System.out.println("║   █████╔╝ ██║   ██║██████╔╝█████╗  ██████╔╝                       ║");
         System.out.println("║   ██╔═██╗ ██║   ██║██╔══██╗██╔══╝  ██╔══██╗                       ║");
@@ -70,7 +99,7 @@ public class KuberApplication {
         System.out.println("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                       ║");
         System.out.println("║                                                                   ║");
         System.out.println("║   High-Performance Distributed Cache                              ║");
-        System.out.println("║   Version 1.3.7                                                  ║");
+        System.out.println(versionLine);
         System.out.println("║                                                                   ║");
         System.out.println("║   Copyright © 2025-2030 Ashutosh Sinha                            ║");
         System.out.println("║   All Rights Reserved                                             ║");

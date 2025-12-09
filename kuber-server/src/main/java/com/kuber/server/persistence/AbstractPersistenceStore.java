@@ -56,11 +56,15 @@ public abstract class AbstractPersistenceStore implements PersistenceStore {
             final int executorId = i;
             asyncSaveExecutors[i] = Executors.newSingleThreadExecutor(r -> {
                 Thread t = new Thread(r, "persistence-async-save-" + executorId);
-                t.setDaemon(true);
+                // CRITICAL FIX (v1.6.1): Use USER threads, NOT daemon threads
+                // Daemon threads are immediately killed by JVM on exit, even mid-write
+                // This was causing RocksDB corruption when writes were interrupted
+                // User threads allow JVM to wait for pending writes to complete
+                t.setDaemon(false);
                 return t;
             });
         }
-        log.info("Initialized {} partitioned async save executors for region-sequential writes", EXECUTOR_COUNT);
+        log.info("Initialized {} partitioned async save executors (user threads) for region-sequential writes", EXECUTOR_COUNT);
     }
     
     /**

@@ -2,6 +2,65 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.6.1] - 2025-12-09 - ROCKSDB DURABILITY & WARM PERCENTAGE
+
+### Critical Fixes
+- **RocksDB Durability Fix**: Changed async save executor threads from daemon to user threads
+  - Daemon threads are killed by JVM on exit, even mid-write causing corruption
+  - User threads allow JVM to wait for pending writes to complete
+- **Shutdown Sync**: Batch writes during shutdown now use sync=true
+  - `prepareForShutdown()` method signals shutdown before CacheService starts batch-saving
+  - Ensures all data is fsync'd to disk before process exits
+- **CacheService Explicit Sync**: Added sync call after batch persistence during shutdown
+  - Protects against direct CacheService.shutdown() calls bypassing ShutdownOrchestrator
+
+### Added
+- **Configurable Warm Percentage**: `kuber.autoload.warm-percentage` setting (default: 10)
+  - Controls how much of cache capacity is pre-warmed after data load operations
+  - Set to 0 to disable pre-warming (use lazy loading only)
+  - Reduces heap pressure and GC pauses for large datasets
+- **warmRegionCacheWithLimit()**: New method for controlled cache warming
+- **Consistent Warming**: Same warm percentage applied to:
+  - Startup loading from existing RocksDB database
+  - Autoload completion
+  - Restore from backup
+  - Manual reload from persistence button
+- **Centralized Version**: `kuber.version` property in application.properties
+  - Version now read from config file instead of hardcoded constant
+  - Used in startup logs, API responses, and server info
+
+### Changed
+- **primeRegion()**: Now respects warm percentage instead of loading to full memory limit
+- **loadEntriesIntoCache()**: Respects warm percentage for restore operations
+- **reloadRegionFromPersistence()**: Uses warm percentage-limited warming
+
+### Performance
+- Reduced memory consumption during startup/restore operations
+- Lower GC pressure for large datasets
+- Faster startup when warm-percentage < 100
+
+---
+
+## [1.6.0] - 2025-12-09 - STABLE BASELINE RELEASE
+
+### Summary
+This release establishes a stable baseline from v1.4.0 with verified autoload performance.
+Future enhancements will be applied incrementally with careful testing.
+
+### Configuration
+- Base data directory: `./kuberdata` (all data files relative to this path)
+- Autoload batch size: 32768 (optimized for bulk loading)
+- Cache warming: 10% of capacity after autoload completes
+
+### Includes
+- All features from v1.4.0 through v1.5.0
+- Factory pattern for pluggable cache implementations
+- Backup and restore functionality
+- Graceful shutdown orchestration
+- Memory management with automatic eviction
+
+---
+
 ## [1.5.0] - 2025-12-08 - FACTORY PATTERN FOR PLUGGABLE CACHE & COLLECTIONS
 
 ### Added

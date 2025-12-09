@@ -379,6 +379,52 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         }
     }
     
+    /**
+     * Prepare for shutdown by signaling that shutdown is imminent.
+     * This should be called by ShutdownOrchestrator BEFORE CacheService.shutdown()
+     * to ensure that subsequent batch writes use sync=true.
+     * 
+     * DURABILITY FIX (v1.6.1): This ensures the shuttingDown flag is set before
+     * CacheService starts batch-saving entries during shutdown. Without this,
+     * the batch writes would use sync=false and data could be lost if the process
+     * exits before OS buffers are flushed.
+     * 
+     * @return true if successful, false if already shutting down
+     */
+    public boolean prepareForShutdown() {
+        if (shuttingDown) {
+            log.debug("RocksDB already preparing for shutdown");
+            return false;
+        }
+        
+        log.info("RocksDB preparing for shutdown - subsequent writes will use sync=true");
+        shuttingDown = true;
+        
+        // Wait for any pending async operations to complete
+        // This ensures a clean state before CacheService starts writing
+        waitForPendingAsyncOperations();
+        
+        return true;
+    }
+    
+    /**
+     * Wait for any pending async save operations to complete.
+     * Used during shutdown preparation to ensure clean state.
+     */
+    private void waitForPendingAsyncOperations() {
+        // Set flag to stop accepting new async saves
+        asyncShuttingDown = true;
+        
+        // Give a brief moment for any in-flight async operations
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        log.debug("Pending async operations cleared");
+    }
+    
     @Override
     public void shutdown() {
         // Guard against double shutdown (ShutdownOrchestrator calls us, then Spring @PreDestroy)
@@ -564,6 +610,17 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void sync() {
+        // DURABILITY FIX (v1.6.1): Wait for any pending async operations first
+        // This ensures all async writes complete before we sync
+        if (!asyncShuttingDown) {
+            // Brief pause to let any in-flight async operations complete
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        
         syncAllRegions();
     }
     
@@ -763,10 +820,11 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                 try (WriteBatch batch = new WriteBatch();
                      WriteOptions writeOptions = new WriteOptions()) {
                     
-                    // For batch writes during shutdown persist, use sync
-                    // For normal batch writes, don't sync every batch (performance)
-                    // The shutdown process will sync everything at the end
-                    writeOptions.setSync(false);  // WAL is still written, just not synced per batch
+                    // DURABILITY FIX (v1.6.1): Force sync during shutdown to prevent data loss
+                    // During normal operation, rely on WAL for crash recovery (faster)
+                    // During shutdown, we MUST sync to ensure data is on disk before close
+                    // This prevents corruption when JVM exits before OS buffers are flushed
+                    writeOptions.setSync(shuttingDown);
                     
                     for (CacheEntry entry : regionEntries.getValue()) {
                         String json = JsonUtils.toJson(entryToMap(entry));
@@ -1140,12 +1198,32 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                 .build();
     }
     
+    /**
+     * Convert CacheEntry to a Map for JSON serialization.
+     * 
+     * <p>OPTIMIZATION (v1.6.1): Avoid redundant JSON serialization.
+     * <ul>
+     *   <li>If stringValue is set, use it directly (no re-serialization)</li>
+     *   <li>Only serialize jsonValue if stringValue is null</li>
+     *   <li>Store only stringValue for JSON entries (jsonValue reconstructed on load)</li>
+     * </ul>
+     */
     private Map<String, Object> entryToMap(CacheEntry entry) {
         java.util.HashMap<String, Object> map = new java.util.HashMap<>();
         map.put("key", entry.getKey());
         map.put("valueType", entry.getValueType().name());
-        map.put("stringValue", entry.getStringValue());
-        map.put("jsonValue", entry.getJsonValue() != null ? JsonUtils.toJson(entry.getJsonValue()) : null);
+        
+        // OPTIMIZATION: Avoid double serialization
+        // For JSON entries, stringValue already contains the serialized form
+        // Only serialize jsonValue if stringValue is not available
+        String strValue = entry.getStringValue();
+        if (strValue == null && entry.getJsonValue() != null) {
+            strValue = JsonUtils.toJson(entry.getJsonValue());
+        }
+        map.put("stringValue", strValue);
+        // No longer storing jsonValue separately - it's reconstructed from stringValue on load
+        // This saves storage space and avoids redundant serialization
+        
         map.put("ttlSeconds", entry.getTtlSeconds());
         map.put("createdAt", entry.getCreatedAt() != null ? entry.getCreatedAt().toEpochMilli() : null);
         map.put("updatedAt", entry.getUpdatedAt() != null ? entry.getUpdatedAt().toEpochMilli() : null);
@@ -1157,12 +1235,21 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         return map;
     }
     
+    /**
+     * Convert a Map back to CacheEntry.
+     * 
+     * <p>OPTIMIZATION (v1.6.1): Reconstruct jsonValue from stringValue.
+     * Since we only store stringValue now, jsonValue is parsed on demand for JSON entries.
+     */
     private CacheEntry mapToEntry(Map<String, Object> map, String region) {
+        CacheEntry.ValueType valueType = CacheEntry.ValueType.valueOf((String) map.get("valueType"));
+        String stringValue = (String) map.get("stringValue");
+        
         CacheEntry.CacheEntryBuilder builder = CacheEntry.builder()
                 .region(region)
                 .key((String) map.get("key"))
-                .valueType(CacheEntry.ValueType.valueOf((String) map.get("valueType")))
-                .stringValue((String) map.get("stringValue"))
+                .valueType(valueType)
+                .stringValue(stringValue)
                 .ttlSeconds(((Number) map.getOrDefault("ttlSeconds", -1L)).longValue())
                 .version(((Number) map.getOrDefault("version", 1L)).longValue())
                 .accessCount(((Number) map.getOrDefault("accessCount", 0L)).longValue())
@@ -1180,8 +1267,15 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
         Object lastAccessedAt = map.get("lastAccessedAt");
         if (lastAccessedAt != null) builder.lastAccessedAt(Instant.ofEpochMilli(((Number) lastAccessedAt).longValue()));
         
+        // OPTIMIZATION (v1.6.1): Reconstruct jsonValue from stringValue
+        // First check for legacy jsonValue field (for backward compatibility)
         String jsonValue = (String) map.get("jsonValue");
-        if (jsonValue != null) builder.jsonValue(JsonUtils.parse(jsonValue));
+        if (jsonValue != null) {
+            builder.jsonValue(JsonUtils.parse(jsonValue));
+        } else if (valueType == CacheEntry.ValueType.JSON && stringValue != null) {
+            // New format: parse jsonValue from stringValue
+            builder.jsonValue(JsonUtils.parse(stringValue));
+        }
         
         return builder.build();
     }

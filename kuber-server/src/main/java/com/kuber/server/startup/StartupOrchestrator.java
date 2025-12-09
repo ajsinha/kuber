@@ -14,6 +14,7 @@ package com.kuber.server.startup;
 import com.kuber.server.autoload.AutoloadService;
 import com.kuber.server.backup.BackupRestoreService;
 import com.kuber.server.cache.CacheService;
+import com.kuber.server.config.KuberProperties;
 import com.kuber.server.network.RedisProtocolServer;
 import com.kuber.server.persistence.PersistenceMaintenanceService;
 import com.kuber.server.publishing.RegionEventPublishingService;
@@ -67,6 +68,7 @@ public class StartupOrchestrator {
     private static final int INITIAL_DELAY_SECONDS = 10;
     private static final int PHASE_DELAY_SECONDS = 2;
     
+    private final KuberProperties properties;
     private final PersistenceMaintenanceService persistenceMaintenanceService;
     private final CacheService cacheService;
     private final AutoloadService autoloadService;
@@ -79,11 +81,13 @@ public class StartupOrchestrator {
     private final AtomicBoolean startupComplete = new AtomicBoolean(false);
     private final AtomicBoolean cacheReady = new AtomicBoolean(false);
     
-    public StartupOrchestrator(PersistenceMaintenanceService persistenceMaintenanceService,
+    public StartupOrchestrator(KuberProperties properties,
+                               PersistenceMaintenanceService persistenceMaintenanceService,
                                CacheService cacheService,
                                AutoloadService autoloadService,
                                RedisProtocolServer redisProtocolServer,
                                BackupRestoreService backupRestoreService) {
+        this.properties = properties;
         this.persistenceMaintenanceService = persistenceMaintenanceService;
         this.cacheService = cacheService;
         this.autoloadService = autoloadService;
@@ -219,6 +223,7 @@ public class StartupOrchestrator {
             startupComplete.set(true);
             
             // Final announcement
+            String versionLine = String.format("║   SYSTEM READY - Version %-37s║", properties.getVersion());
             log.info("╔════════════════════════════════════════════════════════════════════╗");
             log.info("║                                                                    ║");
             log.info("║   ██╗  ██╗██╗   ██╗██████╗ ███████╗██████╗                         ║");
@@ -228,7 +233,7 @@ public class StartupOrchestrator {
             log.info("║   ██║  ██╗╚██████╔╝██████╔╝███████╗██║  ██║                        ║");
             log.info("║   ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝                        ║");
             log.info("║                                                                    ║");
-            log.info("║   SYSTEM READY - Version 1.5.0                                     ║");
+            log.info(versionLine);
             log.info("║                                                                    ║");
             log.info("║   ✓ Persistence maintenance: complete                              ║");
             log.info("║   ✓ Cache service: initialized                                     ║");

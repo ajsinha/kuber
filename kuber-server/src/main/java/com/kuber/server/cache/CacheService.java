@@ -70,8 +70,6 @@ import java.util.stream.Collectors;
 @Service
 public class CacheService {
     
-    private static final String VERSION = "1.5.0";
-    
     private final KuberProperties properties;
     private final PersistenceStore persistenceStore;
     private final EventPublisher eventPublisher;
@@ -143,7 +141,7 @@ public class CacheService {
             log.warn("CacheService already initialized, skipping...");
             return;
         }
-        log.info("Initializing Kuber cache service v{} with HYBRID MEMORY ARCHITECTURE...", VERSION);
+        log.info("Initializing Kuber cache service v{} with HYBRID MEMORY ARCHITECTURE...", properties.getVersion());
         log.info("Using persistence store: {}", persistenceStore.getType());
         log.info("HYBRID MODE: All keys will be kept in memory; values can overflow to disk");
         
@@ -463,6 +461,14 @@ public class CacheService {
     /**
      * Prime a single region's cache.
      * Marks region as loading to block queries until complete.
+     * 
+     * <p>STARTUP OPTIMIZATION (v1.6.1):
+     * <ul>
+     *   <li>ALL keys are loaded into KeyIndex (for fast EXISTS/KEYS operations)</li>
+     *   <li>Only warmPercentage of values are loaded into cache (reduces heap pressure)</li>
+     *   <li>Remaining values loaded on-demand via GET (lazy loading)</li>
+     * </ul>
+     * 
      * @return array of [keysLoaded, valuesLoaded]
      */
     private long[] primeRegion(String regionName) {
@@ -474,13 +480,17 @@ public class CacheService {
             CacheProxy<String, CacheEntry> valueCache = regionCaches.get(regionName);
             int valueMemoryLimit = getEffectiveMemoryLimit(regionName);
             
+            // Get warm percentage from config (default: 10%)
+            int warmPercentage = properties.getAutoload().getWarmPercentage();
+            int warmLimit = (warmPercentage > 0) ? (int) ((valueMemoryLimit * warmPercentage) / 100.0) : 0;
+            
             if (keyIndex == null || valueCache == null) {
                 log.warn("KeyIndex or value cache not found for region '{}', skipping priming", regionName);
                 return new long[]{0, 0};
             }
             
             // Load ALL entries from persistence to populate KeyIndex
-            // For value cache, only load up to memory limit
+            // For value cache, only load up to warm limit (not full memory limit)
             List<CacheEntry> entries = persistenceStore.loadEntries(regionName, Integer.MAX_VALUE);
             
             int keysLoaded = 0;
@@ -489,12 +499,12 @@ public class CacheService {
             for (CacheEntry entry : entries) {
                 if (!entry.isExpired()) {
                     // Always add key to index
-                    boolean valueInMemory = valuesLoaded < valueMemoryLimit;
+                    boolean valueInMemory = (warmLimit > 0) && (valuesLoaded < warmLimit);
                     ValueLocation location = valueInMemory ? ValueLocation.BOTH : ValueLocation.DISK;
                     keyIndex.putFromCacheEntry(entry, location);
                     keysLoaded++;
                     
-                    // Only add hot values to cache (up to limit)
+                    // Only add hot values to cache (up to warm limit, not full memory limit)
                     if (valueInMemory) {
                         valueCache.put(entry.getKey(), entry);
                         valuesLoaded++;
@@ -502,8 +512,13 @@ public class CacheService {
                 }
             }
             
-            log.info("Region '{}': loaded {} keys into index, {} values into cache (limit: {})", 
-                    regionName, keysLoaded, valuesLoaded, valueMemoryLimit);
+            if (warmPercentage > 0) {
+                log.info("Region '{}': loaded {} keys into index, {} values into cache (warm {}% of limit {})", 
+                        regionName, keysLoaded, valuesLoaded, warmPercentage, valueMemoryLimit);
+            } else {
+                log.info("Region '{}': loaded {} keys into index, 0 values (warming disabled, warm-percentage=0)", 
+                        regionName, keysLoaded);
+            }
             
             return new long[]{keysLoaded, valuesLoaded};
             
@@ -1948,6 +1963,18 @@ public class CacheService {
      * @param region Region name
      * @param entries List of entries to load
      */
+    /**
+     * Load entries into cache (both KeyIndex and value cache).
+     * 
+     * <p>OPTIMIZATION (v1.6.1): Respects warm-percentage setting.
+     * <ul>
+     *   <li>ALL keys are loaded into KeyIndex (for EXISTS/KEYS operations)</li>
+     *   <li>Only up to warm-percentage of capacity loaded into value cache</li>
+     * </ul>
+     * 
+     * @param region Region name
+     * @param entries Entries to load
+     */
     public void loadEntriesIntoCache(String region, List<CacheEntry> entries) {
         KeyIndexInterface keyIndex = keyIndices.get(region);
         CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
@@ -1957,9 +1984,25 @@ public class CacheService {
             return;
         }
         
+        // Calculate warm limit based on config (v1.6.1)
+        int warmPercentage = properties.getAutoload().getWarmPercentage();
+        int memoryLimit = getEffectiveMemoryLimit(region);
+        int warmLimit = (warmPercentage > 0) ? (int) ((memoryLimit * warmPercentage) / 100.0) : 0;
+        
+        // Get current cache size
+        long currentSize = valueCache.estimatedSize();
+        
         for (CacheEntry entry : entries) {
-            keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
-            valueCache.put(entry.getKey(), entry);
+            // Always add key to index
+            boolean shouldAddToValueCache = (warmLimit > 0) && (currentSize < warmLimit);
+            ValueLocation location = shouldAddToValueCache ? ValueLocation.BOTH : ValueLocation.DISK;
+            keyIndex.putFromCacheEntry(entry, location);
+            
+            // Only add to value cache if under warm limit
+            if (shouldAddToValueCache) {
+                valueCache.put(entry.getKey(), entry);
+                currentSize++;
+            }
         }
     }
     
@@ -2086,6 +2129,110 @@ public class CacheService {
         long elapsedMs = System.currentTimeMillis() - startTime;
         log.info("Cache warming complete for region '{}': loaded {} entries in {} batches ({} ms)", 
                 region, totalWarmed, batchNumber, elapsedMs);
+        
+        return totalWarmed;
+    }
+    
+    /**
+     * Warm the value cache for a region with a specific limit on entries to load.
+     * 
+     * <p>This method is used by reload and restore operations to respect the
+     * configured warm percentage, rather than loading up to the full memory limit.
+     * 
+     * @param region Region name to warm
+     * @param maxEntriesToLoad Maximum number of entries to load
+     * @return Number of entries actually loaded into cache
+     * @since 1.6.1
+     */
+    public int warmRegionCacheWithLimit(String region, int maxEntriesToLoad) {
+        if (!regions.containsKey(region)) {
+            log.warn("Cannot warm cache for non-existent region: {}", region);
+            return 0;
+        }
+        
+        if (maxEntriesToLoad <= 0) {
+            log.info("Warming skipped for region '{}': limit is 0", region);
+            return 0;
+        }
+        
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex == null || valueCache == null) {
+            log.warn("Region '{}' caches not initialized, cannot warm", region);
+            return 0;
+        }
+        
+        // Get current cache size to determine how many more we can load
+        long currentSize = valueCache.estimatedSize();
+        int entriesToLoad = Math.max(0, maxEntriesToLoad - (int) currentSize);
+        
+        if (entriesToLoad == 0) {
+            log.info("Region '{}' value cache already at warm limit ({} entries), skipping", 
+                    region, currentSize);
+            return 0;
+        }
+        
+        log.info("Warming cache for region '{}': loading up to {} entries (current: {}, limit: {})", 
+                region, entriesToLoad, currentSize, maxEntriesToLoad);
+        
+        long startTime = System.currentTimeMillis();
+        
+        // Get keys that are not in value cache
+        List<String> diskOnlyKeys = keyIndex.getKeysOnDiskOnly();
+        
+        // Collect keys to load
+        List<String> keysToLoad = new ArrayList<>(Math.min(entriesToLoad, 10000));
+        
+        for (String key : diskOnlyKeys) {
+            if (keysToLoad.size() >= entriesToLoad) {
+                break;
+            }
+            
+            // Double-check not in cache
+            if (valueCache.get(key) != null) {
+                continue;
+            }
+            
+            keysToLoad.add(key);
+        }
+        
+        // Clear reference to allow GC
+        diskOnlyKeys = null;
+        
+        if (keysToLoad.isEmpty()) {
+            log.info("No keys to warm for region '{}'", region);
+            return 0;
+        }
+        
+        // Load entries in batches
+        final int BATCH_SIZE = 1000;
+        int totalWarmed = 0;
+        
+        for (int i = 0; i < keysToLoad.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, keysToLoad.size());
+            List<String> batchKeys = keysToLoad.subList(i, end);
+            
+            Map<String, CacheEntry> entries = persistenceStore.loadEntriesByKeys(region, batchKeys);
+            
+            for (Map.Entry<String, CacheEntry> e : entries.entrySet()) {
+                CacheEntry entry = e.getValue();
+                
+                if (entry.isExpired()) {
+                    continue;
+                }
+                
+                keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
+                valueCache.put(entry.getKey(), entry);
+                totalWarmed++;
+            }
+        }
+        
+        keysToLoad.clear();
+        
+        long elapsedMs = System.currentTimeMillis() - startTime;
+        log.info("Cache warming with limit complete for region '{}': loaded {} entries ({} ms)", 
+                region, totalWarmed, elapsedMs);
         
         return totalWarmed;
     }
@@ -2292,13 +2439,25 @@ public class CacheService {
         
         log.info("Cleared {} entries from value cache for region '{}'", entriesBefore, region);
         
-        // Step 2: Warm the cache by loading from persistence (in batches)
-        // Note: This is optional - the cache will warm naturally through GET operations
-        // But we do it to provide some immediate data availability
-        int warmedCount = warmRegionCache(region);
+        // Step 2: Warm the cache using the configured warm percentage (v1.6.1)
+        // This respects the same limit as startup/autoload for consistency
+        // If warm-percentage=0, no entries will be loaded (lazy loading only)
+        int warmPercentage = properties.getAutoload().getWarmPercentage();
+        int warmedCount = 0;
         
-        log.info("Region '{}' reload complete: evicted {} entries, warmed {} entries", 
-                region, entriesBefore, warmedCount);
+        if (warmPercentage > 0) {
+            // Calculate the warm limit based on memory limit and warm percentage
+            int memoryLimit = getEffectiveMemoryLimit(region);
+            int warmLimit = (int) ((memoryLimit * warmPercentage) / 100.0);
+            warmedCount = warmRegionCacheWithLimit(region, warmLimit);
+            
+            log.info("Region '{}' reload complete: evicted {} entries, warmed {} entries ({}% of limit {})", 
+                    region, entriesBefore, warmedCount, warmPercentage, memoryLimit);
+        } else {
+            log.info("Region '{}' reload complete: evicted {} entries, warming disabled (warm-percentage=0)", 
+                    region, entriesBefore);
+        }
+        
         log.info("Remaining entries will be loaded on-demand via GET operations (lazy loading)");
         
         return warmedCount;
@@ -2452,7 +2611,7 @@ public class CacheService {
         Map<String, Object> info = new HashMap<>();
         
         info.put("nodeId", properties.getNodeId());
-        info.put("version", VERSION);
+        info.put("version", properties.getVersion());
         info.put("architecture", "HYBRID"); // v1.2.1+ hybrid memory architecture
         info.put("regionCount", regions.size());
         info.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
@@ -2919,6 +3078,17 @@ public class CacheService {
                 } catch (Exception e) {
                     log.error("Failed to persist entries for region '{}': {}", regionName, e.getMessage());
                 }
+            }
+            
+            // Step 3b: CRITICAL - Force sync to ensure all batch writes are durable (v1.6.1)
+            // CacheService.shutdown() may be called without going through ShutdownOrchestrator
+            // (e.g., direct call or emergency shutdown), so we must sync here explicitly
+            log.info("  Step 3b: Forcing sync to ensure all writes are durable...");
+            try {
+                persistenceStore.sync();
+                log.info("    Sync complete - all entries durable on disk");
+            } catch (Exception e) {
+                log.error("    Failed to sync persistence store: {}", e.getMessage());
             }
             
             // Step 4: Invalidate all value caches
