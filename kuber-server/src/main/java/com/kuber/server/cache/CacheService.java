@@ -184,6 +184,17 @@ public class CacheService {
         return initialized.get();
     }
     
+    /**
+     * Check if shutdown is in progress.
+     * Used by AutoloadService and warming to stop processing during shutdown.
+     * 
+     * @return true if shutdown has been initiated
+     * @since 1.6.3
+     */
+    public boolean isShuttingDown() {
+        return shuttingDown;
+    }
+    
     private void loadRegions() {
         try {
             log.info("Loading regions from {} persistence store...", persistenceStore.getType());
@@ -443,7 +454,7 @@ public class CacheService {
     private void primeCacheHybrid() {
         log.info("Priming HYBRID cache from {} persistence store...", persistenceStore.getType());
         log.info("  - ALL keys will be loaded into memory (KeyIndex)");
-        log.info("  - Hot values will be loaded into value cache (up to memory limit per region)");
+        log.info("  - Hot values will be loaded into value cache (up to warm-percentage)");
         log.info("  - Sequential loading (one region at a time)");
         
         long totalKeysLoaded = 0;
@@ -462,8 +473,9 @@ public class CacheService {
      * Prime a single region's cache.
      * Marks region as loading to block queries until complete.
      * 
-     * <p>STARTUP OPTIMIZATION (v1.6.1):
+     * <p>STARTUP OPTIMIZATION (v1.6.3):
      * <ul>
+     *   <li>Uses STREAMING to avoid loading all entries into memory</li>
      *   <li>ALL keys are loaded into KeyIndex (for fast EXISTS/KEYS operations)</li>
      *   <li>Only warmPercentage of values are loaded into cache (reduces heap pressure)</li>
      *   <li>Remaining values loaded on-demand via GET (lazy loading)</li>
@@ -489,38 +501,64 @@ public class CacheService {
                 return new long[]{0, 0};
             }
             
-            // Load ALL entries from persistence to populate KeyIndex
-            // For value cache, only load up to warm limit (not full memory limit)
-            List<CacheEntry> entries = persistenceStore.loadEntries(regionName, Integer.MAX_VALUE);
+            // Use atomic counters for streaming
+            final java.util.concurrent.atomic.AtomicLong keysLoaded = new java.util.concurrent.atomic.AtomicLong(0);
+            final java.util.concurrent.atomic.AtomicLong valuesLoaded = new java.util.concurrent.atomic.AtomicLong(0);
+            final java.util.concurrent.atomic.AtomicLong lastLoggedCount = new java.util.concurrent.atomic.AtomicLong(0);
+            final int finalWarmLimit = warmLimit;
+            final long startTime = System.currentTimeMillis();
             
-            int keysLoaded = 0;
-            int valuesLoaded = 0;
+            // Log estimated count before streaming
+            long estimatedCount = persistenceStore.estimateEntryCount(regionName);
+            log.info("Region '{}': starting to stream ~{} entries (warm-limit for values: {})", 
+                    regionName, estimatedCount, warmLimit);
             
-            for (CacheEntry entry : entries) {
+            // Progress logging interval - every 10,000 entries
+            final long PROGRESS_INTERVAL = 10000;
+            
+            // STREAMING approach (v1.6.3): iterate without loading all into memory
+            // ALL keys go to KeyIndex, only warmLimit values go to cache
+            persistenceStore.forEachEntry(regionName, entry -> {
                 if (!entry.isExpired()) {
-                    // Always add key to index
-                    boolean valueInMemory = (warmLimit > 0) && (valuesLoaded < warmLimit);
+                    // Always add key to index (ALL keys in memory - core design)
+                    long currentValuesLoaded = valuesLoaded.get();
+                    boolean valueInMemory = (finalWarmLimit > 0) && (currentValuesLoaded < finalWarmLimit);
                     ValueLocation location = valueInMemory ? ValueLocation.BOTH : ValueLocation.DISK;
                     keyIndex.putFromCacheEntry(entry, location);
-                    keysLoaded++;
+                    long currentKeys = keysLoaded.incrementAndGet();
                     
-                    // Only add hot values to cache (up to warm limit, not full memory limit)
+                    // Only add hot values to cache (up to warm limit)
                     if (valueInMemory) {
                         valueCache.put(entry.getKey(), entry);
-                        valuesLoaded++;
+                        valuesLoaded.incrementAndGet();
+                    }
+                    
+                    // Log progress every 10,000 entries
+                    long lastLogged = lastLoggedCount.get();
+                    if (currentKeys - lastLogged >= PROGRESS_INTERVAL) {
+                        if (lastLoggedCount.compareAndSet(lastLogged, currentKeys)) {
+                            long elapsed = System.currentTimeMillis() - startTime;
+                            log.info("Region '{}': PROGRESS - {} keys loaded, {} values warmed ({} ms elapsed)", 
+                                    regionName, currentKeys, valuesLoaded.get(), elapsed);
+                        }
                     }
                 }
-            }
+            });
             
+            long finalKeysLoaded = keysLoaded.get();
+            long finalValuesLoaded = valuesLoaded.get();
+            long totalElapsed = System.currentTimeMillis() - startTime;
+            
+            // Final completion log
             if (warmPercentage > 0) {
-                log.info("Region '{}': loaded {} keys into index, {} values into cache (warm {}% of limit {})", 
-                        regionName, keysLoaded, valuesLoaded, warmPercentage, valueMemoryLimit);
+                log.info("Region '{}': COMPLETED - {} keys into index, {} values into cache (warm {}% of limit {}) in {} ms", 
+                        regionName, finalKeysLoaded, finalValuesLoaded, warmPercentage, valueMemoryLimit, totalElapsed);
             } else {
-                log.info("Region '{}': loaded {} keys into index, 0 values (warming disabled, warm-percentage=0)", 
-                        regionName, keysLoaded);
+                log.info("Region '{}': COMPLETED - {} keys into index, 0 values (warming disabled) in {} ms", 
+                        regionName, finalKeysLoaded, totalElapsed);
             }
             
-            return new long[]{keysLoaded, valuesLoaded};
+            return new long[]{finalKeysLoaded, finalValuesLoaded};
             
         } catch (Exception e) {
             log.warn("Failed to prime cache for region '{}': {}", regionName, e.getMessage());
@@ -2145,6 +2183,12 @@ public class CacheService {
      * @since 1.6.1
      */
     public int warmRegionCacheWithLimit(String region, int maxEntriesToLoad) {
+        // SAFETY CHECK (v1.6.3): Don't warm during shutdown
+        if (shuttingDown) {
+            log.info("Warming skipped for region '{}': shutdown in progress", region);
+            return 0;
+        }
+        
         if (!regions.containsKey(region)) {
             log.warn("Cannot warm cache for non-existent region: {}", region);
             return 0;
@@ -2210,6 +2254,13 @@ public class CacheService {
         int totalWarmed = 0;
         
         for (int i = 0; i < keysToLoad.size(); i += BATCH_SIZE) {
+            // SAFETY CHECK (v1.6.3): Stop warming if shutdown in progress
+            if (shuttingDown) {
+                log.info("Warming stopped for region '{}': shutdown in progress (loaded {} so far)", 
+                        region, totalWarmed);
+                break;
+            }
+            
             int end = Math.min(i + BATCH_SIZE, keysToLoad.size());
             List<String> batchKeys = keysToLoad.subList(i, end);
             
@@ -2255,6 +2306,12 @@ public class CacheService {
      * @param percentageOfCapacity Percentage of max-memory-entries to warm (e.g., 25 for 25%)
      */
     public void warmRegionCacheInBackground(String region, int percentageOfCapacity) {
+        // SAFETY CHECK (v1.6.3): Don't start new warming during shutdown
+        if (shuttingDown) {
+            log.info("Background warming skipped for region '{}': shutdown in progress", region);
+            return;
+        }
+        
         if (!regions.containsKey(region)) {
             log.warn("Cannot warm cache for non-existent region: {}", region);
             return;
@@ -2342,6 +2399,12 @@ public class CacheService {
         int batchNumber = 0;
         
         for (int i = 0; i < keysToLoad.size(); i += BATCH_SIZE) {
+            // SAFETY CHECK (v1.6.3): Stop warming if shutdown in progress
+            if (shuttingDown) {
+                log.info("Background warming stopped for region '{}': shutdown in progress", region);
+                break;
+            }
+            
             // Check if region is still valid and not being loaded
             if (!regions.containsKey(region) || operationLock.isRegionLoading(region)) {
                 log.info("Background warming interrupted for region '{}': region status changed", region);

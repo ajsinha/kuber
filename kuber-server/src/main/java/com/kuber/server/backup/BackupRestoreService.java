@@ -511,6 +511,9 @@ public class BackupRestoreService {
         
         long startTime = System.currentTimeMillis();
         long entryCount = 0;
+        long warmedCount = 0;  // Track how many entries are warmed to memory
+        long lastLoggedCount = 0;  // For progress logging
+        final long PROGRESS_INTERVAL = 10000;  // Log every 10,000 entries
         long byteCount = Files.size(restoreFile);
         
         try {
@@ -525,6 +528,13 @@ public class BackupRestoreService {
             log.info("[{}] Purging existing data before restore...", region);
             persistenceStore.purgeRegion(region);
             cacheService.clearRegionCaches(region);
+            
+            // Get warm limit for logging
+            int warmPercentage = properties.getAutoload().getWarmPercentage();
+            int memoryLimit = properties.getCache().getMaxMemoryEntries();
+            int warmLimit = (warmPercentage > 0) ? (int) ((memoryLimit * warmPercentage) / 100.0) : 0;
+            log.info("[{}] Starting restore (warm-limit: {} entries, {}% of {})", 
+                    region, warmLimit, warmPercentage, memoryLimit);
             
             // Read and restore entries
             List<CacheEntry> batch = new ArrayList<>(batchSize);
@@ -572,8 +582,17 @@ public class BackupRestoreService {
                         if (batch.size() >= batchSize) {
                             persistenceStore.saveEntries(batch);
                             cacheService.loadEntriesIntoCache(region, batch);
-                            log.info("[{}] Restored {} entries so far...", region, entryCount);
+                            // Count warmed entries (limited by warmLimit)
+                            warmedCount = Math.min(entryCount, warmLimit);
                             batch.clear();
+                            
+                            // Log progress every 100,000 entries
+                            if (entryCount - lastLoggedCount >= PROGRESS_INTERVAL) {
+                                long elapsed = System.currentTimeMillis() - startTime;
+                                log.info("[{}] PROGRESS - {} entries restored, {} values warmed ({} ms elapsed)", 
+                                        region, entryCount, warmedCount, elapsed);
+                                lastLoggedCount = entryCount;
+                            }
                         }
                         
                     } catch (Exception e) {
@@ -585,6 +604,7 @@ public class BackupRestoreService {
                 if (!batch.isEmpty()) {
                     persistenceStore.saveEntries(batch);
                     cacheService.loadEntriesIntoCache(region, batch);
+                    warmedCount = Math.min(entryCount, warmLimit);
                 }
             }
             
@@ -594,8 +614,8 @@ public class BackupRestoreService {
             totalRestoreBytes.addAndGet(byteCount);
             lastRestoreTime = Instant.now();
             
-            log.info("[{}] RESTORE COMPLETED: {} entries, {} bytes, {} ms", 
-                    region, entryCount, byteCount, elapsed);
+            log.info("[{}] RESTORE COMPLETED: {} entries restored, {} values warmed, {} bytes, {} ms", 
+                    region, entryCount, warmedCount, byteCount, elapsed);
             
             // Move processed file to backup directory
             String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);

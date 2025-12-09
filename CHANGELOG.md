@@ -2,6 +2,49 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.6.3] - 2025-12-09 - SHUTDOWN SAFETY FOR WARMING & AUTOLOAD
+
+### Added
+- **Shutdown Detection**: New `isShuttingDown()` method in CacheService
+  - Allows AutoloadService and warming operations to detect shutdown state
+  - Enables graceful interruption of long-running operations
+
+### Fixed
+- **CRITICAL: Startup Timeout on Large Databases** (v1.6.3)
+  - PROBLEM: `primeRegion()` was loading ALL entries into memory with `loadEntries(Integer.MAX_VALUE)`
+  - SOLUTION: Now uses STREAMING via `forEachEntry()` - processes one entry at a time
+  - IMPACT: Prevents OOM and timeout when starting with large RocksDB databases
+  - Same fix applies to restore operations (already using streaming)
+
+### Changed
+- **Background Warming**: Now checks for shutdown before starting and inside batch loops
+  - `warmRegionCacheInBackground()`: Skips if shutdown in progress
+  - `warmRegionCacheWithLimit()`: Stops mid-batch if shutdown detected
+  - `backgroundWarmingTask()`: Checks shutdown flag every batch iteration
+- **AutoloadService**: Graceful shutdown handling
+  - `scanAndProcess()`: Stops processing remaining files if shutdown detected
+  - `processFile()`: Checks both operationLock and cacheService for shutdown
+  - `processCsvFile()`: Stops at batch boundary, flushes pending entries to persistence
+  - `processJsonFile()`: Same behavior - flush before stopping
+
+### Safety
+- **Data Integrity**: All accumulated batch entries are flushed to persistence before stopping
+  - Autoload does not abandon mid-batch writes
+  - Persistence writes are allowed to complete during shutdown
+  - Only new file processing and warming operations are stopped
+- **Memory Efficiency**: Startup no longer requires loading all entries into heap
+  - Keys streamed directly into KeyIndex
+  - Only warm-percentage of values loaded into cache
+  - No intermediate List allocation for full dataset
+
+### Technical Notes
+- Warming operations check `shuttingDown` flag at start and in each batch loop
+- AutoloadService checks `cacheService.isShuttingDown()` for coordinated shutdown
+- `primeRegion()` now uses `persistenceStore.forEachEntry()` instead of `loadEntries()`
+- Large dataset warning logged when estimated count > 100,000 entries
+
+---
+
 ## [1.6.2] - 2025-12-09 - BATCHED ASYNC PERSISTENCE
 
 ### Added
@@ -22,7 +65,7 @@ All notable changes to this project are documented in this file.
 
 ### Configuration
 ```properties
-# Batched async persistence (v1.6.2)
+# Batched async persistence (v1.62)
 kuber.cache.persistence-batch-size=100      # Flush when buffer reaches this size
 kuber.cache.persistence-interval-ms=1000    # Max time between flushes (ms)
 ```

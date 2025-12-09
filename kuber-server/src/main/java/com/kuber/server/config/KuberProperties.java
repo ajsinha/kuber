@@ -49,7 +49,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.6.2";
+    private String version = "1.6.3";
     
     /**
      * Unique node identifier

@@ -1,0 +1,1 @@
+ java -Xmx16G -jar target/kuber-server-1.6.3-SNAPSHOT.jar --kuber.base.datadir=/home/ashutosh/ide/kuberdata

@@ -321,6 +321,13 @@ public class AutoloadService {
             
             // Process files sequentially (one at a time)
             for (Path dataFile : dataFiles) {
+                // SAFETY CHECK (v1.6.3): Stop processing if shutdown in progress
+                if (cacheService.isShuttingDown()) {
+                    log.info("Autoload stopping: shutdown in progress ({} files remaining)", 
+                            dataFiles.size() - dataFiles.indexOf(dataFile));
+                    lastActivityMessage = "Stopped - shutdown in progress";
+                    break;
+                }
                 processFile(dataFile);
             }
             
@@ -342,8 +349,8 @@ public class AutoloadService {
         log.info("Processing file: {}", fileName);
         lastActivityMessage = "Processing: " + fileName;
         
-        // Check if system is shutting down
-        if (operationLock.isShuttingDown()) {
+        // SAFETY CHECK (v1.6.3): Check both operationLock and cacheService for shutdown
+        if (operationLock.isShuttingDown() || cacheService.isShuttingDown()) {
             log.warn("System is shutting down - skipping file: {}", fileName);
             return;
         }
@@ -598,6 +605,21 @@ public class AutoloadService {
             long startTime = System.currentTimeMillis();
             
             for (CSVRecord record : parser) {
+                // SAFETY CHECK (v1.6.3): Stop if shutdown in progress
+                // Note: We don't abort mid-batch - we let the current batch finish writing to persistence
+                if (cacheService.isShuttingDown()) {
+                    log.info("[{}] Autoload stopped at record {}: shutdown in progress", fileName, recordCount);
+                    // Flush any accumulated entries before stopping
+                    if (!batch.isEmpty()) {
+                        batchNumber++;
+                        int saved = cacheService.putEntriesBatch(batch, true);
+                        log.info("[{}] Batch #{} (shutdown flush): saved {} entries before shutdown", 
+                                fileName, batchNumber, saved);
+                        batch.clear();
+                    }
+                    break;
+                }
+                
                 if (maxRecords > 0 && recordCount >= maxRecords) {
                     log.info("Reached max records limit: {}", maxRecords);
                     break;
@@ -741,6 +763,21 @@ public class AutoloadService {
                 
                 if (line.isEmpty() || line.startsWith("#")) {
                     continue;
+                }
+                
+                // SAFETY CHECK (v1.6.3): Stop if shutdown in progress
+                // Note: We let current batch finish writing to persistence
+                if (cacheService.isShuttingDown()) {
+                    log.info("[{}] Autoload stopped at line {}: shutdown in progress", fileName, lineNumber);
+                    // Flush any accumulated entries before stopping
+                    if (!batch.isEmpty()) {
+                        batchNumber++;
+                        int saved = cacheService.putEntriesBatch(batch, true);
+                        log.info("[{}] Batch #{} (shutdown flush): saved {} entries before shutdown", 
+                                fileName, batchNumber, saved);
+                        batch.clear();
+                    }
+                    break;
                 }
                 
                 if (maxRecords > 0 && recordCount >= maxRecords) {

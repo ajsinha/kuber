@@ -1,6 +1,6 @@
 # How to Start Kuber Server
 
-**Version 1.6.2**
+**Version 1.6.3**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -77,7 +77,7 @@ mvn clean install
 
 After successful build, the server JAR is located at:
 ```
-kuber-server/target/kuber-server-1.6.2-SNAPSHOT.jar
+kuber-server/target/kuber-server-1.6.3-SNAPSHOT.jar
 ```
 
 ### Build Specific Module
@@ -95,14 +95,14 @@ mvn clean install -pl kuber-server -am -DskipTests
 
 ```bash
 # Basic start
-java -jar kuber-server/target/kuber-server-1.6.2-SNAPSHOT.jar
+java -jar kuber-server/target/kuber-server-1.6.3-SNAPSHOT.jar
 
 # With specific memory settings
-java -Xms512m -Xmx2g -jar kuber-server/target/kuber-server-1.6.2-SNAPSHOT.jar
+java -Xms512m -Xmx2g -jar kuber-server/target/kuber-server-1.6.3-SNAPSHOT.jar
 
 # With garbage collector tuning (for large heaps)
 java -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
-     -jar kuber-server/target/kuber-server-1.6.2-SNAPSHOT.jar
+     -jar kuber-server/target/kuber-server-1.6.3-SNAPSHOT.jar
 ```
 
 ### Method 2: Using Maven (Recommended for Development)
@@ -405,7 +405,7 @@ docker run -d \
   -e SPRING_SECURITY_USER_PASSWORD=secret \
   -p 8080:8080 \
   -p 6380:6380 \
-  kuber-server:1.6.2
+  kuber-server:1.6.3
 ```
 
 ### 6.4 Using .env File (with Docker Compose)
@@ -659,7 +659,7 @@ java \
 ### Minimum Start Command
 
 ```bash
-java -jar kuber-server-1.6.2-SNAPSHOT.jar
+java -jar kuber-server-1.6.3-SNAPSHOT.jar
 ```
 
 ### Typical Production Start

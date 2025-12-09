@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.6.2</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.6.3</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -149,7 +149,7 @@
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
                             Multi-destination support with centralized broker configuration.
                         </p>
-                        <span class="badge bg-light text-dark">v1.6.2</span>
+                        <span class="badge bg-light text-dark">v1.6.3</span>
                     </div>
                 </div>
             </div>
@@ -365,8 +365,20 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.6.2</span>
-                                    <span class="text-muted small">Current - Batched Async Persistence</span>
+                                    <span class="badge bg-primary me-2">v1.6.3</span>
+                                    <span class="text-muted small">Current - Streaming Startup & Shutdown Safety</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Streaming Startup</strong>: Large databases load without timeout/OOM (uses forEachEntry)</li>
+                                    <li><strong>Shutdown Detection</strong>: Warming and autoload check for shutdown in progress</li>
+                                    <li><strong>Graceful Stop</strong>: Background warming stops at batch boundaries</li>
+                                    <li><strong>Data Safety</strong>: Autoload flushes pending batches to persistence before stopping</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.6.2</span>
+                                    <span class="text-muted small">Batched Async Persistence</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Batched Writes</strong>: Entries buffered and saved in batches (5-20x throughput)</li>

@@ -53,7 +53,7 @@ import java.util.Properties;
 @EnableScheduling
 public class KuberApplication {
     
-    private static final String DEFAULT_VERSION = "1.6.2";
+    private static final String DEFAULT_VERSION = "1.6.3";
     
     public static void main(String[] args) {
         // Print banner
