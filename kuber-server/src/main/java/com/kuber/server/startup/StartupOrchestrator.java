@@ -15,6 +15,7 @@ import com.kuber.server.autoload.AutoloadService;
 import com.kuber.server.backup.BackupRestoreService;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.messaging.RequestResponseService;
 import com.kuber.server.network.RedisProtocolServer;
 import com.kuber.server.persistence.PersistenceMaintenanceService;
 import com.kuber.server.publishing.RegionEventPublishingService;
@@ -46,6 +47,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Wait 2 seconds</li>
  *   <li>Start BackupRestoreService (periodic backup, restore monitoring)</li>
  *   <li>Wait 2 seconds</li>
+ *   <li>Start Request/Response Messaging Service (message broker subscriptions)</li>
+ *   <li>Wait 2 seconds</li>
  *   <li>Final system ready announcement</li>
  * </ol>
  * 
@@ -57,9 +60,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Redis server accepts connections before data is recovered</li>
  *   <li>Autoload files are processed before persistence recovery completes</li>
  *   <li>Backups run before data is fully loaded</li>
+ *   <li>Message brokers receive requests before cache is ready</li>
  * </ul>
  * 
- * @version 1.5.0
+ * @version 1.7.0
  */
 @Service
 @Slf4j
@@ -77,6 +81,9 @@ public class StartupOrchestrator {
     
     @Autowired(required = false)
     private RegionEventPublishingService publishingService;
+    
+    @Autowired(required = false)
+    private RequestResponseService requestResponseService;
     
     private final AtomicBoolean startupComplete = new AtomicBoolean(false);
     private final AtomicBoolean cacheReady = new AtomicBoolean(false);
@@ -215,6 +222,27 @@ public class StartupOrchestrator {
             cacheService.setBackupRestoreService(backupRestoreService);
             backupRestoreService.start();
             
+            // Wait between phases
+            log.info("Waiting {} seconds before starting messaging service...", PHASE_DELAY_SECONDS);
+            Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
+            
+            // Phase 7: Start Request/Response Messaging Service
+            log.info("╔════════════════════════════════════════════════════════════════════╗");
+            log.info("║  Phase 7: Request/Response Messaging Service                        ║");
+            log.info("║           Starting message broker subscriptions...                  ║");
+            log.info("╚════════════════════════════════════════════════════════════════════╝");
+            
+            if (requestResponseService != null) {
+                try {
+                    requestResponseService.start();
+                    log.info("Request/Response messaging service started");
+                } catch (Exception e) {
+                    log.warn("Request/Response messaging setup completed with warnings: {}", e.getMessage());
+                }
+            } else {
+                log.info("Request/Response messaging service not configured - skipping");
+            }
+            
             // Wait before final announcement
             log.info("Waiting {} seconds before final announcement...", PHASE_DELAY_SECONDS);
             Thread.sleep(PHASE_DELAY_SECONDS * 1000L);
@@ -242,6 +270,8 @@ public class StartupOrchestrator {
             log.info("║   ✓ Redis server: accepting connections                            ║");
             log.info("║   ✓ Autoload service: running                                      ║");
             log.info("║   ✓ Backup/restore: running                                        ║");
+            log.info("║   ✓ Request/Response: {}                              ║",
+                    requestResponseService != null && requestResponseService.isEnabled() ? "running       " : "not configured");
             log.info("║                                                                    ║");
             log.info("╚════════════════════════════════════════════════════════════════════╝");
             

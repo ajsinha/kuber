@@ -50,8 +50,6 @@ import os
 from typing import Optional, List, Dict, Any, Union
 from datetime import timedelta
 
-import os
-KUBER_API_KEY = os.getenv('KUBER_API_KEY', 'kub_566e7b476ea57c15612a43a02ff98f6188a50209757a6c3f7c115e845c68b15a')
 
 class KuberRestClient:
     """

@@ -1,0 +1,25 @@
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "local_kafka": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Local Kafka Cluster",
+      "connection": {
+        "bootstrap_servers": "localhost:9092",
+        "group_id": "kuber-request-processor",
+        "auto_offset_reset": "earliest"
+      },
+      "request_topics": [
+        "ccs_request",
+        "agg_request",
+        "calc_request"
+      ]
+    }
+  }
+}

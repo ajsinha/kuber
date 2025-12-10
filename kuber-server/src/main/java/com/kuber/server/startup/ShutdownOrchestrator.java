@@ -16,6 +16,7 @@ import com.kuber.server.cache.CacheMetricsService;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.cache.MemoryWatcherService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.messaging.RequestResponseService;
 import com.kuber.server.network.RedisProtocolServer;
 import com.kuber.server.persistence.PersistenceOperationLock;
 import com.kuber.server.persistence.PersistenceStore;
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>Shutdown Order:
  * <ol>
  *   <li>Phase 0: Signal shutdown, stop task scheduler and all scheduled services immediately</li>
+ *   <li>Phase 0.5: Stop Request/Response Messaging Service (first to stop)</li>
  *   <li>Phase 1: Stop Autoload Service (stop processing files)</li>
  *   <li>Phase 2: Stop Redis Protocol Server (reject new connections)</li>
  *   <li>Phase 3: Stop Replication Manager (ZooKeeper coordination)</li>
@@ -67,7 +69,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>WAL is synced before closing each region</li>
  * </ul>
  * 
- * @version 1.5.0
+ * @version 1.7.0
  */
 @Service
 @Slf4j
@@ -103,6 +105,9 @@ public class ShutdownOrchestrator {
     
     @Autowired(required = false)
     private RegionEventPublishingService publishingService;
+    
+    @Autowired(required = false)
+    private RequestResponseService requestResponseService;
     
     @Autowired(required = false)
     private ShutdownFileWatcher shutdownFileWatcher;
@@ -174,6 +179,25 @@ public class ShutdownOrchestrator {
                     "Graceful shutdown", 
                     60, java.util.concurrent.TimeUnit.SECONDS)) {
                 log.warn("Could not acquire exclusive lock - some operations may still be in progress");
+            }
+            
+            sleepBetweenPhases();
+            
+            // Phase 0.5: Stop Request/Response Messaging Service FIRST
+            log.info("╔════════════════════════════════════════════════════════════════════╗");
+            log.info("║  Phase 0.5: Stop Request/Response Messaging Service                 ║");
+            log.info("║             Disconnecting from message brokers...                   ║");
+            log.info("╚════════════════════════════════════════════════════════════════════╝");
+            
+            if (requestResponseService != null) {
+                try {
+                    requestResponseService.stop();
+                    log.info("  ✓ Request/Response messaging service stopped");
+                } catch (Exception e) {
+                    log.warn("  ⚠ Error stopping messaging service: {}", e.getMessage());
+                }
+            } else {
+                log.info("  - Request/Response messaging service not configured");
             }
             
             sleepBetweenPhases();
@@ -331,6 +355,8 @@ public class ShutdownOrchestrator {
             log.info("║   KUBER SHUTDOWN COMPLETE                                          ║");
             log.info("║                                                                    ║");
             log.info("║   ✓ Scheduled services: stopped                                    ║");
+            log.info("║   ✓ Request/Response: {}                                ║",
+                    requestResponseService != null ? "stopped       " : "not configured");
             log.info("║   ✓ Autoload service: stopped                                      ║");
             log.info("║   ✓ Redis server: stopped                                          ║");
             log.info("║   ✓ Replication: {}                                    ║",

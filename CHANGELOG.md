@@ -2,6 +2,137 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.7.0] - 2025-12-10 - REQUEST/RESPONSE MESSAGING
+
+### 🚀 Major New Feature: Request/Response via Message Brokers
+
+**v1.7.0 introduces the ability to interact with the cache through message brokers.**
+
+Access any cache operation (GET, SET, DELETE, JSON operations, etc.) by posting JSON requests 
+to message broker queues/topics. Responses are delivered to corresponding response queues/topics.
+
+| Broker | Request Queue/Topic | Response Queue/Topic |
+|--------|---------------------|----------------------|
+| Kafka | `ccs_cache_request` | `ccs_cache_response` |
+| ActiveMQ | `ccs_cache_request` | `ccs_cache_response` |
+| RabbitMQ | `ccs_cache_request` | `ccs_cache_response` |
+| IBM MQ | `CCS.CACHE.REQUEST` | `CCS.CACHE.RESPONSE` |
+
+### Features
+
+- **Multi-Broker Support**: Kafka, ActiveMQ, RabbitMQ, IBM MQ
+- **Hot-Reload Configuration**: Changes to `request_response.json` apply without restart
+- **Backpressure Control**: Configurable queue depth (default: 100) with automatic pause/resume
+- **Async Processing**: Thread pool for parallel request processing
+- **API Key Authentication**: All requests validated against API keys
+- **Admin UI**: Web interface for managing brokers and monitoring queues
+
+### Request Format
+
+```json
+{
+  "api_key": "kub_your_api_key",
+  "message_id": "unique-correlation-id",
+  "operation": "GET",
+  "region": "default",
+  "key": "user:1001"
+}
+```
+
+### Response Format
+
+```json
+{
+  "request_receive_timestamp": "2025-12-10T15:30:00Z",
+  "response_time": "2025-12-10T15:30:00.025Z",
+  "processing_time_ms": 25,
+  "request": { /* original request */ },
+  "response": {
+    "success": true,
+    "result": { "name": "John Doe", "email": "john@example.com" }
+  }
+}
+```
+
+### Supported Operations
+
+All cache operations are supported via messaging:
+
+| Operation | Description |
+|-----------|-------------|
+| PING | Test connectivity |
+| GET | Get single key |
+| SET | Set key-value (with optional TTL) |
+| DELETE | Delete one or more keys |
+| EXISTS | Check if key exists |
+| KEYS | List keys matching pattern |
+| MGET | Get multiple keys |
+| MSET | Set multiple key-values |
+| TTL | Get time-to-live |
+| EXPIRE | Set expiration |
+| HGET | Get hash field |
+| HSET | Set hash field |
+| HGETALL | Get all hash fields |
+| HMSET | Set multiple hash fields |
+| JSET / JSON.SET | Store JSON document |
+| JGET / JSON.GET | Retrieve JSON (with path) |
+| JSEARCH / JSON.SEARCH | Search JSON documents |
+| INFO | Get server statistics |
+| REGIONS | List all regions |
+
+### Configuration (request_response.json)
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "brokers": {
+    "production_kafka": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Production Kafka",
+      "connection": {
+        "bootstrap_servers": "kafka1:9092,kafka2:9092",
+        "group_id": "kuber-request-processor"
+      },
+      "request_topics": ["ccs_cache_request", "orders_cache_request"]
+    }
+  }
+}
+```
+
+### Backpressure Management
+
+- **High Water Mark (80%)**: Message consumption paused
+- **Low Water Mark (50%)**: Message consumption resumed
+- **Queue Full**: Requests rejected with overload error
+
+### New Admin Pages
+
+- `/admin/messaging` - Manage brokers and topics
+- `/admin/messaging/queue` - View pending requests and queue status
+
+### New API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/messaging/status` | GET | Service status and statistics |
+| `/api/v1/messaging/queue` | GET | Pending requests in queue |
+| `/api/v1/messaging/config` | GET/POST | Get or update configuration |
+| `/api/v1/messaging/brokers` | POST | Add new broker |
+| `/api/v1/messaging/brokers/{name}` | DELETE | Remove broker |
+| `/api/v1/messaging/brokers/{name}/topics` | POST | Add topic to broker |
+| `/api/v1/messaging/brokers/{name}/topics/{topic}` | DELETE | Remove topic |
+| `/api/v1/messaging/toggle` | POST | Enable/disable messaging |
+
+### Startup/Shutdown Integration
+
+- **Startup**: Messaging service starts as Phase 7 (last phase)
+- **Shutdown**: Messaging service stops as Phase 0.5 (first phase)
+
+---
+
 ## [1.6.5] - 2025-12-09 - API KEY ONLY AUTHENTICATION
 
 ### ⚠️ BREAKING CHANGE: Authentication Model

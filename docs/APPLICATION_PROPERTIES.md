@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 1.6.5**
+**Version 1.7.0**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -19,6 +19,7 @@ This document provides a comprehensive reference for all configuration propertie
 - [Memory Management Configuration](#memory-management-configuration)
 - [Replication Configuration](#replication-configuration)
 - [Event Publishing Configuration](#event-publishing-configuration)
+- [Request/Response Messaging Configuration](#requestresponse-messaging-configuration)
 - [Logging Configuration](#logging-configuration)
 
 ---
@@ -27,9 +28,9 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `1.6.5` | Current application version (read-only) |
+| `kuber.version` | `1.7.0` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
-| `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json). Auto-created if missing |
+| `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json, request_response.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
 | `server.port` | `8080` | HTTP port for REST API and Web UI |
 | `server.servlet.session.timeout` | `30m` | Web session timeout duration |
@@ -142,7 +143,7 @@ Data storage backend settings.
 
 ## Security Configuration
 
-> ⚠️ **v1.6.5**: API Keys required for all programmatic access. Username/password only for Web UI.
+> ⚠️ **v1.6.5+**: API Keys required for all programmatic access. Username/password only for Web UI.
 
 | Property | Default | Description |
 |----------|---------|-------------|
@@ -151,6 +152,16 @@ Data storage backend settings.
 | `kuber.security.api-keys-file` | `${kuber.secure.folder}/apikeys.json` | API keys file (created automatically if missing) |
 | `kuber.security.session-timeout-minutes` | `30` | Web UI session timeout |
 | `kuber.security.redis-password` | (empty) | *Deprecated* - Use API keys instead |
+
+### Secure Folder Contents
+
+The secure folder contains sensitive configuration files:
+
+| File | Required | Description |
+|------|----------|-------------|
+| `users.json` | **Yes** | Web UI user credentials |
+| `apikeys.json` | No | API keys (auto-created) |
+| `request_response.json` | No | Message broker configuration (v1.7.0+) |
 
 ### users.json Format
 
@@ -316,6 +327,340 @@ kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
 
 ---
 
+## Request/Response Messaging Configuration
+
+**New in v1.7.0** - Process cache operations via message brokers (Kafka, ActiveMQ, RabbitMQ, IBM MQ).
+
+Configuration is stored in `request_response.json` in the secure folder (alongside `users.json` and `apikeys.json`). The configuration is **hot-reloadable** - changes are detected automatically without server restart.
+
+### Configuration File Location
+
+```
+${kuber.secure.folder}/request_response.json
+```
+
+Default: `./secure/request_response.json`
+
+### Global Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable/disable request/response messaging globally |
+| `max_queue_depth` | integer | `100` | Maximum internal work queue size. When reached, message consumption pauses (backpressure) |
+| `thread_pool_size` | integer | `10` | Number of threads for processing requests |
+| `max_batch_get_size` | integer | `128` | Maximum keys allowed in MGET operations. Requests exceeding this are rejected |
+| `max_batch_set_size` | integer | `128` | Maximum entries allowed in MSET operations. Requests exceeding this are rejected |
+| `max_search_results` | integer | `10000` | Maximum results for KEYS/JSEARCH operations. Excess results are truncated with a warning in `server_message` |
+
+### Broker Configuration
+
+Brokers are defined in the `brokers` map, keyed by a unique broker name.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable/disable this specific broker |
+| `type` | string | (required) | Broker type: `kafka`, `activemq`, `rabbitmq`, `ibmmq` |
+| `display_name` | string | (optional) | Human-readable name for admin UI |
+| `connection` | object | `{}` | Connection properties (varies by broker type) |
+| `request_topics` | array | `[]` | List of request topics/queues to subscribe to |
+
+### Response Topic Convention
+
+Response topics are automatically inferred from request topics:
+- `ccs_request` → `ccs_response`
+- `orders_request` → `orders_response`
+- `my_topic` → `my_topic_response` (if no `_request` suffix)
+
+---
+
+## Request/Response JSON Configuration Examples
+
+### Apache Kafka
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "kafka_primary": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Production Kafka Cluster",
+      "connection": {
+        "bootstrap_servers": "kafka1.prod.local:9092,kafka2.prod.local:9092,kafka3.prod.local:9092",
+        "group_id": "kuber-cache-processor",
+        "auto_offset_reset": "earliest"
+      },
+      "request_topics": [
+        "ccs_request",
+        "agg_request",
+        "calc_request"
+      ]
+    }
+  }
+}
+```
+
+**Kafka Connection Properties:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `bootstrap_servers` | (required) | Comma-separated list of Kafka broker addresses |
+| `group_id` | `kuber-request-processor` | Consumer group ID for coordinated consumption |
+| `auto_offset_reset` | `earliest` | Where to start reading: `earliest`, `latest` |
+
+---
+
+### Apache ActiveMQ
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "activemq_primary": {
+      "enabled": true,
+      "type": "activemq",
+      "display_name": "Production ActiveMQ",
+      "connection": {
+        "broker_url": "tcp://activemq.prod.local:61616",
+        "username": "kuber_service",
+        "password": "secure_password_here"
+      },
+      "request_topics": [
+        "KUBER.REQUEST.ORDERS",
+        "KUBER.REQUEST.INVENTORY",
+        "KUBER.REQUEST.CUSTOMERS"
+      ]
+    }
+  }
+}
+```
+
+**ActiveMQ Connection Properties:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `broker_url` | (required) | ActiveMQ broker URL (e.g., `tcp://host:61616`, `ssl://host:61617`) |
+| `username` | (optional) | Authentication username |
+| `password` | (optional) | Authentication password |
+
+**ActiveMQ Failover Configuration:**
+
+```json
+{
+  "connection": {
+    "broker_url": "failover:(tcp://amq1.prod:61616,tcp://amq2.prod:61616)?randomize=false&maxReconnectAttempts=10",
+    "username": "kuber",
+    "password": "secret"
+  }
+}
+```
+
+---
+
+### RabbitMQ
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "rabbitmq_primary": {
+      "enabled": true,
+      "type": "rabbitmq",
+      "display_name": "Production RabbitMQ Cluster",
+      "connection": {
+        "host": "rabbitmq.prod.local",
+        "port": "5672",
+        "virtual_host": "/kuber",
+        "username": "kuber_service",
+        "password": "secure_password_here"
+      },
+      "request_topics": [
+        "kuber.request.trading",
+        "kuber.request.positions",
+        "kuber.request.risk"
+      ]
+    }
+  }
+}
+```
+
+**RabbitMQ Connection Properties:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `host` | `localhost` | RabbitMQ server hostname |
+| `port` | `5672` | RabbitMQ AMQP port (use `5671` for TLS) |
+| `virtual_host` | `/` | RabbitMQ virtual host |
+| `username` | (optional) | Authentication username |
+| `password` | (optional) | Authentication password |
+
+**RabbitMQ with TLS:**
+
+```json
+{
+  "connection": {
+    "host": "rabbitmq.prod.local",
+    "port": "5671",
+    "virtual_host": "/kuber",
+    "username": "kuber",
+    "password": "secret",
+    "ssl_enabled": "true"
+  }
+}
+```
+
+---
+
+### IBM MQ
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "ibmmq_primary": {
+      "enabled": true,
+      "type": "ibmmq",
+      "display_name": "Production IBM MQ",
+      "connection": {
+        "queue_manager": "QM_PROD",
+        "channel": "KUBER.SVRCONN",
+        "conn_name": "mq.prod.local(1414)",
+        "username": "kuber_svc",
+        "password": "secure_password_here"
+      },
+      "request_topics": [
+        "KUBER.REQ.CACHE",
+        "KUBER.REQ.SESSION",
+        "KUBER.REQ.CONFIG"
+      ]
+    }
+  }
+}
+```
+
+**IBM MQ Connection Properties:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `queue_manager` | (required) | IBM MQ Queue Manager name |
+| `channel` | (required) | Server connection channel name |
+| `conn_name` | (required) | Connection name in format `hostname(port)` |
+| `username` | (optional) | Authentication username |
+| `password` | (optional) | Authentication password |
+
+**IBM MQ with Multiple Hosts (HA):**
+
+```json
+{
+  "connection": {
+    "queue_manager": "QM_PROD",
+    "channel": "KUBER.SVRCONN",
+    "conn_name": "mq1.prod.local(1414),mq2.prod.local(1414)",
+    "username": "kuber",
+    "password": "secret"
+  }
+}
+```
+
+---
+
+### Multi-Broker Configuration
+
+You can configure multiple brokers of different types simultaneously:
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 200,
+  "thread_pool_size": 20,
+  "max_batch_get_size": 256,
+  "max_batch_set_size": 256,
+  "max_search_results": 50000,
+  "brokers": {
+    "kafka_realtime": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Real-time Kafka",
+      "connection": {
+        "bootstrap_servers": "kafka1:9092,kafka2:9092",
+        "group_id": "kuber-realtime"
+      },
+      "request_topics": ["rt_cache_request", "rt_session_request"]
+    },
+    "activemq_batch": {
+      "enabled": true,
+      "type": "activemq",
+      "display_name": "Batch Processing ActiveMQ",
+      "connection": {
+        "broker_url": "tcp://activemq:61616",
+        "username": "kuber",
+        "password": "secret"
+      },
+      "request_topics": ["BATCH.CACHE.REQUEST", "BATCH.BULK.REQUEST"]
+    },
+    "ibmmq_legacy": {
+      "enabled": true,
+      "type": "ibmmq",
+      "display_name": "Legacy IBM MQ",
+      "connection": {
+        "queue_manager": "QM_LEGACY",
+        "channel": "KUBER.CHANNEL",
+        "conn_name": "legacymq:1414"
+      },
+      "request_topics": ["LEGACY.CACHE.REQ"]
+    },
+    "rabbitmq_events": {
+      "enabled": false,
+      "type": "rabbitmq",
+      "display_name": "Event RabbitMQ (disabled)",
+      "connection": {
+        "host": "rabbitmq",
+        "port": "5672"
+      },
+      "request_topics": ["events.cache.request"]
+    }
+  }
+}
+```
+
+---
+
+### Sample Configuration File
+
+A sample configuration file is provided at:
+
+```
+kuber-server/src/main/resources/secure-sample/request_response.json.sample
+```
+
+Copy this to your secure folder and customize:
+
+```bash
+cp secure-sample/request_response.json.sample ./secure/request_response.json
+```
+
+---
+
 ## Logging Configuration
 
 | Property | Default | Description |
@@ -367,6 +712,37 @@ kuber.cache.max-memory-entries=1000000
 kuber.backup.enabled=true
 kuber.backup.cron=0 0 2 * * *
 ```
+
+### Enabling Request/Response Messaging
+
+1. Create `request_response.json` in your secure folder:
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "my_kafka": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "My Kafka",
+      "connection": {
+        "bootstrap_servers": "localhost:9092",
+        "group_id": "kuber-processor"
+      },
+      "request_topics": ["cache_request"]
+    }
+  }
+}
+```
+
+2. Generate an API key via the Web UI (Admin → API Keys)
+
+3. Send requests to your configured topics with the API key
 
 ---
 

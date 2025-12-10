@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.6.5</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.7.0</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -53,6 +53,7 @@
                                     <li><a href="#protocol">Protocol Design</a></li>
                                     <li><a href="#replication">Replication Architecture</a></li>
                                     <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">v1.3.2</span></li>
+                                    <li><a href="#request-response">Request/Response Messaging</a> <span class="badge bg-success">v1.7.0</span></li>
                                     <li><a href="#security">Security Architecture</a></li>
                                     <li><a href="#data-flow">Data Flow</a></li>
                                     <li><a href="#deployment">Deployment Patterns</a></li>
@@ -587,9 +588,105 @@ CacheService.set() / delete()
                     </div>
                 </section>
 
-                <!-- 10. Security Architecture -->
+                <!-- 10. Request/Response Messaging -->
+                <section id="request-response" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-exchange-alt me-2 text-info"></i>10. Request/Response Messaging <span class="badge bg-success">v1.7.0</span></h2>
+                    <p>Kuber can accept cache operation requests via message brokers, enabling asynchronous cache access for event-driven architectures.</p>
+                    
+                    <h4 class="mt-4">Request/Response Architecture</h4>
+                    <pre class="bg-dark text-light p-3 rounded" style="font-size: 0.8rem;">
+External Applications
+         │
+         │ JSON Request (api_key, message_id, operation, ...)
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Message Broker (Kafka/AMQ/RabbitMQ/IBM MQ)    │
+│                      Request Topics                          │
+│    ccs_cache_request    order_cache_request    ...          │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│              RequestResponseService                          │
+│  ┌─────────────────┐  ┌───────────────────────────────────┐ │
+│  │ Broker Adapters │  │  Request Processing Thread Pool   │ │
+│  │ • Kafka         │  │  (configurable, default: 10)      │ │
+│  │ • ActiveMQ      │  └───────────────────────────────────┘ │
+│  │ • RabbitMQ      │  ┌───────────────────────────────────┐ │
+│  │ • IBM MQ        │  │  Blocking Queue (max: 100)        │ │
+│  └─────────────────┘  │  Backpressure: pause at 80%       │ │
+│                       └───────────────────────────────────┘ │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+                        CacheService
+                             │
+                             ▼ JSON Response
+┌─────────────────────────────────────────────────────────────┐
+│               Message Broker Response Topics                 │
+│    ccs_cache_response   order_cache_response   ...          │
+└─────────────────────────────────────────────────────────────┘</pre>
+                    
+                    <h4 class="mt-4">Key Features</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Feature</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Multi-Broker</strong></td><td>Connect to multiple brokers simultaneously (Kafka, ActiveMQ, RabbitMQ, IBM MQ)</td></tr>
+                            <tr><td><strong>Hot Reload</strong></td><td>Configuration changes detected automatically, broker connections update without restart</td></tr>
+                            <tr><td><strong>Backpressure</strong></td><td>Automatic pause/resume when queue exceeds thresholds (80%/50%)</td></tr>
+                            <tr><td><strong>API Key Auth</strong></td><td>All requests must include valid API key for authentication</td></tr>
+                            <tr><td><strong>Full Operations</strong></td><td>All cache operations supported: GET, SET, DELETE, MGET, MSET, JSON ops, etc.</td></tr>
+                            <tr><td><strong>Admin UI</strong></td><td>Web interface for broker management and queue monitoring</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4">Request/Response Flow</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">Request Format</div>
+                                <div class="card-body">
+                                    <pre class="bg-light p-2 rounded mb-0"><code>{
+  "api_key": "kub_abc123...",
+  "message_id": "req-12345",
+  "operation": "GET",
+  "region": "users",
+  "key": "user:1001"
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">Response Format</div>
+                                <div class="card-body">
+                                    <pre class="bg-light p-2 rounded mb-0"><code>{
+  "request_receive_timestamp": "...",
+  "response_time": "...",
+  "processing_time_ms": 2,
+  "request": { ... },
+  "response": {
+    "success": true,
+    "result": {...}
+  }
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-4">
+                        <strong><i class="fas fa-info-circle me-2"></i>Full Documentation:</strong> 
+                        See <a href="/help/messaging" class="alert-link">Request/Response Messaging Guide</a> for complete configuration, 
+                        supported operations, and examples.
+                    </div>
+                </section>
+
+                <!-- 11. Security Architecture -->
                 <section id="security" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-shield-alt me-2 text-success"></i>10. Security Architecture</h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-shield-alt me-2 text-success"></i>11. Security Architecture</h2>
                     <p><strong>All access requires authentication.</strong> Kuber supports multiple authentication methods for different use cases.</p>
                     
                     <h4 class="mt-4">Authentication Methods</h4>
@@ -661,9 +758,9 @@ AUTH password</code></pre>
 }</code></pre>
                 </section>
 
-                <!-- 11. Data Flow -->
+                <!-- 12. Data Flow -->
                 <section id="data-flow" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-exchange-alt me-2 text-primary"></i>11. Data Flow</h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-exchange-alt me-2 text-primary"></i>12. Data Flow</h2>
                     
                     <h4>Write Operation Flow</h4>
                     <pre class="bg-dark text-light p-3 rounded" style="font-size: 0.8rem;">
@@ -702,9 +799,9 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
    │◄─────────────────│◄────────────────────│                   │                  │</pre>
                 </section>
 
-                <!-- 12. Deployment Patterns -->
+                <!-- 13. Deployment Patterns -->
                 <section id="deployment" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-server me-2 text-secondary"></i>12. Deployment Patterns</h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-server me-2 text-secondary"></i>13. Deployment Patterns</h2>
                     
                     <div class="row">
                         <div class="col-md-6">

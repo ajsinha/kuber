@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Request/Response Messaging')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-question-circle me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Request/Response Messaging</li>
+            </ol>
+        </nav>
+        
+        <h1 class="display-6 mb-4"><i class="fas fa-exchange-alt me-3 text-primary"></i>Request/Response Messaging</h1>
+        
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>New in v1.7.0:</strong> Access cache operations via message brokers with asynchronous 
+            request/response pattern, backpressure control, and hot-reload configuration.
+        </div>
+        
+        <!-- Overview -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-book me-2"></i>Overview</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    Request/Response Messaging enables applications to interact with <span th:text="${appName} ?: 'Kuber'">Kuber</span> 
+                    cache through message brokers instead of direct Redis protocol or REST API connections. This is ideal for:
+                </p>
+                <ul>
+                    <li>Decoupled architectures where applications don't have direct network access to cache</li>
+                    <li>Event-driven systems that already use message brokers</li>
+                    <li>Batch processing where requests can be queued and processed asynchronously</li>
+                    <li>Multi-datacenter deployments with message broker replication</li>
+                </ul>
+                
+                <h6>Supported Message Brokers</h6>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card text-center p-3">
+                            <i class="fas fa-stream fa-2x text-primary mb-2"></i>
+                            <strong>Apache Kafka</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center p-3">
+                            <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                            <strong>Apache ActiveMQ</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center p-3">
+                            <i class="fas fa-server fa-2x text-success mb-2"></i>
+                            <strong>RabbitMQ</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center p-3">
+                            <i class="fas fa-industry fa-2x text-info mb-2"></i>
+                            <strong>IBM MQ</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Request Format -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-arrow-right me-2"></i>Request Format</h5>
+            </div>
+            <div class="card-body">
+                <p>All requests must be JSON with the following required fields:</p>
+                
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Field</th>
+                                <th>Required</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>api_key</code></td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                                <td>API key for authentication (e.g., "kub_abc123...")</td>
+                            </tr>
+                            <tr>
+                                <td><code>message_id</code></td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                                <td>Unique ID for request/response correlation</td>
+                            </tr>
+                            <tr>
+                                <td><code>operation</code></td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                                <td>Cache operation (GET, SET, DELETE, MGET, MSET, KEYS, etc.)</td>
+                            </tr>
+                            <tr>
+                                <td><code>region</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Region name (defaults to "default")</td>
+                            </tr>
+                            <tr>
+                                <td><code>key</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Cache key for single-key operations (GET, SET, DELETE)</td>
+                            </tr>
+                            <tr>
+                                <td><code>keys</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Array of cache keys for MGET batch operations. Max size configurable (default: 128).</td>
+                            </tr>
+                            <tr>
+                                <td><code>value</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Value for SET operations (any JSON type)</td>
+                            </tr>
+                            <tr>
+                                <td><code>entries</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Map of key-value pairs for MSET batch operations. Max size configurable (default: 128).</td>
+                            </tr>
+                            <tr>
+                                <td><code>pattern</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Pattern for KEYS operation (regex-based search). Results limited by <code>max_search_results</code>.</td>
+                            </tr>
+                            <tr>
+                                <td><code>ttl</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Time-to-live in seconds for SET/MSET operations</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">Example Request (GET)</h6>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12345",
+    "operation": "GET",
+    "region": "users",
+    "key": "user:1001"
+}</code></pre>
+                
+                <h6 class="mt-4">Example Request (SET with TTL)</h6>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12346",
+    "operation": "SET",
+    "region": "sessions",
+    "key": "session:abc",
+    "value": {"userId": "1001", "role": "admin"},
+    "ttl": 3600
+}</code></pre>
+
+                <h6 class="mt-4">Example Request (MGET - Batch Get)</h6>
+                <p>Retrieve multiple keys in a single request. Maximum <code>max_batch_get_size</code> keys (default: 128).</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12347",
+    "operation": "MGET",
+    "region": "users",
+    "keys": ["user:1001", "user:1002", "user:1003", "user:1004"]
+}</code></pre>
+
+                <h6 class="mt-4">Example Request (MSET - Batch Set)</h6>
+                <p>Set multiple key-value pairs in a single request. Maximum <code>max_batch_set_size</code> entries (default: 128).</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12348",
+    "operation": "MSET",
+    "region": "products",
+    "entries": {
+        "prod:1001": {"name": "Widget", "price": 29.99},
+        "prod:1002": {"name": "Gadget", "price": 49.99},
+        "prod:1003": {"name": "Gizmo", "price": 19.99}
+    },
+    "ttl": 86400
+}</code></pre>
+
+                <h6 class="mt-4">Example Request (KEYS - Pattern Search)</h6>
+                <p>Search for keys matching a pattern. Results limited to <code>max_search_results</code> (default: 10,000).</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12349",
+    "operation": "KEYS",
+    "region": "users",
+    "pattern": "user:*"
+}</code></pre>
+            </div>
+        </div>
+        
+        <!-- Response Format -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-arrow-left me-2"></i>Response Format</h5>
+            </div>
+            <div class="card-body">
+                <p>Responses are sent to the response topic (inferred from request topic by replacing "_request" with "_response").
+                   GET, MGET, and KEYS operations return arrays of key-value pairs.</p>
+                
+                <h6 class="mt-4">GET Response (Key Found)</h6>
+                <p>Returns an array with one key-value pair:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:00.125Z",
+    "processing_time_ms": 2,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": true,
+        "result": [
+            {"key": "user:1001", "value": {"userId": "1001", "name": "John Doe"}}
+        ],
+        "error": "",
+        "error_code": null,
+        "server_message": ""
+    }
+}</code></pre>
+
+                <h6 class="mt-4">GET Response (Key Not Found)</h6>
+                <p>Returns empty array with server_message indicating missing key:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:00.125Z",
+    "processing_time_ms": 2,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": true,
+        "result": [],
+        "error": "",
+        "error_code": null,
+        "server_message": "Key not found: user:9999"
+    }
+}</code></pre>
+                
+                <h6 class="mt-4">MGET Response</h6>
+                <p>Returns array of key-value pairs for found keys. Missing keys are listed in server_message:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:00.130Z",
+    "processing_time_ms": 7,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": true,
+        "result": [
+            {"key": "user:1001", "value": {"name": "Alice", "age": 30}},
+            {"key": "user:1002", "value": {"name": "Bob", "age": 25}}
+        ],
+        "error": "",
+        "error_code": null,
+        "server_message": "Keys not found (2 of 4): user:1003, user:1004",
+        "total_count": 4,
+        "returned_count": 2
+    }
+}</code></pre>
+
+                <h6 class="mt-4">KEYS Response (Pattern Search)</h6>
+                <p>Returns array of key-value pairs matching the pattern:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:00.200Z",
+    "processing_time_ms": 77,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": true,
+        "result": [
+            {"key": "user:1001", "value": {"name": "Alice"}},
+            {"key": "user:1002", "value": {"name": "Bob"}},
+            {"key": "user:1003", "value": {"name": "Charlie"}}
+        ],
+        "error": "",
+        "error_code": null,
+        "server_message": "",
+        "total_count": 3,
+        "returned_count": 3
+    }
+}</code></pre>
+                
+                <h6 class="mt-4">KEYS Response with Truncation</h6>
+                <p>When results exceed <code>max_search_results</code> limit:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:05.500Z",
+    "processing_time_ms": 5377,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": true,
+        "result": [
+            {"key": "user:0001", "value": {...}},
+            {"key": "user:0002", "value": {...}},
+            /* ... 10,000 key-value pairs ... */
+        ],
+        "error": "",
+        "error_code": null,
+        "server_message": "Results truncated: found 15000 keys matching pattern, returning first 10000 (max_search_results=10000)",
+        "total_count": 15000,
+        "returned_count": 10000
+    }
+}</code></pre>
+                
+                <h6 class="mt-4">Error Response Example</h6>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:00.124Z",
+    "processing_time_ms": 1,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": false,
+        "result": null,
+        "error": "Invalid API key",
+        "error_code": "AUTHENTICATION_FAILED",
+        "server_message": ""
+    }
+}</code></pre>
+
+                <h6 class="mt-4">Batch Limit Exceeded Error</h6>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "request_receive_timestamp": "2025-01-15T10:30:00.123Z",
+    "response_time": "2025-01-15T10:30:00.124Z",
+    "processing_time_ms": 1,
+    "request": { /* original request JSON */ },
+    "response": {
+        "success": false,
+        "result": null,
+        "error": "MGET batch size 200 exceeds maximum allowed 128",
+        "error_code": "BATCH_LIMIT_EXCEEDED",
+        "server_message": ""
+    }
+}</code></pre>
+            </div>
+        </div>
+        
+        <!-- Supported Operations -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Supported Operations</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>String Operations</h6>
+                        <ul>
+                            <li><code>GET</code> - Get value by key</li>
+                            <li><code>SET</code> - Set key-value pair</li>
+                            <li><code>DELETE</code> / <code>DEL</code> - Delete key(s)</li>
+                            <li><code>EXISTS</code> - Check if key exists</li>
+                            <li><code>KEYS</code> - List keys by pattern</li>
+                            <li><code>MGET</code> - Get multiple keys</li>
+                            <li><code>MSET</code> - Set multiple key-value pairs</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>TTL Operations</h6>
+                        <ul>
+                            <li><code>TTL</code> - Get time-to-live</li>
+                            <li><code>EXPIRE</code> - Set expiration</li>
+                        </ul>
+                        
+                        <h6>Hash Operations</h6>
+                        <ul>
+                            <li><code>HGET</code> - Get hash field</li>
+                            <li><code>HSET</code> - Set hash field</li>
+                            <li><code>HGETALL</code> - Get all hash fields</li>
+                            <li><code>HMSET</code> - Set multiple hash fields</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>JSON Operations</h6>
+                        <ul>
+                            <li><code>JSET</code> / <code>JSON.SET</code> - Store JSON document</li>
+                            <li><code>JGET</code> / <code>JSON.GET</code> - Get JSON with path</li>
+                            <li><code>JSEARCH</code> / <code>JSON.SEARCH</code> - Search JSON documents</li>
+                        </ul>
+                        
+                        <h6>Server Operations</h6>
+                        <ul>
+                            <li><code>PING</code> - Test connection</li>
+                            <li><code>INFO</code> - Get server info</li>
+                            <li><code>REGIONS</code> - List regions</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Configuration -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration</h5>
+            </div>
+            <div class="card-body">
+                <p>Configuration is stored in <code>request_response.json</code> in the secure folder:</p>
+                
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "enabled": true,
+    "max_queue_depth": 100,
+    "thread_pool_size": 10,
+    "max_batch_get_size": 128,
+    "max_batch_set_size": 128,
+    "max_search_results": 10000,
+    "brokers": {
+        "local_kafka": {
+            "enabled": true,
+            "type": "kafka",
+            "display_name": "Local Kafka Cluster",
+            "connection": {
+                "bootstrap_servers": "localhost:9092",
+                "group_id": "kuber-request-processor",
+                "auto_offset_reset": "earliest"
+            },
+            "request_topics": [
+                "ccs_request",
+                "agg_request",
+                "calc_request"
+            ]
+        },
+        "legacy_activemq": {
+            "enabled": true,
+            "type": "activemq",
+            "display_name": "Legacy ActiveMQ",
+            "connection": {
+                "broker_url": "tcp://activemq:61616",
+                "username": "admin",
+                "password": "admin"
+            },
+            "request_topics": [
+                "legacy_cache_request"
+            ]
+        }
+    }
+}</code></pre>
+
+                <h6 class="mt-4">Configuration Fields</h6>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Field</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>enabled</code></td>
+                                <td>false</td>
+                                <td>Global enable/disable for messaging service</td>
+                            </tr>
+                            <tr>
+                                <td><code>max_queue_depth</code></td>
+                                <td>100</td>
+                                <td>Maximum requests in internal queue (backpressure threshold)</td>
+                            </tr>
+                            <tr>
+                                <td><code>thread_pool_size</code></td>
+                                <td>10</td>
+                                <td>Number of worker threads processing requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>max_batch_get_size</code></td>
+                                <td>128</td>
+                                <td>Maximum keys allowed in MGET batch operations. Requests exceeding this limit are rejected.</td>
+                            </tr>
+                            <tr>
+                                <td><code>max_batch_set_size</code></td>
+                                <td>128</td>
+                                <td>Maximum entries allowed in MSET batch operations. Requests exceeding this limit are rejected.</td>
+                            </tr>
+                            <tr>
+                                <td><code>max_search_results</code></td>
+                                <td>10000</td>
+                                <td>Maximum results returned for KEYS pattern search. If more matches exist, results are truncated and <code>server_message</code> indicates this.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-sync me-2"></i>
+                    <strong>Hot Reload:</strong> Changes to request_response.json are detected automatically. 
+                    Broker connections and subscriptions update dynamically without restart.
+                </div>
+            </div>
+        </div>
+        
+        <!-- Backpressure -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Backpressure Control</h5>
+            </div>
+            <div class="card-body">
+                <p>To prevent memory exhaustion under high load, the service implements backpressure:</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card bg-warning-subtle">
+                            <div class="card-body">
+                                <h6><i class="fas fa-pause-circle me-2"></i>High Water Mark (80%)</h6>
+                                <p class="mb-0">When queue reaches 80% of max_queue_depth, message consumption pauses.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-success-subtle">
+                            <div class="card-body">
+                                <h6><i class="fas fa-play-circle me-2"></i>Low Water Mark (50%)</h6>
+                                <p class="mb-0">Consumption resumes when queue drops to 50% of max_queue_depth.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-danger mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Rejection:</strong> Requests arriving when queue is at 100% capacity are rejected 
+                    with error code "INTERNAL_ERROR" and message "Server overloaded - request rejected".
+                </div>
+            </div>
+        </div>
+        
+        <!-- Topic Naming -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tag me-2"></i>Topic Naming Convention</h5>
+            </div>
+            <div class="card-body">
+                <p>Request topics must end with <code>_request</code>. Response topics are automatically inferred:</p>
+                
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Request Topic</th>
+                                <th>Response Topic (Inferred)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ccs_cache_request</code></td>
+                                <td><code>ccs_cache_response</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>order_service_request</code></td>
+                                <td><code>order_service_response</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>user_cache_request</code></td>
+                                <td><code>user_cache_response</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Admin UI -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-desktop me-2"></i>Admin UI</h5>
+            </div>
+            <div class="card-body">
+                <p>Manage messaging from the Admin UI:</p>
+                <ul>
+                    <li><a href="/admin/messaging"><strong>Broker Management</strong></a> - Add/remove brokers and topics</li>
+                    <li><a href="/admin/messaging/queue"><strong>Queue Status</strong></a> - View pending requests and drain queue</li>
+                </ul>
+                
+                <h6 class="mt-3">Features</h6>
+                <ul>
+                    <li>View active and failed broker connections</li>
+                    <li>Add/remove brokers dynamically</li>
+                    <li>Add/remove request topics per broker</li>
+                    <li>Monitor queue depth and processing stats</li>
+                    <li>Drain queue (partially or fully)</li>
+                    <li>Retry failed subscriptions</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="row mt-4">
+            <div class="col-6">
+                <a href="/help/publishing" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Event Publishing
+                </a>
+            </div>
+            <div class="col-6 text-end">
+                <a href="/help/apikeys" class="btn btn-outline-primary">
+                    API Keys <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

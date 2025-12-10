@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.6.5**
+**Version 1.7.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -21,9 +21,10 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 8. [Persistence Layer](#8-persistence-layer)
 9. [Replication Architecture](#9-replication-architecture)
 10. [Event Publishing](#10-event-publishing)
-11. [Security Architecture](#11-security-architecture)
-12. [Data Flow](#12-data-flow)
-13. [Deployment Patterns](#13-deployment-patterns)
+11. [Request/Response Messaging](#11-request-response-messaging)
+12. [Security Architecture](#12-security-architecture)
+13. [Data Flow](#13-data-flow)
+14. [Deployment Patterns](#14-deployment-patterns)
 
 ---
 
@@ -41,6 +42,7 @@ Kuber is an enterprise-grade distributed caching system designed for high-perfor
 | **High Availability** | Primary/Secondary replication via ZooKeeper |
 | **Mandatory Security** | All clients must authenticate with username/password or API key |
 | **Event Publishing** | Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
+| **Request/Response** | Access cache via message brokers with async processing and backpressure |
 | **Extensibility** | Modular design allowing custom persistence, publishers, and protocol handlers |
 
 ---
@@ -1012,7 +1014,132 @@ kuber:
 
 ---
 
-## 10. Security Architecture
+## 10. Request/Response Messaging (v1.7.0)
+
+Request/Response Messaging enables cache access via message brokers, allowing asynchronous, 
+decoupled communication with the cache system.
+
+### 10.1 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        MESSAGE BROKER LAYER                                  │
+├────────────────┬────────────────┬────────────────┬────────────────────────────┤
+│     Kafka      │   RabbitMQ     │    ActiveMQ    │         IBM MQ            │
+│  (Topics)      │   (Queues)     │   (Queues)     │        (Queues)           │
+└───────┬────────┴───────┬────────┴───────┬────────┴────────────┬──────────────┘
+        │                │                │                      │
+        │ request_topic  │ request_queue  │ request_queue        │ REQUEST.QUEUE
+        ▼                ▼                ▼                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     REQUEST RESPONSE SERVICE                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐ │
+│  │  Broker Adapters │  │  Blocking Queue  │  │     Thread Pool            │ │
+│  │  (Multi-broker)  │  │  (Backpressure)  │  │  (Async Processing)        │ │
+│  └────────┬─────────┘  └────────┬─────────┘  └─────────────┬─────────────┘ │
+│           │                     │                          │               │
+│           └─────────────────────┴──────────────────────────┘               │
+│                                 │                                           │
+│                                 ▼                                           │
+│                        ┌─────────────────┐                                  │
+│                        │  Cache Service  │                                  │
+│                        └─────────────────┘                                  │
+│                                 │                                           │
+│                                 ▼                                           │
+│                        ┌─────────────────┐                                  │
+│                        │ Response Topic  │                                  │
+│                        └─────────────────┘                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.2 Components
+
+| Component | Description |
+|-----------|-------------|
+| **MessageBrokerAdapter** | Interface for broker-specific implementations |
+| **KafkaBrokerAdapter** | Apache Kafka consumer/producer |
+| **ActiveMqBrokerAdapter** | Apache ActiveMQ JMS client |
+| **RabbitMqBrokerAdapter** | RabbitMQ AMQP client |
+| **IbmMqBrokerAdapter** | IBM MQ JMS client |
+| **RequestResponseService** | Main service managing brokers, queue, and processing |
+
+### 10.3 Request Processing Flow
+
+1. **Message Arrival**: Broker adapter receives message from request topic
+2. **Queue Submission**: Message added to blocking queue (with backpressure)
+3. **Worker Pickup**: Thread pool worker takes message from queue
+4. **Authentication**: API key validated against ApiKeyService
+5. **Operation Execution**: Cache operation executed via CacheService
+6. **Response Composition**: Response JSON with timestamps and result
+7. **Response Delivery**: Response published to inferred response topic
+
+### 10.4 Backpressure Management
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    BACKPRESSURE STATES                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Queue Depth: [============================-------] 80%          │
+│               ↑                                                  │
+│               HIGH WATER MARK - Pause Consumption                │
+│                                                                  │
+│  Queue Depth: [==============-------------------] 50%            │
+│               ↑                                                  │
+│               LOW WATER MARK - Resume Consumption                │
+│                                                                  │
+│  Queue Depth: [====================================] 100%        │
+│               ↑                                                  │
+│               QUEUE FULL - Reject Requests                       │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| State | Queue % | Action |
+|-------|---------|--------|
+| Normal | 0-50% | Full speed consumption |
+| Elevated | 50-80% | Normal consumption |
+| High Water | 80%+ | Pause message consumption |
+| Queue Full | 100% | Reject incoming requests |
+
+### 10.5 Configuration
+
+Configuration stored in `request_response.json` in the secure folder:
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "brokers": {
+    "kafka_prod": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Production Kafka",
+      "connection": {
+        "bootstrap_servers": "kafka1:9092,kafka2:9092",
+        "group_id": "kuber-request-processor"
+      },
+      "request_topics": ["ccs_cache_request"]
+    }
+  }
+}
+```
+
+### 10.6 Startup/Shutdown Integration
+
+| Phase | Startup | Shutdown |
+|-------|---------|----------|
+| Messaging | Phase 7 (Last) | Phase 0.5 (First) |
+
+This ensures:
+- Cache is fully initialized before accepting broker requests
+- All in-flight requests complete before cache shutdown
+
+---
+
+## 11. Security Architecture
 
 ### 13.1 Authentication Methods
 

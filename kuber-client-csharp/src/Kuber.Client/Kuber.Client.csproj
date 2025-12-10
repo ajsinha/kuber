@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Kuber.Client</RootNamespace>
+    <AssemblyName>Kuber.Client</AssemblyName>
+    <Version>1.7.0</Version>
+    <Authors>Ashutosh Sinha</Authors>
+    <Company>Kuber</Company>
+    <Description>Kuber Distributed Cache Client Library for .NET</Description>
+    <Copyright>Copyright © 2025-2030 Ashutosh Sinha. All Rights Reserved.</Copyright>
+    <PackageLicenseExpression>Proprietary</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/kuber-cache/kuber</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kuber-cache/kuber</RepositoryUrl>
+    <PackageTags>cache;distributed;redis;kuber</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.7.33" />
+    <!-- Optional: For Kafka messaging -->
+    <!-- <PackageReference Include="Confluent.Kafka" Version="2.3.0" /> -->
+    <!-- Optional: For RabbitMQ messaging -->
+    <!-- <PackageReference Include="RabbitMQ.Client" Version="6.8.1" /> -->
+  </ItemGroup>
+
+</Project>

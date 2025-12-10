@@ -2,6 +2,7 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
       <profile name="Maven default annotation processors profile" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -21,6 +22,7 @@
       <module name="kuber-cache" options="-parameters -parameters" />
       <module name="kuber-client-java" options="-parameters -parameters" />
       <module name="kuber-core" options="-parameters -parameters" />
+      <module name="kuber-parent" options="-parameters -parameters" />
       <module name="kuber-server" options="-parameters -parameters" />
     </option>
   </component>

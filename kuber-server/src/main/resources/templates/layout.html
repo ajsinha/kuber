@@ -99,6 +99,11 @@
                                 <i class="fas fa-key me-2"></i> API Keys
                             </a>
                         </li>
+                        <li sec:authorize="hasRole('ADMIN')">
+                            <a class="dropdown-item" th:href="@{/admin/messaging}">
+                                <i class="fas fa-exchange-alt me-2"></i> Messaging
+                            </a>
+                        </li>
                         <li sec:authorize="hasRole('ADMIN')"><hr class="dropdown-divider"></li>
                         <li>
                             <form th:action="@{/logout}" method="post" class="d-inline">
@@ -140,7 +145,7 @@
             <div class="col-md-6">
                 <span class="text-muted">
                     <i class="fas fa-database me-1"></i>
-                    <strong th:text="${appName} ?: 'Kuber'">Kuber</strong> Distributed Cache v1.5.0
+                    <strong th:text="${appName} ?: 'Kuber'">Kuber</strong> Distributed Cache v1.7.0
                 </span>
             </div>
             <div class="col-md-6 text-end">

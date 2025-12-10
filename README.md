@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.6.5
+Version 1.7.0
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -20,6 +20,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
 - **Event Publishing (v1.2.8)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files
+- **Request/Response Messaging (v1.7.0)**: Access cache via message brokers with async processing and backpressure
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
@@ -90,6 +91,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
 | Event Publishing (v1.2.8) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
+| Request/Response (v1.7.0) | Cache access via message brokers with backpressure control |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
 | Automatic Compaction | Pre-startup compaction before Spring + cron schedule (default: 2 AM daily) |
@@ -615,6 +617,156 @@ kuber:
   "nodeId": "kuber-01"
 }
 ```
+
+## Request/Response Messaging (v1.7.0)
+
+Kuber can accept cache operation requests via message brokers, enabling asynchronous cache access for event-driven architectures.
+
+### Supported Brokers
+
+| Broker | Type | Features |
+|--------|------|----------|
+| Apache Kafka | `kafka` | Consumer groups, auto offset reset, async producer |
+| Apache ActiveMQ | `activemq` | JMS queues/topics, connection pooling |
+| RabbitMQ | `rabbitmq` | Queue auto-declaration, manual ack, prefetch control |
+| IBM MQ | `ibmmq` | Queue manager, channel-based, JMS integration |
+
+### Configuration (request_response.json)
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "max_batch_get_size": 128,
+  "max_batch_set_size": 128,
+  "max_search_results": 10000,
+  "brokers": {
+    "local_kafka": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Local Kafka Cluster",
+      "connection": {
+        "bootstrap_servers": "localhost:9092",
+        "group_id": "kuber-request-processor"
+      },
+      "request_topics": ["ccs_request", "agg_request", "calc_request"]
+    }
+  }
+}
+```
+
+### Request Format
+
+```json
+{
+  "api_key": "kub_abc123...",
+  "message_id": "req-12345",
+  "operation": "GET",
+  "region": "users",
+  "key": "user:1001"
+}
+```
+
+### Batch Operations
+
+**MGET (Batch Get)** - Maximum `max_batch_get_size` keys (default: 128):
+```json
+{
+  "api_key": "kub_abc123...",
+  "message_id": "req-12346",
+  "operation": "MGET",
+  "region": "users",
+  "keys": ["user:1001", "user:1002", "user:1003"]
+}
+```
+
+**MSET (Batch Set)** - Maximum `max_batch_set_size` entries (default: 128):
+```json
+{
+  "api_key": "kub_abc123...",
+  "message_id": "req-12347",
+  "operation": "MSET",
+  "region": "products",
+  "entries": {
+    "prod:1001": {"name": "Widget", "price": 29.99},
+    "prod:1002": {"name": "Gadget", "price": 49.99}
+  }
+}
+```
+
+### Response Format
+
+GET, MGET, and KEYS operations return arrays of key-value pairs:
+
+**GET Response (found):**
+```json
+{
+  "response": {
+    "success": true,
+    "result": [
+      {"key": "user:1001", "value": {"userId": "1001", "name": "John Doe"}}
+    ],
+    "error": "",
+    "server_message": ""
+  }
+}
+```
+
+**GET Response (not found):**
+```json
+{
+  "response": {
+    "success": true,
+    "result": [],
+    "error": "",
+    "server_message": "Key not found: user:9999"
+  }
+}
+```
+
+**MGET Response (partial match):**
+```json
+{
+  "response": {
+    "success": true,
+    "result": [
+      {"key": "user:1001", "value": {"name": "Alice"}},
+      {"key": "user:1002", "value": {"name": "Bob"}}
+    ],
+    "error": "",
+    "server_message": "Keys not found (2 of 4): user:1003, user:1004",
+    "total_count": 4,
+    "returned_count": 2
+  }
+}
+```
+
+### Search Result Truncation
+
+KEYS pattern searches return key-value pairs and are limited to `max_search_results` (default: 10,000):
+
+```json
+{
+  "response": {
+    "success": true,
+    "result": [
+      {"key": "user:0001", "value": {...}},
+      {"key": "user:0002", "value": {...}}
+    ],
+    "error": "",
+    "server_message": "Results truncated: found 15000 keys matching pattern, returning first 10000",
+    "total_count": 15000,
+    "returned_count": 10000
+  }
+}
+```
+
+### Topic Naming
+
+Request topics must end with `_request`. Response topics are inferred automatically:
+- `ccs_request` → `ccs_response`
+- `order_cache_request` → `order_cache_response`
 
 ## Concurrency Safety & Graceful Shutdown (v1.3.3)
 

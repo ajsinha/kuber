@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 # ============================================================================
 KUBER_HOST = os.getenv('KUBER_HOST', 'localhost')
 KUBER_PORT = int(os.getenv('KUBER_PORT', '6380'))
-KUBER_API_KEY = os.getenv('KUBER_API_KEY', 'kub_566e7b476ea57c15612a43a02ff98f6188a50209757a6c3f7c115e845c68b15a')
+KUBER_API_KEY = os.getenv('KUBER_API_KEY', 'kub_admin_sample_key_replace_me')
 
 # ============================================================================
 # KUBER CLIENT CLASS
