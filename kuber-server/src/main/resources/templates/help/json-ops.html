@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('JSON Operations')}"></head>
 <body class="d-flex flex-column min-vh-100">
@@ -11,40 +16,596 @@
                 <li class="breadcrumb-item active">JSON Operations</li>
             </ol>
         </nav>
+        
         <div class="row">
             <div class="col-lg-10 mx-auto">
                 <h1 class="display-5 mb-4"><i class="fas fa-code text-success me-3"></i>JSON Operations</h1>
-
-                <h3>Commands</h3>
-                <table class="table table-striped">
-                    <thead><tr><th>Command</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td>JSON.SET key $ json</td><td>Store JSON document</td></tr>
-                        <tr><td>JSON.GET key [path]</td><td>Get JSON or path</td></tr>
-                        <tr><td>JSON.DEL key path</td><td>Delete JSON path</td></tr>
-                    </tbody>
-                </table>
                 
-                <h3 class="mt-4">JSONPath Syntax</h3>
-                <ul>
-                    <li><code>$</code> - Root element</li>
-                    <li><code>$.field</code> - Field access</li>
-                    <li><code>$.parent.child</code> - Nested access</li>
-                    <li><code>$.array[0]</code> - Array index</li>
-                </ul>
+                <p class="lead">Kuber provides comprehensive JSON document storage and search capabilities, allowing you to store, retrieve, and query JSON documents with powerful operators including regex matching.</p>
+                
+                <!-- Table of Contents -->
+                <div class="card mb-5">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Table of Contents</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <ul class="list-unstyled mb-0">
+                                    <li><a href="#basic-commands">Basic Commands</a></li>
+                                    <li><a href="#jsonpath">JSONPath Syntax</a></li>
+                                    <li><a href="#jsearch">JSON Search (JSEARCH)</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <ul class="list-unstyled mb-0">
+                                    <li><a href="#operators">Query Operators</a></li>
+                                    <li><a href="#regex">Regex Search</a></li>
+                                    <li><a href="#ksearch">Key Search (KSEARCH)</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <ul class="list-unstyled mb-0">
+                                    <li><a href="#examples">Code Examples</a></li>
+                                    <li><a href="#demo-files">Demo Files</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Commands -->
+                <section id="basic-commands" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-terminal text-primary me-2"></i>Basic Commands</h2>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 25%">Command</th>
+                                    <th style="width: 35%">Syntax</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code class="text-success">JSET</code></td>
+                                    <td><code>JSET key json_value [path]</code></td>
+                                    <td>Store a JSON document. Path defaults to <code>$</code> (root).</td>
+                                </tr>
+                                <tr>
+                                    <td><code class="text-success">JGET</code></td>
+                                    <td><code>JGET key [path]</code></td>
+                                    <td>Retrieve JSON document or a specific path within it.</td>
+                                </tr>
+                                <tr>
+                                    <td><code class="text-success">JDEL</code></td>
+                                    <td><code>JDEL key [path]</code></td>
+                                    <td>Delete JSON document or a specific path within it.</td>
+                                </tr>
+                                <tr>
+                                    <td><code class="text-success">JTYPE</code></td>
+                                    <td><code>JTYPE key [path]</code></td>
+                                    <td>Get the JSON type at the specified path (object, array, string, number, boolean, null).</td>
+                                </tr>
+                                <tr>
+                                    <td><code class="text-success">JSEARCH</code></td>
+                                    <td><code>JSEARCH query</code></td>
+                                    <td>Search JSON documents using attribute queries. Returns matching key-value pairs.</td>
+                                </tr>
+                                <tr>
+                                    <td><code class="text-success">JQUERY</code></td>
+                                    <td><code>JQUERY jsonpath</code></td>
+                                    <td>Query JSON documents using JSONPath expressions.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> Kuber also supports Redis-compatible JSON.SET, JSON.GET, and JSON.DEL commands as aliases.
+                    </div>
+                </section>
+
+                <!-- JSONPath Syntax -->
+                <section id="jsonpath" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-sitemap text-info me-2"></i>JSONPath Syntax</h2>
+                    
+                    <p>Kuber supports a simplified JSONPath syntax for accessing nested values within JSON documents:</p>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Path Expression</th>
+                                    <th>Description</th>
+                                    <th>Example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>$</code></td>
+                                    <td>Root element (entire document)</td>
+                                    <td><code>JGET key $</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>$.field</code></td>
+                                    <td>Direct field access</td>
+                                    <td><code>JGET key $.name</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>$.parent.child</code></td>
+                                    <td>Nested field access</td>
+                                    <td><code>JGET key $.address.city</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>$.array[0]</code></td>
+                                    <td>Array index (0-based)</td>
+                                    <td><code>JGET key $.skills[0]</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>$.array[*]</code></td>
+                                    <td>All array elements</td>
+                                    <td><code>JGET key $.skills[*]</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="card bg-light mt-4">
+                        <div class="card-header"><i class="fas fa-code me-2"></i>Example JSON Document</div>
+                        <div class="card-body">
+<pre class="mb-0"><code>{
+  "id": "EMP001",
+  "name": "John Smith",
+  "email": "john.smith@company.com",
+  "department": "Engineering",
+  "salary": 95000,
+  "skills": ["Python", "Java", "Kubernetes"],
+  "address": {
+    "city": "San Francisco",
+    "state": "CA",
+    "zip": "94102"
+  },
+  "active": true
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mt-3">
+                        <div class="card-header"><i class="fas fa-terminal me-2"></i>Path Examples</div>
+                        <div class="card-body">
+<pre class="mb-0"><code>JGET employee:EMP001 $              → (entire document)
+JGET employee:EMP001 $.name         → "John Smith"
+JGET employee:EMP001 $.salary       → 95000
+JGET employee:EMP001 $.skills       → ["Python", "Java", "Kubernetes"]
+JGET employee:EMP001 $.skills[0]    → "Python"
+JGET employee:EMP001 $.address.city → "San Francisco"
+JGET employee:EMP001 $.active       → true</code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- JSON Search -->
+                <section id="jsearch" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-search text-warning me-2"></i>JSON Search (JSEARCH)</h2>
+                    
+                    <p>The <code>JSEARCH</code> command allows you to search JSON documents based on attribute values. It scans all JSON documents in the current region and returns those matching your query criteria.</p>
+                    
+                    <h4>Syntax</h4>
+<pre><code>JSEARCH query</code></pre>
+                    
+                    <h4>Query Format</h4>
+                    <p>The query format uses a simple, intuitive syntax:</p>
+<pre><code>field=value                          # Single condition
+field1=value1,field2=value2          # Multiple conditions (AND)
+nested.field=value                   # Nested field access
+field~=regex_pattern                 # Regex matching</code></pre>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> Multiple conditions are combined with AND logic. All conditions must match for a document to be returned.
+                    </div>
+                </section>
+
+                <!-- Query Operators -->
+                <section id="operators" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-filter text-danger me-2"></i>Query Operators</h2>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 15%">Operator</th>
+                                    <th style="width: 25%">Description</th>
+                                    <th style="width: 30%">Example</th>
+                                    <th>Matches</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>=</code> or <code>==</code></td>
+                                    <td>Exact match</td>
+                                    <td><code>department=Engineering</code></td>
+                                    <td>department equals "Engineering"</td>
+                                </tr>
+                                <tr>
+                                    <td><code>!=</code> or <code>&lt;&gt;</code></td>
+                                    <td>Not equal</td>
+                                    <td><code>active!=false</code></td>
+                                    <td>active is not false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&gt;</code></td>
+                                    <td>Greater than (numeric)</td>
+                                    <td><code>salary&gt;90000</code></td>
+                                    <td>salary greater than 90000</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&lt;</code></td>
+                                    <td>Less than (numeric)</td>
+                                    <td><code>age&lt;30</code></td>
+                                    <td>age less than 30</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&gt;=</code></td>
+                                    <td>Greater or equal</td>
+                                    <td><code>salary&gt;=100000</code></td>
+                                    <td>salary at least 100000</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&lt;=</code></td>
+                                    <td>Less or equal</td>
+                                    <td><code>experience&lt;=5</code></td>
+                                    <td>experience at most 5</td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td><code>~=</code></td>
+                                    <td><strong>Regex match</strong></td>
+                                    <td><code>email~=.*@company\.com</code></td>
+                                    <td>email matches regex pattern</td>
+                                </tr>
+                                <tr>
+                                    <td><code>contains</code></td>
+                                    <td>Contains substring</td>
+                                    <td><code>name contains John</code></td>
+                                    <td>name contains "John"</td>
+                                </tr>
+                                <tr>
+                                    <td><code>startsWith</code></td>
+                                    <td>Starts with prefix</td>
+                                    <td><code>name startsWith J</code></td>
+                                    <td>name starts with "J"</td>
+                                </tr>
+                                <tr>
+                                    <td><code>endsWith</code></td>
+                                    <td>Ends with suffix</td>
+                                    <td><code>name endsWith son</code></td>
+                                    <td>name ends with "son"</td>
+                                </tr>
+                                <tr>
+                                    <td><code>exists</code></td>
+                                    <td>Field exists</td>
+                                    <td><code>manager exists true</code></td>
+                                    <td>manager field exists</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Regex Search -->
+                <section id="regex" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-asterisk text-success me-2"></i>Regex Search on JSON Values</h2>
+                    
+                    <p>Use the <code>~=</code> operator to search JSON attribute values using Java regular expressions:</p>
+                    
+                    <div class="card bg-light">
+                        <div class="card-header"><i class="fas fa-code me-2"></i>Regex Examples</div>
+                        <div class="card-body">
+<pre class="mb-0"><code># Names starting with 'J'
+JSEARCH name~=^J.*
+
+# Email addresses from company.com domain
+JSEARCH email~=.*@company\.com
+
+# Zip codes starting with '9' (West Coast USA)
+JSEARCH address.zip~=^9.*
+
+# Names ending in 'son'
+JSEARCH name~=.*son$
+
+# Phone numbers matching pattern
+JSEARCH phone~=^\d{3}-\d{3}-\d{4}$
+
+# Combined: Engineers with 'Smith' in name
+JSEARCH department=Engineering,name~=.*Smith.*</code></pre>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mt-4">Common Regex Patterns</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr><th>Pattern</th><th>Meaning</th><th>Example</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>^</code></td><td>Start of string</td><td><code>^John</code> - starts with "John"</td></tr>
+                                <tr><td><code>$</code></td><td>End of string</td><td><code>son$</code> - ends with "son"</td></tr>
+                                <tr><td><code>.*</code></td><td>Any characters (0 or more)</td><td><code>.*Smith.*</code> - contains "Smith"</td></tr>
+                                <tr><td><code>.+</code></td><td>Any characters (1 or more)</td><td><code>.+@.+</code> - has @ with text around</td></tr>
+                                <tr><td><code>\d</code></td><td>Any digit</td><td><code>\d{5}</code> - exactly 5 digits</td></tr>
+                                <tr><td><code>\w</code></td><td>Word character</td><td><code>\w+</code> - one or more word chars</td></tr>
+                                <tr><td><code>[abc]</code></td><td>Any of a, b, or c</td><td><code>[A-Z]</code> - any uppercase letter</td></tr>
+                                <tr><td><code>\.</code></td><td>Literal dot (escaped)</td><td><code>\.com$</code> - ends with ".com"</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Key Search -->
+                <section id="ksearch" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-key text-warning me-2"></i>Key Search (KSEARCH)</h2>
+                    
+                    <p>In addition to searching JSON values, you can search keys using regex patterns:</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white"><i class="fas fa-terminal me-2"></i>KEYS (Glob Pattern)</div>
+                                <div class="card-body">
+<pre class="mb-0"><code># All employee keys
+KEYS employee:*
+
+# Keys matching pattern
+KEYS user:???
+
+# All keys
+KEYS *</code></pre>
+                                    <small class="text-muted">Uses glob-style patterns (* for any, ? for single char)</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-success text-white"><i class="fas fa-terminal me-2"></i>KSEARCH (Regex Pattern)</div>
+                                <div class="card-body">
+<pre class="mb-0"><code># Employees 001-003
+KSEARCH employee:EMP00[1-3]
+
+# Any key with digits
+KSEARCH .*\d+.*
+
+# Keys ending with specific pattern
+KSEARCH .*_backup$</code></pre>
+                                    <small class="text-muted">Uses Java regex patterns (more powerful)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mt-4">KSEARCH Syntax</h4>
+<pre><code>KSEARCH regex_pattern [LIMIT count]</code></pre>
+                    <p>Returns JSON objects with key details:</p>
+<pre><code>{"key": "employee:EMP001", "value": "...", "type": "JSON", "ttl": -1}</code></pre>
+                </section>
+
+                <!-- Code Examples -->
+                <section id="examples" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-laptop-code text-info me-2"></i>Code Examples</h2>
+                    
+                    <ul class="nav nav-tabs" id="codeTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="python-tab" data-bs-toggle="tab" data-bs-target="#python" type="button">
+                                <i class="fab fa-python me-1"></i>Python
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="java-tab" data-bs-toggle="tab" data-bs-target="#java" type="button">
+                                <i class="fab fa-java me-1"></i>Java
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="redis-tab" data-bs-toggle="tab" data-bs-target="#redis" type="button">
+                                <i class="fas fa-terminal me-1"></i>Redis CLI
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content border border-top-0 p-3" id="codeTabContent">
+                        <!-- Python Examples -->
+                        <div class="tab-pane fade show active" id="python" role="tabpanel">
+<pre><code># Python - Using KuberClient
+from kuber import KuberClient
+
+with KuberClient('localhost', 6380, api_key='kub_your_key') as client:
+    
+    # a) Set JSON value
+    employee = {
+        "id": "EMP001",
+        "name": "John Smith",
+        "department": "Engineering",
+        "salary": 95000,
+        "address": {"city": "San Francisco", "state": "CA"}
+    }
+    client.json_set("employee:EMP001", employee)
+    
+    # b) Get JSON value
+    emp = client.json_get("employee:EMP001")
+    name = client.json_get("employee:EMP001", "$.name")
+    city = client.json_get("employee:EMP001", "$.address.city")
+    
+    # c) Search by single attribute
+    results = client.json_search("department=Engineering")
+    
+    # c) Search by multiple attributes
+    results = client.json_search("department=Engineering,salary&gt;90000")
+    
+    # d) Regex search on JSON values
+    results = client.json_search("name~=^J.*")           # Names starting with J
+    results = client.json_search("email~=.*@company\\.com")  # Company emails
+    
+    # e) Key regex search
+    keys = client.keys("employee:*")                     # Glob pattern
+    results = client.ksearch("employee:EMP00[1-3]")      # Regex pattern</code></pre>
+                        </div>
+                        
+                        <!-- Java Examples -->
+                        <div class="tab-pane fade" id="java" role="tabpanel">
+<pre><code>// Java - Using KuberClient
+import com.kuber.client.KuberClient;
+
+try (KuberClient client = new KuberClient("localhost", 6380, "kub_your_key")) {
+    
+    // a) Set JSON value
+    String json = """
+        {"id":"EMP001","name":"John Smith","department":"Engineering",
+         "salary":95000,"address":{"city":"San Francisco","state":"CA"}}
+        """;
+    client.jsonSet("employee:EMP001", json);
+    
+    // b) Get JSON value
+    String emp = client.jsonGet("employee:EMP001");
+    String name = client.jsonGet("employee:EMP001", "$.name");
+    String city = client.jsonGet("employee:EMP001", "$.address.city");
+    
+    // c) Search by single attribute
+    List&lt;Map&lt;String, String&gt;&gt; results = client.jsonSearch("department=Engineering");
+    
+    // c) Search by multiple attributes
+    results = client.jsonSearch("department=Engineering,salary&gt;90000");
+    
+    // d) Regex search on JSON values
+    results = client.jsonSearch("name~=^J.*");           // Names starting with J
+    results = client.jsonSearch("email~=.*@company\\.com"); // Company emails
+    
+    // e) Key regex search
+    List&lt;String&gt; keys = client.keys("employee:*");       // Glob pattern
+    results = client.ksearch("employee:EMP00[1-3]", 100); // Regex pattern
+}</code></pre>
+                        </div>
+                        
+                        <!-- Redis CLI Examples -->
+                        <div class="tab-pane fade" id="redis" role="tabpanel">
+<pre><code># Redis Protocol Commands (via redis-cli or netcat)
+
+# Authenticate
+AUTH kub_your_api_key
+
+# Select region
+RSELECT myregion
+
+# a) Set JSON value
+JSET employee:EMP001 {"id":"EMP001","name":"John Smith","department":"Engineering"} $
+
+# b) Get JSON value
+JGET employee:EMP001 $
+JGET employee:EMP001 $.name
+JGET employee:EMP001 $.address.city
+
+# c) Search by single attribute
+JSEARCH department=Engineering
+
+# c) Search by multiple attributes
+JSEARCH department=Engineering,salary&gt;90000
+
+# d) Regex search on JSON values
+JSEARCH name~=^J.*
+JSEARCH email~=.*@company\.com
+JSEARCH address.zip~=^9.*
+
+# e) Key regex search
+KEYS employee:*
+KSEARCH employee:EMP00[1-3] LIMIT 100</code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Demo Files -->
+                <section id="demo-files" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-file-code text-primary me-2"></i>Standalone Demo Files</h2>
+                    
+                    <p>Complete, standalone demo scripts are available in the client modules that demonstrate all JSON operations:</p>
+                    
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="card h-100 border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <i class="fab fa-python fa-lg me-2"></i>Python Demo
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">kuber_json_demo.py</h5>
+                                    <p class="card-text">Located in: <code>kuber-client-python/</code></p>
+                                    <p class="card-text text-muted small">Self-contained Python script demonstrating all JSON operations with employee record examples.</p>
+                                    <hr>
+                                    <h6>Run:</h6>
+<pre class="bg-light p-2"><code>export KUBER_API_KEY=kub_your_key
+python3 kuber_json_demo.py</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100 border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <i class="fab fa-java fa-lg me-2"></i>Java Demo
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">KuberJsonDemo.java</h5>
+                                    <p class="card-text">Located in: <code>kuber-client-java/src/main/java/com/kuber/client/examples/</code></p>
+                                    <p class="card-text text-muted small">Self-contained Java class (no dependencies) demonstrating all JSON operations.</p>
+                                    <hr>
+                                    <h6>Run:</h6>
+<pre class="bg-light p-2"><code>javac KuberJsonDemo.java
+java KuberJsonDemo localhost 6380 kub_your_key</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success mt-4">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Features Demonstrated:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Set keys with JSON values (employee records)</li>
+                            <li>Retrieve JSON values and specific paths</li>
+                            <li>Search by single attribute</li>
+                            <li>Search by multiple attributes (AND conditions)</li>
+                            <li>Regex search on JSON attribute values</li>
+                            <li>Key search using glob and regex patterns</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Back Button -->
                 <div class="mt-5 text-center">
-                    <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                    <a href="/help" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Help Index
+                    </a>
                 </div>
             </div>
         </div>
+        
+        <!-- Footer -->
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.5.0</p></div>
-                <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                    <p class="text-muted small mb-0">Version 1.6.5</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="text-muted small mb-0">
+                        Copyright &copy; 2025-2030, All Rights Reserved<br>
+                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                        <span class="badge bg-warning text-dark">Patent Pending</span>
+                    </p>
+                </div>
             </div>
         </footer>
     </div>
 </main>
+
 <th:block th:replace="~{layout :: scripts}"></th:block>
+
 </body>
 </html>

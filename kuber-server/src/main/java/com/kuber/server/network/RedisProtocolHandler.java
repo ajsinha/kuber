@@ -42,11 +42,11 @@ import java.util.stream.Collectors;
  * Handles Redis protocol commands via MINA.
  * Supports standard Redis commands plus Kuber extensions for regions and JSON.
  * 
- * Authentication methods:
- * 1. Password: AUTH password
- * 2. API Key: AUTH APIKEY kub_xxx...
+ * Authentication (v1.6.5):
+ * - API Key ONLY: AUTH kub_xxx... or AUTH APIKEY kub_xxx...
+ * - Username/password authentication is only for Web UI
  *
- * @version 1.5.0
+ * @version 1.6.5
  */
 @Slf4j
 @Component
@@ -313,6 +313,9 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
             case KEYS:
                 return handleKeys(region, args);
             
+            case SCAN:
+                return handleScan(region, args);
+            
             case RENAME:
                 return handleRename(region, args);
             
@@ -438,56 +441,51 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     
     /**
      * Handle AUTH command.
-     * Supports two formats:
-     * 1. AUTH password - traditional password authentication
-     * 2. AUTH APIKEY kub_xxx... - API key authentication
+     * v1.6.5: API Key authentication ONLY for Redis protocol.
+     * 
+     * Supported formats:
+     * 1. AUTH kub_xxx... - API key direct (recommended)
+     * 2. AUTH APIKEY kub_xxx... - API key with keyword prefix
+     * 
+     * Note: Username/password authentication is only for Web UI.
+     * All programmatic access (Redis protocol, REST API) must use API keys.
      */
     private RedisResponse handleAuth(IoSession session, List<String> args) {
         if (args.isEmpty()) {
             return RedisResponse.error("wrong number of arguments for 'auth' command");
         }
         
-        // Check for API key authentication: AUTH APIKEY kub_xxx...
+        String apiKeyValue = null;
+        
+        // Format 1: AUTH APIKEY kub_xxx...
         if (args.size() >= 2 && "APIKEY".equalsIgnoreCase(args.get(0))) {
-            String apiKeyValue = args.get(1);
-            Optional<ApiKey> validatedKey = apiKeyService.validateKey(apiKeyValue);
-            
-            if (validatedKey.isPresent()) {
-                ApiKey key = validatedKey.get();
-                session.setAttribute(SESSION_AUTHENTICATED, true);
-                session.setAttribute(SESSION_AUTH_USER, key.getUserId());
-                log.info("Redis client authenticated via API key: {} ({})", key.getKeyId(), key.getName());
-                return RedisResponse.ok();
-            }
-            
-            log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
-            return RedisResponse.error("invalid API key");
+            apiKeyValue = args.get(1);
+        }
+        // Format 2: AUTH kub_xxx... (direct API key)
+        else if (args.get(0).startsWith("kub_")) {
+            apiKeyValue = args.get(0);
+        }
+        // Invalid format - must be API key
+        else {
+            log.warn("Invalid auth attempt from {} - API key required (must start with 'kub_')", 
+                    session.getRemoteAddress());
+            return RedisResponse.error("API key required - use AUTH kub_xxx or AUTH APIKEY kub_xxx");
         }
         
-        // Check for API key directly (if it starts with kub_)
-        if (args.get(0).startsWith("kub_")) {
-            Optional<ApiKey> validatedKey = apiKeyService.validateKey(args.get(0));
-            
-            if (validatedKey.isPresent()) {
-                ApiKey key = validatedKey.get();
-                session.setAttribute(SESSION_AUTHENTICATED, true);
-                session.setAttribute(SESSION_AUTH_USER, key.getUserId());
-                log.info("Redis client authenticated via API key: {} ({})", key.getKeyId(), key.getName());
-                return RedisResponse.ok();
-            }
-            
-            log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
-            return RedisResponse.error("invalid API key");
-        }
+        // Validate API key
+        Optional<ApiKey> validatedKey = apiKeyService.validateKey(apiKeyValue);
         
-        // Traditional password authentication
-        String password = properties.getSecurity().getRedisPassword();
-        if (password == null || password.equals(args.get(0))) {
+        if (validatedKey.isPresent()) {
+            ApiKey key = validatedKey.get();
             session.setAttribute(SESSION_AUTHENTICATED, true);
+            session.setAttribute(SESSION_AUTH_USER, key.getUserId());
+            log.info("Redis client authenticated via API key: {} ({}) from {}", 
+                    key.getKeyId(), key.getName(), session.getRemoteAddress());
             return RedisResponse.ok();
         }
         
-        return RedisResponse.error("invalid password");
+        log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
+        return RedisResponse.error("invalid API key");
     }
     
     private RedisResponse handleGet(String region, List<String> args) {
@@ -683,6 +681,63 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
         String pattern = args.isEmpty() ? "*" : args.get(0);
         Set<String> keys = cacheService.keys(region, pattern);
         return RedisResponse.arrayFromStrings(new ArrayList<>(keys));
+    }
+    
+    /**
+     * Handle SCAN command - iterate through keys with cursor-based pagination.
+     * Syntax: SCAN cursor [MATCH pattern] [COUNT count]
+     * Returns: [nextCursor, [key1, key2, ...]]
+     */
+    private RedisResponse handleScan(String region, List<String> args) {
+        int cursor = 0;
+        String pattern = "*";
+        int count = 10;
+        
+        // Parse cursor (first argument)
+        if (!args.isEmpty()) {
+            try {
+                cursor = Integer.parseInt(args.get(0));
+            } catch (NumberFormatException e) {
+                return RedisResponse.error("invalid cursor");
+            }
+        }
+        
+        // Parse optional MATCH and COUNT
+        for (int i = 1; i < args.size() - 1; i++) {
+            String option = args.get(i).toUpperCase();
+            if ("MATCH".equals(option) && i + 1 < args.size()) {
+                pattern = args.get(i + 1);
+                i++;
+            } else if ("COUNT".equals(option) && i + 1 < args.size()) {
+                try {
+                    count = Integer.parseInt(args.get(i + 1));
+                } catch (NumberFormatException e) {
+                    return RedisResponse.error("invalid COUNT value");
+                }
+                i++;
+            }
+        }
+        
+        // Get all matching keys
+        Set<String> allKeys = cacheService.keys(region, pattern);
+        List<String> keyList = new ArrayList<>(allKeys);
+        
+        // Calculate pagination
+        int startIndex = cursor;
+        int endIndex = Math.min(startIndex + count, keyList.size());
+        int nextCursor = endIndex >= keyList.size() ? 0 : endIndex;
+        
+        // Get keys for this batch
+        List<String> batchKeys = startIndex < keyList.size() 
+            ? keyList.subList(startIndex, endIndex) 
+            : new ArrayList<>();
+        
+        // Build response: [nextCursor, [keys...]]
+        List<RedisResponse> response = new ArrayList<>();
+        response.add(RedisResponse.bulkString(String.valueOf(nextCursor)));
+        response.add(RedisResponse.arrayFromStrings(batchKeys));
+        
+        return RedisResponse.array(response);
     }
     
     private RedisResponse handleRename(String region, List<String> args) {

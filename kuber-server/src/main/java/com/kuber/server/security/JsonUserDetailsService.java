@@ -25,7 +25,12 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -33,6 +38,8 @@ import java.util.stream.Collectors;
 /**
  * Simple user details service that reads users from a JSON file.
  * Uses cleartext password comparison for simplicity.
+ * 
+ * @version 1.6.5 - Added secure folder creation and required users.json validation
  */
 @Slf4j
 @Service
@@ -53,11 +60,59 @@ public class JsonUserDetailsService implements UserDetailsService {
     
     @PostConstruct
     public void loadUsers() {
+        // Step 1: Ensure secure folder exists (v1.6.4)
+        ensureSecureFolderExists();
+        
+        // Step 2: Load users from file
+        loadUsersFromFile();
+    }
+    
+    /**
+     * Ensure the secure folder exists, create if necessary.
+     * @since 1.6.5
+     */
+    private void ensureSecureFolderExists() {
+        String secureFolder = properties.getSecure().getFolder();
+        Path securePath = Paths.get(secureFolder);
+        
+        if (!Files.exists(securePath)) {
+            try {
+                Files.createDirectories(securePath);
+                log.info("Created secure folder: {}", securePath.toAbsolutePath());
+            } catch (Exception e) {
+                log.error("Failed to create secure folder '{}': {}", secureFolder, e.getMessage());
+                throw new IllegalStateException("Cannot create secure folder: " + secureFolder, e);
+            }
+        } else {
+            log.info("Secure folder exists: {}", securePath.toAbsolutePath());
+        }
+    }
+    
+    /**
+     * Load users from JSON file. Fails if file is missing.
+     * @since 1.6.5 - Now fails startup if users.json is missing
+     */
+    private void loadUsersFromFile() {
+        String usersFilePath = properties.getSecurity().getUsersFile();
+        log.info("Loading users from: {}", usersFilePath);
+        
         try {
-            String usersFilePath = properties.getSecurity().getUsersFile();
-            log.info("Loading users from: {}", usersFilePath);
+            InputStream inputStream;
             
-            InputStream inputStream = resourceLoader.getResource(usersFilePath).getInputStream();
+            // Check if it's a file path or classpath resource
+            if (usersFilePath.startsWith("classpath:")) {
+                inputStream = resourceLoader.getResource(usersFilePath).getInputStream();
+            } else {
+                // File system path
+                File usersFile = new File(usersFilePath);
+                if (!usersFile.exists()) {
+                    // CRITICAL: users.json is REQUIRED - fail startup (v1.6.4)
+                    logMissingUsersFileWarning(usersFilePath, usersFile.getAbsolutePath());
+                    throw new IllegalStateException("Required file missing: " + usersFilePath);
+                }
+                inputStream = new FileInputStream(usersFile);
+            }
+            
             JsonNode root = objectMapper.readTree(inputStream);
             JsonNode usersNode = root.get("users");
             
@@ -82,19 +137,65 @@ public class JsonUserDetailsService implements UserDetailsService {
                 }
             }
             
-            log.info("Loaded {} users from {}", usersCache.size(), usersFilePath);
+            if (usersCache.isEmpty()) {
+                throw new IllegalStateException("No users found in " + usersFilePath + ". At least one user is required.");
+            }
             
+            log.info("Loaded {} users from {}", usersCache.size(), usersFilePath);
+            inputStream.close();
+            
+        } catch (IllegalStateException e) {
+            // Re-throw startup failures
+            throw e;
         } catch (Exception e) {
-            log.error("Failed to load users from file: {}", e.getMessage());
-            // Create a default admin user if file loading fails
-            JsonUser admin = new JsonUser();
-            admin.setUserId("admin");
-            admin.setPassword("admin123");
-            admin.setFullName("Default Administrator");
-            admin.setRoles(Arrays.asList("ADMIN", "OPERATOR", "USER"));
-            usersCache.put("admin", admin);
-            log.warn("Using default admin user due to file load failure");
+            log.error("Failed to load users from file '{}': {}", usersFilePath, e.getMessage());
+            throw new IllegalStateException("Failed to load users from " + usersFilePath + ": " + e.getMessage(), e);
         }
+    }
+    
+    /**
+     * Log a big, bold, unmistakable warning about missing users.json.
+     */
+    private void logMissingUsersFileWarning(String configuredPath, String absolutePath) {
+        log.error("");
+        log.error("╔═══════════════════════════════════════════════════════════════════════════════════════════════╗");
+        log.error("║                                                                                               ║");
+        log.error("║    ██╗   ██╗███████╗███████╗██████╗ ███████╗         ██╗███████╗ ██████╗ ███╗   ██╗           ║");
+        log.error("║    ██║   ██║██╔════╝██╔════╝██╔══██╗██╔════╝         ██║██╔════╝██╔═══██╗████╗  ██║           ║");
+        log.error("║    ██║   ██║███████╗█████╗  ██████╔╝███████╗         ██║███████╗██║   ██║██╔██╗ ██║           ║");
+        log.error("║    ██║   ██║╚════██║██╔══╝  ██╔══██╗╚════██║    ██   ██║╚════██║██║   ██║██║╚██╗██║           ║");
+        log.error("║    ╚██████╔╝███████║███████╗██║  ██║███████║    ╚█████╔╝███████║╚██████╔╝██║ ╚████║           ║");
+        log.error("║     ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝     ╚════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═══╝           ║");
+        log.error("║                                                                                               ║");
+        log.error("║          ███╗   ███╗██╗███████╗███████╗██╗███╗   ██╗ ██████╗ ██╗                              ║");
+        log.error("║          ████╗ ████║██║██╔════╝██╔════╝██║████╗  ██║██╔════╝ ██║                              ║");
+        log.error("║          ██╔████╔██║██║███████╗███████╗██║██╔██╗ ██║██║  ███╗██║                              ║");
+        log.error("║          ██║╚██╔╝██║██║╚════██║╚════██║██║██║╚██╗██║██║   ██║╚═╝                              ║");
+        log.error("║          ██║ ╚═╝ ██║██║███████║███████║██║██║ ╚████║╚██████╔╝██╗                              ║");
+        log.error("║          ╚═╝     ╚═╝╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝                              ║");
+        log.error("║                                                                                               ║");
+        log.error("║    ⚠️  CRITICAL ERROR: USERS.JSON NOT FOUND! APPLICATION CANNOT START!  ⚠️                    ║");
+        log.error("║                                                                                               ║");
+        log.error("║    Configured: {}", String.format("%-78s║", configuredPath));
+        log.error("║    Absolute:   {}", String.format("%-78s║", absolutePath));
+        log.error("║                                                                                               ║");
+        log.error("║    The users.json file is REQUIRED for Kuber to start.                                       ║");
+        log.error("║    Please create this file with at least one user.                                           ║");
+        log.error("║                                                                                               ║");
+        log.error("║    Example users.json:                                                                        ║");
+        log.error("║    {                                                                                          ║");
+        log.error("║      \"users\": [                                                                              ║");
+        log.error("║        {                                                                                      ║");
+        log.error("║          \"userId\": \"admin\",                                                                  ║");
+        log.error("║          \"password\": \"your-secure-password\",                                                 ║");
+        log.error("║          \"fullName\": \"Administrator\",                                                        ║");
+        log.error("║          \"roles\": [\"ADMIN\", \"OPERATOR\", \"USER\"]                                             ║");
+        log.error("║        }                                                                                      ║");
+        log.error("║      ]                                                                                        ║");
+        log.error("║    }                                                                                          ║");
+        log.error("║                                                                                               ║");
+        log.error("╚═══════════════════════════════════════════════════════════════════════════════════════════════╝");
+        log.error("");
     }
     
     @Override
@@ -132,11 +233,58 @@ public class JsonUserDetailsService implements UserDetailsService {
     }
     
     /**
-     * Reload users from file
+     * Reload users from file.
+     * Does not throw exceptions - logs errors instead.
      */
     public void reloadUsers() {
-        usersCache.clear();
-        loadUsers();
+        String usersFilePath = properties.getSecurity().getUsersFile();
+        File usersFile = new File(usersFilePath);
+        
+        if (!usersFile.exists()) {
+            log.error("Cannot reload users - file not found: {}", usersFilePath);
+            logMissingUsersFileWarning(usersFilePath, usersFile.getAbsolutePath());
+            return;
+        }
+        
+        Map<String, JsonUser> newUsersCache = new ConcurrentHashMap<>();
+        
+        try (InputStream inputStream = new FileInputStream(usersFile)) {
+            JsonNode root = objectMapper.readTree(inputStream);
+            JsonNode usersNode = root.get("users");
+            
+            if (usersNode != null && usersNode.isArray()) {
+                for (JsonNode userNode : usersNode) {
+                    JsonUser user = new JsonUser();
+                    user.setUserId(userNode.get("userId").asText());
+                    user.setPassword(userNode.get("password").asText());
+                    user.setFullName(userNode.get("fullName").asText());
+                    
+                    List<String> roles = new ArrayList<>();
+                    JsonNode rolesNode = userNode.get("roles");
+                    if (rolesNode != null && rolesNode.isArray()) {
+                        for (JsonNode roleNode : rolesNode) {
+                            roles.add(roleNode.asText());
+                        }
+                    }
+                    user.setRoles(roles);
+                    
+                    newUsersCache.put(user.getUserId().toLowerCase(), user);
+                }
+            }
+            
+            if (newUsersCache.isEmpty()) {
+                log.error("No users found in {}. Keeping existing users.", usersFilePath);
+                return;
+            }
+            
+            // Only replace cache if we successfully loaded users
+            usersCache.clear();
+            usersCache.putAll(newUsersCache);
+            log.info("Reloaded {} users from {}", usersCache.size(), usersFilePath);
+            
+        } catch (Exception e) {
+            log.error("Failed to reload users from '{}': {}. Keeping existing users.", usersFilePath, e.getMessage());
+        }
     }
     
     /**

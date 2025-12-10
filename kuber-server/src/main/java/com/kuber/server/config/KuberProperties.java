@@ -44,12 +44,20 @@ public class KuberProperties {
     private Base base = new Base();
     
     /**
+     * Secure folder for sensitive configuration files (users.json, apikeys.json).
+     * This folder will be created automatically if it doesn't exist.
+     * Default: ./secure
+     * @since 1.6.5
+     */
+    private Secure secure = new Secure();
+    
+    /**
      * Application version.
      * Read from application.properties: kuber.version
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.6.3";
+    private String version = "1.6.5";
     
     /**
      * Unique node identifier
@@ -114,6 +122,20 @@ public class KuberProperties {
          * Default: ./kuberdata
          */
         private String datadir = "./kuberdata";
+    }
+    
+    /**
+     * Secure folder configuration for sensitive files.
+     * @since 1.6.5
+     */
+    @Data
+    public static class Secure {
+        /**
+         * Folder for sensitive configuration files (users.json, apikeys.json).
+         * This folder will be created automatically if it doesn't exist.
+         * Default: ./secure
+         */
+        private String folder = "./secure";
     }
     
     @Data

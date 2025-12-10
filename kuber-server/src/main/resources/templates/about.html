@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.6.3</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.6.5</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -149,7 +149,7 @@
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
                             Multi-destination support with centralized broker configuration.
                         </p>
-                        <span class="badge bg-light text-dark">v1.6.3</span>
+                        <span class="badge bg-light text-dark">v1.6.5</span>
                     </div>
                 </div>
             </div>
@@ -365,8 +365,32 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.6.3</span>
-                                    <span class="text-muted small">Current - Streaming Startup & Shutdown Safety</span>
+                                    <span class="badge bg-primary me-2">v1.6.5</span>
+                                    <span class="text-muted small">Current - API Key Only Authentication</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>BREAKING</strong>: All programmatic access requires API Key (username/password only for Web UI)</li>
+                                    <li><strong>Redis Protocol</strong>: Only AUTH kub_xxx or AUTH APIKEY kub_xxx accepted</li>
+                                    <li><strong>REST API</strong>: Only X-API-Key header authentication</li>
+                                    <li><strong>Clients Updated</strong>: Java and Python clients now require api_key parameter</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.6.4</span>
+                                    <span class="text-muted small">Secure Folder Configuration</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Secure Folder</strong>: New kuber.secure.folder property for sensitive files (default: ./secure)</li>
+                                    <li><strong>Auto-Create</strong>: Secure folder created automatically if missing</li>
+                                    <li><strong>Required users.json</strong>: Application fails to start if users.json missing (no default admin)</li>
+                                    <li><strong>Security Paths</strong>: users.json and apikeys.json moved to ${kuber.secure.folder}</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.6.3</span>
+                                    <span class="text-muted small">Streaming Startup & Shutdown Safety</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Streaming Startup</strong>: Large databases load without timeout/OOM (uses forEachEntry)</li>

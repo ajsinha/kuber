@@ -11,6 +11,7 @@
  */
 package com.kuber.server.security;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,7 +25,7 @@ import java.util.List;
  * API keys can be used by REST clients, Python clients, and Java clients
  * as an alternative to username/password authentication.
  *
- * @version 1.5.0
+ * @version 1.6.5
  */
 @Data
 @Builder
@@ -78,8 +79,10 @@ public class ApiKey {
     private boolean active;
     
     /**
-     * Check if the key has expired
+     * Check if the key has expired.
+     * Not serialized to JSON - computed property.
      */
+    @JsonIgnore
     public boolean isExpired() {
         if (expiresAt == null) {
             return false;
@@ -88,8 +91,10 @@ public class ApiKey {
     }
     
     /**
-     * Check if the key is valid (active and not expired)
+     * Check if the key is valid (active and not expired).
+     * Not serialized to JSON - computed property.
      */
+    @JsonIgnore
     public boolean isValid() {
         return active && !isExpired();
     }

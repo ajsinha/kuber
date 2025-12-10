@@ -1,0 +1,24 @@
+[
+  {
+    "keyId": "key-admin-001",
+    "keyValue": "kub_admin_sample_key_replace_me",
+    "name": "Admin API Key",
+    "userId": "admin",
+    "roles": ["ADMIN", "OPERATOR", "USER"],
+    "active": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "expiresAt": null,
+    "lastUsedAt": null
+  },
+  {
+    "keyId": "key-app-001",
+    "keyValue": "kub_app_sample_key_replace_me",
+    "name": "Application API Key",
+    "userId": "app-service",
+    "roles": ["USER"],
+    "active": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "expiresAt": null,
+    "lastUsedAt": null
+  }
+]

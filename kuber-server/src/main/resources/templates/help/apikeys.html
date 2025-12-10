@@ -25,10 +25,10 @@
             <div class="col-lg-10 mx-auto">
                 <h1 class="display-5 mb-4"><i class="fas fa-key me-3 text-warning"></i>API Key Authentication</h1>
                 
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.5.0</strong> - API keys provide secure, revocable authentication for programmatic access 
-                    to <span th:text="${appName} ?: 'Kuber'">Kuber</span>.
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>v1.6.5: API Key Required for All Programmatic Access</strong><br>
+                    All client applications (Java, Python, CLI) must use API keys. Username/password is only for Web UI.
                 </div>
 
                 <!-- Overview -->
@@ -112,34 +112,35 @@ AUTH APIKEY kub_your_api_key_here
 # Or directly with the key
 AUTH kub_your_api_key_here</code></pre>
                     
-                    <h4 class="mt-4">Python Client</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient
+                    <h4 class="mt-4">Python Client (v1.6.5)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient, KuberRestClient
 
-# Using API key
-client = KuberClient(
-    host="localhost",
-    port=8080,
-    api_key="kub_your_api_key_here"
-)
+# Redis Protocol Client
+client = KuberClient('localhost', 6380, api_key='kub_your_api_key_here')
+client.set('key', 'value')
+value = client.get('key')
 
-# Or for Redis protocol
+# REST API Client
+rest_client = KuberRestClient('localhost', 8080, api_key='kub_your_api_key_here')
+rest_client.set('key', 'value')
+
+# Using redis-py
 import redis
-r = redis.Redis(host='localhost', port=6380)
-r.execute_command('AUTH', 'APIKEY', 'kub_your_api_key_here')
+r = redis.Redis(host='localhost', port=6380, decode_responses=True)
+r.execute_command('AUTH', 'kub_your_api_key_here')
 r.set('key', 'value')</code></pre>
                     
-                    <h4 class="mt-4">Java Client</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>// REST Client with API key
-KuberRestClient client = KuberRestClient.builder()
-    .host("localhost")
-    .port(8080)
-    .apiKey("kub_your_api_key_here")
-    .build();
-
+                    <h4 class="mt-4">Java Client (v1.6.5)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>// Redis Protocol Client
+KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key_here");
 client.set("key", "value");
 String value = client.get("key");
 
-// Redis Client with API key
+// REST API Client
+KuberRestClient restClient = new KuberRestClient("localhost", 8080, "kub_your_api_key_here");
+restClient.set("key", "value");
+
+// Using Jedis
 try (Jedis jedis = new Jedis("localhost", 6380)) {
     jedis.auth("kub_your_api_key_here");
     jedis.set("key", "value");
@@ -252,25 +253,92 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
                 <!-- Storage -->
                 <section class="mb-5">
                     <h2 class="border-bottom pb-2 mb-4">Storage and Security</h2>
-                    <p>API keys are stored in a JSON file. The location is configurable via <code>kuber.security.api-keys-file</code> property (default: <code>config/apikeys.json</code>). The file contains:</p>
-                    <pre class="bg-dark text-light p-3 rounded"><code>[
-  {
-    "keyId": "key_abc12345",
-    "keyValue": "kub_...",
-    "name": "Production API",
-    "userId": "admin",
-    "roles": ["USER", "OPERATOR"],
-    "createdAt": "2025-12-05T10:00:00Z",
-    "lastUsedAt": "2025-12-05T15:30:00Z",
-    "expiresAt": null,
-    "active": true
-  }
-]</code></pre>
+                    
+                    <div class="alert alert-success">
+                        <i class="fas fa-folder-open me-2"></i>
+                        <strong>v1.6.5 Secure Folder:</strong> Security files are stored in a dedicated secure folder.
+                    </div>
+                    
+                    <h4>File Locations</h4>
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr><th>File</th><th>Default Path</th><th>Configuration Property</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>users.json</code></td>
+                                <td><code>./secure/users.json</code></td>
+                                <td><code>kuber.security.users-file</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>apikeys.json</code></td>
+                                <td><code>./secure/apikeys.json</code></td>
+                                <td><code>kuber.security.api-keys-file</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="mt-4">Configuration</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code># application.properties
+# Secure folder - created automatically if missing
+kuber.secure.folder=./secure
+
+# Security files (use ${kuber.secure.folder} for relative paths)
+kuber.security.users-file=${kuber.secure.folder}/users.json
+kuber.security.api-keys-file=${kuber.secure.folder}/apikeys.json</code></pre>
+                    
+                    <h4 class="mt-4">users.json (REQUIRED)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+  "users": [
+    {
+      "userId": "admin",
+      "password": "your-secure-password",
+      "fullName": "Administrator",
+      "roles": ["ADMIN", "OPERATOR", "USER"]
+    },
+    {
+      "userId": "operator",
+      "password": "operator-password",
+      "fullName": "System Operator",
+      "roles": ["OPERATOR", "USER"]
+    }
+  ]
+}</code></pre>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>Required:</strong> The <code>users.json</code> file is REQUIRED. If missing, Kuber will fail to start with an error message.
+                    </div>
+                    
+                    <h4 class="mt-4">apikeys.json</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+  "keys": [
+    {
+      "keyId": "key_abc12345",
+      "keyValue": "kub_a1b2c3d4e5f6...",
+      "name": "Production API",
+      "userId": "admin",
+      "roles": ["USER", "OPERATOR"],
+      "createdAt": "2025-12-05T10:00:00Z",
+      "lastUsedAt": "2025-12-05T15:30:00Z",
+      "expiresAt": null,
+      "enabled": true
+    }
+  ]
+}</code></pre>
+                    
                     <div class="alert alert-warning">
                         <i class="fas fa-lock me-2"></i>
-                        <strong>Security:</strong> Ensure proper file system permissions on the apikeys.json file. 
+                        <strong>Security:</strong> Ensure proper file system permissions on the secure folder. 
                         Only the Kuber server process should have read/write access.
                     </div>
+                    
+                    <h4 class="mt-4">Sample Files</h4>
+                    <p>Sample configuration files are provided in <code>src/main/resources/secure-sample/</code>:</p>
+                    <ul>
+                        <li><code>users.json.sample</code> - Example users configuration</li>
+                        <li><code>apikeys.json.sample</code> - Example API keys configuration</li>
+                    </ul>
+                    <p>Copy these to your <code>./secure</code> folder and rename (remove <code>.sample</code>).</p>
                 </section>
             </div>
         </div>

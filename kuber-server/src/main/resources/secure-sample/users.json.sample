@@ -1,0 +1,24 @@
+{
+  "_comment": "Copy this file to ${kuber.secure.folder}/users.json (default: ./secure/users.json)",
+  "_warning": "Change passwords before production use!",
+  "users": [
+    {
+      "userId": "admin",
+      "password": "admin123",
+      "fullName": "Administrator",
+      "roles": ["ADMIN", "OPERATOR", "USER"]
+    },
+    {
+      "userId": "operator",
+      "password": "operator123",
+      "fullName": "System Operator",
+      "roles": ["OPERATOR", "USER"]
+    },
+    {
+      "userId": "user",
+      "password": "user123",
+      "fullName": "Regular User",
+      "roles": ["USER"]
+    }
+  ]
+}

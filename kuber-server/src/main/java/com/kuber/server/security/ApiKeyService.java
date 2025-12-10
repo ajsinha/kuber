@@ -88,7 +88,8 @@ public class ApiKeyService {
     }
     
     /**
-     * Load API keys from file
+     * Load API keys from file.
+     * If file is missing, creates an empty one with a big warning.
      */
     private void loadApiKeys() {
         keyValueCache.clear();
@@ -96,7 +97,8 @@ public class ApiKeyService {
         
         File file = apiKeysFilePath.toFile();
         if (!file.exists()) {
-            log.info("No API keys file found at {}, starting with empty key store", apiKeysFilePath);
+            logMissingFileWarning();
+            createEmptyApiKeysFile(file);
             return;
         }
         
@@ -109,6 +111,53 @@ public class ApiKeyService {
             log.info("Loaded {} API keys from {}", keys.size(), apiKeysFilePath);
         } catch (IOException e) {
             log.error("Failed to load API keys: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Log a big, bold, unmistakable warning about missing apikeys.json.
+     */
+    private void logMissingFileWarning() {
+        String filePath = apiKeysFilePath.toString();
+        
+        log.error("");
+        log.error("╔═══════════════════════════════════════════════════════════════════════════════════════════════╗");
+        log.error("║                                                                                               ║");
+        log.error("║     █████╗ ██████╗ ██╗    ██╗  ██╗███████╗██╗   ██╗███████╗    ███╗   ███╗██╗███████╗███████╗ ║");
+        log.error("║    ██╔══██╗██╔══██╗██║    ██║ ██╔╝██╔════╝╚██╗ ██╔╝██╔════╝    ████╗ ████║██║██╔════╝██╔════╝ ║");
+        log.error("║    ███████║██████╔╝██║    █████╔╝ █████╗   ╚████╔╝ ███████╗    ██╔████╔██║██║███████╗███████╗ ║");
+        log.error("║    ██╔══██║██╔═══╝ ██║    ██╔═██╗ ██╔══╝    ╚██╔╝  ╚════██║    ██║╚██╔╝██║██║╚════██║╚════██║ ║");
+        log.error("║    ██║  ██║██║     ██║    ██║  ██╗███████╗   ██║   ███████║    ██║ ╚═╝ ██║██║███████║███████║ ║");
+        log.error("║    ╚═╝  ╚═╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝    ╚═╝     ╚═╝╚═╝╚══════╝╚══════╝ ║");
+        log.error("║                                                                                               ║");
+        log.error("║    ⚠️  WARNING: API KEYS FILE NOT FOUND!  ⚠️                                                  ║");
+        log.error("║                                                                                               ║");
+        log.error("║    Location: {}", String.format("%-80s║", filePath));
+        log.error("║                                                                                               ║");
+        log.error("║    IMPACT:                                                                                    ║");
+        log.error("║    • All programmatic access (Redis protocol, REST API, clients) will FAIL                   ║");
+        log.error("║    • API Key authentication is REQUIRED as of v1.6.5                                         ║");
+        log.error("║                                                                                               ║");
+        log.error("║    ACTION REQUIRED:                                                                           ║");
+        log.error("║    1. Log into Web UI with username/password                                                  ║");
+        log.error("║    2. Navigate to Admin → API Keys                                                            ║");
+        log.error("║    3. Click 'Generate New Key' to create API keys                                             ║");
+        log.error("║                                                                                               ║");
+        log.error("║    An empty apikeys.json file will be created automatically.                                  ║");
+        log.error("║                                                                                               ║");
+        log.error("╚═══════════════════════════════════════════════════════════════════════════════════════════════╝");
+        log.error("");
+    }
+    
+    /**
+     * Create an empty apikeys.json file.
+     */
+    private void createEmptyApiKeysFile(File file) {
+        try {
+            objectMapper.writeValue(file, new ArrayList<ApiKey>());
+            log.info("Created empty API keys file at: {}", apiKeysFilePath);
+        } catch (IOException e) {
+            log.error("Failed to create empty API keys file: {}", e.getMessage());
         }
     }
     

@@ -26,8 +26,9 @@
                 <h1 class="display-5 mb-4"><i class="fab fa-java me-3 text-danger"></i>Java Client</h1>
                 
                 <div class="alert alert-warning">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Kuber is compatible with standard Java Redis clients like Jedis and Lettuce. You can also use Java's HttpClient for REST API access.
+                    <i class="fas fa-key me-2"></i>
+                    <strong>v1.6.5: API Key Authentication Required</strong><br>
+                    All programmatic access requires an API key. Create one in <a href="/admin/apikeys">Admin → API Keys</a>.
                 </div>
 
                 <!-- Table of Contents -->
@@ -39,17 +40,16 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <ul class="list-unstyled mb-0">
-                                    <li><a href="#dependencies">Maven Dependencies</a></li>
-                                    <li><a href="#jedis">Jedis Examples</a></li>
-                                    <li><a href="#rest-api">REST API with HttpClient</a></li>
-                                    <li><a href="#region-management">Region Management</a></li>
+                                    <li><a href="#redis-client">Redis Protocol Client</a></li>
+                                    <li><a href="#rest-client">REST API Client</a></li>
+                                    <li><a href="#jedis">Using Jedis</a></li>
+                                    <li><a href="#json-ops">JSON Operations</a></li>
                                 </ul>
                             </div>
                             <div class="col-md-6">
                                 <ul class="list-unstyled mb-0">
-                                    <li><a href="#json-ops">JSON Operations</a></li>
-                                    <li><a href="#generic-search">Generic Search API</a></li>
-                                    <li><a href="#spring-boot">Spring Boot Integration</a></li>
+                                    <li><a href="#standalone">Standalone Client Files</a></li>
+                                    <li><a href="#regions">Region Management</a></li>
                                     <li><a href="#complete-example">Complete Example</a></li>
                                 </ul>
                             </div>
@@ -57,77 +57,118 @@
                     </div>
                 </div>
 
-                <!-- Maven Dependencies -->
-                <section id="dependencies" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-cube me-2"></i>Maven Dependencies</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>&lt;!-- Using Jedis --&gt;
-&lt;dependency&gt;
-    &lt;groupId&gt;redis.clients&lt;/groupId&gt;
-    &lt;artifactId&gt;jedis&lt;/artifactId&gt;
-    &lt;version&gt;5.1.0&lt;/version&gt;
-&lt;/dependency&gt;
-
-&lt;!-- Jackson for JSON --&gt;
-&lt;dependency&gt;
-    &lt;groupId&gt;com.fasterxml.jackson.core&lt;/groupId&gt;
-    &lt;artifactId&gt;jackson-databind&lt;/artifactId&gt;
-    &lt;version&gt;2.15.2&lt;/version&gt;
-&lt;/dependency&gt;</code></pre>
-                </section>
-
-                <!-- Jedis Examples -->
-                <section id="jedis" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Jedis Examples</h3>
+                <!-- Redis Protocol Client -->
+                <section id="redis-client" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-plug me-2"></i>Redis Protocol Client (KuberClient)</h3>
                     
-                    <h4>Password Authentication</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
+                    <h4>Maven Dependency</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>&lt;dependency&gt;
+    &lt;groupId&gt;com.kuber&lt;/groupId&gt;
+    &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
+    &lt;version&gt;1.6.5-SNAPSHOT&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+                    <h4 class="mt-4">Basic Usage</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import com.kuber.client.KuberClient;
 
 public class KuberExample {
-    public static void main(String[] args) {
-        try (Jedis jedis = new Jedis("localhost", 6379)) {
-            jedis.auth("admin123");
-            
+    public static void main(String[] args) throws Exception {
+        // API Key required (get from Admin → API Keys)
+        String apiKey = "kub_your_api_key_here";
+        
+        try (KuberClient client = new KuberClient("localhost", 6380, apiKey)) {
             // Test connection
-            System.out.println("PING: " + jedis.ping());
+            System.out.println("PING: " + client.ping());
             
             // String operations
-            jedis.set("user:1001", "John Doe");
-            String name = jedis.get("user:1001");
+            client.set("user:1001", "John Doe");
+            String name = client.get("user:1001");
             System.out.println("User: " + name);
             
-            // Set with TTL
-            jedis.setex("session:abc", 3600, "session-data");
+            // Set with TTL (30 minutes)
+            client.set("session:abc", "session-data", Duration.ofMinutes(30));
             
             // Check TTL
-            long ttl = jedis.ttl("session:abc");
+            long ttl = client.ttl("session:abc");
             System.out.println("TTL: " + ttl + " seconds");
             
-            // Key pattern
-            Set&lt;String&gt; keys = jedis.keys("user:*");
-            System.out.println("Keys: " + keys);
-            
             // Delete
-            jedis.del("user:1001");
+            client.delete("user:1001");
         }
     }
 }</code></pre>
+
+                    <h4 class="mt-4">Constructor Options</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>// Basic - API key required
+KuberClient client = new KuberClient("localhost", 6380, "kub_xxx");
+
+// With custom timeout (5 minutes)
+KuberClient client = new KuberClient("localhost", 6380, "kub_xxx", 300000);</code></pre>
+                </section>
+
+                <!-- REST API Client -->
+                <section id="rest-client" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-cloud me-2"></i>REST API Client (KuberRestClient)</h3>
                     
-                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
+                    <h4>Basic Usage</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import com.kuber.client.KuberRestClient;
+
+public class RestExample {
+    public static void main(String[] args) throws Exception {
+        // API Key required (get from Admin → API Keys)
+        String apiKey = "kub_your_api_key_here";
+        
+        KuberRestClient client = new KuberRestClient("localhost", 8080, apiKey);
+        
+        // Server info
+        System.out.println("Info: " + client.info());
+        
+        // String operations
+        client.set("key1", "value1");
+        String value = client.get("key1");
+        System.out.println("Value: " + value);
+        
+        // Set with TTL (1 hour = 3600 seconds)
+        client.set("temp:key", "temp-value", 3600);
+        
+        client.close();
+    }
+}</code></pre>
+
+                    <h4 class="mt-4">Constructor Options</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>// Basic - API key required
+KuberRestClient client = new KuberRestClient("localhost", 8080, "kub_xxx");
+
+// With SSL
+KuberRestClient client = new KuberRestClient("localhost", 8443, "kub_xxx", true);
+
+// With SSL and custom timeout
+KuberRestClient client = new KuberRestClient("localhost", 8443, "kub_xxx", true, 60000);</code></pre>
+                </section>
+
+                <!-- Using Jedis -->
+                <section id="jedis" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Using Jedis</h3>
+                    
+                    <h4>Maven Dependency</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>&lt;dependency&gt;
+    &lt;groupId&gt;redis.clients&lt;/groupId&gt;
+    &lt;artifactId&gt;jedis&lt;/artifactId&gt;
+    &lt;version&gt;5.1.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+                    <h4 class="mt-4">Basic Usage with API Key</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>import redis.clients.jedis.Jedis;
 
-public class KuberApiKeyExample {
+public class JedisExample {
     public static void main(String[] args) {
         String apiKey = "kub_your_api_key_here";
         
         try (Jedis jedis = new Jedis("localhost", 6380)) {
-            // Authenticate with API Key
+            // Authenticate with API key
             jedis.auth(apiKey);
-            // Or use: jedis.sendCommand(() -> "AUTH", "APIKEY", apiKey);
             
-            // Test connection
-            System.out.println("PING: " + jedis.ping());
-            
-            // Use normally
+            // Now use normally
             jedis.set("key", "value");
             String value = jedis.get("key");
             System.out.println("Value: " + value);
@@ -136,349 +177,238 @@ public class KuberApiKeyExample {
 }</code></pre>
                 </section>
 
-                <!-- REST API -->
-                <section id="rest-api" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-cloud me-2"></i>REST API with HttpClient</h3>
-                    <div class="alert alert-success">
-                        <i class="fas fa-rocket me-2"></i><strong>Recommended:</strong> Copy the KuberRestApi class below for all REST operations.
-                    </div>
-                    
-                    <h4>Password Authentication</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.URI;
-import java.time.Duration;
-import java.util.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-
-public class KuberRestApi {
-    private final String baseUrl;
-    private final HttpClient client;
-    private final String authHeader;
-    private final ObjectMapper mapper;
-    
-    public KuberRestApi(String host, int port, String username, String password) {
-        this.baseUrl = String.format("http://%s:%d/api", host, port);
-        this.client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .build();
-        this.authHeader = "Basic " + Base64.getEncoder()
-            .encodeToString((username + ":" + password).getBytes());
-        this.mapper = new ObjectMapper();
-    }
-    
-    public JsonNode get(String endpoint) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", authHeader)
-            .GET()
-            .build();
-        HttpResponse&lt;String&gt; response = client.send(request, 
-            HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 404) return null;
-        return response.body().isEmpty() ? null : mapper.readTree(response.body());
-    }
-    
-    public JsonNode post(String endpoint, Object body) throws Exception {
-        String json = body != null ? mapper.writeValueAsString(body) : "";
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", authHeader)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build();
-        HttpResponse&lt;String&gt; response = client.send(request, 
-            HttpResponse.BodyHandlers.ofString());
-        return response.body().isEmpty() ? null : mapper.readTree(response.body());
-    }
-    
-    public boolean put(String endpoint, Object body) throws Exception {
-        String json = body != null ? mapper.writeValueAsString(body) : "";
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", authHeader)
-            .header("Content-Type", "application/json")
-            .PUT(HttpRequest.BodyPublishers.ofString(json))
-            .build();
-        int status = client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
-        return status == 200 || status == 201;
-    }
-    
-    public boolean delete(String endpoint) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", authHeader)
-            .DELETE()
-            .build();
-        int status = client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
-        return status == 200 || status == 204;
-    }
-    
-    // Test connection
-    public boolean testConnection() {
-        try {
-            JsonNode info = get("/info");
-            if (info != null) {
-                System.out.println("Connected to Kuber v" + info.get("version").asText());
-                return true;
-            }
-        } catch (Exception e) {
-            System.err.println("Connection failed: " + e.getMessage());
-        }
-        return false;
-    }
-}</code></pre>
-                    
-                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.URI;
-import java.time.Duration;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-
-public class KuberApiKeyClient {
-    private final String baseUrl;
-    private final HttpClient client;
-    private final String apiKey;
-    private final ObjectMapper mapper;
-    
-    public KuberApiKeyClient(String host, int port, String apiKey) {
-        this.baseUrl = String.format("http://%s:%d/api", host, port);
-        this.client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .build();
-        this.apiKey = apiKey;
-        this.mapper = new ObjectMapper();
-    }
-    
-    public JsonNode get(String endpoint) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("X-API-Key", apiKey)  // API Key header
-            .GET()
-            .build();
-        HttpResponse&lt;String&gt; response = client.send(request, 
-            HttpResponse.BodyHandlers.ofString());
-        return mapper.readTree(response.body());
-    }
-    
-    public boolean put(String endpoint, Object body) throws Exception {
-        String json = body != null ? mapper.writeValueAsString(body) : "";
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("X-API-Key", apiKey)  // API Key header
-            .header("Content-Type", "application/json")
-            .PUT(HttpRequest.BodyPublishers.ofString(json))
-            .build();
-        int status = client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
-        return status == 200 || status == 201;
-    }
-    
-    public static void main(String[] args) throws Exception {
-        KuberApiKeyClient client = new KuberApiKeyClient(
-            "localhost", 8080, "kub_your_api_key_here"
-        );
-        
-        // Store and retrieve data
-        client.put("/cache/default/user:1", Map.of("name", "John"));
-        JsonNode user = client.get("/cache/default/user:1");
-        System.out.println("User: " + user);
-    }
-}</code></pre>
-                </section>
-
-                <!-- Region Management -->
-                <section id="region-management" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-layer-group me-2"></i>Region Management</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>KuberRestApi api = new KuberRestApi("localhost", 8080, "admin", "admin123");
-
-// List regions
-JsonNode regions = api.get("/regions");
-for (JsonNode r : regions) {
-    System.out.println("Region: " + r.get("name").asText());
-}
-
-// Create region
-api.post("/regions", Map.of("name", "customers", "description", "Customer data"));
-
-// Set attribute mapping
-api.put("/regions/customers/attributemapping", Map.of(
-    "firstName", "first_name",
-    "lastName", "last_name"
-));
-
-// Store data
-api.put("/cache/customers/cust:1001", Map.of(
-    "firstName", "John",
-    "lastName", "Doe"
-));
-// Stored as: {"first_name": "John", "last_name": "Doe"}
-
-// Get data
-JsonNode result = api.get("/cache/customers/cust:1001");
-System.out.println("Customer: " + result.get("value"));</code></pre>
-                </section>
-
                 <!-- JSON Operations -->
                 <section id="json-ops" class="mb-5">
                     <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>JSON Operations</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>// Store JSON document
-Map&lt;String, Object&gt; user = Map.of(
-    "name", "John Doe",
-    "age", 30,
-    "status", "active",
-    "address", Map.of(
-        "city", "New York",
-        "zip", "10001"
-    )
-);
-api.put("/cache/users/user:1001", user);
+                    
+                    <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
+    // Store JSON document
+    Map&lt;String, Object&gt; user = new HashMap&lt;&gt;();
+    user.put("name", "John Doe");
+    user.put("age", 30);
+    user.put("status", "active");
+    user.put("email", "john@company.com");
+    
+    client.jsonSet("user:1001", user);
+    
+    // Get JSON document
+    Map&lt;String, Object&gt; retrieved = client.jsonGet("user:1001");
+    System.out.println("User: " + retrieved);
+    
+    // Get specific path
+    String name = client.jsonGetPath("user:1001", "$.name");
+    System.out.println("Name: " + name);
+    
+    // Search JSON documents
+    List&lt;Map&lt;String, Object&gt;&gt; activeUsers = client.jsonSearch("$.status=active");
+    System.out.println("Active users: " + activeUsers.size());
+}</code></pre>
 
-// Get entire document
-JsonNode doc = api.get("/cache/users/user:1001");
-System.out.println("User: " + doc.get("value"));
+                    <h4 class="mt-4">JSON Search Operators</h4>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Operator</th>
+                                    <th>Example</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>=</code> or <code>==</code></td><td><code>$.status=active</code></td><td>Exact match</td></tr>
+                                <tr><td><code>!=</code> or <code>&lt;&gt;</code></td><td><code>$.status!=inactive</code></td><td>Not equal</td></tr>
+                                <tr><td><code>&gt;</code></td><td><code>$.age&gt;25</code></td><td>Greater than</td></tr>
+                                <tr><td><code>&lt;</code></td><td><code>$.price&lt;100</code></td><td>Less than</td></tr>
+                                <tr><td><code>&gt;=</code></td><td><code>$.salary&gt;=50000</code></td><td>Greater or equal</td></tr>
+                                <tr><td><code>&lt;=</code></td><td><code>$.stock&lt;=10</code></td><td>Less or equal</td></tr>
+                                <tr class="table-info"><td><code>~=</code></td><td><code>$.email~=.*@company\\.com</code></td><td><strong>Regex match</strong></td></tr>
+                                <tr><td><code>contains</code></td><td><code>$.name contains John</code></td><td>Substring match</td></tr>
+                                <tr><td><code>startsWith</code></td><td><code>$.name startsWith J</code></td><td>Prefix match</td></tr>
+                                <tr><td><code>endsWith</code></td><td><code>$.name endsWith son</code></td><td>Suffix match</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h5 class="mt-3">Regex Search Examples</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code>// Find users with company email
+List&lt;JsonNode&gt; results = client.jsonSearch("$.email~=.*@company\\.com");
 
-// Get specific path
-JsonNode city = api.get("/cache/users/user:1001/json?path=$.address.city");
-System.out.println("City: " + city);
+// Find names starting with 'J'
+results = client.jsonSearch("$.name~=^J.*");
 
-// JSON Search
-JsonNode results = api.post("/cache/users/jsearch", Map.of(
-    "query", "$.status=active"
-));
-System.out.println("Found: " + results.size() + " active users");</code></pre>
+// Find 5-digit zip codes
+results = client.jsonSearch("$.address.zip~=\\d{5}");
+
+// Combined search: Engineering dept AND name contains Smith
+results = client.jsonSearch("$.department=Engineering,$.name~=.*Smith.*");</code></pre>
                 </section>
 
-                <!-- Generic Search API -->
-                <section id="generic-search" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-search-plus me-2"></i>Generic Search API</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>// Key pattern search
-JsonNode results = api.post("/genericsearch", Map.of(
-    "region", "users",
-    "keypattern", "user:\\d+"
-));
+                <!-- Standalone Files -->
+                <section id="standalone" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-file-code me-2"></i>Standalone Client Files</h3>
+                    <p>Ready-to-use standalone Java files in the client module:</p>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-danger text-white">
+                                    <i class="fas fa-plug me-2"></i>Redis Protocol
+                                </div>
+                                <div class="card-body">
+                                    <h6>KuberClient.java</h6>
+                                    <p class="small text-muted">Full-featured Redis protocol client with all operations.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <i class="fas fa-cloud me-2"></i>REST API
+                                </div>
+                                <div class="card-body">
+                                    <h6>KuberRestClient.java</h6>
+                                    <p class="small text-muted">HTTP REST client using java.net.HttpURLConnection.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-info text-white">
+                                    <i class="fas fa-search me-2"></i>JSON Demo
+                                </div>
+                                <div class="card-body">
+                                    <h6>KuberJsonDemo.java</h6>
+                                    <p class="small text-muted">Demonstrates all JSON operations and search.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mt-3">Example Files</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code>kuber-client-java/
+├── src/main/java/com/kuber/client/
+│   ├── KuberClient.java          # Redis protocol client
+│   ├── KuberRestClient.java      # REST API client
+│   └── examples/
+│       ├── KuberJsonDemo.java    # JSON operations demo
+│       ├── KuberRedisExample.java # Redis protocol examples
+│       └── KuberRestExample.java  # REST API examples
+├── pom.xml
+└── README.md</code></pre>
 
-// Key pattern with field projection
-results = api.post("/genericsearch", Map.of(
-    "region", "users",
-    "keypattern", "user:.*",
-    "fields", List.of("name", "email"),
-    "limit", 100
-));
+                    <h5 class="mt-3">Running Examples</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Build the client
+cd kuber-client-java
+mvn clean package
 
-// JSON attribute search
-results = api.post("/genericsearch", Map.of(
-    "region", "users",
-    "type", "json",
-    "values", List.of(Map.of("status", "active"))
-));
+# Run JSON demo
+java -cp target/kuber-client-java-1.6.5.jar \
+    com.kuber.client.examples.KuberJsonDemo localhost 6380 kub_your_api_key
 
-// Combined search with projection
-results = api.post("/genericsearch", Map.of(
-    "region", "products",
-    "type", "json",
-    "values", List.of(Map.of("category", "Electronics")),
-    "fields", List.of("name", "price"),
-    "limit", 50
-));</code></pre>
+# Run Redis example
+java -cp target/kuber-client-java-1.6.5.jar \
+    com.kuber.client.examples.KuberRedisExample localhost 6380 kub_your_api_key
+
+# Run REST example
+java -cp target/kuber-client-java-1.6.5.jar \
+    com.kuber.client.examples.KuberRestExample localhost 8080 kub_your_api_key</code></pre>
+                    
+                    <div class="alert alert-secondary mt-3">
+                        <i class="fas fa-folder-open me-2"></i>
+                        <strong>Location:</strong> <code>kuber-client-java/</code> directory in the distribution archive.
+                    </div>
                 </section>
 
-                <!-- Spring Boot Integration -->
-                <section id="spring-boot" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-leaf me-2"></i>Spring Boot Integration</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>// application.yml
-spring:
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password: admin123
-
-// Configuration class
-@Configuration
-public class RedisConfig {
-    @Bean
-    public RedisTemplate&lt;String, Object&gt; redisTemplate(RedisConnectionFactory factory) {
-        RedisTemplate&lt;String, Object&gt; template = new RedisTemplate&lt;&gt;();
-        template.setConnectionFactory(factory);
-        template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
-        return template;
-    }
-}
-
-// Service class
-@Service
-public class UserService {
-    @Autowired
-    private RedisTemplate&lt;String, Object&gt; redisTemplate;
+                <!-- Region Management -->
+                <section id="regions" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-database me-2"></i>Region Management</h3>
+                    
+                    <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
+    // List regions
+    List&lt;String&gt; regions = client.listRegions();
+    System.out.println("Regions: " + regions);
     
-    public void saveUser(String id, User user) {
-        redisTemplate.opsForValue().set("user:" + id, user);
-    }
+    // Create a new region
+    client.createRegion("sessions", "User session storage");
     
-    public User getUser(String id) {
-        return (User) redisTemplate.opsForValue().get("user:" + id);
-    }
+    // Select region
+    client.selectRegion("sessions");
+    
+    // All operations now apply to 'sessions' region
+    client.set("sess:abc123", "session-data");
+    
+    // Switch back to default
+    client.selectRegion("default");
 }</code></pre>
                 </section>
 
                 <!-- Complete Example -->
                 <section id="complete-example" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>Complete Example: User Manager</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>public class KuberUserManager {
-    private final KuberRestApi api;
-    private final String region = "users";
+                    <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>Complete Example</h3>
+                    
+                    <pre class="bg-dark text-light p-3 rounded"><code>import com.kuber.client.KuberClient;
+import java.time.Duration;
+import java.util.*;
+
+public class KuberCompleteExample {
     
-    public KuberUserManager(String host, int port, String user, String pass) {
-        this.api = new KuberRestApi(host, port, user, pass);
-        setupRegion();
-    }
+    // Get API key from environment or config
+    private static final String API_KEY = System.getenv("KUBER_API_KEY");
     
-    private void setupRegion() {
-        try {
-            api.post("/regions", Map.of("name", region));
-            api.put("/regions/" + region + "/attributemapping", Map.of(
-                "firstName", "first_name",
-                "lastName", "last_name"
-            ));
-        } catch (Exception e) { /* Region may exist */ }
-    }
-    
-    public boolean createUser(String id, Map&lt;String, Object&gt; data) throws Exception {
-        return api.put("/cache/" + region + "/user:" + id, data);
-    }
-    
-    public JsonNode getUser(String id) throws Exception {
-        JsonNode result = api.get("/cache/" + region + "/user:" + id);
-        return result != null ? result.get("value") : null;
-    }
-    
-    public List&lt;JsonNode&gt; findByStatus(String status) throws Exception {
-        JsonNode results = api.post("/genericsearch", Map.of(
-            "region", region,
-            "type", "json",
-            "values", List.of(Map.of("status", status))
-        ));
-        List&lt;JsonNode&gt; users = new ArrayList&lt;&gt;();
-        if (results != null) {
-            for (JsonNode n : results) users.add(n);
+    public static void main(String[] args) {
+        if (API_KEY == null || !API_KEY.startsWith("kub_")) {
+            System.err.println("Set KUBER_API_KEY environment variable");
+            System.exit(1);
         }
-        return users;
-    }
-    
-    public static void main(String[] args) throws Exception {
-        KuberUserManager mgr = new KuberUserManager("localhost", 8080, "admin", "admin123");
-        mgr.createUser("1001", Map.of("firstName", "John", "lastName", "Doe", "status", "active"));
-        System.out.println("User: " + mgr.getUser("1001"));
-        System.out.println("Active: " + mgr.findByStatus("active").size());
+        
+        try (KuberClient client = new KuberClient("localhost", 6380, API_KEY)) {
+            System.out.println("Connected: " + client.ping());
+            
+            // Create region for users
+            client.createRegion("users", "User data");
+            client.selectRegion("users");
+            
+            // Store user as JSON
+            Map&lt;String, Object&gt; user = new HashMap&lt;&gt;();
+            user.put("name", "John Doe");
+            user.put("email", "john@example.com");
+            user.put("age", 30);
+            user.put("status", "active");
+            
+            client.jsonSet("user:1001", user);
+            System.out.println("User stored");
+            
+            // Search for active users
+            List&lt;Map&lt;String, Object&gt;&gt; activeUsers = client.jsonSearch("$.status=active");
+            System.out.println("Found " + activeUsers.size() + " active users");
+            
+            // Hash operations
+            client.hset("profile:1001", "visits", "42");
+            client.hincrBy("profile:1001", "visits", 1);
+            String visits = client.hget("profile:1001", "visits");
+            System.out.println("Visits: " + visits);
+            
+            // Clean up
+            client.delete("user:1001", "profile:1001");
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }</code></pre>
                 </section>
+
+                <!-- Authentication Note -->
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle me-2"></i>Getting an API Key</h5>
+                    <ol class="mb-0">
+                        <li>Log into the <a href="/login">Kuber Web UI</a> with your username/password</li>
+                        <li>Navigate to <a href="/admin/apikeys">Admin → API Keys</a></li>
+                        <li>Click <strong>Generate New Key</strong></li>
+                        <li>Copy the generated key (starts with <code>kub_</code>)</li>
+                        <li>Use this key in all Java client code</li>
+                    </ol>
+                </div>
 
                 <!-- Back to Help -->
                 <div class="mt-5 text-center">
@@ -494,7 +424,7 @@ public class UserService {
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.5.0</p>
+                    <p class="text-muted small mb-0">Version 1.6.5</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

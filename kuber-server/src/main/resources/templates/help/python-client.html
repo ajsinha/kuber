@@ -25,9 +25,10 @@
             <div class="col-lg-10 mx-auto">
                 <h1 class="display-5 mb-4"><i class="fab fa-python me-3 text-info"></i>Python Client</h1>
                 
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Kuber is fully compatible with standard Redis clients. Use <code>redis-py</code> or the REST API with <code>requests</code>.
+                <div class="alert alert-warning">
+                    <i class="fas fa-key me-2"></i>
+                    <strong>v1.6.5: API Key Authentication Required</strong><br>
+                    All programmatic access requires an API key. Create one in <a href="/admin/apikeys">Admin → API Keys</a>.
                 </div>
 
                 <!-- Table of Contents -->
@@ -39,19 +40,16 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <ul class="list-unstyled mb-0">
-                                    <li><a href="#installation">Installation</a></li>
-                                    <li><a href="#basic-ops">Basic Operations</a></li>
-                                    <li><a href="#rest-setup">REST API Setup</a></li>
-                                    <li><a href="#region-management">Region Management</a></li>
-                                    <li><a href="#attribute-mapping">Attribute Mapping</a></li>
+                                    <li><a href="#redis-client">Redis Protocol Client</a></li>
+                                    <li><a href="#rest-client">REST API Client</a></li>
+                                    <li><a href="#redis-py">Using redis-py</a></li>
+                                    <li><a href="#json-ops">JSON Operations</a></li>
                                 </ul>
                             </div>
                             <div class="col-md-6">
                                 <ul class="list-unstyled mb-0">
-                                    <li><a href="#json-ops">JSON Operations</a></li>
-                                    <li><a href="#search">Search Operations</a></li>
-                                    <li><a href="#generic-search">Generic Search API</a></li>
-                                    <li><a href="#hash-list-set">Hash, List, Set Operations</a></li>
+                                    <li><a href="#standalone">Standalone Client Files</a></li>
+                                    <li><a href="#regions">Region Management</a></li>
                                     <li><a href="#complete-example">Complete Example</a></li>
                                 </ul>
                             </div>
@@ -59,62 +57,107 @@
                     </div>
                 </div>
 
-                <!-- Installation -->
-                <section id="installation" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-download me-2"></i>Installation</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Using standard redis-py
-pip install redis
+                <!-- Redis Protocol Client -->
+                <section id="redis-client" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-plug me-2"></i>Redis Protocol Client (KuberClient)</h3>
+                    
+                    <h4>Installation</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Install from package
+pip install kuber-client
 
-# For REST API
-pip install requests</code></pre>
+# Or copy kuber/client.py to your project</code></pre>
+
+                    <h4 class="mt-4">Basic Usage</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient
+
+# API Key required (get from Admin → API Keys)
+api_key = "kub_your_api_key_here"
+
+with KuberClient('localhost', 6380, api_key=api_key) as client:
+    # Test connection
+    print(client.ping())  # PONG
+    
+    # String operations
+    client.set('user:1001', 'John Doe')
+    name = client.get('user:1001')
+    print(f"User: {name}")
+    
+    # Set with TTL
+    from datetime import timedelta
+    client.set('session:abc', 'session-data', ttl=timedelta(hours=1))
+    
+    # Check TTL
+    ttl = client.ttl('session:abc')
+    print(f"TTL: {ttl} seconds")
+    
+    # Delete
+    client.delete('user:1001')</code></pre>
+
+                    <h4 class="mt-4">Constructor Options</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Basic - API key required
+client = KuberClient('localhost', 6380, api_key='kub_xxx')
+
+# With custom timeout (60 seconds)
+client = KuberClient('localhost', 6380, api_key='kub_xxx', timeout=60.0)
+
+# With initial region
+client = KuberClient('localhost', 6380, api_key='kub_xxx', region='users')</code></pre>
                 </section>
 
-                <!-- Basic Operations -->
-                <section id="basic-ops" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Basic Operations (Redis Protocol)</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>import redis
+                <!-- REST API Client -->
+                <section id="rest-client" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-cloud me-2"></i>REST API Client (KuberRestClient)</h3>
+                    
+                    <h4>Basic Usage</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberRestClient
 
-# Connect to Kuber with password
-client = redis.Redis(
-    host='localhost',
-    port=6379,
-    password='admin123',
-    decode_responses=True
-)
+# API Key required (get from Admin → API Keys)
+api_key = "kub_your_api_key_here"
 
-# Test connection
-print(client.ping())  # True
+client = KuberRestClient('localhost', 8080, api_key=api_key)
+
+# Server info
+info = client.info()
+print(f"Server: {info}")
 
 # String operations
-client.set('user:1001', 'John Doe')
-name = client.get('user:1001')
-print(f"User: {name}")
+client.set('key1', 'value1')
+value = client.get('key1')
+print(f"Value: {value}")
 
-# Set with TTL (expires in 1 hour)
-client.setex('session:abc123', 3600, 'session-data')
+# Set with TTL (1 hour = 3600 seconds)
+client.set('temp:key', 'temp-value', ttl=3600)
 
-# Check TTL
-ttl = client.ttl('session:abc123')
-print(f"TTL: {ttl} seconds")
+client.close()</code></pre>
 
-# Increment/Decrement
-client.set('counter', 0)
-client.incr('counter')      # 1
-client.incrby('counter', 10) # 11
+                    <h4 class="mt-4">Constructor Options</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Basic - API key required
+client = KuberRestClient('localhost', 8080, api_key='kub_xxx')
 
-# Delete keys
-client.delete('user:1001')</code></pre>
+# With SSL
+client = KuberRestClient('localhost', 8443, api_key='kub_xxx', use_ssl=True)
+
+# With custom timeout
+client = KuberRestClient('localhost', 8080, api_key='kub_xxx', timeout=60.0)</code></pre>
+                </section>
+
+                <!-- Using redis-py -->
+                <section id="redis-py" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-terminal me-2"></i>Using redis-py</h3>
                     
-                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
+                    <h4>Installation</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>pip install redis</code></pre>
+
+                    <h4 class="mt-4">Basic Usage with API Key</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>import redis
 
-# Connect using API Key
+api_key = "kub_your_api_key_here"
+
+# Create connection (no auto-auth)
 client = redis.Redis(host='localhost', port=6380, decode_responses=True)
 
-# Authenticate with API Key
-client.execute_command('AUTH', 'APIKEY', 'kub_your_api_key_here')
-# Or directly:
-# client.execute_command('AUTH', 'kub_your_api_key_here')
+# Authenticate with API key
+client.execute_command('AUTH', api_key)
 
 # Now use normally
 client.set('key', 'value')
@@ -122,389 +165,197 @@ value = client.get('key')
 print(f"Value: {value}")</code></pre>
                 </section>
 
-                <!-- REST API Setup -->
-                <section id="rest-setup" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-cloud me-2"></i>REST API Setup</h3>
-                    <div class="alert alert-success">
-                        <i class="fas fa-rocket me-2"></i><strong>Recommended:</strong> Copy this setup code and use the helper functions for all REST operations.
-                    </div>
-                    
-                    <h4>Password Authentication</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>import requests
-from requests.auth import HTTPBasicAuth
-import json
-from typing import Optional, Dict, List, Any
-
-# Configuration
-BASE_URL = 'http://localhost:8080/api'
-auth = HTTPBasicAuth('admin', 'admin123')
-headers = {'Content-Type': 'application/json'}
-
-# Helper functions with error handling
-def api_get(endpoint: str, params: Optional[Dict] = None) -&gt; Optional[Dict]:
-    """GET request with error handling"""
-    try:
-        response = requests.get(f'{BASE_URL}{endpoint}', auth=auth, params=params, timeout=30)
-        response.raise_for_status()
-        return response.json() if response.text else None
-    except requests.exceptions.RequestException as e:
-        print(f"GET {endpoint} failed: {e}")
-        return None
-
-def api_post(endpoint: str, data: Any = None) -&gt; Optional[Dict]:
-    """POST request with error handling"""
-    try:
-        response = requests.post(f'{BASE_URL}{endpoint}', auth=auth, headers=headers, json=data, timeout=30)
-        response.raise_for_status()
-        return response.json() if response.text else {}
-    except requests.exceptions.RequestException as e:
-        print(f"POST {endpoint} failed: {e}")
-        return None
-
-def api_put(endpoint: str, data: Any = None) -&gt; bool:
-    """PUT request, returns success status"""
-    try:
-        response = requests.put(f'{BASE_URL}{endpoint}', auth=auth, headers=headers, json=data, timeout=30)
-        return response.status_code in (200, 201, 204)
-    except requests.exceptions.RequestException as e:
-        print(f"PUT {endpoint} failed: {e}")
-        return False
-
-def api_delete(endpoint: str) -&gt; bool:
-    """DELETE request, returns success status"""
-    try:
-        response = requests.delete(f'{BASE_URL}{endpoint}', auth=auth, timeout=30)
-        return response.status_code in (200, 204)
-    except requests.exceptions.RequestException as e:
-        print(f"DELETE {endpoint} failed: {e}")
-        return False
-
-# Test connection
-def test_connection() -&gt; bool:
-    info = api_get('/info')
-    if info:
-        print(f"Connected to Kuber v{info.get('version')}")
-        return True
-    return False
-
-test_connection()</code></pre>
-                    
-                    <h4 class="mt-4"><i class="fas fa-key me-2 text-warning"></i>API Key Authentication (v1.2.5)</h4>
-                    <pre class="bg-dark text-light p-3 rounded"><code>import requests
-
-# Configuration with API Key
-BASE_URL = 'http://localhost:8080/api'
-API_KEY = 'kub_your_api_key_here'
-
-# Method 1: X-API-Key header (recommended)
-headers = {
-    'Content-Type': 'application/json',
-    'X-API-Key': API_KEY
-}
-response = requests.get(f'{BASE_URL}/cache/default/mykey', headers=headers)
-
-# Method 2: Authorization header
-headers = {
-    'Content-Type': 'application/json',
-    'Authorization': f'ApiKey {API_KEY}'
-}
-response = requests.get(f'{BASE_URL}/cache/default/mykey', headers=headers)
-
-# Method 3: Query parameter
-response = requests.get(f'{BASE_URL}/cache/default/mykey?api_key={API_KEY}')
-
-# Helper class for API Key authentication
-class KuberApiClient:
-    def __init__(self, base_url: str, api_key: str):
-        self.base_url = base_url
-        self.headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': api_key
-        }
-    
-    def get(self, key: str, region: str = 'default'):
-        response = requests.get(f'{self.base_url}/cache/{region}/{key}', headers=self.headers)
-        return response.json() if response.ok else None
-    
-    def set(self, key: str, value, region: str = 'default'):
-        response = requests.put(f'{self.base_url}/cache/{region}/{key}', 
-                               headers=self.headers, json=value)
-        return response.ok
-
-# Usage
-client = KuberApiClient('http://localhost:8080/api', 'kub_your_api_key_here')
-client.set('user:1001', {'name': 'John'})
-user = client.get('user:1001')</code></pre>
-                </section>
-
-                <!-- Region Management -->
-                <section id="region-management" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-layer-group me-2"></i>Region Management</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code># List all regions
-regions = api_get('/regions')
-for region in (regions or []):
-    print(f"Region: {region['name']}, Entries: {region.get('entryCount', 0)}")
-
-# Create a new region
-api_post('/regions', {'name': 'users', 'description': 'User data storage'})
-
-# Get region info
-region_info = api_get('/regions/users')
-print(f"Region: {region_info}")
-
-# Store data in a region
-api_put('/cache/users/user:1001', {'name': 'John Doe', 'email': 'john@example.com'})
-
-# Get data from a region
-result = api_get('/cache/users/user:1001')
-print(f"User: {result.get('value')}")
-
-# Purge region (delete all entries)
-api_post('/regions/users/purge')
-
-# Delete region
-api_delete('/regions/users')</code></pre>
-                </section>
-
-                <!-- Attribute Mapping -->
-                <section id="attribute-mapping" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-exchange-alt me-2"></i>Attribute Mapping</h3>
-                    <p>Transform JSON field names automatically when storing data:</p>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Set attribute mapping for a region
-mapping = {
-    'firstName': 'first_name',
-    'lastName': 'last_name',
-    'emailAddress': 'email'
-}
-api_put('/regions/customers/attributemapping', mapping)
-
-# Get current mapping
-current = api_get('/regions/customers/attributemapping')
-print(f"Mapping: {current}")
-
-# Store data - fields are automatically transformed
-customer = {
-    'firstName': 'John',
-    'lastName': 'Doe',
-    'emailAddress': 'john@example.com'
-}
-api_put('/cache/customers/cust:1001', customer)
-
-# Retrieve - stored with transformed names
-result = api_get('/cache/customers/cust:1001')
-# Returns: {"first_name": "John", "last_name": "Doe", "email": "john@example.com"}
-
-# Clear mapping
-api_delete('/regions/customers/attributemapping')</code></pre>
-                </section>
-
                 <!-- JSON Operations -->
                 <section id="json-ops" class="mb-5">
                     <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>JSON Operations</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Store JSON document
-user = {
-    'name': 'John Doe',
-    'age': 30,
-    'email': 'john@example.com',
-    'status': 'active',
-    'address': {
-        'street': '123 Main St',
-        'city': 'New York',
-        'zip': '10001'
-    },
-    'tags': ['premium', 'verified']
-}
-api_put('/cache/users/user:1001', user)
-
-# Get entire document
-result = api_get('/cache/users/user:1001')
-print(f"User: {result.get('value')}")
-
-# Get specific path
-city = api_get('/cache/users/user:1001/json', {'path': '$.address.city'})
-print(f"City: {city}")
-
-# Get nested object
-address = api_get('/cache/users/user:1001/json', {'path': '$.address'})
-print(f"Address: {address}")</code></pre>
-                </section>
-
-                <!-- Search Operations -->
-                <section id="search" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-search me-2"></i>Search Operations</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code># List keys with glob pattern
-result = api_get('/cache/users/keys', {'pattern': 'user:*'})
-keys = result.get('keys', []) if result else []
-print(f"Found {len(keys)} keys")
-
-# KSEARCH - Regex key search with values
-results = api_get('/cache/users/ksearch', {'pattern': r'user:\d+', 'limit': 50})
-for item in (results or []):
-    print(f"Key: {item['key']}, Value: {item['value']}")
-
-# JSON Search - by attributes
-active_users = api_post('/cache/users/jsearch', {'query': '$.status=active'})
-print(f"Found {len(active_users or [])} active users")
-
-# Search with multiple conditions
-results = api_post('/cache/users/jsearch', {'query': '$.status=active,$.age&gt;25'})
-
-# Search with regex
-results = api_post('/cache/users/jsearch', {'query': '$.email~=.*@example\\.com'})</code></pre>
-                </section>
-
-                <!-- Generic Search API -->
-                <section id="generic-search" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-search-plus me-2"></i>Generic Search API</h3>
-                    <p>The Generic Search API provides unified search with field projection:</p>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Mode 1: Simple key lookup
-results = api_post('/genericsearch', {
-    'region': 'users',
-    'key': 'user:1001'
-})
-
-# Mode 2: Key pattern search (regex)
-results = api_post('/genericsearch', {
-    'region': 'users',
-    'keypattern': r'user:\d+'
-})
-
-# Mode 3: Key pattern with field projection
-results = api_post('/genericsearch', {
-    'region': 'users',
-    'keypattern': r'user:.*',
-    'fields': ['name', 'email', 'address.city'],
-    'limit': 100
-})
-
-# Mode 4: JSON attribute search
-results = api_post('/genericsearch', {
-    'region': 'users',
-    'type': 'json',
-    'values': [{'status': 'active'}, {'department': 'Engineering'}]
-})
-
-# Mode 5: JSON search with regex
-results = api_post('/genericsearch', {
-    'region': 'users',
-    'type': 'json',
-    'values': [{'email': '.*@example\\.com', 'type': 'regex'}]
-})
-
-# Mode 6: JSON search with IN operator
-results = api_post('/genericsearch', {
-    'region': 'orders',
-    'type': 'json',
-    'values': [{'status': ['pending', 'processing', 'shipped']}]
-})
-
-# Mode 7: Combined search with projection
-results = api_post('/genericsearch', {
-    'region': 'products',
-    'type': 'json',
-    'values': [{'category': 'Electronics'}],
-    'fields': ['name', 'price'],
-    'limit': 50
-})</code></pre>
-                </section>
-
-                <!-- Hash, List, Set Operations -->
-                <section id="hash-list-set" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-hashtag me-2"></i>Hash, List, Set Operations</h3>
                     
-                    <h5 class="mt-4">Hash Operations</h5>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Set multiple hash fields
-api_put('/cache/default/profile:1001/hash', {
-    'fields': {
-        'name': 'John Doe',
-        'email': 'john@example.com',
-        'age': '30'
-    }
-})
+                    <pre class="bg-dark text-light p-3 rounded"><code>with KuberClient('localhost', 6380, api_key='kub_xxx') as client:
+    # Store JSON document
+    user = {"name": "John", "age": 30, "status": "active", "email": "john@company.com"}
+    client.json_set('user:1001', user)
+    
+    # Get JSON document
+    user = client.json_get('user:1001')
+    print(f"User: {user}")
+    
+    # Get specific path
+    name = client.json_get('user:1001', '$.name')
+    print(f"Name: {name}")
+    
+    # Search JSON documents
+    results = client.json_search('$.status=active')
+    print(f"Active users: {len(results)}")
+    
+    # Search with comparison
+    results = client.json_search('$.age>25')
+    print(f"Users over 25: {len(results)}")</code></pre>
+    
+                    <h4 class="mt-4">JSON Search Operators</h4>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Operator</th>
+                                    <th>Example</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>=</code> or <code>==</code></td><td><code>$.status=active</code></td><td>Exact match</td></tr>
+                                <tr><td><code>!=</code> or <code>&lt;&gt;</code></td><td><code>$.status!=inactive</code></td><td>Not equal</td></tr>
+                                <tr><td><code>&gt;</code></td><td><code>$.age&gt;25</code></td><td>Greater than</td></tr>
+                                <tr><td><code>&lt;</code></td><td><code>$.price&lt;100</code></td><td>Less than</td></tr>
+                                <tr><td><code>&gt;=</code></td><td><code>$.salary&gt;=50000</code></td><td>Greater or equal</td></tr>
+                                <tr><td><code>&lt;=</code></td><td><code>$.stock&lt;=10</code></td><td>Less or equal</td></tr>
+                                <tr class="table-info"><td><code>~=</code></td><td><code>$.email~=.*@company\.com</code></td><td><strong>Regex match</strong></td></tr>
+                                <tr><td><code>contains</code></td><td><code>$.name contains John</code></td><td>Substring match</td></tr>
+                                <tr><td><code>startsWith</code></td><td><code>$.name startsWith J</code></td><td>Prefix match</td></tr>
+                                <tr><td><code>endsWith</code></td><td><code>$.name endsWith son</code></td><td>Suffix match</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h5 class="mt-3">Regex Search Examples</h5>
+                    <pre class="bg-dark text-light p-3 rounded"><code># Find users with company email
+results = client.json_search('$.email~=.*@company\\.com')
 
-# Get all hash fields
-result = api_get('/cache/default/profile:1001/hash')
-profile = result.get('fields', {}) if result else {}
-print(f"Profile: {profile}")</code></pre>
+# Find names starting with 'J'
+results = client.json_search('$.name~=^J.*')
 
-                    <h5 class="mt-4">List Operations</h5>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Push to list
-api_post('/cache/default/queue:tasks/list/lpush', {'values': ['task1', 'task2']})
-api_post('/cache/default/queue:tasks/list/rpush', {'values': ['task3', 'task4']})
+# Find 5-digit zip codes
+results = client.json_search('$.address.zip~=\\d{5}')
 
-# Pop from list
-result = api_post('/cache/default/queue:tasks/list/lpop')
-task = result.get('value') if result else None
+# Combined search: Engineering dept AND name contains Smith
+results = client.json_search('$.department=Engineering,$.name~=.*Smith.*')</code></pre>
+                </section>
 
-# Get list range
-result = api_get('/cache/default/queue:tasks/list', {'start': 0, 'stop': -1})
-items = result.get('values', []) if result else []</code></pre>
+                <!-- Standalone Files -->
+                <section id="standalone" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-file-code me-2"></i>Standalone Client Files</h3>
+                    <p>Ready-to-use standalone Python files (no installation required):</p>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <i class="fas fa-plug me-2"></i>Redis Protocol
+                                </div>
+                                <div class="card-body">
+                                    <h6>kuber_redis_standalone.py</h6>
+                                    <p class="small text-muted">Full-featured Redis protocol client with all operations.</p>
+                                    <code class="small">python kuber_redis_standalone.py -k kub_xxx</code>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <i class="fas fa-cloud me-2"></i>REST API
+                                </div>
+                                <div class="card-body">
+                                    <h6>kuber_rest_standalone.py</h6>
+                                    <p class="small text-muted">HTTP REST client using only standard library.</p>
+                                    <code class="small">python kuber_rest_standalone.py -k kub_xxx</code>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-info text-white">
+                                    <i class="fas fa-search me-2"></i>JSON Demo
+                                </div>
+                                <div class="card-body">
+                                    <h6>kuber_json_demo.py</h6>
+                                    <p class="small text-muted">Demonstrates all JSON operations and search.</p>
+                                    <code class="small">python kuber_json_demo.py -k kub_xxx</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-secondary mt-3">
+                        <i class="fas fa-folder-open me-2"></i>
+                        <strong>Location:</strong> <code>kuber-client-python/</code> directory in the distribution archive.
+                    </div>
+                </section>
 
-                    <h5 class="mt-4">Set Operations</h5>
-                    <pre class="bg-dark text-light p-3 rounded"><code># Add to set
-api_post('/cache/default/tags:user:1001/set/add', {
-    'values': ['premium', 'verified', 'active']
-})
-
-# Get all members
-result = api_get('/cache/default/tags:user:1001/set/members')
-members = result.get('members', []) if result else []
-print(f"Tags: {members}")</code></pre>
+                <!-- Region Management -->
+                <section id="regions" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-database me-2"></i>Region Management</h3>
+                    
+                    <pre class="bg-dark text-light p-3 rounded"><code>with KuberClient('localhost', 6380, api_key='kub_xxx') as client:
+    # List regions
+    regions = client.list_regions()
+    print(f"Regions: {regions}")
+    
+    # Create a new region
+    client.create_region('sessions', 'User session storage')
+    
+    # Select region
+    client.select_region('sessions')
+    
+    # All operations now apply to 'sessions' region
+    client.set('sess:abc123', 'session-data')
+    
+    # Switch back to default
+    client.select_region('default')</code></pre>
                 </section>
 
                 <!-- Complete Example -->
                 <section id="complete-example" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>Complete Example: User Manager</h3>
-                    <pre class="bg-dark text-light p-3 rounded"><code>class KuberUserManager:
-    def __init__(self, base_url='http://localhost:8080/api', 
-                 username='admin', password='admin123'):
-        self.base_url = base_url
-        self.auth = HTTPBasicAuth(username, password)
-        self.headers = {'Content-Type': 'application/json'}
-        self.region = 'users'
-        self._setup_region()
-    
-    def _setup_region(self):
-        # Create region and set attribute mapping
-        requests.post(f'{self.base_url}/regions',
-            auth=self.auth, headers=self.headers,
-            json={'name': self.region})
-        
-        mapping = {'firstName': 'first_name', 'lastName': 'last_name'}
-        requests.put(f'{self.base_url}/regions/{self.region}/attributemapping',
-            auth=self.auth, headers=self.headers, json=mapping)
-    
-    def create_user(self, user_id, data):
-        response = requests.put(
-            f'{self.base_url}/cache/{self.region}/user:{user_id}',
-            auth=self.auth, headers=self.headers, json=data)
-        return response.status_code == 200
-    
-    def get_user(self, user_id):
-        response = requests.get(
-            f'{self.base_url}/cache/{self.region}/user:{user_id}',
-            auth=self.auth)
-        if response.status_code == 200:
-            return response.json().get('value')
-        return None
-    
-    def find_by_status(self, status, limit=100):
-        response = requests.post(f'{self.base_url}/genericsearch',
-            auth=self.auth, headers=self.headers,
-            json={
-                'region': self.region,
-                'type': 'json',
-                'values': [{'status': status}],
-                'limit': limit
-            })
-        return response.json() if response.status_code == 200 else []
+                    <h3 class="border-bottom pb-2"><i class="fas fa-code me-2"></i>Complete Example</h3>
+                    
+                    <pre class="bg-dark text-light p-3 rounded"><code>import os
+from kuber import KuberClient
 
-# Usage
-manager = KuberUserManager()
-manager.create_user('1001', {'firstName': 'John', 'lastName': 'Doe', 'status': 'active'})
-user = manager.get_user('1001')
-active_users = manager.find_by_status('active')</code></pre>
+# Get API key from environment
+API_KEY = os.environ.get('KUBER_API_KEY')
+if not API_KEY or not API_KEY.startswith('kub_'):
+    print("Set KUBER_API_KEY environment variable")
+    exit(1)
+
+with KuberClient('localhost', 6380, api_key=API_KEY) as client:
+    print(f"Connected: {client.ping()}")
+    
+    # Create region for users
+    client.create_region('users', 'User data')
+    client.select_region('users')
+    
+    # Store user as JSON
+    user = {
+        "name": "John Doe",
+        "email": "john@example.com",
+        "age": 30,
+        "status": "active"
+    }
+    client.json_set('user:1001', user)
+    print("User stored")
+    
+    # Search for active users
+    active_users = client.json_search('$.status=active')
+    print(f"Found {len(active_users)} active users")
+    
+    # Hash operations
+    client.hset('profile:1001', 'visits', '42')
+    client.hincrby('profile:1001', 'visits', 1)
+    visits = client.hget('profile:1001', 'visits')
+    print(f"Visits: {visits}")
+    
+    # Clean up
+    client.delete('user:1001', 'profile:1001')</code></pre>
                 </section>
+
+                <!-- Authentication Note -->
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle me-2"></i>Getting an API Key</h5>
+                    <ol class="mb-0">
+                        <li>Log into the <a href="/login">Kuber Web UI</a> with your username/password</li>
+                        <li>Navigate to <a href="/admin/apikeys">Admin → API Keys</a></li>
+                        <li>Click <strong>Generate New Key</strong></li>
+                        <li>Copy the generated key (starts with <code>kub_</code>)</li>
+                        <li>Use this key in all Python client code</li>
+                    </ol>
+                </div>
 
                 <!-- Back to Help -->
                 <div class="mt-5 text-center">
@@ -520,7 +371,7 @@ active_users = manager.find_by_status('active')</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.5.0</p>
+                    <p class="text-muted small mb-0">Version 1.6.5</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

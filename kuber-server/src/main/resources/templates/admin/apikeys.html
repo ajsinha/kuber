@@ -351,6 +351,8 @@ String value = client.get("key");</code></pre>
 
 <footer th:replace="~{layout :: footer}"></footer>
 
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
 <script th:inline="javascript">
     // Table state
     let currentPage = 1;
