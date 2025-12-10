@@ -523,11 +523,149 @@
                     </div>
                 </div>
                 
-                <div class="alert alert-danger mt-3">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Rejection:</strong> Requests arriving when queue is at 100% capacity are rejected 
-                    with error code "INTERNAL_ERROR" and message "Server overloaded - request rejected".
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>No Message Rejection:</strong> When backpressure is active, message consumption pauses but messages 
+                    are NOT rejected. Messages queue at the broker until consumption resumes. This ensures no data loss.
                 </div>
+            </div>
+        </div>
+        
+        <!-- Global Service Control -->
+        <div class="card mb-4">
+            <div class="card-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);">
+                <h5 class="mb-0 text-white"><i class="fas fa-power-off me-2"></i>Global Service Control (v1.7.0)</h5>
+            </div>
+            <div class="card-body">
+                <p>Enable or disable the entire Request/Response Messaging service globally:</p>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6><span class="badge bg-success me-2">Enable Service</span></h6>
+                                <ul class="mb-0">
+                                    <li>Activates message processing</li>
+                                    <li>Connects all enabled brokers</li>
+                                    <li>Sets <code>enabled: true</code> in config</li>
+                                    <li>Persists across server restarts</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-danger">
+                            <div class="card-body">
+                                <h6><span class="badge bg-danger me-2">Disable Service</span></h6>
+                                <ul class="mb-0">
+                                    <li>Stops all message processing</li>
+                                    <li>Disconnects all brokers</li>
+                                    <li>Sets <code>enabled: false</code> in config</li>
+                                    <li>Messages queue at brokers until re-enabled</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h6>Configuration Methods</h6>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Method</th>
+                                <th>How to Use</th>
+                                <th>Persisted</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Admin UI</strong></td>
+                                <td>Admin → Messaging → Enable/Disable Service button</td>
+                                <td><i class="fas fa-check text-success"></i> Yes</td>
+                            </tr>
+                            <tr>
+                                <td><strong>REST API</strong></td>
+                                <td><code>POST /api/v1/messaging/enable</code> or <code>/disable</code></td>
+                                <td><i class="fas fa-check text-success"></i> Yes</td>
+                            </tr>
+                            <tr>
+                                <td><strong>JSON Config</strong></td>
+                                <td>Edit <code>request_response.json</code>: set <code>"enabled": true/false</code></td>
+                                <td><i class="fas fa-check text-success"></i> Yes</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">REST API Endpoints</h6>
+                <pre class="bg-dark text-light p-3 rounded"><code>POST /api/v1/messaging/enable   - Enable service globally (connects all brokers)
+POST /api/v1/messaging/disable  - Disable service globally (disconnects all brokers)
+GET  /api/v1/messaging/status   - Get service status including enabled state</code></pre>
+            </div>
+        </div>
+
+        <!-- Broker Control -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Broker Control (v1.7.0)</h5>
+            </div>
+            <div class="card-body">
+                <p>Manage broker connections dynamically from the Admin UI without server restart:</p>
+                
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Action</th>
+                                <th>Description</th>
+                                <th>Config Update</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge bg-success">Enable</span></td>
+                                <td>Connect to disabled broker and start consuming messages</td>
+                                <td>Sets <code>enabled: true</code> in config</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-danger">Disable</span></td>
+                                <td>Disconnect from broker and stop consuming messages</td>
+                                <td>Sets <code>enabled: false</code> in config</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-warning text-dark">Pause</span></td>
+                                <td>Stop consuming messages but keep connection open. Messages queue at broker.</td>
+                                <td>No config change (runtime only)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-info">Resume</span></td>
+                                <td>Resume consuming messages after pause</td>
+                                <td>No config change (runtime only)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-secondary">Reconnect</span></td>
+                                <td>Attempt to reconnect a failed broker connection</td>
+                                <td>No config change</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">REST API Endpoints</h6>
+                <pre class="bg-dark text-light p-3 rounded"><code>POST /api/v1/messaging/brokers/{name}/enable   - Enable and connect broker
+POST /api/v1/messaging/brokers/{name}/disable  - Disable and disconnect broker  
+POST /api/v1/messaging/brokers/{name}/pause    - Pause message consumption
+POST /api/v1/messaging/brokers/{name}/resume   - Resume message consumption
+GET  /api/v1/messaging/brokers/{name}/status   - Get detailed broker status</code></pre>
+                
+                <h6 class="mt-4">Status Indicators in Admin UI</h6>
+                <ul>
+                    <li><span class="badge bg-success">Connected</span> - Broker is connected and consuming messages</li>
+                    <li><span class="badge bg-warning text-dark">Paused</span> - Broker is connected but consumption is paused</li>
+                    <li><span class="badge bg-danger">Disconnected</span> - Broker is enabled but connection failed</li>
+                    <li><span class="badge bg-secondary">Disabled</span> - Broker is disabled in configuration</li>
+                </ul>
             </div>
         </div>
         

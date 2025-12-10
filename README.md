@@ -20,7 +20,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
 - **Event Publishing (v1.2.8)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files
-- **Request/Response Messaging (v1.7.0)**: Access cache via message brokers with async processing and backpressure
+- **Request/Response Messaging (v1.7.0)**: Access cache via message brokers with async processing, backpressure, and broker controls
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
@@ -29,9 +29,10 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Primary/Secondary Replication**: Automatic failover via ZooKeeper
 - **Autoload**: Bulk data import from CSV, TXT, and JSON files
 - **API Key Authentication (v1.2.5)**: Secure programmatic access with revocable keys
-- **Web Management UI**: Browser-based administration interface
+- **Web Management UI**: Browser-based administration interface with comprehensive help system
 - **REST API**: Programmatic access for all operations
 - **CSV Export**: Export cache data to CSV files
+- **Multi-Language Clients (v1.7.0)**: Python, Java, and C# client libraries
 
 ## Features
 
@@ -91,7 +92,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
 | Event Publishing (v1.2.8) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
-| Request/Response (v1.7.0) | Cache access via message brokers with backpressure control |
+| Request/Response (v1.7.0) | Cache access via message brokers with backpressure and broker controls |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
 | Automatic Compaction | Pre-startup compaction before Spring + cron schedule (default: 2 AM daily) |
@@ -102,7 +103,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | ZooKeeper Replication | Automatic primary/secondary failover |
 | Autoload | Bulk CSV/TXT/JSON import with metadata |
 | CSV Export | Export regions and query results |
-| Web UI | Bootstrap-based management dashboard |
+| Web UI | Bootstrap-based management dashboard with comprehensive help |
 | REST API | Full HTTP/JSON API for all operations |
 | Authentication | User management and API keys with role-based access |
 | Statistics | Comprehensive metrics and monitoring |
@@ -129,23 +130,18 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
    mvn clean package -DskipTests
    ```
 
-3. **Start MongoDB** (if not running)
+3. **Run Kuber**
    ```bash
-   mongod --dbpath /data/db
+   java -jar kuber-server/target/kuber-server-1.7.0-SNAPSHOT.jar
    ```
 
-4. **Run Kuber**
-   ```bash
-   java -jar kuber-server/target/kuber-server-1.6.1-SNAPSHOT.jar
-   ```
-
-5. **Access the Web UI**
+4. **Access the Web UI**
    
    Open http://localhost:8080 in your browser
    
    Default credentials: `admin` / `admin123`
 
-6. **Connect via Redis CLI**
+5. **Connect via Redis CLI**
    ```bash
    redis-cli -p 6380
    127.0.0.1:6380> PING
@@ -158,11 +154,11 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 
 ## Client Libraries
 
-Kuber provides standalone client libraries for Python and Java, each supporting both Redis protocol and REST API.
+Kuber provides client libraries for **Python**, **Java**, and **C#**, each supporting Redis protocol, REST API, and messaging patterns.
 
-### Python Clients
+### Python Client
 
-**Redis Protocol Client** (`kuber_redis_standalone.py`):
+**Redis Protocol** (`kuber_redis_standalone.py`):
 ```python
 from kuber_redis_standalone import KuberRedisClient
 
@@ -178,7 +174,7 @@ with KuberRedisClient('localhost', 6380) as client:
     results = client.json_search('$.age>25', region='users')
 ```
 
-**REST API Client** (`kuber_rest_standalone.py`):
+**REST API** (`kuber_rest_standalone.py`):
 ```python
 from kuber_rest_standalone import KuberRestClient
 
@@ -189,14 +185,24 @@ with KuberRestClient('localhost', 8080, username='admin', password='secret') as 
     
     # JSON operations with specific region
     client.json_set('product:1', {'name': 'Laptop', 'price': 999}, region='products')
-    
-    # Search across regions
-    results = client.json_search('$.price>500', region='products')
 ```
 
-### Java Clients
+**Messaging** (`examples/messaging_example.py`):
+```python
+from kuber.messaging import KuberMessagingClient
 
-**Redis Protocol Client** (`KuberClient.java`):
+client = KuberMessagingClient(api_key='your-api-key')
+
+# Build request message
+request = client.build_get_request('user:123', region='users')
+
+# Send via Kafka/RabbitMQ/ActiveMQ
+producer.send('ccs_cache_request', json.dumps(request))
+```
+
+### Java Client
+
+**Redis Protocol** (`KuberClient.java`):
 ```java
 try (KuberClient client = new KuberClient("localhost", 6380)) {
     // Basic operations
@@ -212,7 +218,7 @@ try (KuberClient client = new KuberClient("localhost", 6380)) {
 }
 ```
 
-**REST API Client** (`KuberRestClient.java`):
+**REST API** (`KuberRestClient.java`):
 ```java
 try (KuberRestClient client = new KuberRestClient("localhost", 8080, "admin", "secret")) {
     // Basic operations
@@ -221,26 +227,173 @@ try (KuberRestClient client = new KuberRestClient("localhost", 8080, "admin", "s
     
     // JSON with specific region and TTL
     client.jsonSet("order:1", orderObject, "orders", Duration.ofDays(30));
-    
-    // Cross-region search
-    List<JsonNode> results = client.jsonSearch("$.status=shipped", "orders");
 }
 ```
 
-### Client Features
+**Messaging** (`KuberMessagingExample.java`):
+```java
+RequestBuilder builder = new RequestBuilder("your-api-key");
 
-| Feature | Python Redis | Python REST | Java Redis | Java REST |
-|---------|:------------:|:-----------:|:----------:|:---------:|
-| GET/SET/MGET/MSET | ✓ | ✓ | ✓ | ✓ |
-| Key Pattern Search | ✓ | ✓ | ✓ | ✓ |
-| Hash Operations | ✓ | ✓ | ✓ | ✓ |
-| Region Management | ✓ | ✓ | ✓ | ✓ |
-| JSON Storage | ✓ | ✓ | ✓ | ✓ |
-| JSON Deep Search | ✓ | ✓ | ✓ | ✓ |
-| Cross-Region Search | ✓ | ✓ | ✓ | ✓ |
-| TTL Support | ✓ | ✓ | ✓ | ✓ |
-| Bulk Operations | - | ✓ | - | ✓ |
-| No Dependencies | ✓ | ✓ | - | - |
+// Build request
+CacheRequest request = builder.get("user:123").inRegion("users").build();
+
+// Send via Kafka
+producer.send("ccs_cache_request", objectMapper.writeValueAsString(request));
+```
+
+### C# / .NET Client (New in v1.7.0)
+
+**Redis Protocol** (`KuberClient.cs`):
+```csharp
+using Kuber.Client;
+
+using var client = new KuberClient("localhost", 6380);
+
+// Basic operations
+await client.SetAsync("key", "value");
+var value = await client.GetAsync("key");
+
+// JSON operations with region
+await client.JsonSetAsync("user:1", new { Name = "Alice", Age = 30 }, "users");
+var results = await client.JsonSearchAsync<User>("$.age>25", "users");
+```
+
+**REST API** (`KuberRestClient.cs`):
+```csharp
+using var client = new KuberRestClient("localhost", 8080, apiKey: "your-api-key");
+
+// Basic operations
+await client.SetAsync("key", "value");
+var value = await client.GetAsync("key");
+
+// JSON operations
+await client.JsonSetAsync("product:1", product, "products");
+```
+
+**Messaging** (`KuberMessagingClient.cs`):
+```csharp
+var messagingClient = new KuberMessagingClient("your-api-key");
+
+// Build request
+var request = messagingClient.BuildGetRequest("user:123", "users");
+
+// Send via message broker
+await producer.SendAsync("ccs_cache_request", JsonSerializer.Serialize(request));
+```
+
+### Client Features Matrix
+
+| Feature | Python Redis | Python REST | Java Redis | Java REST | C# Redis | C# REST |
+|---------|:------------:|:-----------:|:----------:|:---------:|:--------:|:-------:|
+| GET/SET/MGET/MSET | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Key Pattern Search | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Hash Operations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Region Management | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| JSON Storage | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| JSON Deep Search | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| TTL Support | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Messaging Support | ✓ | - | ✓ | - | ✓ | - |
+| Async/Await | - | - | - | - | ✓ | ✓ |
+| No Dependencies | ✓ | ✓ | - | - | - | - |
+
+## Request/Response Messaging (v1.7.0)
+
+Access cache operations via message brokers for decoupled, asynchronous architectures.
+
+### Supported Brokers
+
+| Broker | Status | Features |
+|--------|--------|----------|
+| Apache Kafka | ✓ | High throughput, partitioning, consumer groups |
+| Apache ActiveMQ | ✓ | JMS support, durable subscriptions |
+| RabbitMQ | ✓ | AMQP, flexible routing, acknowledgments |
+| IBM MQ | ✓ | Enterprise messaging, SSL/TLS |
+
+### Message Format
+
+**Request:**
+```json
+{
+  "api_key": "your-api-key",
+  "message_id": "uuid-12345",
+  "operation": "GET",
+  "region": "users",
+  "key": "user:123"
+}
+```
+
+**Response:**
+```json
+{
+  "request_receive_timestamp": "2025-12-10T10:00:00Z",
+  "response_time": "2025-12-10T10:00:00.005Z",
+  "processing_time_ms": 5,
+  "request": { ... },
+  "response": {
+    "success": true,
+    "result": "{\"name\": \"Alice\", \"age\": 30}"
+  }
+}
+```
+
+### Supported Operations
+
+| Category | Operations |
+|----------|------------|
+| Strings | GET, SET, DELETE |
+| Batch | MGET, MSET |
+| Keys | KEYS, EXISTS, TTL, EXPIRE |
+| Hashes | HGET, HSET, HGETALL, HMSET |
+| JSON | JSET, JGET, JSEARCH |
+| Admin | PING, INFO, REGIONS |
+
+### Global Service Control (v1.7.0)
+
+Enable or disable the entire Request/Response Messaging feature:
+
+| Method | How | Persisted |
+|--------|-----|-----------|
+| Admin UI | Admin → Messaging → Enable/Disable Service | Yes |
+| REST API | `POST /api/v1/messaging/enable` or `/disable` | Yes |
+| JSON Config | `request_response.json`: `"enabled": true/false` | Yes |
+
+When disabled globally, all brokers disconnect and messages queue at the broker until re-enabled.
+
+### Broker Control (v1.7.0)
+
+Manage broker connections dynamically from the Admin UI:
+
+| Action | Description |
+|--------|-------------|
+| **Enable** | Connect to a disabled broker and start consuming |
+| **Disable** | Disconnect and stop consuming (updates config) |
+| **Pause** | Stop consuming but keep connection open |
+| **Resume** | Resume consuming after pause |
+| **Reconnect** | Retry connection for failed brokers |
+
+### Configuration
+
+Create `secure/request_response.json`:
+
+```json
+{
+  "enabled": true,
+  "max_queue_depth": 100,
+  "thread_pool_size": 10,
+  "brokers": {
+    "kafka_primary": {
+      "enabled": true,
+      "type": "kafka",
+      "display_name": "Primary Kafka",
+      "connection": {
+        "bootstrap_servers": "kafka:9092",
+        "group_id": "kuber-processor"
+      },
+      "request_topics": ["ccs_cache_request"]
+    }
+  }
+}
+```
 
 ## Configuration
 
@@ -256,353 +409,75 @@ kuber:
   
   # Cache settings
   cache:
-    max-memory-entries: 100000          # Default per-region limit (for value cache)
-    global-max-memory-entries: 500000   # Global cap across all regions (0=unlimited)
-    region-memory-limits:               # Per-region overrides
-      customers: 50000
-      products: 200000
-    persistent-mode: false
-    eviction-policy: LRU
-    
-    # Factory configuration (v1.6.1)
-    cache-implementation: CAFFEINE       # Cache provider: CAFFEINE (default)
-    collections-implementation: DEFAULT  # Collections provider: DEFAULT (default)
+    max-memory-entries: 100000
+    global-max-memory-entries: 500000
+    off-heap-key-index: false
   
-  # Persistence (rocksdb, lmdb, mongodb, postgresql, sqlite, memory)
+  # Persistence
   persistence:
-    type: rocksdb                       # Options: rocksdb, lmdb, mongodb, postgresql, sqlite, memory
-    sync-individual-writes: false       # false=ASYNC (fast), true=SYNC (durable) - v1.3.10
+    type: rocksdb
     rocksdb:
       path: ./data/rocksdb
-      compaction-enabled: true
-      compaction-cron: "0 0 2 * * ?"    # 2 AM daily
-    lmdb:
-      path: ./data/lmdb
-      map-size: 1073741824              # 1GB (increase for larger datasets)
   
-  # MongoDB settings (if persistence.type=mongodb)
-  mongo:
-    uri: mongodb://localhost:27017
-    database: kuber
+  # Security
+  secure:
+    folder: ./secure
   
-  # ZooKeeper settings (optional)
-  zookeeper:
-    enabled: false
-    connect-string: localhost:2181
+  # Backup
+  backup:
+    enabled: true
+    cron: "0 0 23 * * *"
+    backup-directory: ./backup
+    restore-directory: ./restore
+  
+  # Compaction
+  compaction:
+    pre-startup-enabled: true
+    scheduled-enabled: true
+    cron: "0 0 2 * * *"
 ```
 
-### Factory Pattern (v1.6.1)
+## Web Management UI
 
-Kuber uses the Factory Pattern to allow pluggable cache and collections implementations. This enables changing the underlying cache provider or collection types without code changes:
+Kuber provides a comprehensive web-based administration interface:
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `cache-implementation` | `CAFFEINE` | Cache provider for value caches |
-| `collections-implementation` | `DEFAULT` | Collections provider for Map, List, Set, Queue, Deque |
+### Dashboard Features
+- Real-time cache statistics
+- Region management
+- Entry browsing and editing
+- JSON query interface
+- Backup/restore controls
 
-Current implementations:
-- **Cache**: CAFFEINE (default) - High-performance Java caching library
-- **Collections**: DEFAULT (default) - Uses Java concurrent collections (ConcurrentHashMap, CopyOnWriteArrayList, ConcurrentLinkedQueue, etc.)
+### Admin Panel
+- API key management
+- User administration
+- Messaging broker management with live controls
+- Configuration viewer
 
-### Individual Write Modes (v1.3.10)
+### Help System (v1.7.0)
+Comprehensive documentation accessible at `/help`:
 
-Kuber supports two write modes for individual PUT/SET operations:
-
-| Mode | Config Value | Latency | Durability | Use Case |
-|------|--------------|---------|------------|----------|
-| **ASYNC** (default) | `false` | ~0.01-0.1ms | Eventually consistent | High throughput, performance critical |
-| **SYNC** | `true` | ~1-5ms | Immediate | Maximum durability required |
-
-**ASYNC Mode (default)**:
-```
-PUT key=X → Update Memory → Return Success → Background Disk Write
-```
-- Memory (KeyIndex + ValueCache) updated immediately
-- Disk write happens asynchronously in background
-- 10-100x faster than sync mode
-- Trade-off: If crash before async write completes, that entry is lost
-
-**SYNC Mode**:
-```
-PUT key=X → Write to Disk → Wait for fsync → Update Memory → Return Success
-```
-- Disk write completes before returning
-- Maximum durability - survives power loss
-- Slower due to fsync overhead
-
-### Persistence Store Comparison
-
-| Store | Speed | Durability | Use Case |
-|-------|-------|------------|----------|
-| RocksDB | Very Fast | Excellent | Default - production workloads |
-| LMDB | Extremely Fast | Excellent | Read-heavy workloads, memory-mapped |
-| SQLite | Fast | Good | Simple deployments |
-| MongoDB | Fast | Excellent | Document-native, flexible queries |
-| PostgreSQL | Fast | Excellent | JSONB support, SQL queries |
-| Memory | Fastest | None | Testing, ephemeral data |
-
-### Memory Management (v1.2.0)
-
-Kuber provides flexible memory management:
-
-- **Per-Region Limits**: Configure memory for individual regions via `region-memory-limits`
-- **Global Cap**: Set `global-max-memory-entries` to limit total memory across all regions
-- **Smart Allocation**: When global cap is exceeded, memory is allocated proportionally based on:
-  - 50% configured limits
-  - 50% actual data size (persisted entry count)
-- **Smart Priming**: On restart, most recently accessed entries are loaded first
-
-## Usage
-
-### Redis Protocol Commands
-
-Connect using any Redis client:
-
-```bash
-redis-cli -p 6380
-```
-
-#### Standard Commands
-
-```redis
-# String operations
-SET key value
-GET key
-MSET k1 v1 k2 v2
-MGET k1 k2
-INCR counter
-DECR counter
-
-# Key operations
-DEL key
-EXISTS key
-EXPIRE key 60
-TTL key
-KEYS pattern*
-
-# Hash operations
-HSET hash field value
-HGET hash field
-HGETALL hash
-```
-
-#### Kuber Extensions
-
-```redis
-# Region operations
-REGIONS              # List all regions
-RCREATE region desc  # Create a region
-RSELECT region       # Select a region
-RDROP region         # Delete a region
-RPURGE region        # Purge a region
-
-# JSON operations
-JSET key {"name":"John","age":30}
-JGET key
-JGET key $.name
-JSEARCH $.age>25
-JSEARCH $.status=active,$.type=user
-```
-
-### REST API
-
-```bash
-# Server info
-curl http://localhost:8080/api/info
-
-# List regions
-curl http://localhost:8080/api/regions
-
-# Get a value
-curl http://localhost:8080/api/cache/default/mykey
-
-# Set a value
-curl -X PUT http://localhost:8080/api/cache/default/mykey \
-  -H "Content-Type: application/json" \
-  -d '{"value": "hello world", "ttl": 3600}'
-
-# JSON search
-curl -X POST http://localhost:8080/api/cache/default/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "$.status=active"}'
-```
-
-### Java Client
-
-```java
-try (KuberClient client = new KuberClient("localhost", 6380)) {
-    // String operations
-    client.set("user:1001", "John Doe");
-    String name = client.get("user:1001");
-    
-    // JSON operations
-    client.jsonSet("user:1002", "{\"name\": \"Jane\", \"age\": 30}");
-    JsonNode user = client.jsonGet("user:1002");
-    
-    // Region operations
-    client.selectRegion("sessions");
-    client.set("session:abc", "data", Duration.ofMinutes(30));
-}
-```
-
-### Python Client
-
-```python
-from kuber import KuberClient
-
-with KuberClient('localhost', 6380) as client:
-    # String operations
-    client.set('user:1001', 'John Doe')
-    name = client.get('user:1001')
-    
-    # JSON operations
-    client.json_set('user:1002', {'name': 'Jane', 'age': 30})
-    user = client.json_get('user:1002')
-    
-    # Region operations
-    client.select_region('sessions')
-    client.set('session:abc', 'data', ttl=timedelta(minutes=30))
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Kuber Server                            │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│  Redis       │    REST      │    Web       │  Replication   │
-│  Protocol    │    API       │    UI        │  Manager       │
-│  (MINA)      │  (Spring)    │ (Thymeleaf)  │  (ZooKeeper)   │
-├──────────────┴──────────────┴──────────────┴────────────────┤
-│                     Cache Service                            │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
-│  │   Caffeine  │  │    Event     │  │   JSON Utilities   │  │
-│  │   (Memory)  │  │   Publisher  │  │   (JSONPath)       │  │
-│  └─────────────┘  └──────────────┘  └────────────────────┘  │
-├─────────────────────────────────────────────────────────────┤
-│                   Persistence Layer                          │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              MongoDB Repository                       │   │
-│  │   (Regions → Collections, Entries → Documents)        │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Regions
-
-Regions provide logical isolation for cache entries:
-
-- **RocksDB/SQLite**: Each region gets its own dedicated database instance
-  - Better concurrency - parallel I/O across regions
-  - Better isolation - issues in one region don't affect others
-  - Independent compaction - compact individual regions
-- **MongoDB**: Each region maps to a separate collection
-- The `default` region is captive (cannot be deleted)
-- Regions have independent statistics and TTL settings
-
-```
-Directory Structure (RocksDB):
-./data/rocksdb/
-  ├── _metadata/     # Region metadata
-  ├── default/       # Default region database
-  ├── users/         # Users region database
-  └── sessions/      # Sessions region database
-```
-
-```redis
-RCREATE sessions "User session data"
-RSELECT sessions
-SET session:abc "{...}"
-```
-
-## JSON Queries
-
-Kuber supports JSONPath-like queries for searching JSON documents:
-
-```redis
-# Set JSON data
-JSET user:1 {"name":"John","age":30,"status":"active"}
-JSET user:2 {"name":"Jane","age":25,"status":"inactive"}
-JSET user:3 {"name":"Bob","age":35,"status":"active"}
-
-# Search queries
-JSEARCH $.status=active           # Find active users
-JSEARCH $.age>25                  # Find users over 25
-JSEARCH $.name~=J.*               # Regex match on name
-JSEARCH $.status=active,$.age>25  # Multiple conditions (AND)
-```
-
-Supported operators:
-- `=` Equal
-- `!=` Not equal
-- `>` `<` `>=` `<=` Comparison
-- `~=` Regex match
-- `contains` String contains
-- `startsWith` String starts with
-- `endsWith` String ends with
-- `exists` Field exists
-
-## Replication
-
-Kuber supports primary/secondary replication using ZooKeeper for leader election:
-
-1. **Enable ZooKeeper** in configuration:
-   ```yaml
-   kuber:
-     zookeeper:
-       enabled: true
-       connect-string: zk1:2181,zk2:2181,zk3:2181
-   ```
-
-2. **Start multiple nodes** - they will automatically elect a primary
-
-3. **Automatic failover** - if primary fails, a secondary is promoted
-
-4. **Read scaling** - secondary nodes handle read requests
+| Section | Topics |
+|---------|--------|
+| Getting Started | Overview, Quick Start, Configuration |
+| Operations | String, Hash, JSON, Key, TTL, Batch |
+| Client Libraries | Python, Java, C# with examples |
+| Advanced | Regions, Search, Replication, Messaging |
+| Reference | REST API, Redis Protocol, Glossary |
 
 ## Event Publishing (v1.2.8)
 
-Kuber can stream cache events to external messaging systems for real-time integrations:
-
-### Supported Publishers
-
-| Publisher | Type | Features |
-|-----------|------|----------|
-| Apache Kafka | `kafka` | High throughput, auto topic creation, producer pooling |
-| RabbitMQ | `rabbitmq` | AMQP messaging, exchange routing, channel pooling |
-| IBM MQ | `ibmmq` | Enterprise messaging, SSL/TLS, queue manager integration |
-| Apache ActiveMQ | `activemq` | JMS messaging, connection pooling |
-| File System | `file` | JSON Lines format, date/size rotation |
-
-### Configuration
+Stream cache events to external systems for real-time integrations:
 
 ```yaml
 kuber:
   publishing:
-    thread-pool-size: 4
-    queue-capacity: 10000
-    
-    # Define reusable brokers
-    brokers:
-      prod-kafka:
-        type: kafka
-        kafka:
-          bootstrap-servers: kafka1:9092,kafka2:9092
-      
-      event-files:
-        type: file
-        file:
-          directory: ./log/kuber/events
-          rotation-policy: daily
-    
-    # Configure per-region publishing
-    regions:
-      customers:
-        destinations:
-          - broker: prod-kafka
-            topic: customer-events
-          - broker: event-files
-            prefix: customers
+    kafka:
+      enabled: true
+      bootstrap-servers: kafka:9092
+      regions:
+        users: user-events
+        products: product-events
 ```
 
 ### Event Format
@@ -612,584 +487,15 @@ kuber:
   "key": "user:1001",
   "action": "inserted",
   "region": "customers",
-  "payload": {"name": "John", "email": "john@example.com"},
+  "payload": { "name": "John", "email": "john@example.com" },
   "timestamp": "2025-12-06T12:00:00Z",
   "nodeId": "kuber-01"
 }
 ```
 
-## Request/Response Messaging (v1.7.0)
+## Autoload
 
-Kuber can accept cache operation requests via message brokers, enabling asynchronous cache access for event-driven architectures.
-
-### Supported Brokers
-
-| Broker | Type | Features |
-|--------|------|----------|
-| Apache Kafka | `kafka` | Consumer groups, auto offset reset, async producer |
-| Apache ActiveMQ | `activemq` | JMS queues/topics, connection pooling |
-| RabbitMQ | `rabbitmq` | Queue auto-declaration, manual ack, prefetch control |
-| IBM MQ | `ibmmq` | Queue manager, channel-based, JMS integration |
-
-### Configuration (request_response.json)
-
-```json
-{
-  "enabled": true,
-  "max_queue_depth": 100,
-  "thread_pool_size": 10,
-  "max_batch_get_size": 128,
-  "max_batch_set_size": 128,
-  "max_search_results": 10000,
-  "brokers": {
-    "local_kafka": {
-      "enabled": true,
-      "type": "kafka",
-      "display_name": "Local Kafka Cluster",
-      "connection": {
-        "bootstrap_servers": "localhost:9092",
-        "group_id": "kuber-request-processor"
-      },
-      "request_topics": ["ccs_request", "agg_request", "calc_request"]
-    }
-  }
-}
-```
-
-### Request Format
-
-```json
-{
-  "api_key": "kub_abc123...",
-  "message_id": "req-12345",
-  "operation": "GET",
-  "region": "users",
-  "key": "user:1001"
-}
-```
-
-### Batch Operations
-
-**MGET (Batch Get)** - Maximum `max_batch_get_size` keys (default: 128):
-```json
-{
-  "api_key": "kub_abc123...",
-  "message_id": "req-12346",
-  "operation": "MGET",
-  "region": "users",
-  "keys": ["user:1001", "user:1002", "user:1003"]
-}
-```
-
-**MSET (Batch Set)** - Maximum `max_batch_set_size` entries (default: 128):
-```json
-{
-  "api_key": "kub_abc123...",
-  "message_id": "req-12347",
-  "operation": "MSET",
-  "region": "products",
-  "entries": {
-    "prod:1001": {"name": "Widget", "price": 29.99},
-    "prod:1002": {"name": "Gadget", "price": 49.99}
-  }
-}
-```
-
-### Response Format
-
-GET, MGET, and KEYS operations return arrays of key-value pairs:
-
-**GET Response (found):**
-```json
-{
-  "response": {
-    "success": true,
-    "result": [
-      {"key": "user:1001", "value": {"userId": "1001", "name": "John Doe"}}
-    ],
-    "error": "",
-    "server_message": ""
-  }
-}
-```
-
-**GET Response (not found):**
-```json
-{
-  "response": {
-    "success": true,
-    "result": [],
-    "error": "",
-    "server_message": "Key not found: user:9999"
-  }
-}
-```
-
-**MGET Response (partial match):**
-```json
-{
-  "response": {
-    "success": true,
-    "result": [
-      {"key": "user:1001", "value": {"name": "Alice"}},
-      {"key": "user:1002", "value": {"name": "Bob"}}
-    ],
-    "error": "",
-    "server_message": "Keys not found (2 of 4): user:1003, user:1004",
-    "total_count": 4,
-    "returned_count": 2
-  }
-}
-```
-
-### Search Result Truncation
-
-KEYS pattern searches return key-value pairs and are limited to `max_search_results` (default: 10,000):
-
-```json
-{
-  "response": {
-    "success": true,
-    "result": [
-      {"key": "user:0001", "value": {...}},
-      {"key": "user:0002", "value": {...}}
-    ],
-    "error": "",
-    "server_message": "Results truncated: found 15000 keys matching pattern, returning first 10000",
-    "total_count": 15000,
-    "returned_count": 10000
-  }
-}
-```
-
-### Topic Naming
-
-Request topics must end with `_request`. Response topics are inferred automatically:
-- `ccs_request` → `ccs_response`
-- `order_cache_request` → `order_cache_response`
-
-## Concurrency Safety & Graceful Shutdown (v1.3.3)
-
-Kuber v1.3.3 introduces comprehensive concurrency controls and graceful shutdown orchestration to prevent RocksDB corruption and ensure data integrity.
-
-### Persistence Operation Locking
-
-A centralized `PersistenceOperationLock` prevents concurrent operations that could corrupt the persistence store:
-
-| Operation | Lock Type | Blocks |
-|-----------|-----------|--------|
-| **Compaction** | Exclusive Global | All other operations |
-| **Shutdown** | Exclusive Global | All other operations |
-| **Cleanup/Expiration** | Shared Global | Only during exclusive operations |
-| **Autoload** | Per-Region | Only same-region operations |
-| **Region Loading** | Per-Region | Queries to that region |
-
-### Shutdown Orchestrator
-
-The `ShutdownOrchestrator` ensures orderly shutdown in the **exact reverse order** of startup with configurable delays between phases:
-
-```
-Startup Order:                    Shutdown Order (Reverse):
-1. Persistence Maintenance  →     5. Close Persistence Store
-2. Cache Service           →     4. Persist Cache Data
-3. Event Publishing        →     3. Stop Event Publishing
-4. Redis Server            →     2. Stop Redis Server
-5. Autoload Service        →     1. Stop Autoload Service
-```
-
-Each phase has a configurable delay (default: 5 seconds) to ensure:
-- In-flight operations complete
-- Buffers are flushed
-- File handles are properly closed
-- No corruption from concurrent shutdown
-
-### Region Loading Guards
-
-During startup, queries to a region that's still loading will **wait** until loading completes (30s timeout). This prevents:
-- Queries returning incomplete data
-- Race conditions during recovery
-
-## Management Scripts (v1.3.5)
-
-Kuber v1.3.5 provides comprehensive management scripts in the `scripts/` folder for startup, shutdown, and status monitoring.
-
-### Available Scripts
-
-| Script | Platform | Description |
-|--------|----------|-------------|
-| `kuber-start.sh` | Linux/Mac | Start Kuber server |
-| `kuber-start.bat` | Windows | Start Kuber server |
-| `kuber-shutdown.sh` | Linux/Mac | Graceful shutdown |
-| `kuber-shutdown.bat` | Windows | Graceful shutdown |
-| `kuber-status.sh` | Linux/Mac | Check server status |
-
-### Startup Scripts
-
-```bash
-# Basic startup
-./scripts/kuber-start.sh
-
-# With options
-./scripts/kuber-start.sh -m 4g -p prod              # 4GB heap, prod profile
-./scripts/kuber-start.sh -d -l /var/log/kuber       # Daemon mode with log dir
-./scripts/kuber-start.sh --redis-port 6381          # Custom Redis port
-./scripts/kuber-start.sh --debug                     # Enable remote debugging
-
-# Windows
-scripts\kuber-start.bat
-scripts\kuber-start.bat /memory:4g /profile:prod
-```
-
-### Shutdown Methods
-
-| Method | Command | Use Case |
-|--------|---------|----------|
-| **File-based** | `touch kuber.shutdown` | Local shutdown, scripted |
-| **REST API** | `POST /api/admin/shutdown` | Remote shutdown, automation |
-| **Signal** | `SIGTERM` / `Ctrl+C` | Container orchestration |
-| **Script** | `./scripts/kuber-shutdown.sh` | Convenient wrapper |
-
-### File-Based Shutdown (Recommended)
-
-The simplest way to shutdown Kuber cleanly:
-
-```bash
-# Linux/Mac
-touch kuber.shutdown
-
-# Windows
-echo. > kuber.shutdown
-
-# Or use the provided script
-./scripts/kuber-shutdown.sh
-```
-
-Kuber watches for this file every 5 seconds. When detected:
-1. Initiates graceful shutdown sequence
-2. Deletes the shutdown file
-3. Completes all phases in order
-
-### REST API Shutdown
-
-For remote or programmatic shutdown:
-
-```bash
-# Trigger shutdown
-curl -X POST http://localhost:8080/api/admin/shutdown \
-  -H "X-API-Key: your-api-key" \
-  -H "Content-Type: application/json"
-
-# Check shutdown status
-curl http://localhost:8080/api/admin/shutdown/status \
-  -H "X-API-Key: your-api-key"
-
-# View shutdown configuration
-curl http://localhost:8080/api/admin/shutdown/config \
-  -H "X-API-Key: your-api-key"
-```
-
-### Shutdown Scripts
-
-Convenient wrapper scripts are provided:
-
-```bash
-# Linux/Mac
-./scripts/kuber-shutdown.sh                        # File-based (default)
-./scripts/kuber-shutdown.sh -a -k myapikey         # API-based
-./scripts/kuber-shutdown.sh -r "Maintenance"       # With reason
-
-# Windows
-scripts\kuber-shutdown.bat                         # File-based (default)
-scripts\kuber-shutdown.bat /api /key:myapikey      # API-based
-scripts\kuber-shutdown.bat /reason:"Maintenance"   # With reason
-```
-
-### Startup Sequence
-
-```
-Application Start
-       │
-       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Phase 1: Infrastructure Setup                               │
-│  - Initialize logging & configuration                        │
-│  - Connect to ZooKeeper (if replication enabled)            │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Phase 2: Persistence Maintenance (Concurrent)               │
-│  - Initialize RocksDB/SQLite stores per region              │
-│  - Run compaction in parallel                                │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Phase 3: Cache Recovery (Concurrent)                        │
-│  - Load persisted entries into memory                        │
-│  - Build off-heap key indexes                                │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Phase 4: Service Activation                                 │
-│  - Start Event Publishing, Redis Server, HTTP Server        │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Phase 5: Background Services - System Ready!                │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Shutdown Sequence
-
-```
-Shutdown Triggered (file/API/signal)
-       │
-       ▼
-1. Signal Shutdown (block new operations) → Wait 5s
-       │
-2. Stop Autoload Service → Wait 5s
-       │
-3. Stop Redis Protocol Server → Wait 5s
-       │
-4. Stop Event Publishing → Wait 5s
-       │
-5. Persist Cache Data → Wait 5s
-       │
-6. Close Persistence Store → Wait 5s
-       │
-       └── Exit (total ~30 seconds)
-```
-
-### Configuration
-
-```yaml
-kuber:
-  shutdown:
-    file-enabled: true              # Enable file-based shutdown
-    file-path: kuber.shutdown       # Path to shutdown signal file
-    check-interval-ms: 5000         # Check interval (5 seconds)
-    api-enabled: true               # Enable REST API shutdown
-    phase-delay-seconds: 5          # Delay between shutdown phases
-```
-
-## Complete Shutdown Orchestration & RocksDB Durability (v1.3.6)
-
-Kuber v1.3.6 provides comprehensive shutdown orchestration and fixes RocksDB corruption issues.
-
-### Task Scheduler Shutdown
-
-All `@Scheduled` methods are now properly stopped during shutdown:
-
-- **TaskScheduler.shutdown()**: Immediately halts Spring's task scheduler
-- **Shutdown flags**: Each service checks `shuttingDown` before execution
-- **No more stray executions**: CacheMetricsService, MemoryWatcher, Expiration, Compaction all stop cleanly
-
-### RocksDB Write Protection
-
-Writes are now protected during shutdown using a ReadWriteLock:
-
-```
-Write Operation                    Shutdown Operation
-     │                                   │
-     ▼                                   ▼
-┌──────────────────┐            ┌──────────────────┐
-│ readLock.lock()  │            │ shuttingDown=true│
-│     │            │            │      │           │
-│     ▼            │            │      ▼           │
-│ checkWriteAllowed│            │ writeLock.lock() │ ← Blocks until all
-│     │            │            │      │           │   reads complete
-│     ▼            │            │      ▼           │
-│ db.put(...)      │            │ gracefulClose()  │
-│     │            │            │      │           │
-│     ▼            │            │      ▼           │
-│ readLock.unlock()│            │ db.close()       │
-└──────────────────┘            └──────────────────┘
-```
-
-### Enhanced WAL Configuration
-
-RocksDB now uses optimal WAL settings for durability:
-
-```java
-Options options = new Options()
-    .setWalTtlSeconds(0)              // Keep WAL until cleaned
-    .setWalSizeLimitMB(0)             // No size limit
-    .setManualWalFlush(false)         // Auto WAL management
-    .setAvoidFlushDuringShutdown(false) // Flush on shutdown
-    .setAvoidFlushDuringRecovery(false); // Flush on recovery
-```
-
-### WriteOptions Sync
-
-Critical writes now use `WriteOptions.setSync(true)`:
-
-```java
-try (WriteOptions writeOptions = new WriteOptions()) {
-    writeOptions.setSync(true);  // Sync to disk immediately
-    regionDb.put(writeOptions, key, value);
-}
-```
-
-## RocksDB Durability Improvements (v1.3.5)
-
-Kuber v1.3.5 includes critical improvements to RocksDB persistence to prevent data corruption and ensure reliable recovery.
-
-### Graceful Shutdown Sequence
-
-The shutdown process now properly handles RocksDB's background operations:
-
-1. **Cancel Background Work**: Stop all compaction and flush threads
-2. **Flush Memtables**: Write in-memory data to SST files
-3. **Sync WAL**: Ensure Write-Ahead Log is durable on disk
-4. **Final Sync**: Double-sync to ensure OS buffers are flushed
-5. **Close Database**: Release file handles
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  RocksDB Graceful Close Sequence                             │
-├─────────────────────────────────────────────────────────────┤
-│  1. cancelAllBackgroundWork(true)  ← Wait for completion    │
-│  2. flush(waitForFlush=true)       ← Memtable → SST         │
-│  3. syncWal()                      ← WAL to disk            │
-│  4. flushWal(sync=true)            ← Final WAL sync         │
-│  5. wait(500ms)                    ← OS buffer flush        │
-│  6. close()                        ← Release handles        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Corruption Detection and Recovery
-
-If corruption is detected on startup, Kuber automatically attempts recovery:
-
-1. **Backup**: Create backup of corrupted data
-2. **Tolerant Open**: Attempt opening with relaxed checks (may recover partial data)
-3. **Fresh Start**: As last resort, create fresh database (corrupted data backed up)
-
-```
-Corruption Detected on Startup
-         │
-         ▼
-┌─────────────────────────────────────────┐
-│  1. Create backup of corrupted data      │
-│     → {region}_corrupted_{timestamp}     │
-├─────────────────────────────────────────┤
-│  2. Open with paranoidChecks=false       │
-│     → May recover partial data           │
-├─────────────────────────────────────────┤
-│  3. Start fresh (data loss)              │
-│     → Corrupted data preserved in backup │
-└─────────────────────────────────────────┘
-```
-
-### All Persistence Stores - Graceful Shutdown
-
-v1.3.5 adds graceful shutdown to ALL persistence stores:
-
-| Store | Shutdown Sequence |
-|-------|-------------------|
-| **RocksDB** | Cancel background work → Flush memtables → Sync WAL → Close |
-| **LMDB** | Sync environments → Close DBI handles → Close environments |
-| **SQLite** | WAL checkpoint (TRUNCATE) → Close connections |
-| **PostgreSQL** | Wait for active connections → Close HikariCP pool |
-| **MongoDB** | Wait for in-flight ops → Spring manages MongoClient |
-| **Memory** | Clear maps (data is volatile) |
-
-### Pre/Post Sync During Shutdown
-
-The shutdown orchestrator now includes sync phases:
-
-- **Pre-Sync**: Sync existing data before cache persist
-- **Cache Persist**: Save all cache entries
-- **Post-Sync**: Sync newly written data
-- **Extended Wait**: Double delay before closing
-
-This ensures all data is safely written to disk before the database handles are closed.
-
-
-## Concurrent Region Processing (v1.3.2)
-
-Kuber v1.3.2 introduces parallel processing for startup operations, significantly reducing startup time for systems with multiple regions.
-
-### Off-Heap Key Index - Segmented Buffers (v1.3.2)
-
-The off-heap key index now supports buffer sizes **exceeding 2GB** using multiple 1GB segments:
-
-| Feature | v1.3.0 | v1.3.2 |
-|---------|--------|--------|
-| Max Size Per Region | 2047MB (capped) | **8GB+** (configurable) |
-| Buffer Architecture | Single ByteBuffer | Multiple 1GB segments |
-| Offset Type | int | **long** |
-
-Configuration:
-```yaml
-kuber:
-  cache:
-    off-heap-key-index: true
-    off-heap-key-index-initial-size-mb: 16
-    off-heap-key-index-max-size-mb: 8192  # Now supports >2GB!
-```
-
-Segments are allocated dynamically as data grows. Statistics now include `segmentCount` to track allocation.
-
-### What's Processed Concurrently
-
-| Operation | Description | When |
-|-----------|-------------|------|
-| **Startup Compaction** | RocksDB compactRange() or SQLite VACUUM | Before cache initialization |
-| **Data Loading** | Loading keys/values from persistence into memory | During cache priming |
-
-### Why It's Safe
-
-Each region has its own **isolated database instance**:
-- **RocksDB**: Separate directory per region (e.g., `./data/rocksdb/customers/`, `./data/rocksdb/orders/`)
-- **SQLite**: Separate file per region (e.g., `customers.db`, `orders.db`)
-
-No lock contention between regions - they're completely independent databases.
-
-### Configuration
-
-```yaml
-kuber:
-  persistence:
-    type: rocksdb
-    rocksdb:
-      path: ./data/rocksdb
-      compaction-enabled: true
-    
-    # Or for SQLite:
-    sqlite:
-      path: ./data
-```
-
-## Autoload - Bulk Data Import
-
-Kuber can automatically load data from CSV and JSON files placed in a watched directory.
-
-### Setup
-
-The autoload service watches a configurable directory (default: `./autoload`) with two subfolders:
-- `inbox/` - Place data files here with metadata files
-- `outbox/` - Processed files are moved here
-
-### Configuration
-
-```yaml
-kuber:
-  autoload:
-    enabled: true
-    directory: ./autoload
-    scan-interval-seconds: 60
-    batch-size: 8192          # Records per batch for bulk writes (v1.3.9)
-    max-records-per-file: 0   # 0 = unlimited
-    create-directories: true
-    file-encoding: UTF-8
-```
-
-Files are processed sequentially with batch writes for optimal performance.
-Batch writes provide 10-50x faster loading compared to per-record writes.
+Bulk import data from CSV, TXT, and JSON files:
 
 ### Metadata File Format
 
@@ -1203,168 +509,35 @@ key_field:user_id
 delimiter:,
 ```
 
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| region | No | default | Target cache region |
-| ttl | No | -1 | Time-to-live in seconds (-1 = no expiration) |
-| key_field | **Yes** | - | Column/field name to use as cache key |
-| delimiter | No | , | CSV delimiter character |
-
-### CSV File Example
+### Example Files
 
 **users.csv**
 ```csv
 user_id,name,email,age,active
 1001,John Doe,john@example.com,30,true
 1002,Jane Smith,jane@example.com,25,true
-1003,Bob Wilson,bob@example.com,35,false
 ```
-
-**users.csv.metadata**
-```properties
-region:users
-ttl:7200
-key_field:user_id
-```
-
-Result: Three JSON entries created in "users" region with keys "1001", "1002", "1003".
-
-### JSON File Example (JSONL)
-
-**products.json** (one JSON object per line)
-```json
-{"sku":"PROD001","name":"Widget","price":29.99}
-{"sku":"PROD002","name":"Gadget","price":49.99}
-{"sku":"PROD003","name":"Gizmo","price":19.99}
-```
-
-**products.json.metadata**
-```properties
-region:products
-ttl:-1
-key_field:sku
-```
-
-### REST API
-
-```bash
-# Get autoload status
-curl -u admin:admin123 http://localhost:8080/api/autoload/status
-
-# Trigger immediate scan (Admin only)
-curl -X POST -u admin:admin123 http://localhost:8080/api/autoload/trigger
-```
-
-### Processed Files
-
-After processing, files are moved to outbox with timestamp and status:
-```
-20250101_120000_SUCCESS_users.csv
-20250101_120000_SUCCESS_users.csv.metadata
-20250101_120000_ERROR_NO_KEY_FIELD_data.csv
-```
-
-### Replication
-
-Data loaded via autoload is automatically replicated to secondary nodes when replication is enabled.
 
 ## Backup and Restore (v1.4.0)
 
-Kuber provides automatic scheduled backup of all regions and automatic restore when backup files are placed in the restore directory. This feature supports RocksDB and LMDB persistence stores only (SQL databases have their own backup mechanisms).
-
-### Configuration
+Automatic scheduled backup and restore for RocksDB and LMDB:
 
 ```yaml
 kuber:
   backup:
-    enabled: true                    # Enable backup/restore service
-    backup-directory: ./backup       # Where backup files are stored
-    restore-directory: ./restore     # Monitor this for restore files
-    cron: "0 0 23 * * *"            # Schedule: 11:00 PM daily (default)
-    max-backups-per-region: 10       # Keep last 10 backups per region
-    compress: true                   # Gzip compression (recommended)
-    batch-size: 10000               # Entries per batch during backup/restore
+    enabled: true
+    backup-directory: ./backup
+    restore-directory: ./restore
+    cron: "0 0 23 * * *"
+    max-backups-per-region: 10
+    compress: true
 ```
-
-### Cron Expression Examples
-
-| Expression | Description |
-|------------|-------------|
-| `0 0 23 * * *` | 11:00 PM daily (default) |
-| `0 0 2 * * *` | 2:00 AM daily |
-| `0 0 */6 * * *` | Every 6 hours |
-| `0 30 1 * * SUN` | 1:30 AM every Sunday |
-
-### Backup
-
-Backups run automatically according to the cron schedule. Each region is backed up to a separate file:
-
-```
-./backup/
-├── customers.20251207_230000.backup.gz
-├── products.20251207_230003.backup.gz
-└── default.20251207_230005.backup.gz
-```
-
-File format is JSONL (one CacheEntry per line) with optional gzip compression.
-
-#### Manual Backup
-
-Trigger immediate backup via:
-
-1. **Admin Dashboard**: Select a region (or "All Regions") and click the "Backup" button
-2. **REST API**:
-```bash
-# Backup all regions
-curl -X POST http://localhost:8080/api/admin/backup -H "X-API-Key: your-key"
-
-# Backup single region
-curl -X POST http://localhost:8080/api/admin/backup/customers -H "X-API-Key: your-key"
-```
-
-### Restore
-
-To restore a region:
-
-1. Place backup file in `./restore` directory
-2. Service detects file within 30 seconds
-3. Region name inferred from file name
-4. **Region is LOCKED** - all operations blocked
-5. Existing data purged
-6. Backup data restored in batches
-7. Region unlocked
-8. Processed file moved to backup directory
-
-```bash
-# Restore a region
-cp ./backup/customers.20251207_143022.backup.gz ./restore/
-
-# Watch logs for progress
-tail -f logs/kuber.log
-```
-
-### Region Locking During Restore
-
-During restore, all GET, SET, DELETE operations on the region return an error:
-```
-"Region 'customers' is currently being restored. Please wait for restore to complete."
-```
-
-### Supported Stores
-
-| Store | Supported | Notes |
-|-------|-----------|-------|
-| RocksDB | ✓ | Full support |
-| LMDB | ✓ | Full support |
-| SQLite | ✗ | Use `.backup` command |
-| PostgreSQL | ✗ | Use `pg_dump` |
-| MongoDB | ✗ | Use `mongodump` |
 
 ## Security
 
 ### Authentication
 
-Users are configured in `users.json` file with cleartext credentials for simplicity:
+Users configured in `users.json`:
 
 ```json
 {
@@ -1379,11 +552,13 @@ Users are configured in `users.json` file with cleartext credentials for simplic
 }
 ```
 
-Default users:
-- `admin / admin123` - Full system access
-- `operator / operator123` - Region and cache management
-- `user / user123` - Read/write cache entries
-- `readonly / readonly123` - Read-only access
+### API Keys
+
+Generate API keys from Admin UI for programmatic access:
+
+```bash
+curl -H "X-API-Key: your-api-key" http://localhost:8080/api/v1/cache/default/key
+```
 
 ### Roles
 
@@ -1415,12 +590,18 @@ DBSIZE                 # Entry count
 
 ```
 kuber/
-├── kuber-core/           # Core models and protocols
-├── kuber-server/         # Spring Boot server
-├── kuber-client-java/    # Java client library
-├── kuber-client-python/  # Python client library
-├── pom.xml               # Parent POM
-└── README.md             # This file
+├── kuber-core/              # Core models and protocols
+├── kuber-server/            # Spring Boot server
+├── kuber-client-java/       # Java client library
+├── kuber-client-python/     # Python client library
+├── kuber-client-csharp/     # C# / .NET client library (v1.7.0)
+├── docs/                    # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── CLIENT_USAGE.md
+│   └── HOW_TO_START_KUBER_SERVER.md
+├── scripts/                 # Startup/shutdown scripts
+├── pom.xml                  # Parent POM
+└── README.md                # This file
 ```
 
 ## Building

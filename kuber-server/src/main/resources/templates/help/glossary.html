@@ -160,6 +160,24 @@
                             <span class="badge bg-light text-dark">Configuration</span>
                         </div>
                     </div>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Backpressure <span class="badge bg-success ms-2">v1.7.0</span></h5>
+                            <p class="card-text">A flow control mechanism in Request/Response Messaging that prevents memory exhaustion. When the internal queue reaches 80% capacity (high water mark), message consumption pauses. Consumption resumes when queue drops to 50% (low water mark). Messages are NOT rejected - they queue at the broker until consumption resumes.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Performance</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Broker Control <span class="badge bg-success ms-2">v1.7.0</span></h5>
+                            <p class="card-text">Dynamic management of message broker connections from the Admin UI. Includes Enable (connect and start consuming), Disable (disconnect and stop consuming), Pause (stop consuming but keep connection), Resume (resume after pause), and Reconnect (retry failed connections). Enable/Disable persist to configuration; Pause/Resume are runtime-only.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Admin</span>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Section C -->
@@ -414,6 +432,15 @@
                             <p class="card-text">A statistic tracking the total number of read operations (GET commands) performed on a region. Includes both hits and misses.</p>
                             <span class="badge bg-light text-dark">Statistics</span>
                             <span class="badge bg-light text-dark">Operations</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Global Service Control <span class="badge bg-success ms-2">v1.7.0</span></h5>
+                            <p class="card-text">Enable or disable the entire Request/Response Messaging feature globally. When disabled, all broker connections are closed and messages queue at the brokers until re-enabled. Control via Admin UI button, REST API (<code>/api/v1/messaging/enable</code> or <code>/disable</code>), or JSON config (<code>request_response.json</code>).</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Admin</span>
                         </div>
                     </div>
                 </div>

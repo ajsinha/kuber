@@ -33,6 +33,15 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="display-6"><i class="fas fa-exchange-alt me-3 text-primary"></i>Request/Response Messaging</h1>
                 <div>
+                    <!-- Global Service Toggle -->
+                    <div class="btn-group me-2" role="group">
+                        <button th:if="${stats.enabled}" class="btn btn-danger" onclick="disableService()">
+                            <i class="fas fa-power-off me-1"></i>Disable Service
+                        </button>
+                        <button th:unless="${stats.enabled}" class="btn btn-success" onclick="enableService()">
+                            <i class="fas fa-power-off me-1"></i>Enable Service
+                        </button>
+                    </div>
                     <a href="/admin/messaging/queue" class="btn btn-outline-info me-2">
                         <i class="fas fa-list-ol me-1"></i>View Queue
                     </a>
@@ -40,6 +49,13 @@
                         <i class="fas fa-plus me-1"></i>Add Broker
                     </button>
                 </div>
+            </div>
+            
+            <!-- Global Service Status Alert -->
+            <div th:unless="${stats.enabled}" class="alert alert-warning mb-4">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Service Disabled:</strong> Request/Response Messaging is globally disabled. 
+                Click "Enable Service" to activate message processing for all brokers.
             </div>
 
             <!-- Status Cards -->
@@ -809,6 +825,47 @@ function pauseBroker(brokerName) {
 
 function resumeBroker(brokerName) {
     fetch('/api/v1/messaging/brokers/' + encodeURIComponent(brokerName) + '/resume', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            location.reload();
+        } else {
+            showToast('error', 'Error: ' + data.error);
+        }
+    })
+    .catch(err => {
+        showToast('error', 'Request failed: ' + err.message);
+    });
+}
+
+// Global Service Enable/Disable
+function enableService() {
+    if (!confirm('Enable Request/Response Messaging globally?\n\nThis will activate message processing and connect all enabled brokers.')) return;
+    
+    fetch('/api/v1/messaging/enable', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            location.reload();
+        } else {
+            showToast('error', 'Error: ' + data.error);
+        }
+    })
+    .catch(err => {
+        showToast('error', 'Request failed: ' + err.message);
+    });
+}
+
+function disableService() {
+    if (!confirm('Disable Request/Response Messaging globally?\n\nThis will disconnect all brokers and stop message processing.\nMessages will queue at the brokers until re-enabled.')) return;
+    
+    fetch('/api/v1/messaging/disable', {
         method: 'POST'
     })
     .then(r => r.json())

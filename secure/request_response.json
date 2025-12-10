@@ -1,5 +1,5 @@
 {
-  "enabled" : false,
+  "enabled" : true,
   "brokers" : {
     "activemq_example" : {
       "enabled" : true,

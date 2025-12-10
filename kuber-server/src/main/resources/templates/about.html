@@ -171,6 +171,22 @@
             </div>
             
             <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #10b981 0%, #0891b2 100%);">
+                    <div class="card-body text-center p-4 text-white">
+                        <div class="rounded-circle bg-white bg-opacity-25 p-3 d-inline-block mb-3">
+                            <i class="fab fa-microsoft fa-2x"></i>
+                        </div>
+                        <h5 class="card-title">C# / .NET Client</h5>
+                        <p class="card-text opacity-75">
+                            Complete .NET client library with async/await support.
+                            Redis protocol, REST API, and messaging patterns.
+                        </p>
+                        <span class="badge bg-light text-dark">NEW in v1.7.0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);">
                     <div class="card-body text-center p-4 text-white">
                         <div class="rounded-circle bg-white bg-opacity-25 p-3 d-inline-block mb-3">
@@ -381,8 +397,23 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.6.5</span>
-                                    <span class="text-muted small">Current - API Key Only Authentication</span>
+                                    <span class="badge bg-primary me-2">v1.7.0</span>
+                                    <span class="text-muted small">Current - Request/Response Messaging & C# Client</span>
+                                </h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Request/Response Messaging</strong>: Access cache via message brokers (Kafka, RabbitMQ, IBM MQ, ActiveMQ)</li>
+                                    <li><strong>Broker Controls</strong>: Enable/Disable/Pause/Resume broker connections from Admin UI</li>
+                                    <li><strong>C# / .NET Client</strong>: Complete client library with Redis protocol, REST API, and messaging support</li>
+                                    <li><strong>Batch Operations</strong>: MGET/MSET support in messaging with key-value pair response format</li>
+                                    <li><strong>Backpressure Management</strong>: Automatic pause/resume based on queue depth (no message rejection)</li>
+                                    <li><strong>Client Examples</strong>: Python, Java, and C# messaging examples for all brokers</li>
+                                    <li><strong>Enhanced Help System</strong>: Comprehensive glossary, C# client docs, messaging documentation</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.6.5</span>
+                                    <span class="text-muted small">API Key Only Authentication</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>BREAKING</strong>: All programmatic access requires API Key (username/password only for Web UI)</li>
@@ -941,7 +972,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.3.6
+                                <strong>Version:</strong> 1.7.0
                             </li>
                         </ul>
                     </div>

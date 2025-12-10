@@ -50,6 +50,7 @@
                                 <ul class="list-unstyled mb-0">
                                     <li><a href="#standalone">Standalone Client Files</a></li>
                                     <li><a href="#regions">Region Management</a></li>
+                                    <li><a href="#messaging">Request/Response Messaging</a> <span class="badge bg-success">v1.7.0</span></li>
                                     <li><a href="#complete-example">Complete Example</a></li>
                                 </ul>
                             </div>
@@ -65,7 +66,7 @@
                     <pre class="bg-dark text-light p-3 rounded"><code>&lt;dependency&gt;
     &lt;groupId&gt;com.kuber&lt;/groupId&gt;
     &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
-    &lt;version&gt;1.6.5-SNAPSHOT&lt;/version&gt;
+    &lt;version&gt;1.7.0-SNAPSHOT&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
                     <h4 class="mt-4">Basic Usage</h4>
@@ -302,16 +303,20 @@ cd kuber-client-java
 mvn clean package
 
 # Run JSON demo
-java -cp target/kuber-client-java-1.6.5.jar \
+java -cp target/kuber-client-java-1.7.0.jar \
     com.kuber.client.examples.KuberJsonDemo localhost 6380 kub_your_api_key
 
 # Run Redis example
-java -cp target/kuber-client-java-1.6.5.jar \
+java -cp target/kuber-client-java-1.7.0.jar \
     com.kuber.client.examples.KuberRedisExample localhost 6380 kub_your_api_key
 
 # Run REST example
-java -cp target/kuber-client-java-1.6.5.jar \
-    com.kuber.client.examples.KuberRestExample localhost 8080 kub_your_api_key</code></pre>
+java -cp target/kuber-client-java-1.7.0.jar \
+    com.kuber.client.examples.KuberRestExample localhost 8080 kub_your_api_key
+
+# Run Messaging example (v1.7.0)
+java -cp target/kuber-client-java-1.7.0.jar \
+    com.kuber.client.examples.KuberMessagingExample</code></pre>
                     
                     <div class="alert alert-secondary mt-3">
                         <i class="fas fa-folder-open me-2"></i>
@@ -340,6 +345,65 @@ java -cp target/kuber-client-java-1.6.5.jar \
     // Switch back to default
     client.selectRegion("default");
 }</code></pre>
+                </section>
+
+                <!-- Messaging Section -->
+                <section id="messaging" class="mb-5">
+                    <h3 class="border-bottom pb-2"><i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging <span class="badge bg-success">v1.7.0</span></h3>
+                    <p>Access Kuber cache via message brokers (Kafka, RabbitMQ, IBM MQ, ActiveMQ).</p>
+                    
+                    <h4>Message Format</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.*;
+
+ObjectMapper mapper = new ObjectMapper();
+
+// Build a request message
+Map&lt;String, Object&gt; request = new HashMap&lt;&gt;();
+request.put("api_key", "kub_your_api_key");
+request.put("message_id", UUID.randomUUID().toString());
+request.put("operation", "GET");
+request.put("region", "default");
+request.put("key", "user:1001");
+
+// Send to your broker's request topic (e.g., kuber_request)
+String messageJson = mapper.writeValueAsString(request);
+
+// Response will arrive on kuber_response topic:
+// {
+//   "request": { ... original request ... },
+//   "response": {
+//     "success": true,
+//     "result": "{\"name\": \"John\"}",
+//     "error": ""
+//   },
+//   "processing_time_ms": 2
+// }</code></pre>
+
+                    <h4 class="mt-4">Supported Operations</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr><th>Operation</th><th>Required Fields</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>GET</td><td>key</td><td>Get value by key</td></tr>
+                                <tr><td>SET</td><td>key, value</td><td>Set key-value (optional: ttl)</td></tr>
+                                <tr><td>DELETE</td><td>key</td><td>Delete key</td></tr>
+                                <tr><td>MGET</td><td>keys[]</td><td>Get multiple keys</td></tr>
+                                <tr><td>MSET</td><td>entries{}</td><td>Set multiple key-value pairs</td></tr>
+                                <tr><td>KEYS</td><td>pattern</td><td>Find keys by pattern</td></tr>
+                                <tr><td>JSET</td><td>key, value</td><td>Set JSON document</td></tr>
+                                <tr><td>JGET</td><td>key</td><td>Get JSON document</td></tr>
+                                <tr><td>JSEARCH</td><td>query</td><td>Search JSON documents</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-book me-2"></i>
+                        See the <a href="/help/messaging" class="alert-link">Request/Response Messaging</a> help page for complete documentation on message format, broker configuration, and backpressure management.
+                    </div>
                 </section>
 
                 <!-- Complete Example -->
@@ -424,7 +488,7 @@ public class KuberCompleteExample {
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.6.5</p>
+                    <p class="text-muted small mb-0">Version 1.7.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

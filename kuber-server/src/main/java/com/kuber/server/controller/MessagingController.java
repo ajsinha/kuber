@@ -459,6 +459,72 @@ public class MessagingController {
     // ==================== Broker Control Endpoints ====================
     
     /**
+     * Globally enable the messaging service.
+     * This enables the service and connects all configured brokers.
+     */
+    @PostMapping("/api/v1/messaging/enable")
+    @ResponseBody
+    public ResponseEntity<?> enableService() {
+        if (messagingService == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Messaging service not available"
+            ));
+        }
+        
+        try {
+            boolean success = messagingService.enableService();
+            if (success) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Messaging service globally enabled"
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Failed to enable messaging service"
+                ));
+            }
+        } catch (Exception e) {
+            log.error("Failed to enable messaging service: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to enable messaging service: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Globally disable the messaging service.
+     * This disconnects all brokers and stops processing.
+     */
+    @PostMapping("/api/v1/messaging/disable")
+    @ResponseBody
+    public ResponseEntity<?> disableService() {
+        if (messagingService == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Messaging service not available"
+            ));
+        }
+        
+        try {
+            boolean success = messagingService.disableService();
+            if (success) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Messaging service globally disabled"
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Failed to disable messaging service"
+                ));
+            }
+        } catch (Exception e) {
+            log.error("Failed to disable messaging service: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to disable messaging service: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
      * Enable a broker - connect and start consuming messages.
      */
     @PostMapping("/api/v1/messaging/brokers/{brokerName}/enable")

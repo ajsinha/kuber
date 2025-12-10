@@ -1189,6 +1189,80 @@ public class RequestResponseService {
     }
     
     /**
+     * Globally enable the Request/Response messaging service.
+     * This enables the service and connects all configured brokers.
+     * 
+     * @return true if successful
+     */
+    public boolean enableService() {
+        if (config == null) {
+            log.warn("Cannot enable messaging service - no configuration loaded");
+            return false;
+        }
+        
+        if (config.isEnabled() && running.get()) {
+            log.info("Messaging service is already enabled and running");
+            return true;
+        }
+        
+        config.setEnabled(true);
+        try {
+            saveConfig(config);
+        } catch (IOException e) {
+            log.error("Failed to save config after enabling service: {}", e.getMessage());
+            return false;
+        }
+        
+        // If not yet started, start the service
+        if (!running.get()) {
+            initialized.set(false);  // Reset to allow re-initialization
+            start();
+        }
+        
+        log.info("Messaging service globally enabled");
+        return true;
+    }
+    
+    /**
+     * Globally disable the Request/Response messaging service.
+     * This disconnects all brokers and stops processing.
+     * 
+     * @return true if successful
+     */
+    public boolean disableService() {
+        if (config == null) {
+            log.warn("Cannot disable messaging service - no configuration loaded");
+            return false;
+        }
+        
+        config.setEnabled(false);
+        try {
+            saveConfig(config);
+        } catch (IOException e) {
+            log.error("Failed to save config after disabling service: {}", e.getMessage());
+            return false;
+        }
+        
+        // Stop the service if running
+        if (running.get()) {
+            stop();
+            initialized.set(false);  // Allow re-initialization if enabled again
+        }
+        
+        log.info("Messaging service globally disabled");
+        return true;
+    }
+    
+    /**
+     * Check if the service is globally enabled in configuration.
+     * 
+     * @return true if enabled in config
+     */
+    public boolean isServiceEnabled() {
+        return config != null && config.isEnabled();
+    }
+    
+    /**
      * Drain requests from the queue.
      * 
      * @param count number of requests to drain (0 = drain all)

@@ -175,15 +175,29 @@ kuber/
 │   ├── KuberRestClient.java      # REST API client (Auth required)
 │   └── examples/
 │       ├── KuberRedisExample.java
-│       └── KuberRestExample.java
+│       ├── KuberRestExample.java
+│       └── KuberMessagingExample.java  # Messaging client example
 │
 ├── kuber-client-python/           # Python client libraries
 │   ├── kuber_redis_standalone.py # Redis protocol client (Auth required)
-│   └── kuber_rest_standalone.py  # REST API client (Auth required)
+│   ├── kuber_rest_standalone.py  # REST API client (Auth required)
+│   └── examples/
+│       └── messaging_example.py  # Messaging client example
+│
+├── kuber-client-csharp/           # C# / .NET client libraries (v1.7.0)
+│   ├── src/Kuber.Client/
+│   │   ├── KuberClient.cs        # Redis protocol client (StackExchange.Redis)
+│   │   ├── KuberRestClient.cs    # REST API client (HttpClient)
+│   │   └── KuberMessagingClient.cs # Messaging client
+│   └── examples/
+│       ├── RedisProtocolExample.cs
+│       ├── RestApiExample.cs
+│       └── MessagingExample.cs
 │
 └── docs/
     ├── ARCHITECTURE.md           # This document
-    └── CLIENT_USAGE.md           # Client usage guide
+    ├── CLIENT_USAGE.md           # Client usage guide
+    └── HOW_TO_START_KUBER_SERVER.md # Server startup guide
 ```
 
 ---
@@ -706,40 +720,43 @@ Native JSON document support with JSONPath queries:
 
 ## 6. Client Architecture
 
-### 13.1 Client Overview
+### 6.1 Client Overview
 
-**IMPORTANT: All clients require authentication with username and password.**
+**IMPORTANT: All clients require authentication with username/password or API key.**
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         CLIENT ARCHITECTURE                              │
-├─────────────────────────┬───────────────────────────────────────────────┤
-│    Redis Protocol       │              REST API                          │
-│    (Port 6380)          │           (Port 8080)                          │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│                         │                                                │
-│  ┌─────────────────┐    │    ┌─────────────────┐                        │
-│  │ Python Client   │    │    │ Python Client   │                        │
-│  │                 │    │    │                 │                        │
-│  │ • Pure socket   │    │    │ • Pure urllib   │                        │
-│  │ • No deps       │    │    │ • No deps       │                        │
-│  │ • RESP parser   │    │    │ • JSON parsing  │                        │
-│  │ • Auth REQUIRED │    │    │ • Auth REQUIRED │                        │
-│  └─────────────────┘    │    └─────────────────┘                        │
-│                         │                                                │
-│  ┌─────────────────┐    │    ┌─────────────────┐                        │
-│  │ Java Client     │    │    │ Java Client     │                        │
-│  │                 │    │    │                 │                        │
-│  │ • Socket I/O    │    │    │ • HttpURLConn   │                        │
-│  │ • Jackson JSON  │    │    │ • Jackson JSON  │                        │
-│  │ • RESP parser   │    │    │ • Basic Auth    │                        │
-│  │ • Auth REQUIRED │    │    │ • Auth REQUIRED │                        │
-│  └─────────────────┘    │    └─────────────────┘                        │
-│                         │                                                │
-└─────────────────────────┴───────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            CLIENT ARCHITECTURE (v1.7.0)                          │
+├─────────────────────┬─────────────────────┬─────────────────────────────────────┤
+│   Redis Protocol    │      REST API       │           Messaging                  │
+│    (Port 6380)      │    (Port 8080)      │     (Kafka/RabbitMQ/etc.)           │
+├─────────────────────┼─────────────────────┼─────────────────────────────────────┤
+│                     │                     │                                      │
+│ ┌─────────────────┐ │ ┌─────────────────┐ │  ┌─────────────────────────────────┐│
+│ │ Python Client   │ │ │ Python Client   │ │  │ Python Messaging Client         ││
+│ │ • Pure socket   │ │ │ • Pure urllib   │ │  │ • Request builders              ││
+│ │ • No deps       │ │ │ • No deps       │ │  │ • JSON message format           ││
+│ │ • RESP parser   │ │ │ • JSON parsing  │ │  │ • Any broker library            ││
+│ └─────────────────┘ │ └─────────────────┘ │  └─────────────────────────────────┘│
+│                     │                     │                                      │
+│ ┌─────────────────┐ │ ┌─────────────────┐ │  ┌─────────────────────────────────┐│
+│ │ Java Client     │ │ │ Java Client     │ │  │ Java Messaging Client           ││
+│ │ • Socket I/O    │ │ │ • HttpURLConn   │ │  │ • RequestBuilder class          ││
+│ │ • Jackson JSON  │ │ │ • Jackson JSON  │ │  │ • CacheRequest/Response DTOs    ││
+│ │ • RESP parser   │ │ │ • Basic Auth    │ │  │ • Jackson serialization         ││
+│ └─────────────────┘ │ └─────────────────┘ │  └─────────────────────────────────┘│
+│                     │                     │                                      │
+│ ┌─────────────────┐ │ ┌─────────────────┐ │  ┌─────────────────────────────────┐│
+│ │ C# Client       │ │ │ C# Client       │ │  │ C# Messaging Client             ││
+│ │ • StackExchange │ │ │ • HttpClient    │ │  │ • Request builders              ││
+│ │ • Async/await   │ │ │ • Async/await   │ │  │ • System.Text.Json              ││
+│ │ • Generics      │ │ │ • API key auth  │ │  │ • Any broker library            ││
+│ └─────────────────┘ │ └─────────────────┘ │  └─────────────────────────────────┘│
+│                     │                     │                                      │
+└─────────────────────┴─────────────────────┴─────────────────────────────────────┘
 ```
 
-### 13.2 Authentication Methods
+### 6.2 Authentication Methods
 
 All client constructors support both password and API key authentication:
 
@@ -783,7 +800,21 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
 KuberRestClient client = new KuberRestClient(host, port, username, password);
 ```
 
-### 13.3 Client Connection Flow
+**C# Redis Client (v1.7.0):**
+```csharp
+// Connection via StackExchange.Redis
+using var client = new KuberClient("localhost", 6380);
+await client.SetAsync("key", "value");
+```
+
+**C# REST Client (v1.7.0):**
+```csharp
+// API Key authentication
+using var client = new KuberRestClient("localhost", 8080, apiKey: "kub_your_api_key_here");
+await client.SetAsync("key", "value");
+```
+
+### 6.3 Client Connection Flow
 
 ```
 ┌──────────────┐     ┌───────────────────┐     ┌──────────────────┐
@@ -1076,6 +1107,8 @@ decoupled communication with the cache system.
 
 ### 10.4 Backpressure Management
 
+**Note:** Backpressure pauses consumption but does NOT reject messages. Messages queue at the broker until consumption resumes.
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    BACKPRESSURE STATES                          │
@@ -1089,9 +1122,8 @@ decoupled communication with the cache system.
 │               ↑                                                  │
 │               LOW WATER MARK - Resume Consumption                │
 │                                                                  │
-│  Queue Depth: [====================================] 100%        │
-│               ↑                                                  │
-│               QUEUE FULL - Reject Requests                       │
+│  Messages continue to queue at broker during pause.              │
+│  No messages are rejected or lost.                               │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -1100,8 +1132,8 @@ decoupled communication with the cache system.
 |-------|---------|--------|
 | Normal | 0-50% | Full speed consumption |
 | Elevated | 50-80% | Normal consumption |
-| High Water | 80%+ | Pause message consumption |
-| Queue Full | 100% | Reject incoming requests |
+| High Water | 80%+ | Pause message consumption (messages queue at broker) |
+| Recovery | Below 50% | Resume consumption automatically |
 
 ### 10.5 Configuration
 
@@ -1127,7 +1159,106 @@ Configuration stored in `request_response.json` in the secure folder:
 }
 ```
 
-### 10.6 Startup/Shutdown Integration
+### 10.6 Global Service Control (v1.7.0)
+
+The entire Request/Response Messaging feature can be globally enabled or disabled:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  GLOBAL SERVICE LIFECYCLE                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌───────────────┐    Enable Service    ┌───────────────┐       │
+│  │   Disabled    │ ────────────────────► │    Running    │       │
+│  │               │                       │               │       │
+│  │ All brokers   │                       │ All enabled   │       │
+│  │ disconnected  │ ◄──────────────────── │ brokers       │       │
+│  └───────────────┘    Disable Service    │ connected     │       │
+│                                          └───────────────┘       │
+│                                                                  │
+│  Config: enabled: false                  Config: enabled: true   │
+│  Messages queue at broker                Messages processed       │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Configuration Methods
+
+| Method | How | Persisted |
+|--------|-----|-----------|
+| **Admin UI** | Admin → Messaging → Enable/Disable Service button | Yes |
+| **REST API** | `POST /api/v1/messaging/enable` or `/disable` | Yes |
+| **JSON Config** | Edit `request_response.json`: `"enabled": true/false` | Yes |
+
+#### REST API Endpoints
+
+```
+POST /api/v1/messaging/enable   - Enable service globally
+POST /api/v1/messaging/disable  - Disable service globally
+GET  /api/v1/messaging/status   - Get service status (includes enabled state)
+```
+
+#### Behavior
+
+- **Enable**: Activates message processing, connects all individually-enabled brokers
+- **Disable**: Disconnects all brokers, stops processing (messages queue at brokers)
+- Changes are persisted to `request_response.json` and survive server restarts
+- Individual broker enable/disable still controls broker-level connections
+
+### 10.7 Broker Control (v1.7.0)
+
+The messaging system provides dynamic broker control through the Admin UI and REST API:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    BROKER LIFECYCLE                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────┐     Enable      ┌──────────────┐                  │
+│  │ Disabled │ ───────────────► │  Connected   │                  │
+│  └──────────┘                  └──────┬───────┘                  │
+│       ▲                              │                           │
+│       │ Disable                      │ Pause                     │
+│       │                              ▼                           │
+│       │                       ┌──────────────┐                  │
+│       └─────────────────────── │   Paused    │                  │
+│                                └──────┬───────┘                  │
+│                                       │ Resume                   │
+│                                       │                          │
+│                                       ▼                          │
+│                                ┌──────────────┐                  │
+│                                │  Connected   │                  │
+│                                └──────────────┘                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Action | Effect | Config Update |
+|--------|--------|---------------|
+| **Enable** | Connect and start consuming messages | Sets `enabled: true` |
+| **Disable** | Disconnect and stop consuming | Sets `enabled: false` |
+| **Pause** | Stop consuming, keep connection open | No config change |
+| **Resume** | Resume consuming messages | No config change |
+| **Reconnect** | Retry failed connection | No config change |
+
+#### REST API Endpoints
+
+```
+POST /api/v1/messaging/brokers/{name}/enable   - Enable and connect
+POST /api/v1/messaging/brokers/{name}/disable  - Disable and disconnect
+POST /api/v1/messaging/brokers/{name}/pause    - Pause consumption
+POST /api/v1/messaging/brokers/{name}/resume   - Resume consumption
+GET  /api/v1/messaging/brokers/{name}/status   - Get broker status
+```
+
+#### Admin UI Features
+
+The `/admin/messaging` page provides:
+- Status badges: Connected (green), Paused (yellow), Disconnected (red), Disabled (gray)
+- Control buttons: Enable/Disable, Pause/Resume, Reconnect
+- Statistics: Messages received, published, errors per broker
+- Queue management: Drain requests, cancel specific requests
+
+### 10.8 Startup/Shutdown Integration
 
 | Phase | Startup | Shutdown |
 |-------|---------|----------|
