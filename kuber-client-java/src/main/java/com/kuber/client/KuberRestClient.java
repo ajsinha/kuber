@@ -28,23 +28,31 @@ import java.util.*;
 /**
  * Standalone REST API client for Kuber Distributed Cache.
  * 
- * Uses pure HTTP REST endpoints, no Redis protocol required.
+ * <p><strong>v1.6.5: API Key Authentication ONLY</strong></p>
+ * <p>All programmatic access requires an API key (starts with "kub_").
+ * Username/password authentication is only for the Web UI.</p>
  * 
  * <pre>
- * // Usage example:
- * try (KuberRestClient client = new KuberRestClient("localhost", 8080)) {
- *     // Basic operations
- *     client.set("key", "value");
- *     String value = client.get("key");
- *     
- *     // JSON operations with specific region
- *     client.jsonSet("user:1", userObject, "users");
- *     JsonNode user = client.jsonGet("user:1", "users");
- *     
- *     // JSON search
- *     List<JsonNode> results = client.jsonSearch("$.age>30", "users");
- * }
+ * // Create an API key in the Kuber Web UI (Admin → API Keys)
+ * // Then use it to authenticate:
+ * 
+ * KuberRestClient client = new KuberRestClient("localhost", 8080, "kub_your_api_key_here");
+ * 
+ * // Basic operations
+ * client.set("key", "value");
+ * String value = client.get("key");
+ * 
+ * // JSON operations with specific region
+ * client.jsonSet("user:1", userObject, "users");
+ * JsonNode user = client.jsonGet("user:1", "users");
+ * 
+ * // JSON search
+ * List&lt;JsonNode&gt; results = client.jsonSearch("$.age>30", "users");
+ * 
+ * client.close();
  * </pre>
+ * 
+ * @version 1.6.5
  */
 @Slf4j
 public class KuberRestClient implements AutoCloseable {
@@ -54,59 +62,62 @@ public class KuberRestClient implements AutoCloseable {
     
     private final String baseUrl;
     private final int timeout;
-    private final String authHeader;
-    private final String username;
-    private final String password;
+    private final String apiKey;
     private final ObjectMapper objectMapper;
     
     @Getter
     private String currentRegion = "default";
     
     /**
-     * Create a new REST client with required authentication
+     * Create a new REST client with API Key authentication.
      * 
      * @param host Server hostname
-     * @param port HTTP port
-     * @param username Username for Basic Auth (required)
-     * @param password Password for Basic Auth (required)
-     * @throws IllegalArgumentException if username or password is null
+     * @param port HTTP port (default: 8080)
+     * @param apiKey API Key (must start with "kub_")
+     * @throws IllegalArgumentException if API key is null, empty, or invalid format
      */
-    public KuberRestClient(String host, int port, String username, String password) {
-        this(host, port, username, password, false, DEFAULT_TIMEOUT);
+    public KuberRestClient(String host, int port, String apiKey) {
+        this(host, port, apiKey, false, DEFAULT_TIMEOUT);
     }
     
     /**
-     * Create a new REST client with full configuration
+     * Create a new REST client with API Key and SSL option.
      * 
      * @param host Server hostname
      * @param port HTTP port
-     * @param username Username for Basic Auth (required)
-     * @param password Password for Basic Auth (required)
+     * @param apiKey API Key (must start with "kub_")
+     * @param useSsl Use HTTPS if true
+     * @throws IllegalArgumentException if API key is null, empty, or invalid format
+     */
+    public KuberRestClient(String host, int port, String apiKey, boolean useSsl) {
+        this(host, port, apiKey, useSsl, DEFAULT_TIMEOUT);
+    }
+    
+    /**
+     * Create a new REST client with full configuration.
+     * 
+     * @param host Server hostname
+     * @param port HTTP port
+     * @param apiKey API Key (must start with "kub_")
      * @param useSsl Use HTTPS if true
      * @param timeoutMs Request timeout in milliseconds
-     * @throws IllegalArgumentException if username or password is null
+     * @throws IllegalArgumentException if API key is null, empty, or invalid format
      */
-    public KuberRestClient(String host, int port, String username, String password, 
-                           boolean useSsl, int timeoutMs) {
-        if (username == null || username.isEmpty()) {
-            throw new IllegalArgumentException("Username is required for authentication");
+    public KuberRestClient(String host, int port, String apiKey, boolean useSsl, int timeoutMs) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            throw new IllegalArgumentException("API Key is required for authentication");
         }
-        if (password == null || password.isEmpty()) {
-            throw new IllegalArgumentException("Password is required for authentication");
+        if (!apiKey.startsWith("kub_")) {
+            throw new IllegalArgumentException("Invalid API key format - must start with 'kub_'");
         }
         
         String scheme = useSsl ? "https" : "http";
         this.baseUrl = String.format("%s://%s:%d", scheme, host, port);
         this.timeout = timeoutMs;
+        this.apiKey = apiKey;
         this.objectMapper = new ObjectMapper();
-        this.username = username;
-        this.password = password;
         
-        String credentials = username + ":" + password;
-        this.authHeader = "Basic " + Base64.getEncoder()
-                .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-        
-        log.info("Kuber REST client initialized: {}", baseUrl);
+        log.info("Kuber REST client initialized with API Key: {}", baseUrl);
     }
     
     // ==================== HTTP Methods ====================
@@ -145,9 +156,8 @@ public class KuberRestClient implements AutoCloseable {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
             
-            if (authHeader != null) {
-                conn.setRequestProperty("Authorization", authHeader);
-            }
+            // API Key authentication
+            conn.setRequestProperty("X-API-Key", apiKey);
             
             if (body != null) {
                 conn.setDoOutput(true);

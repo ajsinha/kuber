@@ -19,6 +19,10 @@ A comprehensive standalone Python client for Kuber Distributed Cache using
 pure HTTP REST API. This client does not depend on any external Kuber library
 and uses only the standard library (urllib).
 
+v1.6.5: API Key Authentication ONLY
+All programmatic access requires an API key (starts with "kub_").
+Username/password authentication is only for the Web UI.
+
 Features:
 - All cache operations via REST endpoints
 - Key pattern searching
@@ -26,11 +30,11 @@ Features:
 - JSON document storage and retrieval
 - Deep JSON value search with multiple operators
 - Cross-region operations
-- HTTP Basic Authentication support
+- API Key Authentication (X-API-Key header)
 - Bulk import/export operations
 
 Usage:
-    python kuber_rest_standalone.py [--host HOST] [--port PORT] [--username USER] [--password PASS]
+    python kuber_rest_standalone.py [--host HOST] [--port PORT] [--api-key KEY]
 
 Default connection: http://localhost:8080
 """
@@ -42,19 +46,26 @@ import urllib.parse
 import base64
 import argparse
 import sys
+import os
 from typing import Optional, List, Dict, Any, Union
 from datetime import timedelta
 
+import os
+KUBER_API_KEY = os.getenv('KUBER_API_KEY', 'kub_566e7b476ea57c15612a43a02ff98f6188a50209757a6c3f7c115e845c68b15a')
 
 class KuberRestClient:
     """
     Standalone REST API client for Kuber Distributed Cache.
     
+    v1.6.5: API Key Authentication ONLY.
+    All programmatic access requires an API key (starts with "kub_").
+    Username/password authentication is only for the Web UI.
+    
     Uses pure HTTP REST endpoints, no Redis protocol required.
     """
     
     def __init__(self, host: str = 'localhost', port: int = 8080,
-                 username: str = None, password: str = None,
+                 api_key: str = None,
                  use_ssl: bool = False, timeout: int = 30):
         """
         Initialize connection to Kuber REST API.
@@ -62,28 +73,24 @@ class KuberRestClient:
         Args:
             host: Kuber server hostname
             port: HTTP port (default 8080)
-            username: Username for Basic Auth (required)
-            password: Password for Basic Auth (required)
+            api_key: API Key for authentication (must start with "kub_")
             use_ssl: Use HTTPS if True
             timeout: Request timeout in seconds
             
         Raises:
-            ValueError: If username or password is not provided
+            ValueError: If API key is not provided or has invalid format
         """
-        if not username or not password:
-            raise ValueError("Both username and password are required for authentication")
+        if not api_key:
+            raise ValueError("API Key is required for authentication")
+        if not api_key.startswith('kub_'):
+            raise ValueError("Invalid API key format - must start with 'kub_'")
         
         self.scheme = 'https' if use_ssl else 'http'
         self.host = host
         self.port = port
         self.timeout = timeout
         self.current_region = 'default'
-        self.username = username
-        self.password = password
-        
-        credentials = f"{username}:{password}"
-        encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
-        self._auth_header = f"Basic {encoded}"
+        self.api_key = api_key
     
     @property
     def base_url(self) -> str:
@@ -116,11 +123,9 @@ class KuberRestClient:
         
         headers = {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-API-Key': self.api_key
         }
-        
-        if self._auth_header:
-            headers['Authorization'] = self._auth_header
         
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         
@@ -1244,32 +1249,48 @@ def cleanup(client: KuberRestClient):
 def main():
     """Main function to run all examples."""
     parser = argparse.ArgumentParser(
-        description='Kuber Standalone Python Client - HTTP REST API Examples',
+        description='Kuber Standalone Python Client - HTTP REST API Examples (v1.6.5)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+v1.6.5: API Key Authentication ONLY
+All programmatic access requires an API key (starts with "kub_").
+Username/password authentication is only for the Web UI.
+
 Examples:
-  python kuber_rest_standalone.py --username admin --password secret
-  python kuber_rest_standalone.py -H 192.168.1.100 -P 8080 -u admin -p secret
-  python kuber_rest_standalone.py --username admin --password secret --ssl --port 8443
-  python kuber_rest_standalone.py -u admin -p secret --no-cleanup
+  python kuber_rest_standalone.py --api-key kub_your_api_key_here
+  python kuber_rest_standalone.py -H 192.168.1.100 -P 8080 -k kub_xxx
+  python kuber_rest_standalone.py --api-key kub_xxx --ssl --port 8443
+  python kuber_rest_standalone.py -k kub_xxx --no-cleanup
+  
+Environment variable:
+  export KUBER_API_KEY=kub_your_api_key_here
+  python kuber_rest_standalone.py
         """
     )
     parser.add_argument('--host', '-H', default='localhost', help='Kuber server host (default: localhost)')
     parser.add_argument('--port', '-P', type=int, default=8080, help='HTTP port (default: 8080)')
-    parser.add_argument('--username', '-u', required=True, help='Username for Basic Auth (required)')
-    parser.add_argument('--password', '-p', required=True, help='Password for Basic Auth (required)')
+    parser.add_argument('--api-key', '-k', help='API Key for authentication (must start with "kub_")')
     parser.add_argument('--ssl', action='store_true', help='Use HTTPS')
     parser.add_argument('--no-cleanup', action='store_true', help='Skip cleanup at end')
     args = parser.parse_args()
+    
+    # Get API key from args or environment
+    api_key = args.api_key or os.environ.get('KUBER_API_KEY')
+    if not api_key:
+        print("ERROR: API key is required. Use --api-key or set KUBER_API_KEY environment variable.")
+        sys.exit(1)
+    if not api_key.startswith('kub_'):
+        print("ERROR: Invalid API key format - must start with 'kub_'")
+        sys.exit(1)
     
     protocol = 'https' if args.ssl else 'http'
     
     print(f"""
 ╔══════════════════════════════════════════════════════════════════════╗
-║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API                   ║
+║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v1.6.5)          ║
 ║                                                                      ║
-║     Connecting to: {protocol}://{args.host}:{args.port}                                ║
-║     Authentication: {args.username}@{args.host}                                 ║
+║     Connecting to: {protocol}://{args.host}:{args.port:<36}║
+║     Authentication: API Key ({api_key[:12]}...{api_key[-4:]})                     ║
 ║     Protocol: HTTP REST (no Redis protocol required)                 ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """)
@@ -1278,8 +1299,7 @@ Examples:
         with KuberRestClient(
             args.host, 
             args.port,
-            username=args.username,
-            password=args.password,
+            api_key=api_key,
             use_ssl=args.ssl
         ) as client:
             # Verify connection

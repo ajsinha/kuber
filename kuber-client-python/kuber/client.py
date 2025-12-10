@@ -13,6 +13,16 @@ Kuber Client - Redis Protocol Client Implementation
 
 This client uses the Redis protocol with Kuber extensions for regions and JSON queries.
 For REST API access, use KuberRestClient from kuber.rest_client module.
+
+v1.6.5: API Key Authentication ONLY
+All programmatic access requires an API key (starts with "kub_").
+Username/password authentication is only for the Web UI.
+
+Usage:
+    # Create an API key in the Kuber Web UI (Admin → API Keys)
+    with KuberClient('localhost', 6380, api_key='kub_your_api_key_here') as client:
+        client.set('key', 'value')
+        value = client.get('key')
 """
 
 import socket
@@ -34,7 +44,14 @@ class KuberClient:
     """
     Python client for Kuber Distributed Cache using Redis Protocol.
     
-    Supports Redis protocol with Kuber extensions for regions and JSON queries.
+    v1.6.5: API Key Authentication ONLY.
+    All programmatic access requires an API key (starts with "kub_").
+    Username/password authentication is only for the Web UI.
+    
+    Usage:
+        with KuberClient('localhost', 6380, api_key='kub_xxx') as client:
+            client.set('key', 'value')
+            value = client.get('key')
     """
     
     DEFAULT_PORT = 6380
@@ -45,8 +62,8 @@ class KuberClient:
         self,
         host: str = 'localhost',
         port: int = DEFAULT_PORT,
+        api_key: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
-        password: Optional[str] = None,
         region: str = 'default'
     ):
         """
@@ -55,14 +72,22 @@ class KuberClient:
         Args:
             host: Server hostname
             port: Server port (default: 6380)
+            api_key: API Key for authentication (must start with "kub_")
             timeout: Socket timeout in seconds (default: 30)
-            password: Optional password for authentication
             region: Initial region to select (default: 'default')
+            
+        Raises:
+            ValueError: If API key is not provided or has invalid format
         """
+        if not api_key:
+            raise ValueError("API Key is required for authentication")
+        if not api_key.startswith('kub_'):
+            raise ValueError("Invalid API key format - must start with 'kub_'")
+        
         self.host = host
         self.port = port
         self.timeout = timeout
-        self.password = password
+        self.api_key = api_key
         self._socket: Optional[socket.socket] = None
         self._current_region = region
         self._initial_region = region
@@ -83,8 +108,9 @@ class KuberClient:
         self._socket.settimeout(self.timeout)
         self._socket.connect((self.host, self.port))
         
-        if self.password:
-            self.auth(self.password)
+        # Authenticate with API key
+        if not self.auth(self.api_key):
+            raise KuberException("Authentication failed - invalid API key")
         
         if self._initial_region != 'default':
             self.select_region(self._initial_region)
@@ -107,9 +133,17 @@ class KuberClient:
         """Ping the server."""
         return self._send_command('PING')
     
-    def auth(self, password: str) -> bool:
-        """Authenticate with the server."""
-        result = self._send_command('AUTH', password)
+    def auth(self, api_key: str) -> bool:
+        """
+        Authenticate with API key.
+        
+        Args:
+            api_key: API Key for authentication (must start with "kub_")
+            
+        Returns:
+            True if authentication successful
+        """
+        result = self._send_command('AUTH', api_key)
         return result == 'OK'
     
     # ==================== Region Operations ====================

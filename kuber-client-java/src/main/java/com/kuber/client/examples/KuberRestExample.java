@@ -22,6 +22,8 @@ import java.util.*;
  * Comprehensive examples demonstrating all capabilities of the Kuber Java REST client
  * using pure HTTP REST API endpoints.
  * 
+ * v1.6.5: API Key authentication required.
+ * 
  * Features demonstrated:
  * - Server operations (ping, info, status, stats)
  * - Basic key-value operations (GET, SET, MGET, MSET)
@@ -34,33 +36,37 @@ import java.util.*;
  * - Bulk import/export
  * 
  * Usage:
- *   java -cp kuber-client.jar com.kuber.client.examples.KuberRestExample [host] [port]
+ *   java -cp kuber-client.jar com.kuber.client.examples.KuberRestExample [host] [port] [api-key]
  */
 public class KuberRestExample {
     
     public static void main(String[] args) {
-        if (args.length < 4) {
-            System.err.println("Usage: KuberRestExample <host> <port> <username> <password>");
-            System.err.println("Example: KuberRestExample localhost 8080 admin secret");
+        if (args.length < 3) {
+            System.err.println("Usage: KuberRestExample <host> <port> <api-key>");
+            System.err.println("Example: KuberRestExample localhost 8080 kub_your_api_key_here");
             System.exit(1);
         }
         
         String host = args[0];
         int port = Integer.parseInt(args[1]);
-        String username = args[2];
-        String password = args[3];
+        String apiKey = args[2];
+        
+        if (!apiKey.startsWith("kub_")) {
+            System.err.println("Error: API key must start with 'kub_'");
+            System.exit(1);
+        }
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - HTTP REST API                                  ║
+            ║   KUBER JAVA CLIENT - HTTP REST API (v1.6.5)                         ║
             ║                                                                      ║
-            ║   Protocol: HTTP REST (no Redis protocol required)                   ║
+            ║   Protocol: HTTP REST (API Key Authentication)                       ║
             ╚══════════════════════════════════════════════════════════════════════╝
             """);
         System.out.printf("Connecting to: http://%s:%d%n", host, port);
-        System.out.printf("Authentication: %s@%s%n%n", username, host);
+        System.out.println("Authentication: API Key\n");
         
-        try (KuberRestClient client = new KuberRestClient(host, port, username, password)) {
+        try (KuberRestClient client = new KuberRestClient(host, port, apiKey)) {
             // Run all examples
             example1_ServerOperations(client);
             example2_BasicOperations(client);

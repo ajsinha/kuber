@@ -208,20 +208,27 @@ class KuberJsonClient:
             return results
         
         # Response is now a list of strings in format "key:json"
+        # Key might contain colons (e.g., "prod:1001"), so find where JSON starts
         if isinstance(response, list):
             for item in response:
-                if isinstance(item, str) and ':' in item:
-                    # Format: key:{"json":"value"}
-                    colon_idx = item.index(':')
-                    key = item[:colon_idx]
-                    json_str = item[colon_idx + 1:]
-                    try:
-                        results.append({
-                            'key': key,
-                            'value': json.loads(json_str)
-                        })
-                    except json.JSONDecodeError:
-                        pass
+                if isinstance(item, str):
+                    # Find the colon that precedes the JSON (look for :{ or :[)
+                    json_start = -1
+                    for i, c in enumerate(item):
+                        if c == ':' and i + 1 < len(item) and item[i + 1] in '{[':
+                            json_start = i
+                            break
+                    
+                    if json_start > 0:
+                        key = item[:json_start]
+                        json_str = item[json_start + 1:]
+                        try:
+                            results.append({
+                                'key': key,
+                                'value': json.loads(json_str)
+                            })
+                        except json.JSONDecodeError:
+                            pass
         return results
         
     # ==================== Key Search Operations ====================
@@ -530,8 +537,8 @@ def main():
     try:
         with KuberJsonClient(KUBER_HOST, KUBER_PORT, KUBER_API_KEY) as client:
             # Select region for demo
-            client.select_region('json_demo')
-            print(f"  Region:  json_demo")
+            client.select_region('json-demo')
+            print(f"  Region:  json-demo")
             
             # Run all demos
             demo_a_set_json(client)

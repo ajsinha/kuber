@@ -1,6 +1,6 @@
 # Kuber Client Usage Guide
 
-**Version 1.6.3**
+**Version 1.6.5**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com

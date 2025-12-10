@@ -2,6 +2,134 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.6.5] - 2025-12-09 - API KEY ONLY AUTHENTICATION
+
+### ⚠️ BREAKING CHANGE: Authentication Model
+
+**v1.6.5 enforces API Key authentication for ALL programmatic access.**
+
+| Access Method | Authentication | Description |
+|---------------|----------------|-------------|
+| Web UI (Browser) | Username/Password | Users.json credentials |
+| Redis Protocol (Port 6380) | **API Key ONLY** | `AUTH kub_xxx` |
+| REST API (Port 8080) | **API Key ONLY** | `X-API-Key: kub_xxx` |
+| Java Client | **API Key ONLY** | `new KuberClient(host, port, "kub_xxx")` |
+| Python Client | **API Key ONLY** | `KuberClient(host, port, api_key="kub_xxx")` |
+
+### Changed - Server
+
+- **RedisProtocolHandler**: Now ONLY accepts API key authentication
+  - `AUTH kub_xxx` - Direct API key
+  - `AUTH APIKEY kub_xxx` - API key with keyword prefix
+  - Username/password authentication REMOVED for Redis protocol
+  - Error message if non-API-key auth attempted
+
+### Changed - Client Libraries
+
+- **Java Redis Client** (`KuberClient`):
+  - Constructor: `KuberClient(host, port, apiKey)` - API key required
+  - Constructor: `KuberClient(host, port, apiKey, timeoutMs)` - With custom timeout
+  - Validates API key format (must start with `kub_`)
+  - Removed username/password constructors
+  
+- **Java REST Client** (`KuberRestClient`):
+  - Constructor: `KuberRestClient(host, port, apiKey)` - API key required
+  - Constructor: `KuberRestClient(host, port, apiKey, useSsl)` - With SSL
+  - Constructor: `KuberRestClient(host, port, apiKey, useSsl, timeoutMs)` - Full options
+  - Validates API key format (must start with `kub_`)
+  - Removed Basic Auth (username/password) support
+  
+- **Python Redis Client** (`KuberClient`):
+  - Constructor: `KuberClient(host, port, api_key="kub_xxx")` - API key required
+  - Validates API key format (must start with `kub_`)
+  - Removed `password` and `username` parameters
+  
+- **Python REST Client** (`KuberRestClient`):
+  - Constructor: `KuberRestClient(host, port, api_key="kub_xxx")` - API key required
+  - Validates API key format (must start with `kub_`)
+  - Removed `username` and `password` parameters
+  
+- **Python Standalone Client** (`kuber_redis_standalone.py`):
+  - CLI: `--api-key kub_xxx` (required)
+  - Removed `--username` and `--password` options
+
+### Migration Guide
+
+**Before (v1.6.4):**
+```java
+// Java - These NO LONGER WORK
+KuberClient client = new KuberClient("localhost", 6380, "admin", "password");
+KuberRestClient rest = new KuberRestClient("localhost", 8080, "admin", "password");
+```
+
+```python
+# Python - These NO LONGER WORK
+client = KuberClient('localhost', 6380, username='admin', password='password')
+rest = KuberRestClient('localhost', 8080, username='admin', password='password')
+```
+
+**After (v1.6.5):**
+```java
+// Java - API Key required
+KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key");
+KuberRestClient rest = new KuberRestClient("localhost", 8080, "kub_your_api_key");
+```
+
+```python
+# Python - API Key required
+client = KuberClient('localhost', 6380, api_key='kub_your_api_key')
+rest = KuberRestClient('localhost', 8080, api_key='kub_your_api_key')
+```
+
+### How to Get an API Key
+
+1. Log into the Kuber Web UI with username/password
+2. Navigate to **Admin → API Keys**
+3. Click **Generate New Key**
+4. Copy the generated key (starts with `kub_`)
+5. Use this key in all programmatic access
+
+### Security Rationale
+
+- API keys can be revoked without changing passwords
+- Separate keys for different applications/services
+- Keys can have expiration dates
+- Usage tracking via `lastUsedAt` timestamp
+- Role-based access control per key
+
+### Documentation
+
+- Updated Java client help page with API key only examples
+- Updated Python client help page with API key only examples
+- Updated API Keys help page with migration guide
+- All help pages updated to version 1.6.5
+
+---
+
+## [1.6.4] - 2025-12-09 - SECURE FOLDER CONFIGURATION
+
+### Added
+- **Secure Folder**: New `kuber.secure.folder` property for sensitive configuration files
+  - Default location: `./secure`
+  - Automatically created if it doesn't exist
+  - Centralized location for security-related files
+- **Startup Validation**: Application now validates required security files
+  - `users.json` is REQUIRED - application fails to start if missing
+  - Clear error message with example file format displayed on startup failure
+  - No more default admin user fallback (security improvement)
+
+### Changed
+- **Security File Paths**: Users and API keys files moved to secure folder
+  - `kuber.security.users-file=${kuber.secure.folder}/users.json`
+  - `kuber.security.api-keys-file=${kuber.secure.folder}/apikeys.json`
+
+### Security
+- Removed automatic creation of default admin user when users.json fails to load
+- Application now fails fast with clear error message if security configuration is missing
+- Sensitive files isolated in dedicated secure folder for easier permission management
+
+---
+
 ## [1.6.3] - 2025-12-09 - SHUTDOWN SAFETY FOR WARMING & AUTOLOAD
 
 ### Added

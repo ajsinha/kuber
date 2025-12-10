@@ -13,6 +13,17 @@ Kuber REST Client - HTTP REST API Client Implementation
 
 This client uses the HTTP REST API for all operations.
 For Redis protocol access, use KuberClient from kuber.client module.
+
+v1.6.5: API Key Authentication ONLY
+All programmatic access requires an API key (starts with "kub_").
+Username/password authentication is only for the Web UI.
+
+Usage:
+    # Create an API key in the Kuber Web UI (Admin → API Keys)
+    client = KuberRestClient('localhost', 8080, api_key='kub_your_api_key_here')
+    client.set('key', 'value')
+    value = client.get('key')
+    client.close()
 """
 
 import json
@@ -39,8 +50,15 @@ class KuberRestClient:
     """
     Python client for Kuber Distributed Cache using HTTP REST API.
     
-    This client communicates with Kuber server via HTTP REST endpoints.
-    All operations are performed over HTTP without requiring Redis protocol.
+    v1.6.5: API Key Authentication ONLY.
+    All programmatic access requires an API key (starts with "kub_").
+    Username/password authentication is only for the Web UI.
+    
+    Usage:
+        client = KuberRestClient('localhost', 8080, api_key='kub_xxx')
+        client.set('key', 'value')
+        value = client.get('key')
+        client.close()
     """
     
     DEFAULT_PORT = 8080
@@ -50,9 +68,8 @@ class KuberRestClient:
         self,
         host: str = 'localhost',
         port: int = DEFAULT_PORT,
+        api_key: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
         use_ssl: bool = False
     ):
         """
@@ -61,16 +78,22 @@ class KuberRestClient:
         Args:
             host: Server hostname
             port: HTTP port (default: 8080)
+            api_key: API Key for authentication (must start with "kub_")
             timeout: Request timeout in seconds (default: 30)
-            username: Optional username for authentication
-            password: Optional password for authentication
             use_ssl: Use HTTPS instead of HTTP
+            
+        Raises:
+            ValueError: If API key is not provided or has invalid format
         """
+        if not api_key:
+            raise ValueError("API Key is required for authentication")
+        if not api_key.startswith('kub_'):
+            raise ValueError("Invalid API key format - must start with 'kub_'")
+        
         self.host = host
         self.port = port
         self.timeout = timeout
-        self.username = username
-        self.password = password
+        self.api_key = api_key
         self.scheme = 'https' if use_ssl else 'http'
         self._base_url = f"{self.scheme}://{host}:{port}"
         self._current_region = 'default'
@@ -101,12 +124,8 @@ class KuberRestClient:
         return url
     
     def _get_auth_header(self) -> Dict[str, str]:
-        """Get authorization header if credentials are set."""
-        if self.username and self.password:
-            credentials = f"{self.username}:{self.password}"
-            encoded = base64.b64encode(credentials.encode()).decode()
-            return {'Authorization': f'Basic {encoded}'}
-        return {}
+        """Get authorization header (API Key)."""
+        return {'X-API-Key': self.api_key}
     
     def _request(
         self,

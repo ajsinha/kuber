@@ -1,0 +1,11 @@
+[ {
+  "keyId" : "key_c839ca7f",
+  "keyValue" : "kub_566e7b476ea57c15612a43a02ff98f6188a50209757a6c3f7c115e845c68b15a",
+  "name" : "sample_user",
+  "userId" : "user",
+  "roles" : [ "USER" ],
+  "createdAt" : "2025-12-10T02:15:14.697456138Z",
+  "lastUsedAt" : "2025-12-10T03:59:56.740076906Z",
+  "expiresAt" : null,
+  "active" : true
+} ]

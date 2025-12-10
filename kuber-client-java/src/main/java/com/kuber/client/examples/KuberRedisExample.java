@@ -23,6 +23,8 @@ import java.util.*;
  * Comprehensive examples demonstrating all capabilities of the Kuber Java client
  * using Redis protocol with Kuber extensions.
  * 
+ * v1.6.5: API Key authentication required.
+ * 
  * Features demonstrated:
  * - Basic string operations (GET, SET, MGET, MSET, INCR, DECR)
  * - Key pattern search (KEYS, SCAN)
@@ -33,35 +35,39 @@ import java.util.*;
  * - Cross-region operations
  * 
  * Usage:
- *   java -cp kuber-client.jar com.kuber.client.examples.KuberRedisExample [host] [port]
+ *   java -cp kuber-client.jar com.kuber.client.examples.KuberRedisExample [host] [port] [api-key]
  */
 public class KuberRedisExample {
     
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
     public static void main(String[] args) {
-        if (args.length < 4) {
-            System.err.println("Usage: KuberRedisExample <host> <port> <username> <password>");
-            System.err.println("Example: KuberRedisExample localhost 6380 admin secret");
+        if (args.length < 3) {
+            System.err.println("Usage: KuberRedisExample <host> <port> <api-key>");
+            System.err.println("Example: KuberRedisExample localhost 6380 kub_your_api_key_here");
             System.exit(1);
         }
         
         String host = args[0];
         int port = Integer.parseInt(args[1]);
-        String username = args[2];
-        String password = args[3];
+        String apiKey = args[2];
+        
+        if (!apiKey.startsWith("kub_")) {
+            System.err.println("Error: API key must start with 'kub_'");
+            System.exit(1);
+        }
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS                 ║
+            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v1.6.5)        ║
             ║                                                                      ║
-            ║   Protocol: Redis RESP with Kuber Extensions                         ║
+            ║   Protocol: Redis RESP with Kuber Extensions (API Key Auth)          ║
             ╚══════════════════════════════════════════════════════════════════════╝
             """);
         System.out.printf("Connecting to: %s:%d%n", host, port);
-        System.out.printf("Username: %s%n%n", username);
+        System.out.println("Authentication: API Key\n");
         
-        try (KuberClient client = new KuberClient(host, port, username, password)) {
+        try (KuberClient client = new KuberClient(host, port, apiKey)) {
             System.out.println("  Authentication successful!\n");
             
             // Run all examples

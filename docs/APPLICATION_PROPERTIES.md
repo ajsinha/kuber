@@ -1,0 +1,373 @@
+# Kuber Distributed Cache - Application Properties Reference
+
+**Version 1.6.5**
+
+This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
+
+---
+
+## Table of Contents
+
+- [Core Settings](#core-settings)
+- [Network Configuration](#network-configuration)
+- [Cache Configuration](#cache-configuration)
+- [Persistence Configuration](#persistence-configuration)
+- [Security Configuration](#security-configuration)
+- [Autoload Configuration](#autoload-configuration)
+- [Backup & Restore Configuration](#backup--restore-configuration)
+- [Graceful Shutdown Configuration](#graceful-shutdown-configuration)
+- [Memory Management Configuration](#memory-management-configuration)
+- [Replication Configuration](#replication-configuration)
+- [Event Publishing Configuration](#event-publishing-configuration)
+- [Logging Configuration](#logging-configuration)
+
+---
+
+## Core Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.version` | `1.6.5` | Current application version (read-only) |
+| `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
+| `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json). Auto-created if missing |
+| `server.app.name` | `Kuber` | Application display name shown in Web UI |
+| `server.port` | `8080` | HTTP port for REST API and Web UI |
+| `server.servlet.session.timeout` | `30m` | Web session timeout duration |
+| `server.shutdown` | `graceful` | Shutdown mode. `graceful` waits for active requests to complete |
+| `spring.lifecycle.timeout-per-shutdown-phase` | `30s` | Maximum time to wait during each shutdown phase |
+
+---
+
+## Network Configuration
+
+Redis protocol network settings for client connections.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.network.port` | `6380` | Redis protocol port for client connections |
+| `kuber.network.bind-address` | `0.0.0.0` | IP address to bind to. `0.0.0.0` binds to all interfaces |
+| `kuber.network.max-connections` | `10000` | Maximum concurrent client connections |
+| `kuber.network.connection-timeout-ms` | `30000` | Connection establishment timeout in milliseconds |
+| `kuber.network.read-timeout-ms` | `30000` | Socket read timeout in milliseconds |
+| `kuber.network.decoder-max-line-length` | `1048576` | Maximum command line length (1MB default) |
+| `kuber.network.read-buffer-size` | `2048` | Socket read buffer size in bytes |
+| `kuber.network.write-buffer-size` | `2048` | Socket write buffer size in bytes |
+| `kuber.network.io-processor-count` | `0` | I/O processor threads. `0` = auto-detect CPU cores |
+
+---
+
+## Cache Configuration
+
+In-memory cache settings.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.cache.max-memory-entries` | `100000` | Maximum entries to keep in memory per region |
+| `kuber.cache.persistent-mode` | `false` | `true` = sync writes to disk, `false` = async writes |
+| `kuber.cache.persistence-batch-size` | `100` | Number of entries per async persistence batch |
+| `kuber.cache.persistence-interval-ms` | `1000` | Interval between async persistence flushes in milliseconds |
+| `kuber.cache.default-ttl-seconds` | `-1` | Default TTL for entries. `-1` = no expiration |
+| `kuber.cache.eviction-policy` | `LRU` | Eviction policy: `LRU`, `LFU`, or `FIFO` |
+| `kuber.cache.ttl-cleanup-interval-seconds` | `60` | How often to scan for expired entries |
+| `kuber.cache.enable-statistics` | `true` | Enable cache hit/miss statistics |
+
+### Off-Heap Key Index (v1.2.2+)
+
+For large datasets with millions of keys.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.cache.off-heap-key-index` | `false` | Store key index in off-heap memory (reduces GC pressure) |
+| `kuber.cache.off-heap-key-index-initial-size-mb` | `16` | Initial off-heap buffer size per region in MB |
+| `kuber.cache.off-heap-key-index-max-size-mb` | `8192` | Maximum off-heap buffer size per region in MB |
+
+---
+
+## Persistence Configuration
+
+Data storage backend settings.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.persistence.type` | `rocksdb` | Backend type: `rocksdb`, `lmdb`, `mongodb`, `sqlite`, `postgresql`, `memory` |
+| `kuber.persistence.sync-individual-writes` | `false` | `true` = wait for disk sync on each write (slower but durable) |
+
+### RocksDB Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.persistence.rocksdb.path` | `${kuber.base.datadir}/data/rocksdb` | RocksDB data directory |
+| `kuber.persistence.rocksdb.compaction-enabled` | `true` | Enable scheduled compaction to reclaim disk space |
+| `kuber.persistence.rocksdb.compaction-cron` | `0 0 2 * * ?` | Compaction cron schedule (default: 2 AM daily) |
+
+### LMDB Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.persistence.lmdb.path` | `${kuber.base.datadir}/data/lmdb` | LMDB data directory |
+| `kuber.persistence.lmdb.map-size` | `1073741824` | Maximum database size in bytes (1GB default) |
+
+### MongoDB Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.mongo.uri` | `mongodb://localhost:27017` | MongoDB connection URI |
+| `kuber.mongo.database` | `kuber` | MongoDB database name |
+| `kuber.mongo.connection-pool-size` | `50` | Connection pool size |
+| `kuber.mongo.connect-timeout-ms` | `10000` | Connection timeout |
+| `kuber.mongo.socket-timeout-ms` | `30000` | Socket timeout |
+| `kuber.mongo.server-selection-timeout-ms` | `30000` | Server selection timeout |
+| `kuber.mongo.write-concern` | `ACKNOWLEDGED` | Write concern level |
+
+### SQLite Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.persistence.sqlite.path` | `${kuber.base.datadir}/data/kuber.db` | SQLite database file path |
+
+### PostgreSQL Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.persistence.postgresql.url` | `jdbc:postgresql://localhost:5432/kuber` | JDBC connection URL |
+| `kuber.persistence.postgresql.username` | `kuber` | Database username |
+| `kuber.persistence.postgresql.password` | `kuber` | Database password |
+| `kuber.persistence.postgresql.pool-size` | `10` | Connection pool size |
+| `kuber.persistence.postgresql.min-idle` | `2` | Minimum idle connections |
+| `kuber.persistence.postgresql.connection-timeout-ms` | `30000` | Connection timeout |
+| `kuber.persistence.postgresql.idle-timeout-ms` | `600000` | Idle connection timeout |
+| `kuber.persistence.postgresql.max-lifetime-ms` | `1800000` | Maximum connection lifetime |
+
+---
+
+## Security Configuration
+
+> ⚠️ **v1.6.5**: API Keys required for all programmatic access. Username/password only for Web UI.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.secure.folder` | `./secure` | Directory for security files |
+| `kuber.security.users-file` | `${kuber.secure.folder}/users.json` | User credentials file. **REQUIRED** - app fails without it |
+| `kuber.security.api-keys-file` | `${kuber.secure.folder}/apikeys.json` | API keys file (created automatically if missing) |
+| `kuber.security.session-timeout-minutes` | `30` | Web UI session timeout |
+| `kuber.security.redis-password` | (empty) | *Deprecated* - Use API keys instead |
+
+### users.json Format
+
+```json
+[
+  {
+    "userId": "admin",
+    "password": "admin123",
+    "roles": ["ADMIN", "USER"],
+    "enabled": true
+  }
+]
+```
+
+### apikeys.json Format
+
+```json
+[
+  {
+    "keyId": "kub_abc123...",
+    "name": "Production App",
+    "userId": "admin",
+    "roles": ["ADMIN"],
+    "enabled": true,
+    "createdAt": "2025-01-01T00:00:00Z"
+  }
+]
+```
+
+---
+
+## Autoload Configuration
+
+Automatic data loading from CSV/JSON files.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.autoload.enabled` | `true` | Enable automatic loading from inbox folder |
+| `kuber.autoload.directory` | `${kuber.base.datadir}/autoload` | Directory to watch for files |
+| `kuber.autoload.scan-interval-seconds` | `60` | How often to scan for new files |
+| `kuber.autoload.max-records-per-file` | `0` | Maximum records per file. `0` = unlimited |
+| `kuber.autoload.batch-size` | `32768` | Records per persistence batch |
+| `kuber.autoload.warm-percentage` | `10` | % of data to pre-warm into memory after load |
+| `kuber.autoload.create-directories` | `true` | Create inbox/processed/error directories |
+| `kuber.autoload.file-encoding` | `UTF-8` | File character encoding |
+
+---
+
+## Backup & Restore Configuration
+
+Scheduled backup and automatic restore.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.backup.enabled` | `true` | Enable scheduled backups |
+| `kuber.backup.backup-directory` | `${kuber.base.datadir}/backup` | Directory for backup files |
+| `kuber.backup.restore-directory` | `${kuber.base.datadir}/restore` | Directory to monitor for restore files |
+| `kuber.backup.cron` | `0 0 23 * * *` | Backup cron schedule (default: 11 PM daily) |
+| `kuber.backup.max-backups-per-region` | `10` | Backups to retain per region. `0` = unlimited |
+| `kuber.backup.batch-size` | `10000` | Entries per batch during backup/restore |
+| `kuber.backup.compress` | `true` | Compress backup files (gzip) |
+| `kuber.backup.create-directories` | `true` | Create directories if missing |
+| `kuber.backup.file-encoding` | `UTF-8` | File encoding |
+
+---
+
+## Graceful Shutdown Configuration
+
+Multiple shutdown methods supported.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.shutdown.file-enabled` | `true` | Enable file-based shutdown (`touch kuber.shutdown`) |
+| `kuber.shutdown.file-path` | `${kuber.base.datadir}/kuber.shutdown` | Shutdown signal file path |
+| `kuber.shutdown.check-interval-ms` | `5000` | How often to check for shutdown file |
+| `kuber.shutdown.api-enabled` | `true` | Enable REST API shutdown endpoint |
+| `kuber.shutdown.phase-delay-seconds` | `5` | Delay between shutdown phases |
+
+### Shutdown Methods
+
+1. **File**: `touch ./kuberdata/kuber.shutdown`
+2. **REST API**: `POST /api/admin/shutdown` with API key
+3. **SIGTERM**: Standard Unix signal
+
+---
+
+## Memory Management Configuration
+
+Automatic memory pressure handling.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.cache.memory-watcher-enabled` | `true` | Enable automatic memory pressure handling |
+| `kuber.cache.memory-high-watermark-percent` | `85` | Start evicting when heap exceeds this % |
+| `kuber.cache.memory-low-watermark-percent` | `50` | Stop evicting when heap drops below this % |
+| `kuber.cache.memory-eviction-batch-size` | `1000` | Entries to evict per batch |
+| `kuber.cache.memory-watcher-interval-ms` | `5000` | Memory check interval in milliseconds |
+
+---
+
+## Replication Configuration
+
+ZooKeeper-based cluster replication.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.zookeeper.enabled` | `false` | Enable ZooKeeper-based replication |
+| `kuber.zookeeper.connect-string` | `localhost:2181` | ZooKeeper connection string |
+| `kuber.zookeeper.session-timeout-ms` | `30000` | ZK session timeout |
+| `kuber.zookeeper.connection-timeout-ms` | `10000` | ZK connection timeout |
+| `kuber.zookeeper.base-path` | `/kuber` | ZK base path for Kuber nodes |
+| `kuber.zookeeper.retry-base-sleep-ms` | `1000` | Retry base sleep time |
+| `kuber.zookeeper.retry-max-attempts` | `3` | Maximum retry attempts |
+| `kuber.replication.sync-batch-size` | `1000` | Entries per sync batch |
+| `kuber.replication.sync-timeout-ms` | `30000` | Sync operation timeout |
+| `kuber.replication.heartbeat-interval-ms` | `5000` | Heartbeat interval between nodes |
+| `kuber.replication.primary-check-interval-ms` | `10000` | Primary node check interval |
+
+---
+
+## Event Publishing Configuration
+
+Publish cache events to message brokers.
+
+### Global Settings
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.publishing.thread-pool-size` | `4` | Publisher thread pool size |
+| `kuber.publishing.queue-capacity` | `10000` | Event queue capacity |
+
+### Broker Definition Pattern
+
+Define brokers centrally, then reference them from regions.
+
+```properties
+# Define a Kafka broker
+kuber.publishing.brokers.kafka-prod.enabled=true
+kuber.publishing.brokers.kafka-prod.type=kafka
+kuber.publishing.brokers.kafka-prod.bootstrap-servers=kafka1:9092,kafka2:9092
+kuber.publishing.brokers.kafka-prod.partitions=6
+kuber.publishing.brokers.kafka-prod.replication-factor=3
+```
+
+### Region Destination Pattern
+
+```properties
+# Configure region to publish to broker
+kuber.publishing.regions.customers.enabled=true
+kuber.publishing.regions.customers.destinations[0].broker=kafka-prod
+kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
+```
+
+### Supported Broker Types
+
+| Type | Description |
+|------|-------------|
+| `kafka` | Apache Kafka |
+| `rabbitmq` | RabbitMQ |
+| `activemq` | Apache ActiveMQ |
+| `ibmmq` | IBM MQ |
+| `file` | File-based (for audit logs) |
+
+---
+
+## Logging Configuration
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `logging.level.root` | `INFO` | Root logging level |
+| `logging.level.com.kuber` | `DEBUG` | Kuber application logging level |
+| `logging.level.org.apache.mina` | `WARN` | MINA networking logging level |
+| `logging.level.org.springframework.security` | `WARN` | Spring Security logging level |
+| `logging.pattern.console` | `%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n` | Console log pattern |
+
+---
+
+## Environment Variable Override
+
+All properties can be overridden via environment variables:
+
+1. Replace `.` with `_`
+2. Convert to uppercase
+3. Replace `-` with `_`
+
+**Examples:**
+
+| Property | Environment Variable |
+|----------|---------------------|
+| `kuber.cache.max-memory-entries` | `KUBER_CACHE_MAX_MEMORY_ENTRIES` |
+| `kuber.network.port` | `KUBER_NETWORK_PORT` |
+| `kuber.persistence.type` | `KUBER_PERSISTENCE_TYPE` |
+
+---
+
+## Quick Start Configuration
+
+Minimal production configuration:
+
+```properties
+# Base directory
+kuber.base.datadir=/var/kuber/data
+
+# Persistence
+kuber.persistence.type=rocksdb
+
+# Security (create users.json in secure folder)
+kuber.secure.folder=/var/kuber/secure
+
+# Cache tuning
+kuber.cache.max-memory-entries=1000000
+
+# Backup
+kuber.backup.enabled=true
+kuber.backup.cron=0 0 2 * * *
+```
+
+---
+
+*Copyright © 2025-2030, All Rights Reserved - Ashutosh Sinha*

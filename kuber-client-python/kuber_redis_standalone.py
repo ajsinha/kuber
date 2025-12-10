@@ -19,6 +19,10 @@ A comprehensive standalone Python client for Kuber Distributed Cache using
 Redis protocol with Kuber extensions. This client does not depend on any
 external Kuber library - it directly implements the Redis wire protocol.
 
+v1.6.5: API Key Authentication ONLY
+All programmatic access requires an API key (starts with "kub_").
+Username/password authentication is only for the Web UI.
+
 Features:
 - String operations (GET, SET, MGET, MSET, INCR, DECR, etc.)
 - Key pattern searching (KEYS, SCAN)
@@ -27,10 +31,10 @@ Features:
 - JSON operations (JSET, JGET, JDEL, JSEARCH)
 - Deep JSON value search with multiple operators
 - Cross-region operations
-- Full authentication support
+- API Key authentication
 
 Usage:
-    python kuber_redis_standalone.py [--host HOST] [--port PORT] [--password PASSWORD]
+    python kuber_redis_standalone.py --api-key kub_your_api_key_here [--host HOST] [--port PORT]
 
 Default connection: localhost:6380
 """
@@ -41,44 +45,49 @@ import argparse
 import sys
 from typing import Optional, List, Dict, Any, Tuple, Union
 from datetime import timedelta
-
+import os
+KUBER_API_KEY = os.getenv('KUBER_API_KEY', 'kub_566e7b476ea57c15612a43a02ff98f6188a50209757a6c3f7c115e845c68b15a')
 
 class KuberRedisClient:
     """
     Standalone Redis protocol client for Kuber Distributed Cache.
+    
+    v1.6.5: API Key Authentication ONLY.
+    All programmatic access requires an API key (starts with "kub_").
+    Username/password authentication is only for the Web UI.
     
     Implements Redis wire protocol with Kuber extensions for regions
     and JSON operations.
     """
     
     def __init__(self, host: str = 'localhost', port: int = 6380, 
-                 username: str = None, password: str = None, timeout: int = 30):
+                 api_key: str = None, timeout: int = 30):
         """
         Initialize connection to Kuber server.
         
         Args:
             host: Kuber server hostname
             port: Kuber Redis protocol port (default 6380)
-            username: Username for authentication (required)
-            password: Password for authentication (required)
+            api_key: API Key for authentication (must start with "kub_")
             timeout: Socket timeout in seconds
             
         Raises:
-            ValueError: If username or password is not provided
+            ValueError: If API key is not provided or has invalid format
         """
-        if not username or not password:
-            raise ValueError("Both username and password are required for authentication")
+        if not api_key:
+            raise ValueError("API Key is required for authentication")
+        if not api_key.startswith('kub_'):
+            raise ValueError("Invalid API key format - must start with 'kub_'")
         
         self.host = host
         self.port = port
         self.timeout = timeout
         self.socket: Optional[socket.socket] = None
         self.current_region = 'default'
-        self.username = username
-        self.password = password
+        self.api_key = api_key
         
         self._connect()
-        self.auth(password)
+        self.auth(api_key)
     
     def _connect(self):
         """Establish connection to Kuber server."""
@@ -97,12 +106,13 @@ class KuberRedisClient:
         Returns:
             Parsed response
         """
-        # Build inline command
+        # Build inline command (server uses TextLineCodecFactory)
         parts = []
         for arg in args:
             arg_str = str(arg) if arg is not None else ''
-            if ' ' in arg_str or '"' in arg_str or '\n' in arg_str:
-                escaped = arg_str.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+            # Quote arguments containing spaces, quotes, or newlines
+            if ' ' in arg_str or '"' in arg_str or '\n' in arg_str or '\r' in arg_str:
+                escaped = arg_str.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
                 parts.append(f'"{escaped}"')
             else:
                 parts.append(arg_str)
@@ -190,9 +200,17 @@ class KuberRedisClient:
     
     # ==================== Authentication ====================
     
-    def auth(self, password: str) -> bool:
-        """Authenticate with the server."""
-        result = self._send_command('AUTH', password)
+    def auth(self, api_key: str) -> bool:
+        """
+        Authenticate with API key.
+        
+        Args:
+            api_key: API Key for authentication (must start with "kub_")
+            
+        Returns:
+            True if authentication successful
+        """
+        result = self._send_command('AUTH', api_key)
         return result == 'OK'
     
     def ping(self) -> str:
@@ -414,7 +432,20 @@ class KuberRedisClient:
             Tuple of (next_cursor, keys_list)
         """
         result = self._send_command('SCAN', cursor, 'MATCH', match, 'COUNT', count)
-        return int(result[0]), result[1] if len(result) > 1 else []
+        
+        # Handle response - should be [cursor_string, [keys...]]
+        if not isinstance(result, list) or len(result) < 2:
+            # Unexpected response format, return empty
+            return 0, []
+        
+        try:
+            next_cursor = int(result[0])
+        except (ValueError, TypeError):
+            # If cursor can't be parsed, return 0 to stop iteration
+            return 0, []
+        
+        keys = result[1] if isinstance(result[1], list) else []
+        return next_cursor, keys
     
     def exists(self, *keys: str) -> int:
         """Check if keys exist. Returns count of existing keys."""
@@ -533,7 +564,7 @@ class KuberRedisClient:
             region: Optional region
             
         Returns:
-            Parsed JSON object
+            Parsed JSON object, or None if key doesn't exist
         """
         original_region = self.current_region
         if region and region != original_region:
@@ -541,9 +572,17 @@ class KuberRedisClient:
         
         try:
             result = self._send_command('JGET', key, path)
-            if result:
-                return json.loads(result)
-            return None
+            # Handle None (key doesn't exist) or empty string
+            if result is None or result == '':
+                return None
+            # Try to parse as JSON
+            if isinstance(result, str):
+                try:
+                    return json.loads(result)
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, return as-is (might be a simple string value)
+                    return result
+            return result
         finally:
             if region and region != original_region:
                 self.select_region(original_region)
@@ -584,16 +623,38 @@ class KuberRedisClient:
             documents = []
             for result in results:
                 # Result format: "key:json_value"
+                # Key might contain colons (e.g., "prod:1001"), so find where JSON starts
+                # JSON always starts with { or [
                 if isinstance(result, str):
-                    colon_pos = result.find(':')
-                    if colon_pos > 0:
-                        key = result[:colon_pos]
-                        json_str = result[colon_pos + 1:]
+                    # Find the colon that precedes the JSON (look for :{ or :[)
+                    json_start = -1
+                    for i, c in enumerate(result):
+                        if c == ':' and i + 1 < len(result) and result[i + 1] in '{[':
+                            json_start = i
+                            break
+                    
+                    if json_start > 0:
+                        key = result[:json_start]
+                        json_str = result[json_start + 1:]
                         try:
                             value = json.loads(json_str)
                             documents.append({'key': key, 'value': value})
                         except json.JSONDecodeError:
                             documents.append({'key': key, 'value': json_str})
+                    else:
+                        # Fallback: try to find last colon before first {
+                        brace_pos = result.find('{')
+                        if brace_pos > 0:
+                            # Find last colon before brace
+                            colon_pos = result.rfind(':', 0, brace_pos)
+                            if colon_pos > 0:
+                                key = result[:colon_pos]
+                                json_str = result[colon_pos + 1:]
+                                try:
+                                    value = json.loads(json_str)
+                                    documents.append({'key': key, 'value': value})
+                                except json.JSONDecodeError:
+                                    documents.append({'key': key, 'value': json_str})
             
             return documents
         finally:
@@ -1454,15 +1515,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python kuber_redis_standalone.py --host localhost --port 6380 --username admin --password secret
-  python kuber_redis_standalone.py -H 192.168.1.100 -P 6380 -u admin -p secret
-  python kuber_redis_standalone.py --username admin --password mypassword --no-cleanup
+  python kuber_redis_standalone.py --api-key kub_your_api_key_here
+  python kuber_redis_standalone.py -H 192.168.1.100 -P 6380 -k kub_your_api_key
+  python kuber_redis_standalone.py --api-key kub_xxx --no-cleanup
         """
     )
     parser.add_argument('--host', '-H', default='localhost', help='Kuber server host (default: localhost)')
     parser.add_argument('--port', '-P', type=int, default=6380, help='Redis protocol port (default: 6380)')
-    parser.add_argument('--username', '-u', required=True, help='Authentication username (required)')
-    parser.add_argument('--password', '-p', required=True, help='Authentication password (required)')
+    parser.add_argument('--api-key', '-k', required=True, help='API Key for authentication (must start with kub_)')
     parser.add_argument('--no-cleanup', action='store_true', help='Skip cleanup at end')
     args = parser.parse_args()
     
@@ -1471,13 +1531,13 @@ Examples:
 ║   KUBER STANDALONE PYTHON CLIENT - REDIS PROTOCOL WITH EXTENSIONS   ║
 ║                                                                      ║
 ║   Connecting to: {args.host}:{args.port}                                       ║
-║   Username: {args.username}                                                    ║
+║   Auth: API Key                                                       ║
 ║   Protocol: Redis RESP with Kuber Extensions                         ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """)
     
     try:
-        with KuberRedisClient(args.host, args.port, username=args.username, password=args.password) as client:
+        with KuberRedisClient(args.host, args.port, api_key=args.api_key) as client:
             print("  Authentication successful!\n")
             
             # Run all examples
@@ -1498,6 +1558,7 @@ Examples:
             print_section("ALL EXAMPLES COMPLETED SUCCESSFULLY")
             print("""
     This standalone client demonstrated:
+    ✓ API Key authentication (v1.6.5)
     ✓ Basic string operations (GET, SET, INCR, DECR, APPEND)
     ✓ Multi-key operations (MGET, MSET)
     ✓ Key pattern search (KEYS with wildcards, SCAN)

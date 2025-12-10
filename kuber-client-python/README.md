@@ -2,6 +2,8 @@
 
 Python client library for [Kuber Distributed Cache](https://github.com/ashutosh/kuber).
 
+**v1.6.5**: API Key Authentication Required - All programmatic access now requires an API key.
+
 ## Installation
 
 ```bash
@@ -20,8 +22,9 @@ pip install -e .
 ```python
 from kuber import KuberClient
 
-# Using context manager (recommended)
-with KuberClient('localhost', 6380) as client:
+# v1.6.5: API key authentication required
+# Generate API keys in Web UI: Admin → API Keys
+with KuberClient('localhost', 6380, api_key='kub_your_api_key') as client:
     # String operations
     client.set('key', 'value')
     value = client.get('key')
@@ -29,15 +32,25 @@ with KuberClient('localhost', 6380) as client:
     # With TTL
     from datetime import timedelta
     client.set('temp', 'data', ttl=timedelta(minutes=5))
-
-# Manual connection management
-client = KuberClient('localhost', 6380)
-client.connect()
-try:
-    client.set('key', 'value')
-finally:
-    client.close()
 ```
+
+## Demo Scripts
+
+### JSON Operations Demo (kuber_json_demo.py)
+
+A comprehensive standalone demo demonstrating all JSON operations:
+
+```bash
+export KUBER_API_KEY=kub_your_key
+python3 kuber_json_demo.py
+```
+
+Features demonstrated:
+- Set keys with JSON values
+- Retrieve JSON values and specific paths
+- Search by single/multiple attributes
+- Regex search on JSON attribute values  
+- Key search using glob and regex patterns
 
 ## Features
 
@@ -98,8 +111,19 @@ print(user['name'])  # John
 # Query at specific path
 name = client.json_get('user:1', '$.name')
 
-# Search JSON documents
-results = client.json_search('$.age>25')
+# Search by single attribute
+results = client.json_search('department=Engineering')
+
+# Search by multiple attributes (AND)
+results = client.json_search('department=Engineering,salary>90000')
+
+# Regex search on JSON attribute values
+results = client.json_search('name~=^J.*')           # Names starting with J
+results = client.json_search('email~=.*@company\\.com')  # Company emails
+
+# Key regex search
+results = client.ksearch('employee:EMP00[1-3]')      # Regex pattern
+
 for doc in results:
     print(f"{doc['key']}: {doc['value']}")
 ```
@@ -143,7 +167,7 @@ client.flushdb()     # Clear current region
 from kuber import KuberClient, KuberException
 
 try:
-    with KuberClient('localhost', 6380) as client:
+    with KuberClient('localhost', 6380, api_key='kub_your_key') as client:
         client.get('nonexistent')
 except KuberException as e:
     print(f"Kuber error: {e}")
@@ -155,10 +179,11 @@ except ConnectionError as e:
 
 ```python
 client = KuberClient(
-    host='localhost',      # Server hostname
-    port=6380,             # Server port
-    timeout=30.0,          # Socket timeout (seconds)
-    password='secret'      # Optional authentication
+    host='localhost',           # Server hostname
+    port=6380,                  # Server port
+    api_key='kub_your_key',     # Required API key (starts with 'kub_')
+    timeout=30.0,               # Socket timeout (seconds)
+    region='default'            # Initial region to select
 )
 ```
 

@@ -26,25 +26,24 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Java client for Kuber Distributed Cache.
+ * Java client for Kuber Distributed Cache using Redis Protocol.
  * Supports Redis protocol with Kuber extensions for regions and JSON queries.
  * 
+ * <p><strong>v1.6.5: API Key Authentication ONLY</strong></p>
+ * <p>All programmatic access requires an API key (starts with "kub_").
+ * Username/password authentication is only for the Web UI.</p>
+ * 
  * <pre>
- * // Usage example:
- * try (KuberClient client = new KuberClient("localhost", 6380)) {
- *     // String operations
+ * // Create an API key in the Kuber Web UI (Admin → API Keys)
+ * // Then use it to authenticate:
+ * 
+ * try (KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key_here")) {
  *     client.set("user:1001", "John Doe");
  *     String name = client.get("user:1001");
- *     
- *     // JSON operations
- *     client.jsonSet("user:1002", "{\"name\": \"Jane\", \"age\": 30}");
- *     JsonNode user = client.jsonGet("user:1002");
- *     
- *     // Region operations
- *     client.selectRegion("sessions");
- *     client.set("session:abc", "data", Duration.ofMinutes(30));
  * }
  * </pre>
+ * 
+ * @version 1.6.5
  */
 @Slf4j
 public class KuberClient implements AutoCloseable {
@@ -56,8 +55,7 @@ public class KuberClient implements AutoCloseable {
     private final String host;
     private final int port;
     private final int timeout;
-    private final String username;
-    private final String password;
+    private final String apiKey;
     
     private Socket socket;
     private BufferedWriter writer;
@@ -69,50 +67,49 @@ public class KuberClient implements AutoCloseable {
     private final ObjectMapper objectMapper;
     
     /**
-     * Create a new Kuber client with required authentication
+     * Create a new Kuber client with API key authentication.
      * 
      * @param host Server hostname
-     * @param port Server port
-     * @param username Username for authentication (required)
-     * @param password Password for authentication (required)
-     * @throws IllegalArgumentException if username or password is null
+     * @param port Server port (default: 6380)
+     * @param apiKey API Key for authentication (must start with "kub_")
+     * @throws IOException if connection or authentication fails
+     * @throws IllegalArgumentException if API key is null, empty, or invalid format
      */
-    public KuberClient(String host, int port, String username, String password) throws IOException {
-        this(host, port, username, password, DEFAULT_TIMEOUT);
+    public KuberClient(String host, int port, String apiKey) throws IOException {
+        this(host, port, apiKey, DEFAULT_TIMEOUT);
     }
     
     /**
-     * Create a new Kuber client with required authentication and custom timeout
+     * Create a new Kuber client with API key and custom timeout.
      * 
      * @param host Server hostname
      * @param port Server port
-     * @param username Username for authentication (required)
-     * @param password Password for authentication (required)
+     * @param apiKey API Key for authentication (must start with "kub_")
      * @param timeoutMs Connection timeout in milliseconds
-     * @throws IllegalArgumentException if username or password is null
+     * @throws IOException if connection or authentication fails
+     * @throws IllegalArgumentException if API key is null, empty, or invalid format
      */
-    public KuberClient(String host, int port, String username, String password, int timeoutMs) throws IOException {
-        if (username == null || username.isEmpty()) {
-            throw new IllegalArgumentException("Username is required for authentication");
+    public KuberClient(String host, int port, String apiKey, int timeoutMs) throws IOException {
+        if (apiKey == null || apiKey.isEmpty()) {
+            throw new IllegalArgumentException("API Key is required for authentication");
         }
-        if (password == null || password.isEmpty()) {
-            throw new IllegalArgumentException("Password is required for authentication");
+        if (!apiKey.startsWith("kub_")) {
+            throw new IllegalArgumentException("Invalid API key format - must start with 'kub_'");
         }
         
         this.host = host;
         this.port = port;
         this.timeout = timeoutMs;
-        this.username = username;
-        this.password = password;
+        this.apiKey = apiKey;
         
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         
         connect();
         
-        // Authenticate
-        if (!auth(password)) {
-            throw new IOException("Authentication failed");
+        // Authenticate with API key
+        if (!auth(apiKey)) {
+            throw new IOException("Authentication failed - invalid API key");
         }
     }
     
@@ -131,10 +128,13 @@ public class KuberClient implements AutoCloseable {
     }
     
     /**
-     * Authenticate with password
+     * Authenticate with API key.
+     * 
+     * @param apiKey API Key (must start with "kub_")
+     * @return true if authentication successful
      */
-    public boolean auth(String password) throws IOException {
-        return "OK".equals(sendCommand("AUTH", password));
+    public boolean auth(String apiKey) throws IOException {
+        return "OK".equals(sendCommand("AUTH", apiKey));
     }
     
     /**
@@ -594,9 +594,17 @@ public class KuberClient implements AutoCloseable {
         List<JsonNode> nodes = new ArrayList<>();
         for (String result : results) {
             // Result format: "key:json"
-            int colonPos = result.indexOf(':');
-            if (colonPos > 0) {
-                String json = result.substring(colonPos + 1);
+            // Key might contain colons (e.g., "prod:1001"), so find where JSON starts
+            // JSON always starts with { or [
+            int jsonStart = -1;
+            for (int i = 0; i < result.length() - 1; i++) {
+                if (result.charAt(i) == ':' && (result.charAt(i + 1) == '{' || result.charAt(i + 1) == '[')) {
+                    jsonStart = i;
+                    break;
+                }
+            }
+            if (jsonStart > 0) {
+                String json = result.substring(jsonStart + 1);
                 nodes.add(objectMapper.readTree(json));
             }
         }
