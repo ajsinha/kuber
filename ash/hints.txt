@@ -1,0 +1,22 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║  LMDB MAP SIZE EXCEEDED                                                     ║
+║  The LMDB database has reached its maximum size limit.                      ║
+║                                                                             ║
+║  TO FIX: Increase map size in application.yml:                              ║
+║    kuber:                                                                   ║
+║      persistence:                                                           ║
+║        lmdb:                                                                ║
+║          map-size: 21474836480  # 20GB (or larger)                          ║
+║                                                                             ║
+║  Common values: 10GB=10737418240, 20GB=21474836480, 50GB=53687091200        ║
+║  NOTE: Restart required after changing map-size                             ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+java -Xmx16G --add-opens=java.base/java.nio=ALL-UNNAMED \
+     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -Dkuber.persistence.lmdb.map-size=21474836480 \
+     -Dserver.app.name=PHRONEXUS \
+     -Dkuber.secure.folder=./secure \
+     -Dkuber.base.datadir=./kuberdata \
+     -jar kuber-server-1.7.1-SNAPSHOT.jar

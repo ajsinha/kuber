@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.0
+Version 1.7.1
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -18,9 +18,9 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Redis Protocol Compatibility**: Connect using any Redis client
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
-- **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
+- **Multi-Backend Persistence**: LMDB (default), RocksDB, MongoDB, SQLite, PostgreSQL
 - **Event Publishing (v1.2.8)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files
-- **Request/Response Messaging (v1.7.0)**: Access cache via message brokers with async processing, backpressure, and broker controls
+- **Request/Response Messaging (v1.7.1)**: Access cache via message brokers with async processing, backpressure, and broker controls
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
@@ -32,7 +32,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Web Management UI**: Browser-based administration interface with comprehensive help system
 - **REST API**: Programmatic access for all operations
 - **CSV Export**: Export cache data to CSV files
-- **Multi-Language Clients (v1.7.0)**: Python, Java, and C# client libraries
+- **Multi-Language Clients (v1.7.1)**: Python, Java, and C# client libraries
 
 ## Features
 
@@ -87,12 +87,13 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 
 | Feature | Description |
 |---------|-------------|
-| Multi-Backend Persistence | RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL, or in-memory |
+| Multi-Backend Persistence | LMDB (default), RocksDB, MongoDB, SQLite, PostgreSQL, or in-memory |
 | LMDB Support (v1.2.0) | Lightning Memory-Mapped Database with zero-copy reads |
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
+| Key Length Validation | Configurable max key length (default: 256 bytes) with logging |
 | Event Publishing (v1.2.8) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
-| Request/Response (v1.7.0) | Cache access via message brokers with backpressure and broker controls |
+| Request/Response (v1.7.1) | Cache access via message brokers with backpressure and broker controls |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
 | Automatic Compaction | Pre-startup compaction before Spring + cron schedule (default: 2 AM daily) |
@@ -132,7 +133,15 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 
 3. **Run Kuber**
    ```bash
-   java -jar kuber-server/target/kuber-server-1.7.0-SNAPSHOT.jar
+   # Required JVM options for LMDB persistence support on Java 9+
+   java --add-opens=java.base/java.nio=ALL-UNNAMED \
+        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+        -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
+   ```
+   
+   Or use the startup script which includes all required JVM options:
+   ```bash
+   ./scripts/kuber-start.sh
    ```
 
 4. **Access the Web UI**
@@ -241,7 +250,7 @@ CacheRequest request = builder.get("user:123").inRegion("users").build();
 producer.send("ccs_cache_request", objectMapper.writeValueAsString(request));
 ```
 
-### C# / .NET Client (New in v1.7.0)
+### C# / .NET Client (New in v1.7.1)
 
 **Redis Protocol** (`KuberClient.cs`):
 ```csharp
@@ -296,7 +305,7 @@ await producer.SendAsync("ccs_cache_request", JsonSerializer.Serialize(request))
 | Async/Await | - | - | - | - | ✓ | ✓ |
 | No Dependencies | ✓ | ✓ | - | - | - | - |
 
-## Request/Response Messaging (v1.7.0)
+## Request/Response Messaging (v1.7.1)
 
 Access cache operations via message brokers for decoupled, asynchronous architectures.
 
@@ -347,7 +356,7 @@ Access cache operations via message brokers for decoupled, asynchronous architec
 | JSON | JSET, JGET, JSEARCH |
 | Admin | PING, INFO, REGIONS |
 
-### Global Service Control (v1.7.0)
+### Global Service Control (v1.7.1)
 
 Enable or disable the entire Request/Response Messaging feature:
 
@@ -359,7 +368,7 @@ Enable or disable the entire Request/Response Messaging feature:
 
 When disabled globally, all brokers disconnect and messages queue at the broker until re-enabled.
 
-### Broker Control (v1.7.0)
+### Broker Control (v1.7.1)
 
 Manage broker connections dynamically from the Admin UI:
 
@@ -395,6 +404,50 @@ Create `secure/request_response.json`:
 }
 ```
 
+## JVM Requirements
+
+Kuber requires specific JVM options for certain features:
+
+### Required for LMDB Persistence
+
+When using LMDB as the persistence store (Java 9+), the following JVM arguments are **required**:
+
+```bash
+--add-opens=java.base/java.nio=ALL-UNNAMED
+--add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+```
+
+These allow the LMDB Java library to access internal ByteBuffer fields for direct memory operations.
+
+### Complete JVM Options
+
+For production deployments, use the startup scripts which include all required options:
+
+```bash
+# Linux/macOS
+./scripts/kuber-start.sh -m 4g -d
+
+# Windows
+kuber-start.bat /memory:4g
+```
+
+Or specify options manually:
+
+```bash
+java --add-opens=java.base/java.nio=ALL-UNNAMED \
+     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -Xms4g -Xmx4g \
+     -XX:+UseG1GC \
+     -jar kuber-server.jar
+```
+
+| Option | Purpose |
+|--------|---------|
+| `--add-opens=java.base/java.nio=ALL-UNNAMED` | Required for LMDB persistence (Java 9+) |
+| `--add-opens=java.base/sun.nio.ch=ALL-UNNAMED` | Required for LMDB persistence (Java 9+) |
+| `-Xms4g -Xmx4g` | Heap size (adjust based on data size) |
+| `-XX:+UseG1GC` | Recommended garbage collector |
+
 ## Configuration
 
 Configuration is done via `application.yml`:
@@ -413,11 +466,12 @@ kuber:
     global-max-memory-entries: 500000
     off-heap-key-index: false
   
-  # Persistence
+  # Persistence (LMDB is default and recommended)
   persistence:
-    type: rocksdb
-    rocksdb:
-      path: ./data/rocksdb
+    type: lmdb
+    lmdb:
+      path: ./data/lmdb
+      map-size: 1099511627776  # 1TB (virtual address space, not disk)
   
   # Security
   secure:
@@ -454,7 +508,7 @@ Kuber provides a comprehensive web-based administration interface:
 - Messaging broker management with live controls
 - Configuration viewer
 
-### Help System (v1.7.0)
+### Help System (v1.7.1)
 Comprehensive documentation accessible at `/help`:
 
 | Section | Topics |
@@ -594,7 +648,7 @@ kuber/
 ├── kuber-server/            # Spring Boot server
 ├── kuber-client-java/       # Java client library
 ├── kuber-client-python/     # Python client library
-├── kuber-client-csharp/     # C# / .NET client library (v1.7.0)
+├── kuber-client-csharp/     # C# / .NET client library (v1.7.1)
 ├── docs/                    # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── CLIENT_USAGE.md

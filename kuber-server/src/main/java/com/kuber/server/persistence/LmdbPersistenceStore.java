@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * - {basePath}/{regionName}/data.mdb - LMDB data file
  * - {basePath}/{regionName}/lock.mdb - LMDB lock file
  * 
- * @version 1.5.0
+ * @version 1.7.1
  */
 @Slf4j
 public class LmdbPersistenceStore extends AbstractPersistenceStore {
@@ -486,7 +486,12 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void saveEntries(List<CacheEntry> entries) {
-        if (entries.isEmpty()) return;
+        if (entries.isEmpty()) {
+            log.debug("saveEntries called with empty list - nothing to save");
+            return;
+        }
+        
+        log.info("LMDB saveEntries: received {} entries", entries.size());
         
         // Group by region
         Map<String, List<CacheEntry>> entriesByRegion = new HashMap<>();
@@ -494,36 +499,118 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
             entriesByRegion.computeIfAbsent(entry.getRegion(), k -> new ArrayList<>()).add(entry);
         }
         
+        log.info("LMDB saveEntries: grouped into {} region(s)", entriesByRegion.size());
+        
         // Save each region's entries in a single transaction
         for (Map.Entry<String, List<CacheEntry>> regionEntries : entriesByRegion.entrySet()) {
             String region = regionEntries.getKey();
-            Env<ByteBuffer> env = getOrCreateRegionEnvironment(region);
-            Dbi<ByteBuffer> dbi = regionDatabases.get(region);
+            List<CacheEntry> entriesToSave = regionEntries.getValue();
             
-            if (dbi == null) {
-                dbi = env.openDbi(ENTRIES_DB_NAME, DbiFlags.MDB_CREATE);
-                regionDatabases.put(region, dbi);
-            }
+            log.info("LMDB saveEntries: processing region '{}' with {} entries", region, entriesToSave.size());
             
-            try (Txn<ByteBuffer> txn = env.txnWrite()) {
-                for (CacheEntry entry : regionEntries.getValue()) {
-                    String json = JsonUtils.toJson(entryToMap(entry));
-                    byte[] keyBytes = entry.getKey().getBytes(StandardCharsets.UTF_8);
-                    byte[] valueBytes = json.getBytes(StandardCharsets.UTF_8);
-                    
-                    ByteBuffer keyBuffer = ByteBuffer.allocateDirect(keyBytes.length);
-                    keyBuffer.put(keyBytes).flip();
-                    
-                    ByteBuffer valueBuffer = ByteBuffer.allocateDirect(valueBytes.length);
-                    valueBuffer.put(valueBytes).flip();
-                    
-                    dbi.put(txn, keyBuffer, valueBuffer);
+            Txn<ByteBuffer> txn = null;
+            try {
+                Env<ByteBuffer> env = getOrCreateRegionEnvironment(region);
+                log.info("LMDB saveEntries: got env for region '{}': {}", region, env != null ? "OK" : "NULL");
+                
+                if (env == null) {
+                    log.error("Failed to get LMDB environment for region '{}'", region);
+                    continue;
                 }
+                
+                Dbi<ByteBuffer> dbi = regionDatabases.get(region);
+                log.info("LMDB saveEntries: got dbi for region '{}': {}", region, dbi != null ? "OK" : "NULL");
+                
+                if (dbi == null) {
+                    log.warn("DBI not found for region '{}', creating new one", region);
+                    dbi = env.openDbi(ENTRIES_DB_NAME, DbiFlags.MDB_CREATE);
+                    regionDatabases.put(region, dbi);
+                    log.info("LMDB saveEntries: created new DBI for region '{}'", region);
+                }
+                
+                log.info("LMDB saveEntries: opening write transaction for region '{}'", region);
+                txn = env.txnWrite();
+                log.info("LMDB saveEntries: write transaction opened for region '{}'", region);
+                
+                log.info("LMDB saveEntries: starting entry loop for {} entries", entriesToSave.size());
+                int savedCount = 0;
+                
+                for (CacheEntry entry : entriesToSave) {
+                    try {
+                        String json = JsonUtils.toJson(entryToMap(entry));
+                        byte[] keyBytes = entry.getKey().getBytes(StandardCharsets.UTF_8);
+                        byte[] valueBytes = json.getBytes(StandardCharsets.UTF_8);
+                        
+                        ByteBuffer keyBuffer = ByteBuffer.allocateDirect(keyBytes.length);
+                        keyBuffer.put(keyBytes).flip();
+                        
+                        ByteBuffer valueBuffer = ByteBuffer.allocateDirect(valueBytes.length);
+                        valueBuffer.put(valueBytes).flip();
+                        
+                        dbi.put(txn, keyBuffer, valueBuffer);
+                        savedCount++;
+                        
+                        if (savedCount == 1) {
+                            log.info("LMDB saveEntries: first entry written to region '{}'", region);
+                        }
+                        if (savedCount % 10000 == 0) {
+                            log.info("LMDB saveEntries: {} entries written so far to region '{}'", savedCount, region);
+                        }
+                    } catch (Throwable t) {
+                        log.error("LMDB saveEntries: ENTRY ERROR for key '{}' in region '{}': {} - {}", 
+                                entry.getKey(), region, t.getClass().getName(), t.getMessage(), t);
+                        // Don't continue on error - abort the whole transaction
+                        throw t;
+                    }
+                }
+                
+                log.info("LMDB saveEntries: all {} entries written, committing transaction for region '{}'", 
+                        savedCount, region);
                 txn.commit();
-            } catch (Exception e) {
-                log.error("Failed to batch save entries to region '{}': {}", region, e.getMessage(), e);
+                log.info("LMDB saveEntries: COMMITTED {} entries to region '{}'", savedCount, region);
+                txn = null; // Mark as committed so we don't abort in finally
+                
+            } catch (Throwable t) {
+                // Check if this is a MapFullException and provide guidance
+                String errorMsg = t.getMessage();
+                if (t.getClass().getName().contains("MapFullException") || 
+                    (errorMsg != null && errorMsg.contains("mapsize reached"))) {
+                    log.error("╔════════════════════════════════════════════════════════════════════════════╗");
+                    log.error("║  LMDB MAP SIZE EXCEEDED                                                     ║");
+                    log.error("║  The LMDB database has reached its maximum size limit.                      ║");
+                    log.error("║                                                                             ║");
+                    log.error("║  TO FIX: Increase map size in application.yml:                              ║");
+                    log.error("║    kuber:                                                                   ║");
+                    log.error("║      persistence:                                                           ║");
+                    log.error("║        lmdb:                                                                ║");
+                    log.error("║          map-size: 21474836480  # 20GB (or larger)                          ║");
+                    log.error("║                                                                             ║");
+                    log.error("║  Common values: 10GB=10737418240, 20GB=21474836480, 50GB=53687091200        ║");
+                    log.error("║  NOTE: Restart required after changing map-size                             ║");
+                    log.error("╚════════════════════════════════════════════════════════════════════════════╝");
+                }
+                log.error("LMDB saveEntries: FATAL ERROR for region '{}': {} - {}", 
+                        region, t.getClass().getName(), t.getMessage(), t);
+                if (txn != null) {
+                    try {
+                        txn.abort();
+                        log.info("LMDB saveEntries: transaction aborted for region '{}'", region);
+                    } catch (Throwable t2) {
+                        log.error("LMDB saveEntries: failed to abort transaction: {}", t2.getMessage());
+                    }
+                }
+            } finally {
+                if (txn != null) {
+                    try {
+                        txn.close();
+                    } catch (Throwable t) {
+                        log.error("LMDB saveEntries: failed to close transaction: {}", t.getMessage());
+                    }
+                }
             }
         }
+        
+        log.info("LMDB saveEntries: method completed");
     }
     
     @Override

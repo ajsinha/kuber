@@ -8,7 +8,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="1.2.8"
+VERSION="1.7.1"
 
 echo "=============================================="
 echo "  Kuber Distributed Cache - Build Script"
@@ -88,13 +88,17 @@ create_dist() {
     # Create startup scripts
     cat > "$DIST_DIR/$DIST_NAME/start.sh" << 'EOF'
 #!/bin/bash
-java -jar kuber-server.jar "$@"
+# Java Module System options required for LMDB persistence on Java 9+
+JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+java $JAVA_OPTS -jar kuber-server.jar "$@"
 EOF
     chmod +x "$DIST_DIR/$DIST_NAME/start.sh"
     
     cat > "$DIST_DIR/$DIST_NAME/start.bat" << 'EOF'
 @echo off
-java -jar kuber-server.jar %*
+REM Java Module System options required for LMDB persistence on Java 9+
+set JAVA_OPTS=--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+java %JAVA_OPTS% -jar kuber-server.jar %*
 EOF
     
     # Create archive

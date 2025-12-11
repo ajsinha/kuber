@@ -949,6 +949,10 @@ public class CacheService {
         checkWriteAccess();
         checkRegionNotBeingRestored(region);
         ensureRegionExists(region);
+        
+        // Validate key length before any processing
+        validateKeyLength(region, key, value);
+        
         waitForRegionLoadingIfNeeded(region, "SET");
         
         // Check if key exists (for insert vs update detection)
@@ -993,6 +997,9 @@ public class CacheService {
     public boolean setNx(String region, String key, String value) {
         checkWriteAccess();
         ensureRegionExists(region);
+        
+        // Validate key length before any processing
+        validateKeyLength(region, key, value);
         
         if (exists(region, key)) {
             return false;
@@ -1629,6 +1636,10 @@ public class CacheService {
     public void hset(String region, String key, String field, String value) {
         checkWriteAccess();
         ensureRegionExists(region);
+        
+        // Validate key length before any processing
+        validateKeyLength(region, key, value);
+        
         waitForRegionLoadingIfNeeded(region, "HSET");
         
         CacheEntry entry = getEntry(region, key);
@@ -1682,6 +1693,97 @@ public class CacheService {
     }
     
     // ==================== Helper Methods ====================
+    
+    /**
+     * Validate that a key does not exceed the maximum allowed length.
+     * 
+     * @param region the region name
+     * @param key the key to validate
+     * @param value the value (for logging purposes if validation fails)
+     * @throws KuberException if key length exceeds the configured maximum
+     */
+    private void validateKeyLength(String region, String key, String value) {
+        int maxKeyLengthBytes = properties.getCache().getMaxKeyLengthBytes();
+        int keyLengthBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        
+        if (keyLengthBytes > maxKeyLengthBytes) {
+            // Log the rejected key and value for debugging
+            String truncatedValue = value != null && value.length() > 500 
+                    ? value.substring(0, 500) + "... [TRUNCATED]" 
+                    : value;
+            
+            log.error("╔════════════════════════════════════════════════════════════════════════════╗");
+            log.error("║  KEY LENGTH EXCEEDED - ENTRY REJECTED                                       ║");
+            log.error("╠════════════════════════════════════════════════════════════════════════════╣");
+            log.error("║  Region: {}", region);
+            log.error("║  Key Length: {} bytes (max allowed: {} bytes)", keyLengthBytes, maxKeyLengthBytes);
+            log.error("║  Key: {}", key);
+            log.error("║  Value: {}", truncatedValue);
+            log.error("╚════════════════════════════════════════════════════════════════════════════╝");
+            
+            throw new KuberException(String.format(
+                    "Key length %d bytes exceeds maximum allowed %d bytes for region '%s'. Key: %s",
+                    keyLengthBytes, maxKeyLengthBytes, region, 
+                    key.length() > 100 ? key.substring(0, 100) + "..." : key));
+        }
+    }
+    
+    /**
+     * Validate key length for CacheEntry.
+     * Returns true if valid, false if invalid (and removes from heap if present).
+     * 
+     * @param entry the cache entry to validate
+     * @return true if key length is valid, false otherwise
+     */
+    private boolean validateKeyLengthForEntry(CacheEntry entry) {
+        int maxKeyLengthBytes = properties.getCache().getMaxKeyLengthBytes();
+        String key = entry.getKey();
+        int keyLengthBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        
+        if (keyLengthBytes > maxKeyLengthBytes) {
+            String region = entry.getRegion();
+            String value = entry.getStringValue();
+            String truncatedValue = value != null && value.length() > 500 
+                    ? value.substring(0, 500) + "... [TRUNCATED]" 
+                    : value;
+            
+            log.error("╔════════════════════════════════════════════════════════════════════════════╗");
+            log.error("║  KEY LENGTH EXCEEDED - ENTRY REJECTED                                       ║");
+            log.error("╠════════════════════════════════════════════════════════════════════════════╣");
+            log.error("║  Region: {}", region);
+            log.error("║  Key Length: {} bytes (max allowed: {} bytes)", keyLengthBytes, maxKeyLengthBytes);
+            log.error("║  Key: {}", key);
+            log.error("║  Value: {}", truncatedValue);
+            log.error("╚════════════════════════════════════════════════════════════════════════════╝");
+            
+            // Remove from heap if already added
+            removeFromHeapIfPresent(region, key);
+            
+            return false;
+        }
+        return true;
+    }
+    
+    /**
+     * Remove entry from heap (KeyIndex and ValueCache) if present.
+     * Used when a key is rejected due to length validation.
+     */
+    private void removeFromHeapIfPresent(String region, String key) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex != null) {
+            KeyIndexEntry removed = keyIndex.remove(key);
+            if (removed != null) {
+                log.debug("Removed oversized key from KeyIndex: region='{}', key='{}'", region, key);
+            }
+        }
+        
+        if (valueCache != null) {
+            valueCache.invalidate(key);
+            log.debug("Invalidated oversized key from ValueCache: region='{}', key='{}'", region, key);
+        }
+    }
     
     /**
      * Get entry using hybrid architecture:
@@ -1869,14 +1971,38 @@ public class CacheService {
      */
     public int putEntriesBatch(List<CacheEntry> entries, boolean skipValueCache) {
         if (entries == null || entries.isEmpty()) {
+            log.debug("putEntriesBatch called with null or empty list");
             return 0;
         }
         
+        log.debug("putEntriesBatch called with {} entries (skipValueCache={})", entries.size(), skipValueCache);
+        
         checkWriteAccess();
+        
+        // Validate key lengths and filter out oversized keys
+        List<CacheEntry> validEntries = new ArrayList<>();
+        int rejectedCount = 0;
+        for (CacheEntry entry : entries) {
+            if (validateKeyLengthForEntry(entry)) {
+                validEntries.add(entry);
+            } else {
+                rejectedCount++;
+            }
+        }
+        
+        if (rejectedCount > 0) {
+            log.warn("Rejected {} entries due to key length exceeding {} bytes", 
+                    rejectedCount, properties.getCache().getMaxKeyLengthBytes());
+        }
+        
+        if (validEntries.isEmpty()) {
+            log.warn("All entries rejected due to key length validation");
+            return 0;
+        }
         
         // Group entries by region
         Map<String, List<CacheEntry>> entriesByRegion = new LinkedHashMap<>();
-        for (CacheEntry entry : entries) {
+        for (CacheEntry entry : validEntries) {
             entriesByRegion.computeIfAbsent(entry.getRegion(), k -> new ArrayList<>()).add(entry);
         }
         
@@ -1885,6 +2011,8 @@ public class CacheService {
         for (Map.Entry<String, List<CacheEntry>> regionGroup : entriesByRegion.entrySet()) {
             String region = regionGroup.getKey();
             List<CacheEntry> regionEntries = regionGroup.getValue();
+            
+            log.debug("Processing batch of {} entries for region '{}'", regionEntries.size(), region);
             
             // Ensure region exists
             ensureRegionExists(region);
@@ -1904,7 +2032,10 @@ public class CacheService {
             
             try {
                 // CRITICAL: Save to disk FIRST (batch write) before updating index
+                log.debug("Calling persistenceStore.saveEntries for {} entries in region '{}'", 
+                        regionEntries.size(), region);
                 persistenceStore.saveEntries(regionEntries);
+                log.debug("persistenceStore.saveEntries completed for region '{}'", region);
                 
                 // Update KeyIndex for all entries
                 // If skipping value cache (autoload mode), mark as PERSISTENCE_ONLY
@@ -1921,6 +2052,8 @@ public class CacheService {
                     
                     savedCount++;
                 }
+                
+                log.debug("Updated KeyIndex for {} entries in region '{}'", regionEntries.size(), region);
                 
                 // Record statistics
                 if (properties.getCache().isEnableStatistics()) {
@@ -1941,6 +2074,7 @@ public class CacheService {
             }
         }
         
+        log.debug("putEntriesBatch completed, saved {} entries total", savedCount);
         return savedCount;
     }
     

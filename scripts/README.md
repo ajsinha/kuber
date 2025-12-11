@@ -1,8 +1,19 @@
 # Kuber Scripts
 
-**Version 1.4.0**
+**Version 1.7.1**
 
 This folder contains utility scripts for managing the Kuber cache server.
+
+## JVM Options
+
+The startup scripts automatically include required JVM options for Java 9+:
+
+```
+--add-opens=java.base/java.nio=ALL-UNNAMED
+--add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+```
+
+These options are **required** for LMDB persistence support, as the LMDB Java library needs to access internal ByteBuffer and DirectBuffer fields for direct memory operations.
 
 ## Available Scripts
 

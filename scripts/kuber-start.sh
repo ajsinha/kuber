@@ -65,7 +65,7 @@ print_banner() {
     echo -e "${BLUE}"
     echo "╔════════════════════════════════════════════════════════════════════╗"
     echo "║                     KUBER STARTUP UTILITY                          ║"
-    echo "║                        Version 1.4.0                               ║"
+    echo "║                        Version 1.7.1                               ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -244,6 +244,11 @@ JVM_OPTS="$JVM_OPTS -XX:+HeapDumpOnOutOfMemoryError"
 JVM_OPTS="$JVM_OPTS -XX:HeapDumpPath=${LOG_DIR}/heapdump.hprof"
 JVM_OPTS="$JVM_OPTS -Djava.awt.headless=true"
 JVM_OPTS="$JVM_OPTS -Dfile.encoding=UTF-8"
+
+# Java Module System options (required for LMDB persistence on Java 9+)
+# This allows lmdbjava to access internal ByteBuffer fields for direct memory operations
+JVM_OPTS="$JVM_OPTS --add-opens=java.base/java.nio=ALL-UNNAMED"
+JVM_OPTS="$JVM_OPTS --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
 
 # Debug options
 if [ "$DEBUG" = true ]; then

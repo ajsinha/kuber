@@ -96,7 +96,7 @@ REM Print banner
 echo.
 echo ========================================================================
 echo                      KUBER STARTUP UTILITY
-echo                         Version 1.4.0
+echo                         Version 1.7.1
 echo ========================================================================
 echo.
 
@@ -160,6 +160,10 @@ set JVM_OPTS=%JVM_OPTS% -XX:+HeapDumpOnOutOfMemoryError
 set JVM_OPTS=%JVM_OPTS% -Djava.awt.headless=true
 set JVM_OPTS=%JVM_OPTS% -Dfile.encoding=UTF-8
 
+REM Java Module System options (required for LMDB persistence on Java 9+)
+set JVM_OPTS=%JVM_OPTS% --add-opens=java.base/java.nio=ALL-UNNAMED
+set JVM_OPTS=%JVM_OPTS% --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+
 REM Debug options
 if "%DEBUG%"=="true" (
     set JVM_OPTS=%JVM_OPTS% -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
@@ -202,7 +206,7 @@ goto :end
 echo.
 echo ========================================================================
 echo                      KUBER STARTUP UTILITY
-echo                         Version 1.4.0
+echo                         Version 1.7.1
 echo ========================================================================
 echo.
 echo Usage: kuber-start.bat [options]

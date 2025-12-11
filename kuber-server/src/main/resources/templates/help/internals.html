@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.7.0</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
+                    <strong>Version 1.7.1</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
                     architecture and operational mechanics.
                 </div>
 
@@ -382,7 +382,7 @@ DELETE key
                                         <td><strong>RocksDB</strong> (Default)</td>
                                         <td>High performance, no external deps</td>
                                         <td>LSM-tree, embedded, fast writes</td>
-                                        <td><code>kuber.persistence.type=rocksdb</code></td>
+                                        <td><code>kuber.persistence.type=lmdb</code></td>
                                     </tr>
                                     <tr>
                                         <td><strong>LMDB</strong></td>
@@ -1299,7 +1299,7 @@ CacheService.set() / delete()
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.0</p>
+                    <p class="text-muted small mb-0">Version 1.7.1</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

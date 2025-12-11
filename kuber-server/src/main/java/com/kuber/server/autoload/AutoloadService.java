@@ -121,7 +121,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * with compaction operations. Acquires region locks during file processing.
  * Write operations wait for autoload to complete before proceeding.
  * 
- * @version 1.5.0
+ * @version 1.7.1
  */
 @Service
 @Slf4j
@@ -604,7 +604,14 @@ public class AutoloadService {
             
             long startTime = System.currentTimeMillis();
             
+            log.debug("[{}] Starting CSV record iteration for region '{}'", fileName, region);
+            int iterationCount = 0;
+            
             for (CSVRecord record : parser) {
+                iterationCount++;
+                if (iterationCount == 1) {
+                    log.info("[{}] First CSV record found, processing...", fileName);
+                }
                 // SAFETY CHECK (v1.6.3): Stop if shutdown in progress
                 // Note: We don't abort mid-batch - we let the current batch finish writing to persistence
                 if (cacheService.isShuttingDown()) {
@@ -670,6 +677,9 @@ public class AutoloadService {
                     result.incrementErrors();
                 }
             }
+            
+            log.debug("[{}] CSV iteration complete: {} total iterations, {} records processed, batch size: {}", 
+                    fileName, iterationCount, recordCount, batch.size());
             
             // Flush remaining entries
             if (!batch.isEmpty()) {

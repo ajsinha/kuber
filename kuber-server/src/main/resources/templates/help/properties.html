@@ -59,7 +59,7 @@
                                     <li><a href="#memory">Memory Management</a></li>
                                     <li><a href="#replication">Replication</a></li>
                                     <li><a href="#publishing">Event Publishing</a></li>
-                                    <li><a href="#messaging">Request/Response Messaging</a> <span class="badge bg-success">v1.7.0</span></li>
+                                    <li><a href="#messaging">Request/Response Messaging</a> <span class="badge bg-success">v1.7.1</span></li>
                                     <li><a href="#logging">Logging</a></li>
                                 </ul>
                             </div>
@@ -76,7 +76,7 @@
                                 <tr><th>Property</th><th>Default</th><th>Description</th></tr>
                             </thead>
                             <tbody>
-                                <tr><td><code>kuber.version</code></td><td>1.7.0</td><td>Current application version (read-only)</td></tr>
+                                <tr><td><code>kuber.version</code></td><td>1.7.1</td><td>Current application version (read-only)</td></tr>
                                 <tr><td><code>kuber.base.datadir</code></td><td>./kuberdata</td><td>Base directory for all data files (persistence, autoload, backup, logs)</td></tr>
                                 <tr><td><code>kuber.secure.folder</code></td><td>./secure</td><td>Directory for sensitive files (users.json, apikeys.json). Auto-created if missing.</td></tr>
                                 <tr><td><code>server.app.name</code></td><td>Kuber</td><td>Application display name shown in UI</td></tr>
@@ -122,6 +122,7 @@
                             </thead>
                             <tbody>
                                 <tr><td><code>kuber.cache.max-memory-entries</code></td><td>100000</td><td>Maximum entries to keep in memory per region</td></tr>
+                                <tr><td><code>kuber.cache.max-key-length-bytes</code></td><td>256</td><td>Maximum allowed key length in bytes. Keys exceeding this are rejected with error logged.</td></tr>
                                 <tr><td><code>kuber.cache.persistent-mode</code></td><td>false</td><td>Sync mode: true=sync writes to disk, false=async writes</td></tr>
                                 <tr><td><code>kuber.cache.persistence-batch-size</code></td><td>100</td><td>Number of entries per async persistence batch</td></tr>
                                 <tr><td><code>kuber.cache.persistence-interval-ms</code></td><td>1000</td><td>Interval between async persistence flushes</td></tr>
@@ -146,15 +147,17 @@
                                 <tr><th>Property</th><th>Default</th><th>Description</th></tr>
                             </thead>
                             <tbody>
-                                <tr><td><code>kuber.persistence.type</code></td><td>rocksdb</td><td>Backend: rocksdb, lmdb, mongodb, sqlite, postgresql, memory</td></tr>
+                                <tr><td><code>kuber.persistence.type</code></td><td>lmdb</td><td>Backend: lmdb (default), rocksdb, mongodb, sqlite, postgresql, memory</td></tr>
                                 <tr><td><code>kuber.persistence.sync-individual-writes</code></td><td>false</td><td>Wait for disk sync on each write (slower but durable)</td></tr>
                                 <tr class="table-secondary"><td colspan="3"><strong>RocksDB Settings</strong></td></tr>
                                 <tr><td><code>kuber.persistence.rocksdb.path</code></td><td>${kuber.base.datadir}/data/rocksdb</td><td>RocksDB data directory</td></tr>
                                 <tr><td><code>kuber.persistence.rocksdb.compaction-enabled</code></td><td>true</td><td>Enable scheduled compaction to reclaim space</td></tr>
                                 <tr><td><code>kuber.persistence.rocksdb.compaction-cron</code></td><td>0 0 2 * * ?</td><td>Compaction schedule (default: 2 AM daily)</td></tr>
-                                <tr class="table-secondary"><td colspan="3"><strong>LMDB Settings</strong></td></tr>
+                                <tr class="table-secondary"><td colspan="3"><strong>LMDB Settings (Default Persistence)</strong></td></tr>
                                 <tr><td><code>kuber.persistence.lmdb.path</code></td><td>${kuber.base.datadir}/data/lmdb</td><td>LMDB data directory</td></tr>
-                                <tr><td><code>kuber.persistence.lmdb.map-size</code></td><td>1073741824</td><td>Maximum database size in bytes (1GB)</td></tr>
+                                <tr><td><code>kuber.persistence.lmdb.map-size</code></td><td>1099511627776</td><td>Max DB size in bytes (default: 1TB). Virtual address space only - actual file grows on demand. Safe to set large on 64-bit.</td></tr>
+                                <tr class="table-info"><td colspan="3"><i class="fas fa-info-circle me-2"></i><strong>LMDB Disk Usage:</strong> The map-size is virtual address space. A 512GB map-size with 1GB data uses ~1GB disk. Safe to set large values on 64-bit systems.</td></tr>
+                                <tr class="table-warning"><td colspan="3"><i class="fas fa-exclamation-triangle me-2"></i><strong>LMDB JVM Requirement:</strong> Add <code>--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED</code> when running on Java 9+</td></tr>
                                 <tr class="table-secondary"><td colspan="3"><strong>MongoDB Settings</strong></td></tr>
                                 <tr><td><code>kuber.mongo.uri</code></td><td>mongodb://localhost:27017</td><td>MongoDB connection URI</td></tr>
                                 <tr><td><code>kuber.mongo.database</code></td><td>kuber</td><td>MongoDB database name</td></tr>
@@ -324,7 +327,7 @@
 
                 <!-- Request/Response Messaging -->
                 <section id="messaging" class="mb-5">
-                    <h3 class="border-bottom pb-2"><i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging <span class="badge bg-success">v1.7.0</span></h3>
+                    <h3 class="border-bottom pb-2"><i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging <span class="badge bg-success">v1.7.1</span></h3>
                     <p>Access cache operations via message brokers. Configuration is managed via JSON file, not application.properties.</p>
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
@@ -378,7 +381,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.0</p>
+                    <p class="text-muted small mb-0">Version 1.7.1</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

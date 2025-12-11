@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 1.7.0**
+**Version 1.7.1**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -28,7 +28,7 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `1.7.0` | Current application version (read-only) |
+| `kuber.version` | `1.7.1` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
 | `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json, request_response.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
@@ -64,6 +64,7 @@ In-memory cache settings.
 | Property | Default | Description |
 |----------|---------|-------------|
 | `kuber.cache.max-memory-entries` | `100000` | Maximum entries to keep in memory per region |
+| `kuber.cache.max-key-length-bytes` | `256` | Maximum allowed key length in bytes. Keys exceeding this limit are rejected with error and the key/value logged for debugging. Applies to all persistence stores. |
 | `kuber.cache.persistent-mode` | `false` | `true` = sync writes to disk, `false` = async writes |
 | `kuber.cache.persistence-batch-size` | `100` | Number of entries per async persistence batch |
 | `kuber.cache.persistence-interval-ms` | `1000` | Interval between async persistence flushes in milliseconds |
@@ -90,7 +91,7 @@ Data storage backend settings.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.persistence.type` | `rocksdb` | Backend type: `rocksdb`, `lmdb`, `mongodb`, `sqlite`, `postgresql`, `memory` |
+| `kuber.persistence.type` | `lmdb` | Backend type: `rocksdb`, `lmdb`, `mongodb`, `sqlite`, `postgresql`, `memory` |
 | `kuber.persistence.sync-individual-writes` | `false` | `true` = wait for disk sync on each write (slower but durable) |
 
 ### RocksDB Settings
@@ -161,7 +162,7 @@ The secure folder contains sensitive configuration files:
 |------|----------|-------------|
 | `users.json` | **Yes** | Web UI user credentials |
 | `apikeys.json` | No | API keys (auto-created) |
-| `request_response.json` | No | Message broker configuration (v1.7.0+) |
+| `request_response.json` | No | Message broker configuration (v1.7.1+) |
 
 ### users.json Format
 
@@ -329,7 +330,7 @@ kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
 
 ## Request/Response Messaging Configuration
 
-**New in v1.7.0** - Process cache operations via message brokers (Kafka, ActiveMQ, RabbitMQ, IBM MQ).
+**New in v1.7.1** - Process cache operations via message brokers (Kafka, ActiveMQ, RabbitMQ, IBM MQ).
 
 Configuration is stored in `request_response.json` in the secure folder (alongside `users.json` and `apikeys.json`). The configuration is **hot-reloadable** - changes are detected automatically without server restart.
 
@@ -700,7 +701,7 @@ Minimal production configuration:
 kuber.base.datadir=/var/kuber/data
 
 # Persistence
-kuber.persistence.type=rocksdb
+kuber.persistence.type=lmdb
 
 # Security (create users.json in secure folder)
 kuber.secure.folder=/var/kuber/secure

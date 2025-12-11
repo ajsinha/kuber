@@ -227,7 +227,7 @@ java -jar kuber-server.jar</code></pre>
   --kuber.network.port=6380 \
   --kuber.network.bind-address=0.0.0.0 \
   --kuber.cache.max-memory-entries=500000 \
-  --kuber.persistence.type=rocksdb \
+  --kuber.persistence.type=lmdb \
   --kuber.persistence.rocksdb.path=/data/kuber \
   --spring.security.user.name=admin \
   --spring.security.user.password=secret123</code></pre>
@@ -304,7 +304,7 @@ java -jar kuber-server.jar</code></pre>
                         <div class="card mb-3">
                             <div class="card-header bg-primary text-white">RocksDB (Recommended)</div>
                             <div class="card-body">
-                                <pre class="bg-dark text-light p-2 rounded small"><code>--kuber.persistence.type=rocksdb \
+                                <pre class="bg-dark text-light p-2 rounded small"><code>--kuber.persistence.type=lmdb \
 --kuber.persistence.rocksdb.path=/var/kuber/data</code></pre>
                             </div>
                         </div>
@@ -410,7 +410,7 @@ java -jar kuber-server.jar</code></pre>
   -jar kuber-server.jar \
   --kuber.network.port=6380 \
   --kuber.cache.max-memory-entries=1000000 \
-  --kuber.persistence.type=rocksdb \
+  --kuber.persistence.type=lmdb \
   --kuber.persistence.rocksdb.path=/var/kuber/data \
   --kuber.backup.enabled=true \
   --kuber.backup.cron="0 0 2 * * ?" \
@@ -427,7 +427,7 @@ java -jar kuber-server.jar</code></pre>
   --kuber.node-id=node1 \
   --kuber.zookeeper.enabled=true \
   --kuber.zookeeper.connect-string=zk1:2181,zk2:2181,zk3:2181 \
-  --kuber.persistence.type=rocksdb</code></pre>
+  --kuber.persistence.type=lmdb</code></pre>
                     </div>
                 </div>
 
@@ -525,7 +525,7 @@ redis-cli -p 6380 -a admin:admin PING</code></pre>
                         <h5 class="mt-4">Typical Production Start</h5>
                         <pre class="bg-dark text-light p-3 rounded"><code>java -Xms2g -Xmx4g \
   -jar kuber-server.jar \
-  --kuber.persistence.type=rocksdb \
+  --kuber.persistence.type=lmdb \
   --kuber.persistence.rocksdb.path=/var/kuber/data \
   --spring.security.user.password=${KUBER_PASSWORD}</code></pre>
 

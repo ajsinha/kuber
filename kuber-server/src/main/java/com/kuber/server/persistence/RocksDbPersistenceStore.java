@@ -44,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>ReadWriteLock protects against concurrent close/write races</li>
  * </ul>
  * 
- * @version 1.5.0
+ * @version 1.7.1
  */
 @Slf4j
 public class RocksDbPersistenceStore extends AbstractPersistenceStore {
@@ -807,7 +807,12 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
     
     @Override
     public void saveEntries(List<CacheEntry> entries) {
-        if (entries.isEmpty()) return;
+        if (entries.isEmpty()) {
+            log.debug("RocksDB saveEntries called with empty list - nothing to save");
+            return;
+        }
+        
+        log.info("RocksDB saveEntries: received {} entries", entries.size());
         
         // Acquire read lock (allows concurrent writes, blocks during shutdown)
         shutdownLock.readLock().lock();
@@ -819,32 +824,78 @@ public class RocksDbPersistenceStore extends AbstractPersistenceStore {
                 entriesByRegion.computeIfAbsent(entry.getRegion(), k -> new ArrayList<>()).add(entry);
             }
             
+            log.info("RocksDB saveEntries: grouped into {} region(s)", entriesByRegion.size());
+            
             for (Map.Entry<String, List<CacheEntry>> regionEntries : entriesByRegion.entrySet()) {
                 String region = regionEntries.getKey();
-                RocksDB regionDb = getOrCreateRegionDatabase(region);
+                List<CacheEntry> entriesToSave = regionEntries.getValue();
                 
-                try (WriteBatch batch = new WriteBatch();
-                     WriteOptions writeOptions = new WriteOptions()) {
+                log.info("RocksDB saveEntries: processing region '{}' with {} entries", region, entriesToSave.size());
+                
+                try {
+                    RocksDB regionDb = getOrCreateRegionDatabase(region);
+                    log.info("RocksDB saveEntries: got database for region '{}': {}", region, regionDb != null ? "OK" : "NULL");
                     
-                    // DURABILITY FIX (v1.6.1): Force sync during shutdown to prevent data loss
-                    // During normal operation, rely on WAL for crash recovery (faster)
-                    // During shutdown, we MUST sync to ensure data is on disk before close
-                    // This prevents corruption when JVM exits before OS buffers are flushed
-                    writeOptions.setSync(shuttingDown);
-                    
-                    for (CacheEntry entry : regionEntries.getValue()) {
-                        String json = JsonUtils.toJson(entryToMap(entry));
-                        batch.put(
-                                entry.getKey().getBytes(StandardCharsets.UTF_8),
-                                json.getBytes(StandardCharsets.UTF_8));
+                    if (regionDb == null) {
+                        log.error("RocksDB saveEntries: Failed to get database for region '{}'", region);
+                        continue;
                     }
                     
-                    regionDb.write(writeOptions, batch);
-                } catch (RocksDBException e) {
-                    log.error("Failed to batch save entries to region '{}': {}", region, e.getMessage(), e);
-                    throw new RuntimeException("Failed to batch save entries", e);
+                    log.info("RocksDB saveEntries: creating WriteBatch for region '{}'", region);
+                    
+                    try (WriteBatch batch = new WriteBatch();
+                         WriteOptions writeOptions = new WriteOptions()) {
+                        
+                        // DURABILITY FIX (v1.6.1): Force sync during shutdown to prevent data loss
+                        // During normal operation, rely on WAL for crash recovery (faster)
+                        // During shutdown, we MUST sync to ensure data is on disk before close
+                        // This prevents corruption when JVM exits before OS buffers are flushed
+                        writeOptions.setSync(shuttingDown);
+                        
+                        int addedCount = 0;
+                        for (CacheEntry entry : entriesToSave) {
+                            try {
+                                String json = JsonUtils.toJson(entryToMap(entry));
+                                batch.put(
+                                        entry.getKey().getBytes(StandardCharsets.UTF_8),
+                                        json.getBytes(StandardCharsets.UTF_8));
+                                addedCount++;
+                                
+                                if (addedCount == 1) {
+                                    log.info("RocksDB saveEntries: first entry added to batch for region '{}'", region);
+                                }
+                                if (addedCount % 10000 == 0) {
+                                    log.info("RocksDB saveEntries: {} entries added to batch for region '{}'", addedCount, region);
+                                }
+                            } catch (Throwable t) {
+                                log.error("RocksDB saveEntries: ENTRY ERROR for key '{}' in region '{}': {} - {}", 
+                                        entry.getKey(), region, t.getClass().getName(), t.getMessage(), t);
+                                throw t;
+                            }
+                        }
+                        
+                        log.info("RocksDB saveEntries: writing batch of {} entries to region '{}'", addedCount, region);
+                        regionDb.write(writeOptions, batch);
+                        log.info("RocksDB saveEntries: COMMITTED {} entries to region '{}'", addedCount, region);
+                        
+                    } catch (RocksDBException e) {
+                        log.error("RocksDB saveEntries: FATAL ERROR for region '{}': {} - {}", 
+                                region, e.getClass().getName(), e.getMessage(), e);
+                        throw new RuntimeException("Failed to batch save entries", e);
+                    }
+                    
+                } catch (Throwable t) {
+                    log.error("RocksDB saveEntries: OUTER exception for region '{}': {} - {}", 
+                            region, t.getClass().getName(), t.getMessage(), t);
+                    if (t instanceof RuntimeException) {
+                        throw (RuntimeException) t;
+                    }
+                    throw new RuntimeException("Failed to save entries to region: " + region, t);
                 }
             }
+            
+            log.info("RocksDB saveEntries: method completed");
+            
         } finally {
             shutdownLock.readLock().unlock();
         }

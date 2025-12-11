@@ -1,6 +1,6 @@
 # How to Start Kuber Server
 
-**Version 1.7.0**
+**Version 1.7.1**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -56,6 +56,16 @@ echo $JAVA_HOME
 | **Disk** | 1 GB | 10+ GB | For persistence data |
 | **CPU** | 1 core | 4+ cores | For concurrent operations |
 
+### JVM Requirements (Java 9+)
+
+When running on Java 9 or later, the following JVM option is **required** for LMDB persistence support:
+
+```bash
+--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+```
+
+This allows the LMDB Java library to access internal ByteBuffer fields for direct memory operations. The startup scripts (`kuber-start.sh`, `kuber-start.bat`) include this option automatically.
+
 ### Optional Components
 
 | Component | Purpose | When Needed |
@@ -88,7 +98,7 @@ mvn clean install
 
 After successful build, the server JAR is located at:
 ```
-kuber-server/target/kuber-server-1.7.0-SNAPSHOT.jar
+kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
 ```
 
 ### Build Specific Module
@@ -115,15 +125,19 @@ dotnet build
 ### Method 1: Using the JAR File (Recommended for Production)
 
 ```bash
-# Basic start
-java -jar kuber-server/target/kuber-server-1.7.0-SNAPSHOT.jar
+# Basic start (includes required JVM options)
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
 
 # With specific memory settings
-java -Xms512m -Xmx2g -jar kuber-server/target/kuber-server-1.7.0-SNAPSHOT.jar
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -Xms512m -Xmx2g \
+     -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
 
 # With garbage collector tuning (for large heaps)
-java -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
-     -jar kuber-server/target/kuber-server-1.7.0-SNAPSHOT.jar
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
+     -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
 ```
 
 ### Method 2: Using Maven (Recommended for Development)
@@ -131,13 +145,16 @@ java -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
 ```bash
 # From the project root directory
 cd kuber-server
-mvn spring-boot:run
+
+# Basic run with required JVM options
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
 
 # With specific profile
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+mvn spring-boot:run -Dspring-boot.run.profiles=dev \
+    -Dspring-boot.run.jvmArguments="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
 
-# With JVM arguments
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xms512m -Xmx2g"
+# With additional JVM arguments
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -Xms512m -Xmx2g"
 ```
 
 ### Method 3: Using the Startup Scripts
@@ -246,7 +263,7 @@ java -jar kuber-server.jar \
   --kuber.network.port=6380 \
   --kuber.network.bind-address=0.0.0.0 \
   --kuber.cache.max-memory-entries=500000 \
-  --kuber.persistence.type=rocksdb \
+  --kuber.persistence.type=lmdb \
   --kuber.persistence.rocksdb.path=/data/kuber/rocksdb \
   --spring.security.user.name=admin \
   --spring.security.user.password=secret123
@@ -261,7 +278,7 @@ java -jar kuber-server.jar \
 | `--kuber.network.bind-address=0.0.0.0` | 0.0.0.0 | Network interface |
 | `--kuber.cache.max-memory-entries=100000` | 100000 | Max entries per region |
 | `--kuber.cache.global-max-memory-entries=500000` | 0 | Global max (0=unlimited) |
-| `--kuber.persistence.type=rocksdb` | rocksdb | Persistence backend |
+| `--kuber.persistence.type=lmdb` | lmdb | Persistence backend |
 | `--kuber.persistence.rocksdb.path=./data` | ./data/rocksdb | Data directory |
 | `--kuber.secure.folder=./secure` | ./secure | Secure config folder |
 
@@ -270,7 +287,7 @@ java -jar kuber-server.jar \
 ```bash
 # Use RocksDB (default, recommended)
 java -jar kuber-server.jar \
-  --kuber.persistence.type=rocksdb \
+  --kuber.persistence.type=lmdb \
   --kuber.persistence.rocksdb.path=/var/kuber/data
 
 # Use LMDB
@@ -329,7 +346,7 @@ docker run -d \
   -e SPRING_SECURITY_USER_PASSWORD=secret \
   -p 8080:8080 \
   -p 6380:6380 \
-  kuber-server:1.7.0
+  kuber-server:1.7.1
 ```
 
 ---
@@ -437,13 +454,14 @@ java -jar kuber-server.jar \
 ### 8.2 Production Setup with RocksDB
 
 ```bash
-java -Xms4g -Xmx8g \
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -Xms4g -Xmx8g \
      -XX:+UseG1GC \
      -XX:MaxGCPauseMillis=200 \
      -jar kuber-server.jar \
   --kuber.network.port=6380 \
   --kuber.cache.max-memory-entries=1000000 \
-  --kuber.persistence.type=rocksdb \
+  --kuber.persistence.type=lmdb \
   --kuber.persistence.rocksdb.path=/var/kuber/data \
   --kuber.backup.enabled=true \
   --kuber.backup.cron="0 0 23 * * *" \
@@ -453,11 +471,12 @@ java -Xms4g -Xmx8g \
 ### 8.3 High-Availability Setup with ZooKeeper
 
 ```bash
-java -jar kuber-server.jar \
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -jar kuber-server.jar \
   --kuber.node-id=node1 \
   --kuber.zookeeper.enabled=true \
   --kuber.zookeeper.connect-string=zk1:2181,zk2:2181,zk3:2181 \
-  --kuber.persistence.type=rocksdb
+  --kuber.persistence.type=lmdb
 ```
 
 ### 8.4 Off-Heap Key Index (Large Datasets)
@@ -478,8 +497,9 @@ Create `start-kuber.sh`:
 #!/bin/bash
 
 KUBER_HOME=/opt/kuber
-JAVA_OPTS="-Xms4g -Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-KUBER_JAR="${KUBER_HOME}/kuber-server-1.7.0-SNAPSHOT.jar"
+# Required: --add-opens for LMDB persistence on Java 9+
+JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -Xms4g -Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+KUBER_JAR="${KUBER_HOME}/kuber-server-1.7.1-SNAPSHOT.jar"
 CONFIG_DIR="${KUBER_HOME}/config"
 LOG_DIR="${KUBER_HOME}/logs"
 PID_FILE="${KUBER_HOME}/kuber.pid"
@@ -554,6 +574,23 @@ curl -u admin:admin123 http://localhost:8080/api/v1/messaging/status
 
 ### 10.1 Server Won't Start
 
+**LMDB Error: InaccessibleObjectException (Java 9+):**
+
+If you see this error when using LMDB persistence:
+```
+java.lang.reflect.InaccessibleObjectException: Unable to make field long java.nio.Buffer.address accessible
+```
+
+Add the following JVM option:
+```bash
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -jar kuber-server.jar
+```
+
+Or use the startup scripts which include this option automatically:
+```bash
+./scripts/kuber-start.sh
+```
+
 **Port already in use:**
 ```bash
 # Find process using port
@@ -620,17 +657,19 @@ java -jar kuber-server.jar \
 ### Minimum Start Command
 
 ```bash
-java -jar kuber-server-1.7.0-SNAPSHOT.jar
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -jar kuber-server-1.7.1-SNAPSHOT.jar
 ```
 
 ### Typical Production Start
 
 ```bash
-java -Xms2g -Xmx4g \
-  -jar kuber-server.jar \
-  --kuber.persistence.type=rocksdb \
-  --kuber.persistence.rocksdb.path=/var/kuber/data \
-  --spring.security.user.password=${KUBER_PASSWORD}
+java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -Xms2g -Xmx4g \
+     -jar kuber-server.jar \
+     --kuber.persistence.type=lmdb \
+     --kuber.persistence.rocksdb.path=/var/kuber/data \
+     --spring.security.user.password=${KUBER_PASSWORD}
 ```
 
 ### Key URLs

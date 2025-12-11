@@ -2,11 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
-## [1.7.0] - 2025-12-10 - REQUEST/RESPONSE MESSAGING
+## [1.7.1] - 2025-12-10 - REQUEST/RESPONSE MESSAGING
 
 ### 🚀 Major New Feature: Request/Response via Message Brokers
 
-**v1.7.0 introduces the ability to interact with the cache through message brokers.**
+**v1.7.1 introduces the ability to interact with the cache through message brokers.**
 
 Access any cache operation (GET, SET, DELETE, JSON operations, etc.) by posting JSON requests 
 to message broker queues/topics. Responses are delivered to corresponding response queues/topics.

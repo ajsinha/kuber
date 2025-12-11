@@ -204,6 +204,21 @@ public class KuberProperties {
         private int maxMemoryEntries = 100000;
         
         /**
+         * Maximum allowed key length in bytes.
+         * Keys exceeding this length will be rejected with an error.
+         * The key and value will be logged for debugging purposes.
+         * 
+         * This limit applies to ALL persistence stores (LMDB, RocksDB, MongoDB, etc.)
+         * and prevents issues with database-specific key length limits.
+         * 
+         * Default: 256 bytes (sufficient for most use cases)
+         * Maximum recommended: 1024 bytes (for compatibility with all backends)
+         */
+        @Min(1)
+        @Max(65536)
+        private int maxKeyLengthBytes = 256;
+        
+        /**
          * Global maximum number of entries across ALL regions combined.
          * When set (> 0), the total in-memory entries across all regions
          * will not exceed this value. Memory is allocated proportionally
@@ -1046,11 +1061,18 @@ public class KuberProperties {
     @Data
     public static class Persistence {
         /**
-         * Persistence store type: mongodb, sqlite, postgresql, rocksdb, lmdb, memory
-         * Default: rocksdb (no external dependencies required)
+         * Persistence store type: lmdb, rocksdb, mongodb, sqlite, postgresql, memory
+         * Default: lmdb (fastest reads via memory-mapping, no external dependencies)
+         * 
+         * LMDB is recommended for most use cases due to:
+         * - Zero-copy reads via memory mapping
+         * - Excellent read performance
+         * - ACID transactions
+         * - No recovery needed after crash
+         * - Simple deployment (no external services)
          */
         @NotBlank
-        private String type = "rocksdb";
+        private String type = "lmdb";
         
         /**
          * Whether to synchronously write individual PUT/SET operations to disk.
@@ -1185,17 +1207,27 @@ public class KuberProperties {
         
         /**
          * Maximum database size (map size) in bytes.
-         * LMDB memory-maps the entire database, so this sets the upper limit.
-         * Default: 1GB. Increase for larger datasets.
+         * LMDB memory-maps the database using virtual address space.
+         * Default: 1TB (1024GB). This is safe on 64-bit systems.
+         * 
+         * IMPORTANT NOTES:
+         * - This reserves VIRTUAL address space, NOT physical disk or RAM
+         * - Actual disk usage grows only as data is written (sparse file)
+         * - Physical RAM usage is managed by OS page cache (only active pages)
+         * - 64-bit systems have 128TB+ virtual space, so 1TB is trivial
+         * - Can be set much larger than available RAM or disk without issues
+         * 
+         * If you see "Environment mapsize reached" error, increase this value
+         * and restart. The map size cannot be changed while database is running.
          * 
          * Common values:
-         *   1GB  = 1073741824
-         *   2GB  = 2147483648
-         *   4GB  = 4294967296
-         *   8GB  = 8589934592
-         *   16GB = 17179869184
+         *   100GB = 107374182400
+         *   500GB = 536870912000
+         *   1TB   = 1099511627776 (default)
+         *   2TB   = 2199023255552
+         *   4TB   = 4398046511104
          */
-        private long mapSize = 1073741824L; // 1GB
+        private long mapSize = 1099511627776L; // 1TB (1024GB)
         
         /**
          * Whether to sync writes immediately.

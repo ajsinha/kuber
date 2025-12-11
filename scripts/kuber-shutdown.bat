@@ -94,7 +94,7 @@ REM Print banner
 echo.
 echo ========================================================================
 echo                     KUBER SHUTDOWN UTILITY
-echo                         Version 1.4.0
+echo                         Version 1.7.1
 echo ========================================================================
 echo.
 
@@ -168,7 +168,7 @@ goto :end
 echo.
 echo ========================================================================
 echo                     KUBER SHUTDOWN UTILITY
-echo                         Version 1.4.0
+echo                         Version 1.7.1
 echo ========================================================================
 echo.
 echo Usage: kuber-shutdown.bat [options]

@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.7.0**
+**Version 1.7.1**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -184,7 +184,7 @@ kuber/
 │   └── examples/
 │       └── messaging_example.py  # Messaging client example
 │
-├── kuber-client-csharp/           # C# / .NET client libraries (v1.7.0)
+├── kuber-client-csharp/           # C# / .NET client libraries (v1.7.1)
 │   ├── src/Kuber.Client/
 │   │   ├── KuberClient.cs        # Redis protocol client (StackExchange.Redis)
 │   │   ├── KuberRestClient.cs    # REST API client (HttpClient)
@@ -726,7 +726,7 @@ Native JSON document support with JSONPath queries:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            CLIENT ARCHITECTURE (v1.7.0)                          │
+│                            CLIENT ARCHITECTURE (v1.7.1)                          │
 ├─────────────────────┬─────────────────────┬─────────────────────────────────────┤
 │   Redis Protocol    │      REST API       │           Messaging                  │
 │    (Port 6380)      │    (Port 8080)      │     (Kafka/RabbitMQ/etc.)           │
@@ -800,14 +800,14 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
 KuberRestClient client = new KuberRestClient(host, port, username, password);
 ```
 
-**C# Redis Client (v1.7.0):**
+**C# Redis Client (v1.7.1):**
 ```csharp
 // Connection via StackExchange.Redis
 using var client = new KuberClient("localhost", 6380);
 await client.SetAsync("key", "value");
 ```
 
-**C# REST Client (v1.7.0):**
+**C# REST Client (v1.7.1):**
 ```csharp
 // API Key authentication
 using var client = new KuberRestClient("localhost", 8080, apiKey: "kub_your_api_key_here");
@@ -1045,7 +1045,7 @@ kuber:
 
 ---
 
-## 10. Request/Response Messaging (v1.7.0)
+## 10. Request/Response Messaging (v1.7.1)
 
 Request/Response Messaging enables cache access via message brokers, allowing asynchronous, 
 decoupled communication with the cache system.
@@ -1159,7 +1159,7 @@ Configuration stored in `request_response.json` in the secure folder:
 }
 ```
 
-### 10.6 Global Service Control (v1.7.0)
+### 10.6 Global Service Control (v1.7.1)
 
 The entire Request/Response Messaging feature can be globally enabled or disabled:
 
@@ -1205,7 +1205,7 @@ GET  /api/v1/messaging/status   - Get service status (includes enabled state)
 - Changes are persisted to `request_response.json` and survive server restarts
 - Individual broker enable/disable still controls broker-level connections
 
-### 10.7 Broker Control (v1.7.0)
+### 10.7 Broker Control (v1.7.1)
 
 The messaging system provides dynamic broker control through the Admin UI and REST API:
 
