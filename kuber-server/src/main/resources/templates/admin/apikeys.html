@@ -330,6 +330,7 @@ String value = client.get("key");</code></pre>
     <div class="modal-dialog">
         <div class="modal-content">
             <form id="deleteKeyForm" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Delete API Key</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>

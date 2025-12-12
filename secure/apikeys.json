@@ -1,11 +1,11 @@
 [ {
-  "keyId" : "key_c839ca7f",
-  "keyValue" : "kub_566e7b476ea57c15612a43a02ff98f6188a50209757a6c3f7c115e845c68b15a",
-  "name" : "sample_user",
-  "userId" : "user",
-  "roles" : [ "USER" ],
-  "createdAt" : "2025-12-10T02:15:14.697456138Z",
-  "lastUsedAt" : "2025-12-10T17:57:48.314052569Z",
+  "keyId" : "key_7db46831",
+  "keyValue" : "kub_27d6eb2319ad721472f8c1b740e5b97188efa45e8830cfe193606714887e798d",
+  "name" : "admin2",
+  "userId" : "admin",
+  "roles" : [ "USER", "OPERATOR", "ADMIN" ],
+  "createdAt" : "2025-12-12T22:08:41.590556084Z",
+  "lastUsedAt" : "2025-12-12T22:09:06.525864560Z",
   "expiresAt" : null,
   "active" : true
 } ]

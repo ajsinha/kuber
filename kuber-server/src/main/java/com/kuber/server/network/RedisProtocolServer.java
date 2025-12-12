@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.mina.core.service.IoAcceptor;
 import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.filter.codec.ProtocolCodecFilter;
-import org.apache.mina.filter.codec.textline.TextLineCodecFactory;
 import org.apache.mina.filter.executor.ExecutorFilter;
 import org.apache.mina.transport.socket.nio.NioSocketAcceptor;
 import org.springframework.stereotype.Component;
@@ -37,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * after the cache service has been initialized and data has been recovered from
  * persistence. This prevents clients from connecting before the cache is ready.
  * 
- * @version 1.5.0
+ * @version 1.7.4
  */
 @Slf4j
 @Component
@@ -71,11 +70,11 @@ public class RedisProtocolServer {
             
             acceptor = new NioSocketAcceptor(processorCount);
             
-            // Configure text line codec with configurable max line length
-            TextLineCodecFactory codecFactory = new TextLineCodecFactory(
-                    StandardCharsets.UTF_8);
-            codecFactory.setDecoderMaxLineLength(networkConfig.getDecoderMaxLineLength());
-            codecFactory.setEncoderMaxLineLength(networkConfig.getDecoderMaxLineLength());
+            // Configure RESP protocol codec with configurable max line length
+            RedisProtocolCodecFactory codecFactory = new RedisProtocolCodecFactory(
+                    StandardCharsets.UTF_8,
+                    networkConfig.getDecoderMaxLineLength()
+            );
             
             acceptor.getFilterChain().addLast("codec", 
                     new ProtocolCodecFilter(codecFactory));
