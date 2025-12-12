@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.1
+Version 1.7.2
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -136,7 +136,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
+        -jar kuber-server/target/kuber-server-1.7.2-SNAPSHOT.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -171,13 +171,20 @@ Kuber provides client libraries for **Python**, **Java**, and **C#**, each suppo
 ```python
 from kuber_redis_standalone import KuberRedisClient
 
-with KuberRedisClient('localhost', 6380) as client:
+# Connect with API key authentication
+with KuberRedisClient('localhost', 6380, api_key='kub_your_key') as client:
     # Basic operations
     client.set('key', 'value')
     value = client.get('key')
     
     # Store JSON in specific region
-    client.json_set('user:1', {'name': 'Alice', 'age': 30}, region='users')
+    client.json_set('user:1', {'name': 'Alice', 'age': 30, 'temp': 'x'}, region='users')
+    
+    # Update/merge JSON (new in v1.7.2)
+    client.json_update('user:1', {'age': 31, 'city': 'NYC'}, region='users')
+    
+    # Remove attributes from JSON (new in v1.7.2)
+    client.json_remove('user:1', ['temp'], region='users')
     
     # Deep JSON search
     results = client.json_search('$.age>25', region='users')
@@ -187,7 +194,8 @@ with KuberRedisClient('localhost', 6380) as client:
 ```python
 from kuber_rest_standalone import KuberRestClient
 
-with KuberRestClient('localhost', 8080, username='admin', password='secret') as client:
+# Using API key (recommended)
+with KuberRestClient('localhost', 8080, api_key='kub_your_key') as client:
     # Basic operations  
     client.set('key', 'value')
     value = client.get('key')
@@ -213,14 +221,21 @@ producer.send('ccs_cache_request', json.dumps(request))
 
 **Redis Protocol** (`KuberClient.java`):
 ```java
-try (KuberClient client = new KuberClient("localhost", 6380)) {
+// Connect with API key authentication
+try (KuberClient client = new KuberClient("localhost", 6380, "kub_your_key")) {
     // Basic operations
     client.set("key", "value");
     String value = client.get("key");
     
     // Region-based JSON storage
     client.selectRegion("products");
-    client.jsonSet("prod:1", "{\"name\": \"Widget\", \"price\": 29.99}");
+    client.jsonSet("prod:1", "{\"name\": \"Widget\", \"price\": 29.99, \"temp\": \"x\"}");
+    
+    // Update/merge JSON (new in v1.7.2)
+    client.jsonUpdate("prod:1", "{\"price\": 39.99, \"stock\": 100}");
+    
+    // Remove attributes from JSON (new in v1.7.2)
+    client.jsonRemove("prod:1", "temp");
     
     // JSON search
     List<JsonNode> results = client.jsonSearch("$.price<50");

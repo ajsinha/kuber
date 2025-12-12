@@ -46,6 +46,8 @@ import java.util.Map;
  *   <li>HGETALL - Get all hash fields</li>
  *   <li>JSET - Set JSON document</li>
  *   <li>JGET - Get JSON document</li>
+ *   <li>JUPDATE - Update/merge JSON document (upsert with deep merge)</li>
+ *   <li>JREMOVE - Remove attributes from JSON document</li>
  *   <li>JSEARCH - Search JSON documents</li>
  *   <li>PING - Test connection</li>
  *   <li>INFO - Get server info</li>

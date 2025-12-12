@@ -13,7 +13,9 @@ package com.kuber.server.controller;
 
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.persistence.LmdbPersistenceStore;
 import com.kuber.server.persistence.PersistenceStore;
+import com.kuber.server.persistence.PersistenceStore.PersistenceType;
 import com.kuber.server.replication.ReplicationManager;
 import com.kuber.server.security.ApiKey;
 import com.kuber.server.security.ApiKeyService;
@@ -271,6 +273,103 @@ public class AdminController {
         }
         
         return "admin/stats";
+    }
+    
+    // ==================== LMDB Management ====================
+    
+    /**
+     * View LMDB disk usage for all regions.
+     */
+    @GetMapping("/lmdb/disk-usage")
+    @ResponseBody
+    public Map<String, Object> getLmdbDiskUsage() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        
+        if (persistenceStore.getType() != PersistenceType.LMDB) {
+            response.put("error", "LMDB is not the active persistence backend");
+            response.put("currentBackend", persistenceStore.getType().name());
+            return response;
+        }
+        
+        LmdbPersistenceStore lmdbStore = (LmdbPersistenceStore) persistenceStore;
+        return lmdbStore.getDiskUsageSummary();
+    }
+    
+    /**
+     * Get detailed LMDB stats for a specific region.
+     */
+    @GetMapping("/lmdb/stats/{region}")
+    @ResponseBody
+    public Map<String, Object> getLmdbRegionStats(@PathVariable String region) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        
+        if (persistenceStore.getType() != PersistenceType.LMDB) {
+            response.put("error", "LMDB is not the active persistence backend");
+            return response;
+        }
+        
+        LmdbPersistenceStore lmdbStore = (LmdbPersistenceStore) persistenceStore;
+        return lmdbStore.getRegionStats(region);
+    }
+    
+    /**
+     * Compact an LMDB region to reclaim disk space.
+     * 
+     * LMDB never shrinks database files automatically - when you delete entries,
+     * the pages are added to an internal freelist and reused for future writes.
+     * 
+     * This endpoint creates a compacted copy of the database with only active data,
+     * resulting in a smaller file on disk.
+     * 
+     * WARNING: This operation briefly closes the region's database. Writes will 
+     * be blocked during compaction, but reads should continue from the old file.
+     */
+    @PostMapping("/lmdb/compact/{region}")
+    @ResponseBody
+    public Map<String, Object> compactLmdbRegion(@PathVariable String region) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        
+        if (persistenceStore.getType() != PersistenceType.LMDB) {
+            response.put("error", "LMDB is not the active persistence backend");
+            return response;
+        }
+        
+        LmdbPersistenceStore lmdbStore = (LmdbPersistenceStore) persistenceStore;
+        return lmdbStore.compactRegion(region);
+    }
+    
+    /**
+     * Compact all LMDB regions.
+     */
+    @PostMapping("/lmdb/compact-all")
+    @ResponseBody
+    public Map<String, Object> compactAllLmdbRegions() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        
+        if (persistenceStore.getType() != PersistenceType.LMDB) {
+            response.put("error", "LMDB is not the active persistence backend");
+            return response;
+        }
+        
+        LmdbPersistenceStore lmdbStore = (LmdbPersistenceStore) persistenceStore;
+        
+        List<Map<String, Object>> results = new ArrayList<>();
+        long totalSaved = 0;
+        
+        for (String region : cacheService.getRegionNames()) {
+            Map<String, Object> result = lmdbStore.compactRegion(region);
+            results.add(result);
+            
+            if (Boolean.TRUE.equals(result.get("success")) && result.get("savedBytes") != null) {
+                totalSaved += (Long) result.get("savedBytes");
+            }
+        }
+        
+        response.put("results", results);
+        response.put("totalSavedBytes", totalSaved);
+        response.put("totalSavedMB", String.format("%.2f", totalSaved / (1024.0 * 1024.0)));
+        
+        return response;
     }
     
     /**

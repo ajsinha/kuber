@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.7.1**
+**Version 1.7.2**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -871,6 +871,8 @@ Additional commands beyond standard Redis:
 | `REGIONS` | List regions | `REGIONS` |
 | `JSET key json [path] [ttl]` | Set JSON | `JSET user:1 {"name":"Alice"}` |
 | `JGET key [path]` | Get JSON | `JGET user:1 $.name` |
+| `JUPDATE key json [ttl]` | Update/merge JSON (upsert) | `JUPDATE user:1 {"age":31}` |
+| `JREMOVE key ["attr",...]` | Remove attributes from JSON | `JREMOVE user:1 ["age","temp"]` |
 | `JSEARCH query` | Search JSON | `JSEARCH $.age>30` |
 | `STATUS` | Server status | `STATUS` |
 | `REPLINFO` | Replication info | `REPLINFO` |
@@ -913,7 +915,9 @@ Hash Operations:
 JSON Operations:
   GET    /json/{region}/{key}       - Get JSON document
   PUT    /json/{region}/{key}       - Set JSON document
+  PATCH  /json/{region}/{key}       - Update/merge JSON document (JUPDATE)
   DELETE /json/{region}/{key}       - Delete JSON document
+  POST   /json/{region}/{key}/remove - Remove attributes from JSON (JREMOVE)
   POST   /json/{region}/search      - Search JSON documents
 
 Generic Search API:

@@ -1,5 +1,5 @@
 {
-  "enabled" : true,
+  "enabled" : false,
   "brokers" : {
     "activemq_example" : {
       "enabled" : true,
@@ -13,6 +13,7 @@
       "host" : "localhost",
       "port" : 5672,
       "channel" : null,
+      "password" : "admin",
       "username" : "admin",
       "virtualHost" : "/",
       "queueManager" : null,
@@ -21,7 +22,6 @@
       "autoOffsetReset" : "earliest",
       "connName" : null,
       "connectionSummary" : "tcp://localhost:61616",
-      "password" : "admin",
       "display_name" : "Example ActiveMQ",
       "request_topics" : [ "ccs_cache_request" ]
     },
@@ -36,6 +36,7 @@
       "host" : "localhost",
       "port" : 5672,
       "channel" : null,
+      "password" : null,
       "username" : null,
       "virtualHost" : "/",
       "queueManager" : null,
@@ -44,7 +45,6 @@
       "autoOffsetReset" : "earliest",
       "connName" : null,
       "connectionSummary" : "kafka://localhost:9092",
-      "password" : null,
       "display_name" : "Example Kafka",
       "request_topics" : [ "ccs_cache_request" ]
     }

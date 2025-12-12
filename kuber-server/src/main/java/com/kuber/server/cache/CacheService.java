@@ -1502,6 +1502,180 @@ public class CacheService {
         putEntry(region, key, entry);
     }
     
+    /**
+     * Update/merge JSON value (upsert with merge).
+     * 
+     * Behavior:
+     * - If key doesn't exist: set the JSON value
+     * - If key exists and is valid JSON: merge new JSON onto existing (deep merge, new values override)
+     * - If key exists but is not valid JSON: replace with new JSON value
+     * 
+     * @param region the region name
+     * @param key the cache key
+     * @param newJson the JSON value to update/merge
+     * @param ttlSeconds TTL in seconds (-1 for no expiry)
+     * @return the resulting merged JSON value
+     */
+    public JsonNode jsonUpdate(String region, String key, JsonNode newJson, long ttlSeconds) {
+        checkWriteAccess();
+        ensureRegionExists(region);
+        waitForRegionLoadingIfNeeded(region, "JUPDATE");
+        
+        Instant now = Instant.now();
+        Instant expiresAt = ttlSeconds > 0 ? now.plusSeconds(ttlSeconds) : null;
+        
+        CacheEntry existing = getEntry(region, key);
+        JsonNode finalValue;
+        
+        if (existing == null) {
+            // Key doesn't exist: set the new JSON value
+            finalValue = applyAttributeMapping(region, newJson);
+            log.debug("JUPDATE: key '{}' not found, setting new value", key);
+        } else if (existing.getJsonValue() != null && existing.getJsonValue().isObject() && newJson.isObject()) {
+            // Key exists with valid JSON object: merge
+            finalValue = mergeJsonNodes(existing.getJsonValue(), newJson);
+            log.debug("JUPDATE: merging JSON for key '{}'", key);
+        } else if (existing.getValueType() == CacheEntry.ValueType.JSON && existing.getJsonValue() != null) {
+            // Key exists with JSON but can't merge (e.g., arrays): replace
+            finalValue = applyAttributeMapping(region, newJson);
+            log.debug("JUPDATE: replacing non-object JSON for key '{}'", key);
+        } else {
+            // Key exists but not valid JSON: replace with new JSON
+            finalValue = applyAttributeMapping(region, newJson);
+            log.debug("JUPDATE: replacing non-JSON value for key '{}'", key);
+        }
+        
+        CacheEntry entry = CacheEntry.builder()
+                .id(existing != null ? existing.getId() : UUID.randomUUID().toString())
+                .key(key)
+                .region(region)
+                .valueType(CacheEntry.ValueType.JSON)
+                .jsonValue(finalValue)
+                .stringValue(JsonUtils.toJson(finalValue))
+                .ttlSeconds(ttlSeconds)
+                .createdAt(existing != null ? existing.getCreatedAt() : now)
+                .updatedAt(now)
+                .expiresAt(expiresAt)
+                .build();
+        
+        putEntry(region, key, entry);
+        return finalValue;
+    }
+    
+    /**
+     * Deep merge two JSON nodes. Values from newJson override values from existingJson.
+     * For nested objects, merge recursively. Arrays are replaced, not merged.
+     */
+    private JsonNode mergeJsonNodes(JsonNode existingJson, JsonNode newJson) {
+        if (existingJson == null || !existingJson.isObject()) {
+            return newJson;
+        }
+        if (newJson == null || !newJson.isObject()) {
+            return existingJson;
+        }
+        
+        // Convert to Map for merging
+        Map<String, Object> existingMap = JsonUtils.getObjectMapper()
+                .convertValue(existingJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        Map<String, Object> newMap = JsonUtils.getObjectMapper()
+                .convertValue(newJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        
+        // Deep merge
+        deepMerge(existingMap, newMap);
+        
+        return JsonUtils.getObjectMapper().valueToTree(existingMap);
+    }
+    
+    /**
+     * Deep merge newMap into existingMap. Modifies existingMap in place.
+     */
+    @SuppressWarnings("unchecked")
+    private void deepMerge(Map<String, Object> existingMap, Map<String, Object> newMap) {
+        for (Map.Entry<String, Object> entry : newMap.entrySet()) {
+            String key = entry.getKey();
+            Object newValue = entry.getValue();
+            
+            if (existingMap.containsKey(key)) {
+                Object existingValue = existingMap.get(key);
+                
+                // If both are maps, merge recursively
+                if (existingValue instanceof Map && newValue instanceof Map) {
+                    deepMerge((Map<String, Object>) existingValue, (Map<String, Object>) newValue);
+                } else {
+                    // Otherwise, new value overrides
+                    existingMap.put(key, newValue);
+                }
+            } else {
+                // Key doesn't exist in existing map, add it
+                existingMap.put(key, newValue);
+            }
+        }
+    }
+    
+    /**
+     * Remove specified attributes from a JSON value.
+     * 
+     * Behavior:
+     * - If key exists and has valid JSON object: removes specified attributes and saves
+     * - If key doesn't exist or value is not JSON object: returns null (nothing done)
+     * 
+     * @param region the region name
+     * @param key the cache key
+     * @param attributes list of attribute names to remove
+     * @return the updated JSON value, or null if nothing was done
+     */
+    public JsonNode jsonRemoveAttributes(String region, String key, List<String> attributes) {
+        checkWriteAccess();
+        ensureRegionExists(region);
+        waitForRegionLoadingIfNeeded(region, "JREMOVE");
+        
+        CacheEntry existing = getEntry(region, key);
+        
+        // If key doesn't exist, return null
+        if (existing == null) {
+            log.debug("JREMOVE: key '{}' not found, nothing to do", key);
+            return null;
+        }
+        
+        // If value is not a JSON object, return null
+        if (existing.getJsonValue() == null || !existing.getJsonValue().isObject()) {
+            log.debug("JREMOVE: value for key '{}' is not a JSON object, nothing to do", key);
+            return null;
+        }
+        
+        // Convert to Map for attribute removal
+        Map<String, Object> jsonMap = JsonUtils.getObjectMapper()
+                .convertValue(existing.getJsonValue(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        
+        // Remove specified attributes
+        int removedCount = 0;
+        for (String attr : attributes) {
+            if (jsonMap.containsKey(attr)) {
+                jsonMap.remove(attr);
+                removedCount++;
+                log.debug("JREMOVE: removed attribute '{}' from key '{}'", attr, key);
+            }
+        }
+        
+        // If nothing was removed, return the original JSON (no changes needed)
+        if (removedCount == 0) {
+            log.debug("JREMOVE: no attributes found to remove from key '{}'", key);
+            return existing.getJsonValue();
+        }
+        
+        // Convert back to JsonNode and save
+        JsonNode updatedJson = JsonUtils.getObjectMapper().valueToTree(jsonMap);
+        
+        existing.setJsonValue(updatedJson);
+        existing.setStringValue(JsonUtils.toJson(updatedJson));
+        existing.setUpdatedAt(Instant.now());
+        
+        putEntry(region, key, existing);
+        
+        log.debug("JREMOVE: removed {} attribute(s) from key '{}'", removedCount, key);
+        return updatedJson;
+    }
+    
     public JsonNode jsonGet(String region, String key) {
         return jsonGet(region, key, "$");
     }

@@ -1,6 +1,6 @@
 # Kuber Client Usage Guide
 
-**Version 1.7.1**
+**Version 1.7.2**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -54,22 +54,60 @@ Kuber provides client libraries for three languages, each supporting multiple ac
 
 ## 2. Authentication Requirements
 
-**All API access requires authentication** via one of:
+**All programmatic API access requires API Key authentication.**
 
-- **Username/Password**: For web UI and basic auth
-- **API Key**: For programmatic access (recommended)
+### Getting an API Key
 
-### API Key Usage
+1. Log in to the Web UI at http://localhost:8080
+2. Navigate to **Admin** → **API Keys**
+3. Click **Create New API Key**
+4. Copy the generated key (starts with `kub_`)
+
+### Authentication Methods by Access Pattern
+
+| Access Pattern | Auth Method | Notes |
+|----------------|-------------|-------|
+| **Redis Protocol** | API Key only | `AUTH kub_xxx...` command |
+| **REST API** | API Key or Username/Password | `X-API-Key` header or Basic Auth |
+| **Messaging** | API Key only | `api_key` field in request JSON |
+| **Web UI** | Username/Password | For browser-based access |
+
+### Redis Protocol Authentication (API Key Only)
 
 ```bash
-# REST API
-curl -H "X-API-Key: your-api-key" http://localhost:8080/api/v1/cache/default/key
+# Using redis-cli
+redis-cli -p 6380
+127.0.0.1:6380> AUTH kub_your_api_key_here
+OK
+127.0.0.1:6380> PING
+PONG
+127.0.0.1:6380> SET hello world
+OK
+```
 
-# Messaging
+**Important:** Redis protocol connections ONLY accept API keys for authentication. Username/password authentication is only available for the Web UI.
+
+### REST API Authentication
+
+```bash
+# Using API Key (recommended)
+curl -H "X-API-Key: kub_your_api_key_here" \
+     http://localhost:8080/api/v1/cache/default/mykey
+
+# Using Basic Auth (alternative)
+curl -u admin:admin123 \
+     http://localhost:8080/api/v1/cache/default/mykey
+```
+
+### Messaging Authentication
+
+```json
 {
-  "api_key": "your-api-key",
+  "api_key": "kub_your_api_key_here",
+  "message_id": "unique-msg-id",
   "operation": "GET",
-  ...
+  "region": "default",
+  "key": "mykey"
 }
 ```
 
@@ -84,11 +122,12 @@ curl -H "X-API-Key: your-api-key" http://localhost:8080/api/v1/cache/default/key
 cp kuber-client-python/kuber_redis_standalone.py your_project/
 ```
 
-**Basic Usage:**
+**Basic Usage with API Key:**
 ```python
 from kuber_redis_standalone import KuberRedisClient
 
-with KuberRedisClient('localhost', 6380) as client:
+# Connect with API key authentication
+with KuberRedisClient('localhost', 6380, api_key='kub_your_api_key_here') as client:
     # String operations
     client.set('key', 'value')
     value = client.get('key')
@@ -115,6 +154,9 @@ with KuberRedisClient('localhost', 6380) as client:
     client.json_set('product:1', {'name': 'Widget', 'price': 29.99})
     product = client.json_get('product:1')
     results = client.json_search('$.price<50')
+    
+    # JSON update/merge
+    client.json_update('product:1', {'price': 39.99, 'stock': 100})  # Merges with existing
     
     # Region operations
     client.create_region('users', 'User data region')
@@ -212,15 +254,16 @@ producer.send('ccs_cache_request', json.dumps(request).encode())
 <dependency>
     <groupId>com.kuber</groupId>
     <artifactId>kuber-client-java</artifactId>
-    <version>1.7.1-SNAPSHOT</version>
+    <version>1.7.2-SNAPSHOT</version>
 </dependency>
 ```
 
-**Basic Usage:**
+**Basic Usage with API Key:**
 ```java
 import com.kuber.client.KuberClient;
 
-try (KuberClient client = new KuberClient("localhost", 6380)) {
+// Connect with API key authentication
+try (KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key_here")) {
     // String operations
     client.set("key", "value");
     String value = client.get("key");
@@ -246,6 +289,9 @@ try (KuberClient client = new KuberClient("localhost", 6380)) {
     client.jsonSet("product:1", "{\"name\": \"Widget\", \"price\": 29.99}");
     String product = client.jsonGet("product:1");
     List<JsonNode> results = client.jsonSearch("$.price<50");
+    
+    // JSON update/merge (new in v1.7.2)
+    client.jsonUpdate("product:1", "{\"price\": 39.99, \"stock\": 100}");  // Merges with existing
     
     // Region operations
     client.createRegion("users", "User data region");
@@ -681,7 +727,9 @@ var profile = await client.HGetAllAsync("user:1");
 
 ## 8. JSON Operations
 
-### 8.1 Storing JSON
+Kuber provides comprehensive JSON document storage capabilities including store, retrieve, search, and merge operations.
+
+### 8.1 Storing JSON (JSET)
 
 **Python:**
 ```python
@@ -703,7 +751,7 @@ var user = new { Name = "Alice", Age = 30, Email = "alice@example.com" };
 await client.JsonSetAsync("user:1", user, "users");
 ```
 
-### 8.2 Retrieving JSON
+### 8.2 Retrieving JSON (JGET)
 
 **Python:**
 ```python
@@ -724,7 +772,47 @@ var user = await client.JsonGetAsync<User>("user:1", "users");
 var name = await client.JsonGetAsync<string>("user:1", "users", "$.name");
 ```
 
-### 8.3 Searching JSON
+### 8.3 Updating/Merging JSON (JUPDATE) - New in v1.7.2
+
+The `JUPDATE` command performs an upsert with deep merge:
+- **If key doesn't exist:** Creates new entry with the JSON value
+- **If key exists with JSON object:** Deep merges new JSON onto existing (new values override)
+- **If key exists but not valid JSON:** Replaces with new JSON value
+
+**Python:**
+```python
+# Initial user
+client.json_set('user:1', {'name': 'Alice', 'age': 30})
+
+# Update/merge - adds city, updates age
+client.json_update('user:1', {'age': 31, 'city': 'NYC'})
+# Result: {'name': 'Alice', 'age': 31, 'city': 'NYC'}
+
+# Deep merge works on nested objects too
+client.json_set('config:1', {'db': {'host': 'localhost', 'port': 5432}})
+client.json_update('config:1', {'db': {'port': 5433}, 'cache': {'enabled': True}})
+# Result: {'db': {'host': 'localhost', 'port': 5433}, 'cache': {'enabled': True}}
+```
+
+**Java:**
+```java
+// Initial user
+client.jsonSet("user:1", "{\"name\": \"Alice\", \"age\": 30}");
+
+// Update/merge
+client.jsonUpdate("user:1", "{\"age\": 31, \"city\": \"NYC\"}");
+// Result: {"name": "Alice", "age": 31, "city": "NYC"}
+```
+
+**Redis Protocol:**
+```bash
+JSET user:1 {"name":"Alice","age":30}
+JUPDATE user:1 {"age":31,"city":"NYC"}
+JGET user:1
+# Result: {"name":"Alice","age":31,"city":"NYC"}
+```
+
+### 8.4 Searching JSON (JSEARCH)
 
 **Python:**
 ```python
@@ -749,6 +837,54 @@ List<JsonNode> products = client.jsonSearch("$.price<50", "products");
 var users = await client.JsonSearchAsync<User>("$.age>25", "users");
 var products = await client.JsonSearchAsync<Product>("$.price<50", "products");
 ```
+
+### 8.5 Removing Attributes from JSON (JREMOVE) - New in v1.7.2
+
+The `JREMOVE` command removes specified attributes from a JSON document:
+- **If key exists with JSON object:** removes specified attributes and saves
+- **If key doesn't exist or value is not JSON:** does nothing (returns null)
+
+**Python:**
+```python
+# Initial user
+client.json_set('user:1', {'name': 'Alice', 'age': 30, 'city': 'NYC', 'temp_field': 'x'})
+
+# Remove attributes
+result = client.json_remove('user:1', ['age', 'temp_field'])
+# result: {'name': 'Alice', 'city': 'NYC'}
+```
+
+**Java:**
+```java
+// Initial user
+client.jsonSet("user:1", "{\"name\": \"Alice\", \"age\": 30, \"city\": \"NYC\"}");
+
+// Remove attributes using varargs
+JsonNode result = client.jsonRemove("user:1", "age", "city");
+// result: {"name": "Alice"}
+
+// Or using List
+result = client.jsonRemove("user:1", List.of("age", "city"));
+```
+
+**Redis Protocol:**
+```bash
+JSET user:1 {"name":"Alice","age":30,"city":"NYC"}
+JREMOVE user:1 ["age","city"]
+JGET user:1
+# Result: {"name":"Alice"}
+```
+
+### 8.6 JSON Command Summary
+
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| **JSET** | `JSET key json [path] [ttl]` | Store JSON document |
+| **JGET** | `JGET key [path]` | Retrieve JSON document or path |
+| **JUPDATE** | `JUPDATE key json [ttl]` | Update/merge JSON (upsert with deep merge) |
+| **JREMOVE** | `JREMOVE key ["attr1",...]` | Remove attributes from JSON |
+| **JDEL** | `JDEL key [path]` | Delete JSON document or path |
+| **JSEARCH** | `JSEARCH query` | Search JSON documents |
 
 ---
 

@@ -172,7 +172,7 @@ print(f"Value: {value}")</code></pre>
                     
                     <pre class="bg-dark text-light p-3 rounded"><code>with KuberClient('localhost', 6380, api_key='kub_xxx') as client:
     # Store JSON document
-    user = {"name": "John", "age": 30, "status": "active", "email": "john@company.com"}
+    user = {"name": "John", "age": 30, "status": "active", "email": "john@company.com", "temp": "x"}
     client.json_set('user:1001', user)
     
     # Get JSON document
@@ -183,6 +183,16 @@ print(f"Value: {value}")</code></pre>
     name = client.json_get('user:1001', '$.name')
     print(f"Name: {name}")
     
+    # Update/merge JSON (new in v1.7.2) - upsert with deep merge
+    # Adds new fields, updates existing fields
+    updated = client.json_update('user:1001', {'age': 31, 'city': 'NYC'})
+    print(f"After merge: {updated}")  # {"name":"John","age":31,"status":"active","email":"...","city":"NYC","temp":"x"}
+    
+    # Remove attributes from JSON (new in v1.7.2)
+    # Removes specified fields from the document
+    result = client.json_remove('user:1001', ['temp', 'city'])
+    print(f"After remove: {result}")  # {"name":"John","age":31,"status":"active","email":"..."}
+    
     # Search JSON documents
     results = client.json_search('$.status=active')
     print(f"Active users: {len(results)}")
@@ -190,6 +200,51 @@ print(f"Value: {value}")</code></pre>
     # Search with comparison
     results = client.json_search('$.age>25')
     print(f"Users over 25: {len(results)}")</code></pre>
+    
+                    <h4 class="mt-4">JSON Command Summary</h4>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Description</th>
+                                    <th>Example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>json_set(key, value)</code></td>
+                                    <td>Store JSON document</td>
+                                    <td><code>client.json_set('user:1', {'name': 'Alice'})</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>json_get(key, path)</code></td>
+                                    <td>Get JSON document or path</td>
+                                    <td><code>client.json_get('user:1', '$.name')</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>json_update(key, value)</code></td>
+                                    <td>Merge JSON (upsert, deep merge)</td>
+                                    <td><code>client.json_update('user:1', {'age': 31})</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>json_remove(key, attrs)</code></td>
+                                    <td>Remove attributes from JSON</td>
+                                    <td><code>client.json_remove('user:1', ['age', 'temp'])</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>json_delete(key, path)</code></td>
+                                    <td>Delete JSON document or path</td>
+                                    <td><code>client.json_delete('user:1')</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>json_search(query)</code></td>
+                                    <td>Search JSON documents</td>
+                                    <td><code>client.json_search('$.age>25')</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
     
                     <h4 class="mt-4">JSON Search Operators</h4>
                     <div class="table-responsive">
@@ -442,7 +497,7 @@ with KuberClient('localhost', 6380, api_key=API_KEY) as client:
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.1</p>
+                    <p class="text-muted small mb-0">Version 1.7.2</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

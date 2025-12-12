@@ -189,21 +189,82 @@ public class JedisExample {
     user.put("age", 30);
     user.put("status", "active");
     user.put("email", "john@company.com");
+    user.put("temp", "temporary_field");
     
     client.jsonSet("user:1001", user);
     
     // Get JSON document
-    Map&lt;String, Object&gt; retrieved = client.jsonGet("user:1001");
+    JsonNode retrieved = client.jsonGet("user:1001");
     System.out.println("User: " + retrieved);
     
     // Get specific path
-    String name = client.jsonGetPath("user:1001", "$.name");
+    JsonNode name = client.jsonGet("user:1001", "$.name");
     System.out.println("Name: " + name);
     
+    // Update/merge JSON (new in v1.7.2) - upsert with deep merge
+    // Adds new fields, updates existing fields
+    JsonNode updated = client.jsonUpdate("user:1001", "{\"age\": 31, \"city\": \"NYC\"}");
+    System.out.println("After merge: " + updated);
+    // Result: {"name":"John Doe","age":31,"status":"active","email":"...","city":"NYC","temp":"..."}
+    
+    // Remove attributes from JSON (new in v1.7.2)
+    // Using varargs
+    JsonNode afterRemove = client.jsonRemove("user:1001", "temp", "city");
+    System.out.println("After remove: " + afterRemove);
+    // Result: {"name":"John Doe","age":31,"status":"active","email":"..."}
+    
+    // Or using List
+    JsonNode result = client.jsonRemove("user:1001", Arrays.asList("field1", "field2"));
+    
     // Search JSON documents
-    List&lt;Map&lt;String, Object&gt;&gt; activeUsers = client.jsonSearch("$.status=active");
+    List&lt;JsonNode&gt; activeUsers = client.jsonSearch("$.status=active");
     System.out.println("Active users: " + activeUsers.size());
 }</code></pre>
+
+                    <h4 class="mt-4">JSON Command Summary</h4>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Description</th>
+                                    <th>Example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>jsonSet(key, json)</code></td>
+                                    <td>Store JSON document</td>
+                                    <td><code>client.jsonSet("user:1", "{\"name\":\"Alice\"}")</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>jsonGet(key, path)</code></td>
+                                    <td>Get JSON document or path</td>
+                                    <td><code>client.jsonGet("user:1", "$.name")</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>jsonUpdate(key, json)</code></td>
+                                    <td>Merge JSON (upsert, deep merge)</td>
+                                    <td><code>client.jsonUpdate("user:1", "{\"age\":31}")</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>jsonRemove(key, attrs...)</code></td>
+                                    <td>Remove attributes from JSON</td>
+                                    <td><code>client.jsonRemove("user:1", "age", "temp")</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>jsonDelete(key, path)</code></td>
+                                    <td>Delete JSON document or path</td>
+                                    <td><code>client.jsonDelete("user:1")</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>jsonSearch(query)</code></td>
+                                    <td>Search JSON documents</td>
+                                    <td><code>client.jsonSearch("$.age&gt;25")</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <h4 class="mt-4">JSON Search Operators</h4>
                     <div class="table-responsive">
@@ -488,7 +549,7 @@ public class KuberCompleteExample {
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.1</p>
+                    <p class="text-muted small mb-0">Version 1.7.2</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

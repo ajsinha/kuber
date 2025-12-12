@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('String Operations')}"></head>
 <body class="d-flex flex-column min-vh-100">
@@ -12,30 +17,308 @@
             </ol>
         </nav>
         <div class="row">
-            <div class="col-lg-10 mx-auto">
+            <div class="col-lg-11 mx-auto">
                 <h1 class="display-5 mb-4"><i class="fas fa-font text-primary me-3"></i>String Operations</h1>
+                
+                <p class="lead">String operations are the foundation of key-value caching. These commands allow you to store, retrieve, and manipulate string values.</p>
 
-                <h3>Commands</h3>
-                <table class="table table-striped">
-                    <thead><tr><th>Command</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td>SET key value</td><td>Set string value</td></tr>
-                        <tr><td>GET key</td><td>Get string value</td></tr>
-                        <tr><td>SETEX key ttl value</td><td>Set with expiration</td></tr>
-                        <tr><td>INCR key</td><td>Increment by 1</td></tr>
-                        <tr><td>INCRBY key n</td><td>Increment by n</td></tr>
-                        <tr><td>APPEND key value</td><td>Append to string</td></tr>
-                        <tr><td>STRLEN key</td><td>Get string length</td></tr>
-                    </tbody>
-                </table>
+                <!-- Command Reference Table -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Command Reference</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr><th>Command</th><th>Syntax</th><th>Description</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><code>SET</code></td><td><code>SET key value [EX seconds] [PX ms] [NX|XX]</code></td><td>Set string value with optional TTL and conditions</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>GET key</code></td><td>Get the value of a key</td></tr>
+                                    <tr><td><code>SETEX</code></td><td><code>SETEX key seconds value</code></td><td>Set value with expiration in seconds</td></tr>
+                                    <tr><td><code>SETNX</code></td><td><code>SETNX key value</code></td><td>Set only if key does not exist</td></tr>
+                                    <tr><td><code>GETSET</code></td><td><code>GETSET key value</code></td><td>Set new value and return old value</td></tr>
+                                    <tr><td><code>APPEND</code></td><td><code>APPEND key value</code></td><td>Append value to existing string</td></tr>
+                                    <tr><td><code>STRLEN</code></td><td><code>STRLEN key</code></td><td>Get length of string value</td></tr>
+                                    <tr><td><code>INCR</code></td><td><code>INCR key</code></td><td>Increment integer value by 1</td></tr>
+                                    <tr><td><code>INCRBY</code></td><td><code>INCRBY key increment</code></td><td>Increment integer value by amount</td></tr>
+                                    <tr><td><code>DECR</code></td><td><code>DECR key</code></td><td>Decrement integer value by 1</td></tr>
+                                    <tr><td><code>DECRBY</code></td><td><code>DECRBY key decrement</code></td><td>Decrement integer value by amount</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SET Command -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><code>SET</code> - Set String Value</h5></div>
+                    <div class="card-body">
+                        <p>Set the string value of a key. If the key already exists, it is overwritten.</p>
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#set-redis">Redis CLI</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#set-python">Python</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#set-java">Java</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#set-csharp">C#</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="set-redis">
+<pre class="bg-dark text-light p-3 rounded"><code># Basic SET
+SET greeting "Hello, World!"
+
+# SET with expiration (60 seconds)
+SET session:token "abc123" EX 60
+
+# SET only if not exists (NX)
+SET lock:resource "locked" NX
+
+# SET only if exists (XX)
+SET counter "100" XX</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="set-python">
+<pre class="bg-dark text-light p-3 rounded"><code>with KuberRedisClient('localhost', 6380, api_key='kub_xxx') as client:
+    # Basic SET
+    client.set('greeting', 'Hello, World!')
+    
+    # SET with TTL (60 seconds)
+    client.set('session:token', 'abc123', ttl=60)
+    
+    # SET only if not exists
+    result = client.setnx('lock:resource', 'locked')
+    print(f"Lock acquired: {result}")  # True if set</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="set-java">
+<pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
+    // Basic SET
+    client.set("greeting", "Hello, World!");
+    
+    // SET with TTL (60 seconds)
+    client.setex("session:token", 60, "abc123");
+    
+    // SET only if not exists
+    boolean acquired = client.setnx("lock:resource", "locked");
+}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="set-csharp">
+<pre class="bg-dark text-light p-3 rounded"><code>using var client = new KuberClient("localhost", 6380, "kub_xxx");
+
+// Basic SET
+await client.SetAsync("greeting", "Hello, World!");
+
+// SET with TTL (60 seconds)
+await client.SetAsync("session:token", "abc123", TimeSpan.FromSeconds(60));
+
+// SET only if not exists
+bool acquired = await client.SetNxAsync("lock:resource", "locked");</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GET Command -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><code>GET</code> - Get String Value</h5></div>
+                    <div class="card-body">
+                        <p>Get the value of a key. Returns nil if the key does not exist.</p>
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#get-redis">Redis CLI</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#get-python">Python</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#get-java">Java</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#get-csharp">C#</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="get-redis">
+<pre class="bg-dark text-light p-3 rounded"><code>GET greeting
+# Returns: "Hello, World!"
+
+GET nonexistent
+# Returns: (nil)</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="get-python">
+<pre class="bg-dark text-light p-3 rounded"><code>value = client.get('greeting')
+print(f"Value: {value}")  # "Hello, World!"
+
+value = client.get('nonexistent')
+print(f"Value: {value}")  # None</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="get-java">
+<pre class="bg-dark text-light p-3 rounded"><code>String value = client.get("greeting");
+System.out.println("Value: " + value);  // "Hello, World!"
+
+String missing = client.get("nonexistent");
+System.out.println("Value: " + missing);  // null</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="get-csharp">
+<pre class="bg-dark text-light p-3 rounded"><code>string? value = await client.GetAsync("greeting");
+Console.WriteLine($"Value: {value}");  // "Hello, World!"
+
+string? missing = await client.GetAsync("nonexistent");
+Console.WriteLine($"Value: {missing}");  // null</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INCR/DECR Commands -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><code>INCR</code> / <code>INCRBY</code> / <code>DECR</code> / <code>DECRBY</code> - Counter Operations</h5></div>
+                    <div class="card-body">
+                        <p>Atomically increment or decrement integer values. Creates key with 0 if doesn't exist.</p>
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#incr-redis">Redis CLI</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#incr-python">Python</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#incr-java">Java</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#incr-csharp">C#</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="incr-redis">
+<pre class="bg-dark text-light p-3 rounded"><code>SET pageviews 100
+
+INCR pageviews        # Returns: 101
+INCRBY pageviews 10   # Returns: 111
+DECR pageviews        # Returns: 110
+DECRBY pageviews 5    # Returns: 105</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="incr-python">
+<pre class="bg-dark text-light p-3 rounded"><code>client.set('pageviews', '100')
+
+client.incr('pageviews')         # 101
+client.incrby('pageviews', 10)   # 111
+client.decr('pageviews')         # 110
+client.decrby('pageviews', 5)    # 105</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="incr-java">
+<pre class="bg-dark text-light p-3 rounded"><code>client.set("pageviews", "100");
+
+client.incr("pageviews");        // 101
+client.incrBy("pageviews", 10);  // 111
+client.decr("pageviews");        // 110
+client.decrBy("pageviews", 5);   // 105</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="incr-csharp">
+<pre class="bg-dark text-light p-3 rounded"><code>await client.SetAsync("pageviews", "100");
+
+await client.IncrAsync("pageviews");        // 101
+await client.IncrByAsync("pageviews", 10);  // 111
+await client.DecrAsync("pageviews");        // 110
+await client.DecrByAsync("pageviews", 5);   // 105</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- APPEND/STRLEN Commands -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><code>APPEND</code> / <code>STRLEN</code> - String Manipulation</h5></div>
+                    <div class="card-body">
+                        <p>Append to strings and get string length.</p>
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#append-redis">Redis CLI</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#append-python">Python</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#append-java">Java</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#append-csharp">C#</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="append-redis">
+<pre class="bg-dark text-light p-3 rounded"><code>SET message "Hello"
+APPEND message ", World!"   # Returns: 13 (new length)
+GET message                 # Returns: "Hello, World!"
+STRLEN message              # Returns: 13</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="append-python">
+<pre class="bg-dark text-light p-3 rounded"><code>client.set('message', 'Hello')
+client.append('message', ', World!')  # Returns: 13
+client.get('message')                 # "Hello, World!"
+client.strlen('message')              # 13</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="append-java">
+<pre class="bg-dark text-light p-3 rounded"><code>client.set("message", "Hello");
+client.append("message", ", World!");  // Returns: 13
+client.get("message");                 // "Hello, World!"
+client.strlen("message");              // 13</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="append-csharp">
+<pre class="bg-dark text-light p-3 rounded"><code>await client.SetAsync("message", "Hello");
+await client.AppendAsync("message", ", World!");  // Returns: 13
+await client.GetAsync("message");                 // "Hello, World!"
+await client.StrLenAsync("message");              // 13</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GETSET/SETNX Commands -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><code>GETSET</code> / <code>SETNX</code> / <code>SETEX</code> - Atomic Operations</h5></div>
+                    <div class="card-body">
+                        <p>Atomic operations for concurrency control and TTL management.</p>
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#atomic-redis">Redis CLI</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#atomic-python">Python</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#atomic-java">Java</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#atomic-csharp">C#</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="atomic-redis">
+<pre class="bg-dark text-light p-3 rounded"><code># GETSET - atomically set new, return old
+SET counter "100"
+GETSET counter "200"    # Returns: "100"
+GET counter             # Returns: "200"
+
+# SETNX - set only if not exists (for locks)
+SETNX lock:job "process-1"   # Returns: 1 (success)
+SETNX lock:job "process-2"   # Returns: 0 (already exists)
+
+# SETEX - set with TTL
+SETEX session:token 3600 "abc123"</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="atomic-python">
+<pre class="bg-dark text-light p-3 rounded"><code># GETSET
+client.set('counter', '100')
+old = client.getset('counter', '200')  # Returns: "100"
+
+# SETNX - acquire lock
+acquired = client.setnx('lock:job', 'process-1')  # True
+
+# SETEX - set with TTL
+client.setex('session:token', 3600, 'abc123')</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="atomic-java">
+<pre class="bg-dark text-light p-3 rounded"><code>// GETSET
+client.set("counter", "100");
+String old = client.getSet("counter", "200");  // "100"
+
+// SETNX - acquire lock
+boolean acquired = client.setnx("lock:job", "process-1");
+
+// SETEX - set with TTL
+client.setex("session:token", 3600, "abc123");</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="atomic-csharp">
+<pre class="bg-dark text-light p-3 rounded"><code>// GETSET
+await client.SetAsync("counter", "100");
+string? old = await client.GetSetAsync("counter", "200");
+
+// SETNX - acquire lock
+bool acquired = await client.SetNxAsync("lock:job", "process-1");
+
+// SETEX - set with TTL
+await client.SetExAsync("session:token", 3600, "abc123");</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                    <a href="/help/key-ops" class="btn btn-outline-secondary ms-2">Key Operations <i class="fas fa-arrow-right ms-2"></i></a>
                 </div>
             </div>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.1</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.2</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

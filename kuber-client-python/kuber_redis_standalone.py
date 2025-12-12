@@ -590,6 +590,106 @@ class KuberRedisClient:
         """Delete a JSON path."""
         return self._send_command('JDEL', key, path) == 1
     
+    def json_update(self, key: str, value: Any, region: Optional[str] = None,
+                    ttl: Optional[Union[int, timedelta]] = None) -> Any:
+        """
+        Update/merge a JSON document (upsert with deep merge).
+        
+        Behavior:
+        - If key doesn't exist: creates new entry with the JSON value
+        - If key exists with JSON object: deep merges new JSON onto existing (new values override)
+        - If key exists but not valid JSON: replaces with new JSON value
+        
+        Args:
+            key: Key name
+            value: Python object to merge as JSON
+            region: Optional region (uses current region if not specified)
+            ttl: Optional TTL in seconds or timedelta
+            
+        Returns:
+            The resulting merged JSON object
+            
+        Example:
+            # Initial user
+            client.json_set('user:1', {'name': 'Alice', 'age': 30})
+            
+            # Update/merge - adds city, updates age
+            result = client.json_update('user:1', {'age': 31, 'city': 'NYC'})
+            # result: {'name': 'Alice', 'age': 31, 'city': 'NYC'}
+        """
+        original_region = self.current_region
+        if region and region != original_region:
+            self.select_region(region)
+        
+        try:
+            json_str = json.dumps(value) if not isinstance(value, str) else value
+            
+            if ttl is not None:
+                if isinstance(ttl, timedelta):
+                    ttl = int(ttl.total_seconds())
+                result = self._send_command('JUPDATE', key, json_str, ttl)
+            else:
+                result = self._send_command('JUPDATE', key, json_str)
+            
+            # Parse the returned merged JSON
+            if result is None or result == '':
+                return None
+            if isinstance(result, str):
+                try:
+                    return json.loads(result)
+                except json.JSONDecodeError:
+                    return result
+            return result
+        finally:
+            if region and region != original_region:
+                self.select_region(original_region)
+    
+    def json_remove(self, key: str, attributes: List[str], region: Optional[str] = None) -> Any:
+        """
+        Remove specified attributes from a JSON document.
+        
+        Behavior:
+        - If key exists and has valid JSON object: removes specified attributes and saves
+        - If key doesn't exist or value is not JSON object: returns None (nothing done)
+        
+        Args:
+            key: Key name
+            attributes: List of attribute names to remove
+            region: Optional region (uses current region if not specified)
+            
+        Returns:
+            The updated JSON object, or None if nothing was done
+            
+        Example:
+            # Initial user
+            client.json_set('user:1', {'name': 'Alice', 'age': 30, 'city': 'NYC'})
+            
+            # Remove attributes
+            result = client.json_remove('user:1', ['age', 'city'])
+            # result: {'name': 'Alice'}
+        """
+        original_region = self.current_region
+        if region and region != original_region:
+            self.select_region(region)
+        
+        try:
+            # Send attributes as JSON array
+            attributes_json = json.dumps(attributes)
+            result = self._send_command('JREMOVE', key, attributes_json)
+            
+            # Parse the returned JSON
+            if result is None or result == '' or result == 0:
+                return None
+            if isinstance(result, str):
+                try:
+                    return json.loads(result)
+                except json.JSONDecodeError:
+                    return result
+            return result
+        finally:
+            if region and region != original_region:
+                self.select_region(original_region)
+    
     def json_search(self, query: str, region: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Search JSON documents.

@@ -851,6 +851,18 @@ public class RequestResponseService {
                 JsonNode jsonValue = convertToJsonNode(request.getValue());
                 cacheService.jsonSet(region, request.getKey(), jsonValue);
                 return "OK";
+            
+            case "JUPDATE":
+            case "JSON.UPDATE":
+                JsonNode updateJsonValue = convertToJsonNode(request.getValue());
+                long ttl = request.getTtl() != null ? request.getTtl() : -1;
+                return cacheService.jsonUpdate(region, request.getKey(), updateJsonValue, ttl);
+            
+            case "JREMOVE":
+            case "JSON.REMOVE":
+                // Value should be a list of attribute names to remove
+                List<String> attributesToRemove = convertToStringList(request.getValue());
+                return cacheService.jsonRemoveAttributes(region, request.getKey(), attributesToRemove);
                 
             case "JGET":
             case "JSON.GET":
@@ -864,6 +876,34 @@ public class RequestResponseService {
             default:
                 throw new IllegalArgumentException("Unsupported operation: " + op);
         }
+    }
+    
+    /**
+     * Convert Object value to list of strings.
+     */
+    @SuppressWarnings("unchecked")
+    private List<String> convertToStringList(Object value) throws Exception {
+        if (value == null) {
+            return new ArrayList<>();
+        }
+        if (value instanceof List) {
+            List<String> result = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                result.add(item != null ? item.toString() : null);
+            }
+            return result;
+        }
+        if (value instanceof String) {
+            // Try to parse as JSON array
+            try {
+                return objectMapper.readValue((String) value, 
+                    new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                // Single value - return as single-element list
+                return List.of((String) value);
+            }
+        }
+        return List.of(value.toString());
     }
     
     /**

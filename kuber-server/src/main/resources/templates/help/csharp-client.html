@@ -157,6 +157,7 @@ var product = new
     Id = 5001,
     Name = "Gaming Laptop",
     Price = 1299.99,
+    TempField = "temporary",
     Specs = new { Cpu = "Intel i9", Ram = "32GB" }
 };
 await client.JsonSetAsync("product:5001", product);
@@ -166,7 +167,16 @@ public record Product(int Id, string Name, decimal Price, ProductSpecs Specs);
 public record ProductSpecs(string Cpu, string Ram);
 
 var retrieved = await client.JsonGetAsync&lt;Product&gt;("product:5001");
-Console.WriteLine($"Product: {retrieved?.Name}, ${retrieved?.Price}");</code></pre>
+Console.WriteLine($"Product: {retrieved?.Name}, ${retrieved?.Price}");
+
+// Update/merge JSON (new in v1.7.2) - upsert with deep merge
+var updates = new { Price = 1199.99, Stock = 50 };
+await client.JsonUpdateAsync("product:5001", updates);
+// Result: merges updates into existing document
+
+// Remove attributes from JSON (new in v1.7.2)
+await client.JsonRemoveAsync("product:5001", new[] { "TempField" });
+// Result: removes TempField from the document</code></pre>
 
                 <h6 class="mt-4">Key Operations</h6>
                 <pre class="bg-light p-3 rounded"><code class="language-csharp">// Find keys by pattern
@@ -237,12 +247,20 @@ var order = new
         new { ProductId = "P001", Name = "Laptop", Price = 999.99 },
         new { ProductId = "P002", Name = "Mouse", Price = 29.99 }
     },
-    Total = 1029.98
+    Total = 1029.98,
+    TempNote = "pending review"
 };
 await client.JsonSetAsync("order:2025-001", order);
 
 // Retrieve with JSONPath
 var customerName = await client.JsonGetAsync&lt;string&gt;("order:2025-001", "$.Customer.Name");
+
+// Update/merge JSON (new in v1.7.2)
+var updates = new { Status = "shipped", ShipDate = DateTime.Now };
+await client.JsonUpdateAsync("order:2025-001", updates);
+
+// Remove attributes (new in v1.7.2)
+await client.JsonRemoveAsync("order:2025-001", new[] { "TempNote" });
 
 // Search JSON documents
 var results = await client.JsonSearchAsync("Total > 500");
@@ -365,6 +383,8 @@ else
                             <tr><td>HMSET</td><td><code>BuildHMSet(key, fields)</code></td><td>Set multiple hash fields</td></tr>
                             <tr><td>JSET</td><td><code>BuildJSet(key, value)</code></td><td>Set JSON document</td></tr>
                             <tr><td>JGET</td><td><code>BuildJGet(key, path?)</code></td><td>Get JSON (with optional path)</td></tr>
+                            <tr><td>JUPDATE</td><td><code>BuildJUpdate(key, value, ttl?)</code></td><td>Update/merge JSON (upsert)</td></tr>
+                            <tr><td>JREMOVE</td><td><code>BuildJRemove(key, attrs)</code></td><td>Remove attributes from JSON</td></tr>
                             <tr><td>JSEARCH</td><td><code>BuildJSearch(query)</code></td><td>Search JSON documents</td></tr>
                             <tr><td>PING</td><td><code>BuildPing()</code></td><td>Health check</td></tr>
                             <tr><td>INFO</td><td><code>BuildInfo()</code></td><td>Server information</td></tr>
@@ -410,6 +430,9 @@ else
                             <tr><td><code>HDelAsync(key, fields[])</code></td><td><code>Task&lt;long&gt;</code></td><td>Delete fields</td></tr>
                             <tr><td><code>JsonSetAsync&lt;T&gt;(key, doc)</code></td><td><code>Task&lt;bool&gt;</code></td><td>Store JSON</td></tr>
                             <tr><td><code>JsonGetAsync&lt;T&gt;(key)</code></td><td><code>Task&lt;T?&gt;</code></td><td>Retrieve JSON</td></tr>
+                            <tr><td><code>JsonUpdateAsync&lt;T&gt;(key, doc)</code></td><td><code>Task&lt;T?&gt;</code></td><td>Update/merge JSON</td></tr>
+                            <tr><td><code>JsonRemoveAsync(key, attrs[])</code></td><td><code>Task&lt;bool&gt;</code></td><td>Remove JSON attributes</td></tr>
+                            <tr><td><code>JsonSearchAsync(query)</code></td><td><code>Task&lt;List&lt;T&gt;&gt;</code></td><td>Search JSON documents</td></tr>
                             <tr><td><code>PingAsync()</code></td><td><code>Task&lt;TimeSpan&gt;</code></td><td>Test connection</td></tr>
                             <tr><td><code>WithRegion(region)</code></td><td><code>KuberClient</code></td><td>Get regional client</td></tr>
                         </tbody>

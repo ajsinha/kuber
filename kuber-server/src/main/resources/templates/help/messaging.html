@@ -200,6 +200,64 @@
     "region": "users",
     "pattern": "user:*"
 }</code></pre>
+
+                <h6 class="mt-4">Example Request (JSET - Store JSON Document)</h6>
+                <p>Store a JSON document with optional path and TTL.</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12350",
+    "operation": "JSET",
+    "region": "users",
+    "key": "user:1001",
+    "value": {"name": "Alice", "age": 30, "city": "NYC"},
+    "ttl": 3600
+}</code></pre>
+
+                <h6 class="mt-4">Example Request (JGET - Get JSON Document)</h6>
+                <p>Retrieve a JSON document, optionally at a specific path.</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12351",
+    "operation": "JGET",
+    "region": "users",
+    "key": "user:1001",
+    "path": "$.name"
+}</code></pre>
+
+                <h6 class="mt-4">Example Request (JUPDATE - Merge JSON Document)</h6>
+                <p>Update/merge JSON with existing value. Creates entry if key doesn't exist (upsert). Deep merges nested objects.</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12352",
+    "operation": "JUPDATE",
+    "region": "users",
+    "key": "user:1001",
+    "value": {"age": 31, "email": "alice@example.com"},
+    "ttl": 3600
+}</code></pre>
+                <p class="text-muted small">Result: If user:1001 had <code>{"name":"Alice","age":30,"city":"NYC"}</code>, after merge: <code>{"name":"Alice","age":31,"city":"NYC","email":"alice@example.com"}</code></p>
+
+                <h6 class="mt-4">Example Request (JREMOVE - Remove JSON Attributes)</h6>
+                <p>Remove specified attributes from a JSON document. Does nothing if key doesn't exist or value is not a JSON object.</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12353",
+    "operation": "JREMOVE",
+    "region": "users",
+    "key": "user:1001",
+    "value": ["age", "city"]
+}</code></pre>
+                <p class="text-muted small">Result: If user:1001 had <code>{"name":"Alice","age":31,"city":"NYC","email":"alice@example.com"}</code>, after remove: <code>{"name":"Alice","email":"alice@example.com"}</code></p>
+
+                <h6 class="mt-4">Example Request (JSEARCH - Search JSON Documents)</h6>
+                <p>Search JSON documents by field values.</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "api_key": "kub_abc123def456...",
+    "message_id": "req-12354",
+    "operation": "JSEARCH",
+    "region": "users",
+    "query": "$.age>25"
+}</code></pre>
             </div>
         </div>
         
@@ -382,6 +440,8 @@
                         <ul>
                             <li><code>JSET</code> / <code>JSON.SET</code> - Store JSON document</li>
                             <li><code>JGET</code> / <code>JSON.GET</code> - Get JSON with path</li>
+                            <li><code>JUPDATE</code> / <code>JSON.UPDATE</code> - Update/merge JSON (upsert)</li>
+                            <li><code>JREMOVE</code> / <code>JSON.REMOVE</code> - Remove attributes from JSON</li>
                             <li><code>JSEARCH</code> / <code>JSON.SEARCH</code> - Search JSON documents</li>
                         </ul>
                         

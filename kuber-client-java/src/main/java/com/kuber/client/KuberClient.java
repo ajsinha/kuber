@@ -551,6 +551,85 @@ public class KuberClient implements AutoCloseable {
     }
     
     /**
+     * Update/merge a JSON value (upsert with deep merge).
+     * 
+     * Behavior:
+     * - If key doesn't exist: creates new entry with the JSON value
+     * - If key exists with JSON object: deep merges new JSON onto existing (new values override)
+     * - If key exists but not valid JSON: replaces with new JSON value
+     * 
+     * @param key the cache key
+     * @param json the JSON string to merge
+     * @return the resulting merged JSON
+     */
+    public JsonNode jsonUpdate(String key, String json) throws IOException {
+        String result = sendCommand("JUPDATE", key, json);
+        if (result == null || result.isEmpty()) {
+            return null;
+        }
+        return objectMapper.readTree(result);
+    }
+    
+    /**
+     * Update/merge a JSON value with TTL.
+     * 
+     * @param key the cache key
+     * @param json the JSON string to merge
+     * @param ttl time-to-live for the entry
+     * @return the resulting merged JSON
+     */
+    public JsonNode jsonUpdate(String key, String json, Duration ttl) throws IOException {
+        String result = sendCommand("JUPDATE", key, json, String.valueOf(ttl.getSeconds()));
+        if (result == null || result.isEmpty()) {
+            return null;
+        }
+        return objectMapper.readTree(result);
+    }
+    
+    /**
+     * Update/merge a JSON value from object.
+     * 
+     * @param key the cache key
+     * @param value the object to serialize and merge
+     * @return the resulting merged JSON
+     */
+    public JsonNode jsonUpdate(String key, Object value) throws IOException {
+        String json = objectMapper.writeValueAsString(value);
+        return jsonUpdate(key, json);
+    }
+    
+    /**
+     * Remove specified attributes from a JSON value.
+     * 
+     * Behavior:
+     * - If key exists and has valid JSON object: removes specified attributes and saves
+     * - If key doesn't exist or value is not JSON object: returns null (nothing done)
+     * 
+     * @param key the cache key
+     * @param attributes list of attribute names to remove
+     * @return the updated JSON, or null if nothing was done
+     */
+    public JsonNode jsonRemove(String key, List<String> attributes) throws IOException {
+        String attributesJson = objectMapper.writeValueAsString(attributes);
+        String result = sendCommand("JREMOVE", key, attributesJson);
+        if (result == null || result.isEmpty() || "0".equals(result)) {
+            return null;
+        }
+        return objectMapper.readTree(result);
+    }
+    
+    /**
+     * Remove specified attributes from a JSON value.
+     * 
+     * @param key the cache key
+     * @param attributes attribute names to remove (varargs)
+     * @return the updated JSON, or null if nothing was done
+     */
+    public JsonNode jsonRemove(String key, String... attributes) throws IOException {
+        return jsonRemove(key, Arrays.asList(attributes));
+    }
+    
+    /**
      * Get a JSON value
      */
     public JsonNode jsonGet(String key) throws IOException {

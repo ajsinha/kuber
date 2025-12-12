@@ -56,6 +56,9 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     private static final String ENTRIES_DB_NAME = "entries";
     private static final long DEFAULT_MAP_SIZE = 1024L * 1024L * 1024L; // 1GB default
     
+    // Batch size for writes - keeps transactions short to avoid blocking readers
+    private static final int WRITE_BATCH_SIZE = 1000;
+    
     // Reusable TypeReference to avoid creating new anonymous classes in loops (memory leak prevention)
     private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<Map<String, Object>>() {};
     
@@ -491,7 +494,8 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
             return;
         }
         
-        log.info("LMDB saveEntries: received {} entries", entries.size());
+        log.info("LMDB saveEntries: received {} entries (batch size: {})", entries.size(), WRITE_BATCH_SIZE);
+        long startTime = System.currentTimeMillis();
         
         // Group by region
         Map<String, List<CacheEntry>> entriesByRegion = new HashMap<>();
@@ -501,116 +505,145 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
         
         log.info("LMDB saveEntries: grouped into {} region(s)", entriesByRegion.size());
         
-        // Save each region's entries in a single transaction
+        // Save each region's entries using batched transactions
         for (Map.Entry<String, List<CacheEntry>> regionEntries : entriesByRegion.entrySet()) {
             String region = regionEntries.getKey();
             List<CacheEntry> entriesToSave = regionEntries.getValue();
+            int totalEntries = entriesToSave.size();
+            int totalBatches = (totalEntries + WRITE_BATCH_SIZE - 1) / WRITE_BATCH_SIZE;
             
-            log.info("LMDB saveEntries: processing region '{}' with {} entries", region, entriesToSave.size());
+            log.info("LMDB saveEntries: processing region '{}' with {} entries in {} batch(es)", 
+                    region, totalEntries, totalBatches);
             
-            Txn<ByteBuffer> txn = null;
             try {
                 Env<ByteBuffer> env = getOrCreateRegionEnvironment(region);
-                log.info("LMDB saveEntries: got env for region '{}': {}", region, env != null ? "OK" : "NULL");
-                
                 if (env == null) {
                     log.error("Failed to get LMDB environment for region '{}'", region);
                     continue;
                 }
                 
                 Dbi<ByteBuffer> dbi = regionDatabases.get(region);
-                log.info("LMDB saveEntries: got dbi for region '{}': {}", region, dbi != null ? "OK" : "NULL");
-                
                 if (dbi == null) {
                     log.warn("DBI not found for region '{}', creating new one", region);
                     dbi = env.openDbi(ENTRIES_DB_NAME, DbiFlags.MDB_CREATE);
                     regionDatabases.put(region, dbi);
-                    log.info("LMDB saveEntries: created new DBI for region '{}'", region);
                 }
                 
-                log.info("LMDB saveEntries: opening write transaction for region '{}'", region);
-                txn = env.txnWrite();
-                log.info("LMDB saveEntries: write transaction opened for region '{}'", region);
+                int totalSaved = 0;
+                int batchNum = 0;
                 
-                log.info("LMDB saveEntries: starting entry loop for {} entries", entriesToSave.size());
-                int savedCount = 0;
-                
-                for (CacheEntry entry : entriesToSave) {
-                    try {
-                        String json = JsonUtils.toJson(entryToMap(entry));
-                        byte[] keyBytes = entry.getKey().getBytes(StandardCharsets.UTF_8);
-                        byte[] valueBytes = json.getBytes(StandardCharsets.UTF_8);
-                        
-                        ByteBuffer keyBuffer = ByteBuffer.allocateDirect(keyBytes.length);
-                        keyBuffer.put(keyBytes).flip();
-                        
-                        ByteBuffer valueBuffer = ByteBuffer.allocateDirect(valueBytes.length);
-                        valueBuffer.put(valueBytes).flip();
-                        
-                        dbi.put(txn, keyBuffer, valueBuffer);
-                        savedCount++;
-                        
-                        if (savedCount == 1) {
-                            log.info("LMDB saveEntries: first entry written to region '{}'", region);
-                        }
-                        if (savedCount % 10000 == 0) {
-                            log.info("LMDB saveEntries: {} entries written so far to region '{}'", savedCount, region);
-                        }
-                    } catch (Throwable t) {
-                        log.error("LMDB saveEntries: ENTRY ERROR for key '{}' in region '{}': {} - {}", 
-                                entry.getKey(), region, t.getClass().getName(), t.getMessage(), t);
-                        // Don't continue on error - abort the whole transaction
-                        throw t;
-                    }
+                // Process in batches to avoid long-running transactions
+                for (int i = 0; i < totalEntries; i += WRITE_BATCH_SIZE) {
+                    batchNum++;
+                    int end = Math.min(i + WRITE_BATCH_SIZE, totalEntries);
+                    List<CacheEntry> batch = entriesToSave.subList(i, end);
+                    
+                    long batchStart = System.currentTimeMillis();
+                    int batchSaved = saveBatch(env, dbi, region, batch);
+                    long batchTime = System.currentTimeMillis() - batchStart;
+                    
+                    totalSaved += batchSaved;
+                    
+                    double progress = (totalSaved * 100.0) / totalEntries;
+                    double entriesPerSec = batchSaved * 1000.0 / Math.max(1, batchTime);
+                    
+                    log.info("LMDB saveEntries: region '{}' batch {}/{} committed - {}/{} entries ({}%) - {} entries/sec", 
+                            region, batchNum, totalBatches, totalSaved, totalEntries, 
+                            String.format("%.1f", progress), String.format("%.0f", entriesPerSec));
                 }
                 
-                log.info("LMDB saveEntries: all {} entries written, committing transaction for region '{}'", 
-                        savedCount, region);
-                txn.commit();
-                log.info("LMDB saveEntries: COMMITTED {} entries to region '{}'", savedCount, region);
-                txn = null; // Mark as committed so we don't abort in finally
+                log.info("LMDB saveEntries: region '{}' COMPLETE - {} entries saved", region, totalSaved);
                 
             } catch (Throwable t) {
-                // Check if this is a MapFullException and provide guidance
-                String errorMsg = t.getMessage();
-                if (t.getClass().getName().contains("MapFullException") || 
-                    (errorMsg != null && errorMsg.contains("mapsize reached"))) {
-                    log.error("╔════════════════════════════════════════════════════════════════════════════╗");
-                    log.error("║  LMDB MAP SIZE EXCEEDED                                                     ║");
-                    log.error("║  The LMDB database has reached its maximum size limit.                      ║");
-                    log.error("║                                                                             ║");
-                    log.error("║  TO FIX: Increase map size in application.yml:                              ║");
-                    log.error("║    kuber:                                                                   ║");
-                    log.error("║      persistence:                                                           ║");
-                    log.error("║        lmdb:                                                                ║");
-                    log.error("║          map-size: 21474836480  # 20GB (or larger)                          ║");
-                    log.error("║                                                                             ║");
-                    log.error("║  Common values: 10GB=10737418240, 20GB=21474836480, 50GB=53687091200        ║");
-                    log.error("║  NOTE: Restart required after changing map-size                             ║");
-                    log.error("╚════════════════════════════════════════════════════════════════════════════╝");
-                }
-                log.error("LMDB saveEntries: FATAL ERROR for region '{}': {} - {}", 
-                        region, t.getClass().getName(), t.getMessage(), t);
-                if (txn != null) {
-                    try {
-                        txn.abort();
-                        log.info("LMDB saveEntries: transaction aborted for region '{}'", region);
-                    } catch (Throwable t2) {
-                        log.error("LMDB saveEntries: failed to abort transaction: {}", t2.getMessage());
-                    }
-                }
-            } finally {
-                if (txn != null) {
-                    try {
-                        txn.close();
-                    } catch (Throwable t) {
-                        log.error("LMDB saveEntries: failed to close transaction: {}", t.getMessage());
-                    }
-                }
+                handleSaveError(region, t);
             }
         }
         
-        log.info("LMDB saveEntries: method completed");
+        long totalTime = System.currentTimeMillis() - startTime;
+        double avgRate = entries.size() * 1000.0 / Math.max(1, totalTime);
+        log.info("LMDB saveEntries: COMPLETED {} entries in {}ms ({} entries/sec)", 
+                entries.size(), totalTime, String.format("%.0f", avgRate));
+    }
+    
+    /**
+     * Save a batch of entries in a single transaction.
+     * Returns the number of entries successfully saved.
+     */
+    private int saveBatch(Env<ByteBuffer> env, Dbi<ByteBuffer> dbi, String region, List<CacheEntry> batch) {
+        Txn<ByteBuffer> txn = null;
+        int savedCount = 0;
+        
+        try {
+            txn = env.txnWrite();
+            
+            for (CacheEntry entry : batch) {
+                try {
+                    String json = JsonUtils.toJson(entryToMap(entry));
+                    byte[] keyBytes = entry.getKey().getBytes(StandardCharsets.UTF_8);
+                    byte[] valueBytes = json.getBytes(StandardCharsets.UTF_8);
+                    
+                    ByteBuffer keyBuffer = ByteBuffer.allocateDirect(keyBytes.length);
+                    keyBuffer.put(keyBytes).flip();
+                    
+                    ByteBuffer valueBuffer = ByteBuffer.allocateDirect(valueBytes.length);
+                    valueBuffer.put(valueBytes).flip();
+                    
+                    dbi.put(txn, keyBuffer, valueBuffer);
+                    savedCount++;
+                } catch (Throwable t) {
+                    log.error("LMDB saveBatch: error saving key '{}' in region '{}': {}", 
+                            entry.getKey(), region, t.getMessage());
+                    throw t;
+                }
+            }
+            
+            txn.commit();
+            txn = null; // Mark as committed
+            return savedCount;
+            
+        } catch (Throwable t) {
+            if (txn != null) {
+                try {
+                    txn.abort();
+                } catch (Throwable t2) {
+                    log.error("LMDB saveBatch: failed to abort transaction: {}", t2.getMessage());
+                }
+            }
+            throw new RuntimeException("Batch save failed for region '" + region + "'", t);
+        } finally {
+            if (txn != null) {
+                try {
+                    txn.close();
+                } catch (Throwable t) {
+                    log.error("LMDB saveBatch: failed to close transaction: {}", t.getMessage());
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle save errors with helpful messages.
+     */
+    private void handleSaveError(String region, Throwable t) {
+        String errorMsg = t.getMessage();
+        if (t.getClass().getName().contains("MapFullException") || 
+            (errorMsg != null && errorMsg.contains("mapsize reached"))) {
+            log.error("╔════════════════════════════════════════════════════════════════════════════╗");
+            log.error("║  LMDB MAP SIZE EXCEEDED                                                     ║");
+            log.error("║  The LMDB database has reached its maximum size limit.                      ║");
+            log.error("║                                                                             ║");
+            log.error("║  TO FIX: Increase map size in application.yml:                              ║");
+            log.error("║    kuber:                                                                   ║");
+            log.error("║      persistence:                                                           ║");
+            log.error("║        lmdb:                                                                ║");
+            log.error("║          map-size: 21474836480  # 20GB (or larger)                          ║");
+            log.error("║                                                                             ║");
+            log.error("║  Common values: 10GB=10737418240, 20GB=21474836480, 50GB=53687091200        ║");
+            log.error("║  NOTE: Restart required after changing map-size                             ║");
+            log.error("╚════════════════════════════════════════════════════════════════════════════╝");
+        }
+        log.error("LMDB saveEntries: FATAL ERROR for region '{}': {} - {}", 
+                region, t.getClass().getName(), t.getMessage(), t);
     }
     
     @Override
@@ -1111,7 +1144,7 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
     }
     
     /**
-     * Get LMDB statistics for a region.
+     * Get LMDB statistics for a region, including disk usage.
      */
     public Map<String, Object> getRegionStats(String region) {
         Map<String, Object> stats = new LinkedHashMap<>();
@@ -1128,17 +1161,215 @@ public class LmdbPersistenceStore extends AbstractPersistenceStore {
                 stats.put("overflowPages", stat.overflowPages);
                 stats.put("pageSize", stat.pageSize);
                 
+                // Calculate used pages
+                long usedPages = stat.branchPages + stat.leafPages + stat.overflowPages;
+                long usedBytes = usedPages * stat.pageSize;
+                stats.put("usedPages", usedPages);
+                stats.put("usedBytes", usedBytes);
+                stats.put("usedMB", String.format("%.2f", usedBytes / (1024.0 * 1024.0)));
+                
                 EnvInfo info = env.info();
                 stats.put("mapSize", info.mapSize);
+                stats.put("mapSizeMB", String.format("%.2f", info.mapSize / (1024.0 * 1024.0)));
                 stats.put("lastPageNo", info.lastPageNumber);
                 stats.put("lastTxnId", info.lastTransactionId);
                 stats.put("maxReaders", info.maxReaders);
                 stats.put("numReaders", info.numReaders);
+                
+                // Calculate file size on disk
+                String regionPath = basePath + File.separator + region;
+                File dataFile = new File(regionPath, "data.mdb");
+                if (dataFile.exists()) {
+                    long fileSize = dataFile.length();
+                    stats.put("fileBytes", fileSize);
+                    stats.put("fileMB", String.format("%.2f", fileSize / (1024.0 * 1024.0)));
+                    
+                    // Estimate wasted space (file size - used bytes)
+                    // Note: This is approximate since LMDB reserves some space for metadata
+                    long wastedBytes = fileSize - usedBytes;
+                    if (wastedBytes > 0) {
+                        stats.put("freeBytes", wastedBytes);
+                        stats.put("freeMB", String.format("%.2f", wastedBytes / (1024.0 * 1024.0)));
+                        stats.put("freePercent", String.format("%.1f", (wastedBytes * 100.0) / fileSize));
+                    }
+                }
             } catch (Exception e) {
                 log.warn("Failed to get stats for region '{}': {}", region, e.getMessage());
             }
         }
         
         return stats;
+    }
+    
+    /**
+     * Compact a region's LMDB database to reclaim disk space.
+     * 
+     * IMPORTANT: LMDB never shrinks its database file automatically.
+     * When you delete entries, the pages are added to an internal freelist
+     * and reused for future writes, but the file size stays the same.
+     * 
+     * This method creates a compacted copy of the database, which:
+     * 1. Only contains active data (no free pages)
+     * 2. Results in a smaller file on disk
+     * 3. May improve read performance due to better data locality
+     * 
+     * @param region The region name to compact
+     * @return Map containing compaction results (originalSize, compactedSize, savedBytes, savedPercent)
+     */
+    public Map<String, Object> compactRegion(String region) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("region", region);
+        result.put("success", false);
+        
+        Env<ByteBuffer> env = regionEnvironments.get(region);
+        if (env == null) {
+            result.put("error", "Region not found or not initialized");
+            return result;
+        }
+        
+        String regionPath = basePath + File.separator + region;
+        File dataFile = new File(regionPath, "data.mdb");
+        File compactFile = new File(regionPath, "data_compact.mdb");
+        File backupFile = new File(regionPath, "data_backup.mdb");
+        
+        if (!dataFile.exists()) {
+            result.put("error", "Data file does not exist");
+            return result;
+        }
+        
+        long originalSize = dataFile.length();
+        result.put("originalSize", originalSize);
+        result.put("originalSizeMB", String.format("%.2f", originalSize / (1024.0 * 1024.0)));
+        
+        log.info("Starting compaction for region '{}' (original size: {} MB)", 
+                region, String.format("%.2f", originalSize / (1024.0 * 1024.0)));
+        
+        try {
+            // Step 1: Copy database to compact file using LMDB's copy with compaction flag
+            log.info("Copying database with compaction for region '{}'...", region);
+            env.copy(compactFile, CopyFlags.MDB_CP_COMPACT);
+            
+            long compactedSize = compactFile.length();
+            result.put("compactedSize", compactedSize);
+            result.put("compactedSizeMB", String.format("%.2f", compactedSize / (1024.0 * 1024.0)));
+            
+            long savedBytes = originalSize - compactedSize;
+            double savedPercent = (savedBytes * 100.0) / originalSize;
+            result.put("savedBytes", savedBytes);
+            result.put("savedMB", String.format("%.2f", savedBytes / (1024.0 * 1024.0)));
+            result.put("savedPercent", String.format("%.1f", savedPercent));
+            
+            log.info("Compaction complete: {} MB -> {} MB (saved {} MB, {}%)", 
+                    String.format("%.2f", originalSize / (1024.0 * 1024.0)),
+                    String.format("%.2f", compactedSize / (1024.0 * 1024.0)),
+                    String.format("%.2f", savedBytes / (1024.0 * 1024.0)),
+                    String.format("%.1f", savedPercent));
+            
+            // Step 2: Close the environment so we can swap files
+            log.info("Closing environment for region '{}'...", region);
+            Dbi<ByteBuffer> dbi = regionDatabases.remove(region);
+            if (dbi != null) {
+                dbi.close();
+            }
+            regionEnvironments.remove(region);
+            env.close();
+            
+            // Step 3: Backup original file
+            log.info("Backing up original file...");
+            if (backupFile.exists()) {
+                backupFile.delete();
+            }
+            if (!dataFile.renameTo(backupFile)) {
+                throw new IOException("Failed to rename original file to backup");
+            }
+            
+            // Step 4: Move compacted file to replace original
+            log.info("Installing compacted file...");
+            if (!compactFile.renameTo(dataFile)) {
+                // Restore backup
+                backupFile.renameTo(dataFile);
+                throw new IOException("Failed to rename compacted file");
+            }
+            
+            // Step 5: Delete backup
+            log.info("Cleaning up...");
+            backupFile.delete();
+            
+            // Step 6: Re-open the environment
+            log.info("Reopening environment for region '{}'...", region);
+            getOrCreateRegionEnvironment(region);
+            
+            result.put("success", true);
+            log.info("Compaction successful for region '{}'", region);
+            
+        } catch (Exception e) {
+            log.error("Compaction failed for region '{}': {}", region, e.getMessage(), e);
+            result.put("error", e.getMessage());
+            
+            // Clean up partial files
+            if (compactFile.exists()) {
+                compactFile.delete();
+            }
+            
+            // Try to reopen environment if it was closed
+            if (!regionEnvironments.containsKey(region)) {
+                try {
+                    getOrCreateRegionEnvironment(region);
+                } catch (Exception reopenError) {
+                    log.error("Failed to reopen environment after failed compaction: {}", reopenError.getMessage());
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Get disk usage summary for all regions.
+     */
+    public Map<String, Object> getDiskUsageSummary() {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        long totalFileSize = 0;
+        long totalUsedBytes = 0;
+        
+        List<Map<String, Object>> regionDetails = new ArrayList<>();
+        
+        for (String region : regionEnvironments.keySet()) {
+            Map<String, Object> stats = getRegionStats(region);
+            if (!stats.isEmpty()) {
+                Map<String, Object> regionInfo = new LinkedHashMap<>();
+                regionInfo.put("region", region);
+                regionInfo.put("entries", stats.get("entries"));
+                regionInfo.put("fileMB", stats.get("fileMB"));
+                regionInfo.put("usedMB", stats.get("usedMB"));
+                regionInfo.put("freeMB", stats.get("freeMB"));
+                regionInfo.put("freePercent", stats.get("freePercent"));
+                regionDetails.add(regionInfo);
+                
+                if (stats.get("fileBytes") != null) {
+                    totalFileSize += (Long) stats.get("fileBytes");
+                }
+                if (stats.get("usedBytes") != null) {
+                    totalUsedBytes += (Long) stats.get("usedBytes");
+                }
+            }
+        }
+        
+        summary.put("regions", regionDetails);
+        summary.put("totalFileMB", String.format("%.2f", totalFileSize / (1024.0 * 1024.0)));
+        summary.put("totalUsedMB", String.format("%.2f", totalUsedBytes / (1024.0 * 1024.0)));
+        
+        long totalFreeBytes = totalFileSize - totalUsedBytes;
+        summary.put("totalFreeMB", String.format("%.2f", totalFreeBytes / (1024.0 * 1024.0)));
+        
+        if (totalFileSize > 0) {
+            summary.put("totalFreePercent", String.format("%.1f", (totalFreeBytes * 100.0) / totalFileSize));
+        }
+        
+        summary.put("recommendation", totalFreeBytes > 100 * 1024 * 1024 
+                ? "Consider running compaction to reclaim " + String.format("%.2f", totalFreeBytes / (1024.0 * 1024.0)) + " MB"
+                : "No compaction needed");
+        
+        return summary;
     }
 }

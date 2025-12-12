@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.7.1</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.7.2</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -284,7 +284,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.7.1                                     ║
+║   SYSTEM READY - Version 1.7.2                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -472,6 +472,8 @@ kuber.cache.off-heap-key-index-max-size-mb=8192</pre>
                             <tr><td><code>REGIONS</code></td><td>List regions</td><td><code>REGIONS</code></td></tr>
                             <tr><td><code>JSET key json</code></td><td>Set JSON</td><td><code>JSET user:1 {"name":"Alice"}</code></td></tr>
                             <tr><td><code>JGET key [path]</code></td><td>Get JSON</td><td><code>JGET user:1 $.name</code></td></tr>
+                            <tr><td><code>JUPDATE key json [ttl]</code></td><td>Merge JSON (upsert)</td><td><code>JUPDATE user:1 {"age":31}</code></td></tr>
+                            <tr><td><code>JREMOVE key ["attr",...]</code></td><td>Remove JSON attributes</td><td><code>JREMOVE user:1 ["temp"]</code></td></tr>
                             <tr><td><code>JSEARCH query</code></td><td>Search JSON</td><td><code>JSEARCH $.age&gt;30</code></td></tr>
                             <tr><td><code>STATUS</code></td><td>Server status</td><td><code>STATUS</code></td></tr>
                         </tbody>
@@ -890,7 +892,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.1</p>
+                    <p class="text-muted small mb-0">Version 1.7.2</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

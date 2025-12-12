@@ -167,6 +167,8 @@ public class RedisCommand implements Serializable {
         // Kuber extension commands
         JSET,       // Set JSON value
         JGET,       // Get JSON value
+        JUPDATE,    // Update/merge JSON value (upsert with merge)
+        JREMOVE,    // Remove attributes from JSON value
         JQUERY,     // Query JSON using path
         JSEARCH,    // Search JSON values
         JDEL,       // Delete JSON path

@@ -351,6 +351,12 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
             case JGET:
                 return handleJGet(region, args);
             
+            case JUPDATE:
+                return handleJUpdate(region, args);
+            
+            case JREMOVE:
+                return handleJRemove(region, args);
+            
             case JSEARCH:
                 return handleJSearch(region, args);
             
@@ -831,6 +837,96 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
         JsonNode json = JsonUtils.parse(jsonStr);
         cacheService.jsonSet(region, key, path, json, ttl);
         return RedisResponse.ok();
+    }
+    
+    /**
+     * Handle JUPDATE command - Update/merge JSON value.
+     * Syntax: JUPDATE key json [TTL seconds]
+     * 
+     * Behavior:
+     * - If key doesn't exist: set the JSON value
+     * - If key exists and is valid JSON: merge new JSON onto existing (new values override)
+     * - If key exists but is not valid JSON: replace with new JSON value
+     * 
+     * Returns: OK on success, or the merged JSON string
+     */
+    private RedisResponse handleJUpdate(String region, List<String> args) {
+        if (args.size() < 2) {
+            return RedisResponse.error("wrong number of arguments for 'jupdate' command");
+        }
+        String key = args.get(0);
+        String jsonStr = args.get(1);
+        long ttl = args.size() > 2 ? Long.parseLong(args.get(2)) : -1;
+        
+        // Validate that the input is valid JSON
+        JsonNode newJson;
+        try {
+            newJson = JsonUtils.parse(jsonStr);
+            if (newJson == null) {
+                return RedisResponse.error("ERR invalid JSON");
+            }
+        } catch (Exception e) {
+            return RedisResponse.error("ERR invalid JSON: " + e.getMessage());
+        }
+        
+        // Perform the update/merge operation
+        JsonNode result = cacheService.jsonUpdate(region, key, newJson, ttl);
+        
+        if (result != null) {
+            return RedisResponse.bulkString(JsonUtils.toJson(result));
+        }
+        return RedisResponse.ok();
+    }
+    
+    /**
+     * Handle JREMOVE command - Remove attributes from JSON value.
+     * Syntax: JREMOVE key ["attr1", "attr2", ...]
+     * 
+     * Behavior:
+     * - If key exists and has valid JSON object: removes specified attributes and saves
+     * - If key doesn't exist or value is not JSON: returns 0 (nothing done)
+     * 
+     * Returns: Number of attributes removed, or the updated JSON string
+     */
+    private RedisResponse handleJRemove(String region, List<String> args) {
+        if (args.size() < 2) {
+            return RedisResponse.error("wrong number of arguments for 'jremove' command");
+        }
+        String key = args.get(0);
+        String jsonStr = args.get(1);
+        
+        // Parse the attributes array
+        JsonNode attributesJson;
+        try {
+            attributesJson = JsonUtils.parse(jsonStr);
+            if (attributesJson == null || !attributesJson.isArray()) {
+                return RedisResponse.error("ERR second argument must be a JSON array of attribute names");
+            }
+        } catch (Exception e) {
+            return RedisResponse.error("ERR invalid JSON array: " + e.getMessage());
+        }
+        
+        // Extract attribute names from array
+        List<String> attributes = new java.util.ArrayList<>();
+        for (JsonNode node : attributesJson) {
+            if (node.isTextual()) {
+                attributes.add(node.asText());
+            } else {
+                return RedisResponse.error("ERR attribute names must be strings");
+            }
+        }
+        
+        if (attributes.isEmpty()) {
+            return RedisResponse.integer(0);
+        }
+        
+        // Perform the remove operation
+        JsonNode result = cacheService.jsonRemoveAttributes(region, key, attributes);
+        
+        if (result != null) {
+            return RedisResponse.bulkString(JsonUtils.toJson(result));
+        }
+        return RedisResponse.integer(0);
     }
     
     private RedisResponse handleJGet(String region, List<String> args) {
