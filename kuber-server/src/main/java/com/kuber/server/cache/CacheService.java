@@ -3298,6 +3298,104 @@ public class CacheService {
     }
     
     /**
+     * Evict values from a specific region.
+     * Used by ValueCacheLimitService for count-based eviction.
+     * 
+     * @param region Region name
+     * @param count Maximum number of values to evict
+     * @return Actual number of values evicted
+     * @since 1.7.4
+     */
+    public int evictValuesFromRegion(String region, int count) {
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        
+        if (valueCache == null) {
+            return 0;
+        }
+        
+        int evicted = 0;
+        List<String> keysToEvict = new ArrayList<>();
+        List<CacheEntry> entriesToPersist = new ArrayList<>();
+        
+        // Collect entries to evict (LRU order from cache)
+        for (Map.Entry<String, CacheEntry> entry : valueCache.asMap().entrySet()) {
+            if (keysToEvict.size() >= count) {
+                break;
+            }
+            
+            CacheEntry cacheEntry = entry.getValue();
+            
+            // Skip expired entries
+            if (cacheEntry.isExpired()) {
+                continue;
+            }
+            
+            keysToEvict.add(entry.getKey());
+            entriesToPersist.add(cacheEntry);
+        }
+        
+        // Persist entries before evicting
+        for (CacheEntry entry : entriesToPersist) {
+            try {
+                persistenceStore.saveEntry(entry);
+            } catch (Exception e) {
+                log.warn("Failed to persist entry '{}' during count-based eviction: {}", 
+                        entry.getKey(), e.getMessage());
+            }
+        }
+        
+        // Evict values from memory and update KeyIndex
+        for (String key : keysToEvict) {
+            valueCache.invalidate(key);
+            
+            // Update KeyIndex to mark value as DISK only
+            if (keyIndex != null) {
+                keyIndex.updateLocation(key, ValueLocation.DISK);
+            }
+            
+            evicted++;
+            recordStatistic(region, "evictions");
+        }
+        
+        if (evicted > 0) {
+            log.debug("Count-based eviction: evicted {} values from region '{}' to disk", evicted, region);
+        }
+        
+        return evicted;
+    }
+    
+    /**
+     * Get total number of keys in a region (from KeyIndex).
+     * 
+     * @param region Region name
+     * @return Total key count in the region
+     * @since 1.7.4
+     */
+    public long getKeyCount(String region) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        if (keyIndex != null) {
+            return keyIndex.size();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get number of values currently in memory for a region.
+     * 
+     * @param region Region name
+     * @return Number of values in memory (value cache size)
+     * @since 1.7.4
+     */
+    public long getValueCacheSize(String region) {
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        if (valueCache != null) {
+            return valueCache.estimatedSize();
+        }
+        return 0;
+    }
+    
+    /**
      * Get total number of entries across all regions in memory.
      */
     public long getTotalMemoryEntries() {

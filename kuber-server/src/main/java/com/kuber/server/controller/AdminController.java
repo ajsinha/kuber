@@ -17,9 +17,7 @@ import com.kuber.server.persistence.LmdbPersistenceStore;
 import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.persistence.PersistenceStore.PersistenceType;
 import com.kuber.server.replication.ReplicationManager;
-import com.kuber.server.security.ApiKey;
-import com.kuber.server.security.ApiKeyService;
-import com.kuber.server.security.JsonUserDetailsService;
+import com.kuber.server.security.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,13 +26,14 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.security.Principal;
 import java.util.*;
 
 /**
  * Controller for administrative operations.
- * Manages users (read-only from users.json) and API keys.
+ * Manages users, roles, and API keys with fine-grained RBAC.
  *
- * @version 1.5.0
+ * @version 1.7.4
  */
 @Controller
 @RequestMapping("/admin")
@@ -42,7 +41,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AdminController {
     
-    private final JsonUserDetailsService userService;
+    private final KuberUserService userService;
+    private final KuberRoleService roleService;
     private final ApiKeyService apiKeyService;
     private final CacheService cacheService;
     private final KuberProperties properties;
@@ -117,22 +117,146 @@ public class AdminController {
     
     @GetMapping("/users")
     public String listUsers(Model model) {
-        Collection<JsonUserDetailsService.JsonUser> users = userService.getAllUsers();
+        Collection<KuberUser> users = userService.getAllUsers();
         model.addAttribute("users", users);
         model.addAttribute("usersFile", properties.getSecurity().getUsersFile());
+        model.addAttribute("roles", roleService.getAllRoles());
+        model.addAttribute("userStats", userService.getStatistics());
         return "admin/users";
     }
     
     @GetMapping("/users/{userId}")
     public String viewUser(@PathVariable String userId, Model model) {
-        JsonUserDetailsService.JsonUser user = userService.getUser(userId);
+        Optional<KuberUser> userOpt = userService.getUser(userId);
         
-        if (user == null) {
+        if (userOpt.isEmpty()) {
             return "redirect:/admin/users";
         }
         
+        KuberUser user = userOpt.get();
         model.addAttribute("user", user);
+        model.addAttribute("allRoles", roleService.getAllRoles());
         return "admin/user-detail";
+    }
+    
+    @PostMapping("/users/create")
+    public String createUser(
+            @RequestParam String userId,
+            @RequestParam String password,
+            @RequestParam String fullName,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) List<String> roles,
+            Principal principal,
+            RedirectAttributes redirectAttributes) {
+        try {
+            KuberUser user = KuberUser.builder()
+                    .userId(userId)
+                    .password(password)
+                    .fullName(fullName)
+                    .email(email)
+                    .roles(roles != null ? new HashSet<>(roles) : new HashSet<>())
+                    .build();
+            
+            userService.createUser(user, principal.getName());
+            redirectAttributes.addFlashAttribute("success", "User created successfully: " + userId);
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to create user: " + e.getMessage());
+        }
+        return "redirect:/admin/users";
+    }
+    
+    @PostMapping("/users/{userId}/update")
+    public String updateUser(
+            @PathVariable String userId,
+            @RequestParam(required = false) String fullName,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String password,
+            Principal principal,
+            RedirectAttributes redirectAttributes) {
+        try {
+            KuberUser updates = KuberUser.builder()
+                    .fullName(fullName)
+                    .email(email)
+                    .password(password != null && !password.isEmpty() ? password : null)
+                    .build();
+            
+            userService.updateUser(userId, updates, principal.getName());
+            redirectAttributes.addFlashAttribute("success", "User updated successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update user: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + userId;
+    }
+    
+    @PostMapping("/users/{userId}/roles")
+    public String setUserRoles(
+            @PathVariable String userId,
+            @RequestParam(required = false) List<String> roles,
+            Principal principal,
+            RedirectAttributes redirectAttributes) {
+        try {
+            Set<String> roleSet = roles != null ? new HashSet<>(roles) : new HashSet<>();
+            userService.setRoles(userId, roleSet, principal.getName());
+            redirectAttributes.addFlashAttribute("success", "User roles updated successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update roles: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + userId;
+    }
+    
+    @PostMapping("/users/{userId}/enable")
+    public String enableUser(@PathVariable String userId, RedirectAttributes redirectAttributes) {
+        try {
+            userService.enableUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User enabled successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to enable user: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + userId;
+    }
+    
+    @PostMapping("/users/{userId}/disable")
+    public String disableUser(@PathVariable String userId, RedirectAttributes redirectAttributes) {
+        try {
+            userService.disableUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User disabled successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to disable user: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + userId;
+    }
+    
+    @PostMapping("/users/{userId}/lock")
+    public String lockUser(@PathVariable String userId, RedirectAttributes redirectAttributes) {
+        try {
+            userService.lockUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User locked successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to lock user: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + userId;
+    }
+    
+    @PostMapping("/users/{userId}/unlock")
+    public String unlockUser(@PathVariable String userId, RedirectAttributes redirectAttributes) {
+        try {
+            userService.unlockUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User unlocked successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to unlock user: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + userId;
+    }
+    
+    @PostMapping("/users/{userId}/delete")
+    public String deleteUser(@PathVariable String userId, RedirectAttributes redirectAttributes) {
+        try {
+            userService.deleteUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User deleted successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to delete user: " + e.getMessage());
+        }
+        return "redirect:/admin/users";
     }
     
     @PostMapping("/users/reload")
@@ -144,6 +268,98 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("error", "Failed to reload users: " + e.getMessage());
         }
         return "redirect:/admin/users";
+    }
+    
+    // ==================== Role Management ====================
+    
+    @GetMapping("/roles")
+    public String listRoles(Model model) {
+        Collection<KuberRole> roles = roleService.getAllRoles();
+        model.addAttribute("roles", roles);
+        model.addAttribute("roleStats", roleService.getStatistics());
+        model.addAttribute("regions", cacheService.getRegionNames());
+        model.addAttribute("permissions", KuberPermission.values());
+        return "admin/roles";
+    }
+    
+    @PostMapping("/roles/create")
+    public String createRole(
+            @RequestParam String name,
+            @RequestParam(required = false) String displayName,
+            @RequestParam(required = false) String description,
+            @RequestParam String region,
+            @RequestParam(required = false) List<String> permissions,
+            Principal principal,
+            RedirectAttributes redirectAttributes) {
+        try {
+            Set<KuberPermission> permSet = new HashSet<>();
+            if (permissions != null) {
+                for (String perm : permissions) {
+                    KuberPermission p = KuberPermission.fromString(perm);
+                    if (p != null) {
+                        permSet.add(p);
+                    }
+                }
+            }
+            
+            KuberRole role = KuberRole.builder()
+                    .name(name)
+                    .displayName(displayName != null ? displayName : name)
+                    .description(description)
+                    .region(region)
+                    .permissions(permSet)
+                    .build();
+            
+            roleService.createRole(role, principal.getName());
+            redirectAttributes.addFlashAttribute("success", "Role created successfully: " + name);
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to create role: " + e.getMessage());
+        }
+        return "redirect:/admin/roles";
+    }
+    
+    @PostMapping("/roles/{roleName}/delete")
+    public String deleteRole(@PathVariable String roleName, RedirectAttributes redirectAttributes) {
+        try {
+            roleService.deleteRole(roleName);
+            redirectAttributes.addFlashAttribute("success", "Role deleted successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to delete role: " + e.getMessage());
+        }
+        return "redirect:/admin/roles";
+    }
+    
+    @PostMapping("/roles/{roleName}/activate")
+    public String activateRole(@PathVariable String roleName, RedirectAttributes redirectAttributes) {
+        try {
+            roleService.activateRole(roleName);
+            redirectAttributes.addFlashAttribute("success", "Role activated successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to activate role: " + e.getMessage());
+        }
+        return "redirect:/admin/roles";
+    }
+    
+    @PostMapping("/roles/{roleName}/deactivate")
+    public String deactivateRole(@PathVariable String roleName, RedirectAttributes redirectAttributes) {
+        try {
+            roleService.deactivateRole(roleName);
+            redirectAttributes.addFlashAttribute("success", "Role deactivated successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to deactivate role: " + e.getMessage());
+        }
+        return "redirect:/admin/roles";
+    }
+    
+    @PostMapping("/roles/reload")
+    public String reloadRoles(RedirectAttributes redirectAttributes) {
+        try {
+            roleService.reloadRoles();
+            redirectAttributes.addFlashAttribute("success", "Roles reloaded from file successfully");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to reload roles: " + e.getMessage());
+        }
+        return "redirect:/admin/roles";
     }
     
     // ==================== API Key Management ====================

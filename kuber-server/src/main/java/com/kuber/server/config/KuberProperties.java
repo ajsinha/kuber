@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.6.5";
+    private String version = "1.7.4";
     
     /**
      * Unique node identifier
@@ -363,6 +363,42 @@ public class KuberProperties {
          */
         @Min(1000)
         private int memoryWatcherIntervalMs = 5000;
+        
+        // ==================== Count-Based Value Cache Limiting ====================
+        
+        /**
+         * Enable count-based value cache limiting per region.
+         * When enabled, limits the number of values kept in memory based on
+         * percentage of total keys or absolute count (whichever is lower).
+         * This runs independently of memory pressure-based eviction.
+         */
+        private boolean valueCacheLimitEnabled = true;
+        
+        /**
+         * Maximum percentage of total keys in a region to keep in value cache.
+         * For example, 20 means only 20% of keys can have their values in memory.
+         * Used in conjunction with valueCacheMaxEntries (whichever is lower wins).
+         */
+        @Min(1)
+        @Max(100)
+        private int valueCacheMaxPercent = 20;
+        
+        /**
+         * Maximum absolute number of values to keep in memory per region.
+         * Used in conjunction with valueCacheMaxPercent (whichever is lower wins).
+         * For example, if a region has 100,000 keys and valueCacheMaxPercent=20,
+         * the limit would be 20,000, but if valueCacheMaxEntries=10,000,
+         * then only 10,000 values will be kept in memory.
+         */
+        @Min(100)
+        private int valueCacheMaxEntries = 10000;
+        
+        /**
+         * Interval in milliseconds for count-based cache limit checks.
+         * This runs separately from memory watcher.
+         */
+        @Min(1000)
+        private int valueCacheLimitCheckIntervalMs = 30000;
     }
     
     @Data
@@ -475,15 +511,25 @@ public class KuberProperties {
     @Data
     public static class Security {
         /**
-         * Path to users.json file for authentication
+         * Path to users.json file for authentication.
+         * Default: secure/users.json
+         * @since 1.7.3 - Moved to secure folder, supports RBAC roles
          */
-        private String usersFile = "classpath:users.json";
+        private String usersFile = "secure/users.json";
+        
+        /**
+         * Path to roles.json file for RBAC role definitions.
+         * Default: secure/roles.json
+         * @since 1.7.3
+         */
+        private String rolesFile = "secure/roles.json";
         
         /**
          * Path to API keys JSON file.
-         * Default: config/apikeys.json
+         * Default: secure/apikeys.json
+         * @since 1.7.3 - Moved to secure folder
          */
-        private String apiKeysFile = "config/apikeys.json";
+        private String apiKeysFile = "secure/apikeys.json";
         
         /**
          * Session timeout in minutes
@@ -495,6 +541,22 @@ public class KuberProperties {
          * Password for Redis AUTH command (empty = no auth)
          */
         private String redisPassword = null;
+        
+        /**
+         * Whether to enforce RBAC authorization on cache operations.
+         * When enabled, users must have appropriate roles to read/write/delete from regions.
+         * Default: true
+         * @since 1.7.3
+         */
+        private boolean rbacEnabled = true;
+        
+        /**
+         * Whether to auto-create region roles when a new region is created.
+         * When enabled, creates {region}_readonly, {region}_readwrite, {region}_full roles.
+         * Default: true
+         * @since 1.7.3
+         */
+        private boolean autoCreateRegionRoles = true;
     }
     
     @Data

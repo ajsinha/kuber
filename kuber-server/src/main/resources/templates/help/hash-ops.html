@@ -103,7 +103,7 @@ HGET user:1001 phone
     client.hset("user:1001", "name", "Alice");
     
     // Set multiple fields
-    Map<String, String> fields = new HashMap<>();
+    Map&lt;String, String&gt; fields = new HashMap&lt;&gt;();
     fields.put("email", "alice@example.com");
     fields.put("age", "30");
     fields.put("city", "NYC");
@@ -121,7 +121,7 @@ HGET user:1001 phone
 await client.HSetAsync("user:1001", "name", "Alice");
 
 // Set multiple fields
-await client.HSetAsync("user:1001", new Dictionary<string, string> {
+await client.HSetAsync("user:1001", new Dictionary&lt;string, string&gt; {
     ["email"] = "alice@example.com",
     ["age"] = "30",
     ["city"] = "NYC"
@@ -170,11 +170,11 @@ HGETALL user:1001
                             <div class="tab-pane fade" id="hmget-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
     // Get specific fields
-    List<String> values = client.hmget("user:1001", "name", "email", "age");
+    List&lt;String&gt; values = client.hmget("user:1001", "name", "email", "age");
     System.out.println("Values: " + values);
     
     // Get all fields and values
-    Map<String, String> user = client.hgetAll("user:1001");
+    Map&lt;String, String&gt; user = client.hgetAll("user:1001");
     System.out.println("User: " + user);
 }</code></pre>
                             </div>
@@ -311,11 +311,11 @@ HLEN user:1001
                             <div class="tab-pane fade" id="hkeys-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
     // Get all field names
-    Set<String> fields = client.hkeys("user:1001");
+    Set&lt;String&gt; fields = client.hkeys("user:1001");
     System.out.println("Fields: " + fields);
     
     // Get all values
-    List<String> values = client.hvals("user:1001");
+    List&lt;String&gt; values = client.hvals("user:1001");
     System.out.println("Values: " + values);
     
     // Get count
@@ -432,7 +432,7 @@ Console.WriteLine($"Set: {result}");  // false</code></pre>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.4</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

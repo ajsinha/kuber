@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 1.7.1**
+**Version 1.7.4**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -28,7 +28,7 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `1.7.1` | Current application version (read-only) |
+| `kuber.version` | `1.7.4` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
 | `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json, request_response.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
@@ -260,6 +260,19 @@ Automatic memory pressure handling.
 | `kuber.cache.memory-low-watermark-percent` | `50` | Stop evicting when heap drops below this % |
 | `kuber.cache.memory-eviction-batch-size` | `1000` | Entries to evict per batch |
 | `kuber.cache.memory-watcher-interval-ms` | `5000` | Memory check interval in milliseconds |
+
+### Count-Based Value Cache Limiting (v1.7.4)
+
+Proactive count-based eviction to limit values in memory per region. The effective limit is the **LOWER** of percentage-based or absolute limit.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.cache.value-cache-limit-enabled` | `true` | Enable count-based value cache limiting |
+| `kuber.cache.value-cache-max-percent` | `20` | Max % of keys to keep values in memory |
+| `kuber.cache.value-cache-max-entries` | `10000` | Max values per region in memory |
+| `kuber.cache.value-cache-limit-check-interval-ms` | `30000` | Interval between limit checks |
+
+**Example:** With 100,000 keys, 20% limit = 20,000 max, but if max-entries = 10,000, effective limit is **10,000** (lower wins).
 
 ---
 

@@ -17,19 +17,30 @@
 
                 <h3>Authentication</h3>
                 <p>Use HTTP Basic Auth: <code>Authorization: Basic base64(username:password)</code></p>
+                <p>Or use API Key: <code>X-API-Key: kub_your_api_key</code></p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    <strong>v1.7.4: Role-Based Access Control</strong><br>
+                    All endpoints require appropriate permissions. Operations return HTTP 403 if permission is denied.
+                    See <a href="/help/security">Security &amp; RBAC</a> for details.
+                </div>
                 
                 <h3 class="mt-4">Endpoints</h3>
                 <table class="table table-striped">
-                    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+                    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Permission</th></tr></thead>
                     <tbody>
-                        <tr><td>GET</td><td>/api/info</td><td>Server information</td></tr>
-                        <tr><td>GET</td><td>/api/regions</td><td>List all regions</td></tr>
-                        <tr><td>POST</td><td>/api/regions</td><td>Create region</td></tr>
-                        <tr><td>GET</td><td>/api/cache/{region}/{key}</td><td>Get value</td></tr>
-                        <tr><td>PUT</td><td>/api/cache/{region}/{key}</td><td>Set value</td></tr>
-                        <tr><td>DELETE</td><td>/api/cache/{region}/{key}</td><td>Delete key</td></tr>
-                        <tr><td>POST</td><td>/api/genericsearch</td><td>Generic search</td></tr>
-                        <tr><td>POST</td><td>/api/cache/{region}/jsearch</td><td>JSON search</td></tr>
+                        <tr><td>GET</td><td>/api/info</td><td>Server information</td><td><span class="badge bg-secondary">Any</span></td></tr>
+                        <tr><td>GET</td><td>/api/regions</td><td>List all regions</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>POST</td><td>/api/regions</td><td>Create region</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>DELETE</td><td>/api/regions/{name}</td><td>Delete region</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>GET</td><td>/api/cache/{region}/keys</td><td>List keys</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>GET</td><td>/api/cache/{region}/{key}</td><td>Get value</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>PUT</td><td>/api/cache/{region}/{key}</td><td>Set value</td><td><span class="badge bg-warning text-dark">WRITE</span></td></tr>
+                        <tr><td>DELETE</td><td>/api/cache/{region}/{key}</td><td>Delete key</td><td><span class="badge bg-danger">DELETE</span></td></tr>
+                        <tr><td>POST</td><td>/api/regions/{name}/purge</td><td>Purge region</td><td><span class="badge bg-danger">DELETE</span></td></tr>
+                        <tr><td>POST</td><td>/api/genericsearch</td><td>Generic search</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>POST</td><td>/api/cache/{region}/search</td><td>JSON search</td><td><span class="badge bg-success">READ</span></td></tr>
                     </tbody>
                 </table>
                 
@@ -56,7 +67,7 @@
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.4</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

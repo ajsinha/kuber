@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.7.2</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.7.4</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -284,7 +284,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.7.2                                     ║
+║   SYSTEM READY - Version 1.7.4                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -747,14 +747,113 @@ AUTH password</code></pre>
                         <li><strong>Audit</strong>: Track last-used timestamps</li>
                     </ul>
                     
+                    <h4 class="mt-4"><i class="fas fa-user-shield me-2"></i>Role-Based Access Control (v1.7.4)</h4>
+                    <p>Kuber implements enterprise-grade RBAC with region-specific permissions:</p>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header bg-danger text-white">Authorization Flow</div>
+                        <div class="card-body">
+                            <pre class="bg-light p-3 rounded mb-0" style="font-size: 0.85rem;">
+┌──────────┐      ┌────────────┐      ┌─────────────────────┐      ┌──────────────┐
+│   User   │─────▶│   Roles    │─────▶│   Permissions       │─────▶│   Regions    │
+└──────────┘      └────────────┘      └─────────────────────┘      └──────────────┘
+
+admin ──────────▶ [admin] ───────────▶ ALL ────────────────────────▶ * (all regions)
+operator ───────▶ [default_full] ───▶ READ, WRITE, DELETE ─────────▶ default
+readonly ───────▶ [orders_readonly]─▶ READ ─────────────────────────▶ orders</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Permission Types</h5>
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Permission</th><th>Operations</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><span class="badge bg-success">READ</span></td><td>GET, EXISTS, KEYS, SCAN, SEARCH</td></tr>
+                                    <tr><td><span class="badge bg-warning text-dark">WRITE</span></td><td>SET, SETEX, INCR, HSET, JSET</td></tr>
+                                    <tr><td><span class="badge bg-danger">DELETE</span></td><td>DEL, HDEL, JDEL, FLUSHDB</td></tr>
+                                    <tr><td><span class="badge bg-dark">ADMIN</span></td><td>Region mgmt, User/Role mgmt</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Role Naming Convention</h5>
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Pattern</th><th>Example</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><code>admin</code></td><td>System admin (reserved)</td></tr>
+                                    <tr><td><code>{region}_readonly</code></td><td>orders_readonly</td></tr>
+                                    <tr><td><code>{region}_readwrite</code></td><td>orders_readwrite</td></tr>
+                                    <tr><td><code>{region}_full</code></td><td>orders_full</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mt-3">Hot Reload</h5>
+                    <ul>
+                        <li><strong>Automatic:</strong> Security files checked every 30 seconds</li>
+                        <li><strong>Linked:</strong> Changes to users.json OR roles.json reload BOTH files</li>
+                        <li><strong>No Restart:</strong> Security changes take effect without server restart</li>
+                    </ul>
+                    
+                    <h5 class="mt-3">Authorization Enforcement</h5>
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr><th>Layer</th><th>Enforcement Point</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Web UI</td><td>CacheController, RegionController, HomeController</td></tr>
+                            <tr><td>REST API</td><td>ApiController - all /api/* endpoints</td></tr>
+                            <tr><td>Redis Protocol</td><td>RedisProtocolHandler after AUTH</td></tr>
+                        </tbody>
+                    </table>
+                    
                     <h4 class="mt-4">User Configuration (users.json)</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>{
   "users": [
     {
       "userId": "admin",
       "password": "admin123",
-      "fullName": "Administrator",
-      "roles": ["ADMIN", "OPERATOR", "USER"]
+      "fullName": "System Administrator",
+      "roles": ["admin"],
+      "enabled": true,
+      "systemUser": true
+    },
+    {
+      "userId": "operator",
+      "password": "operator123", 
+      "fullName": "Cache Operator",
+      "roles": ["default_full", "orders_readwrite"],
+      "enabled": true
+    }
+  ]
+}</code></pre>
+                    
+                    <h4 class="mt-4">Role Configuration (roles.json)</h4>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+  "roles": [
+    {
+      "name": "admin",
+      "displayName": "System Administrator",
+      "region": "*",
+      "permissions": ["READ", "WRITE", "DELETE", "ADMIN"],
+      "systemRole": true
+    },
+    {
+      "name": "default_readonly",
+      "region": "default",
+      "permissions": ["READ"]
+    },
+    {
+      "name": "orders_full",
+      "region": "orders",
+      "permissions": ["READ", "WRITE", "DELETE"]
     }
   ]
 }</code></pre>
@@ -892,7 +991,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.2</p>
+                    <p class="text-muted small mb-0">Version 1.7.4</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

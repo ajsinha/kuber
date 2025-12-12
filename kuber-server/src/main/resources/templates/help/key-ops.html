@@ -205,11 +205,11 @@ KEYS user:100?
                             <div class="tab-pane fade" id="keys-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
     // Find all user keys
-    Set<String> keys = client.keys("user:*");
+    Set&lt;String&gt; keys = client.keys("user:*");
     System.out.println("User keys: " + keys);
     
     // All keys in region
-    Set<String> allKeys = client.keys("*");
+    Set&lt;String&gt; allKeys = client.keys("*");
     System.out.println("Total keys: " + allKeys.size());
 }</code></pre>
                             </div>
@@ -262,7 +262,7 @@ SCAN 42 MATCH user:* COUNT 100</code></pre>
                             </div>
                             <div class="tab-pane fade" id="scan-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
-    List<String> allKeys = new ArrayList<>();
+    List&lt;String&gt; allKeys = new ArrayList&lt;&gt;();
     String cursor = "0";
     do {
         ScanResult<String> result = client.scan(cursor, "user:*", 100);
@@ -275,7 +275,7 @@ SCAN 42 MATCH user:* COUNT 100</code></pre>
                             <div class="tab-pane fade" id="scan-csharp">
 <pre class="bg-dark text-light p-3 rounded"><code>using var client = new KuberClient("localhost", 6380, "kub_xxx");
 
-var allKeys = new List<string>();
+var allKeys = new List&lt;string&gt;();
 long cursor = 0;
 do {
     var result = await client.ScanAsync(cursor, "user:*", 100);
@@ -384,7 +384,7 @@ KSEARCH session:[a-z0-9]{8} LIMIT 50</code></pre>
                             <div class="tab-pane fade" id="ksearch-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
     // Regex search with values
-    List<KeyValue> results = client.ksearch("user:100[0-9]", 100);
+    List&lt;KeyValue&gt; results = client.ksearch("user:100[0-9]", 100);
     for (KeyValue kv : results) {
         System.out.println("Key: " + kv.getKey() + ", Value: " + kv.getValue());
     }
@@ -412,7 +412,7 @@ foreach (var kv in results) {
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.4</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

@@ -24,8 +24,7 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.event.EventPublisher;
 import com.kuber.server.replication.ReplicationManager;
-import com.kuber.server.security.ApiKey;
-import com.kuber.server.security.ApiKeyService;
+import com.kuber.server.security.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.mina.core.service.IoHandlerAdapter;
@@ -45,8 +44,13 @@ import java.util.stream.Collectors;
  * Authentication (v1.6.5):
  * - API Key ONLY: AUTH kub_xxx... or AUTH APIKEY kub_xxx...
  * - Username/password authentication is only for Web UI
+ * 
+ * Authorization (v1.7.3):
+ * - RBAC: Permissions checked based on user's roles and region
+ * - Admin users have full access to all operations
+ * - Other users need specific roles granting READ/WRITE/DELETE
  *
- * @version 1.6.5
+ * @version 1.7.4
  */
 @Slf4j
 @Component
@@ -56,6 +60,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     private static final String SESSION_REGION = "currentRegion";
     private static final String SESSION_AUTHENTICATED = "authenticated";
     private static final String SESSION_AUTH_USER = "authUser";
+    private static final String SESSION_API_KEY = "apiKey";
     private static final String SESSION_IN_MULTI = "inMulti";
     private static final String SESSION_QUEUED_COMMANDS = "queuedCommands";
     private static final String SESSION_SUBSCRIPTIONS = "subscriptions";
@@ -64,6 +69,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     private final KuberProperties properties;
     private final EventPublisher eventPublisher;
     private final ApiKeyService apiKeyService;
+    private final AuthorizationService authorizationService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -251,133 +257,178 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
                 // In Kuber, SELECT changes the region
                 return handleRSelect(session, args);
             
-            // String commands
+            // String commands - READ
             case GET:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleGet(region, args);
             
+            // String commands - WRITE
             case SET:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleSet(region, args);
             
             case SETNX:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleSetNx(region, args);
             
             case SETEX:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleSetEx(region, args);
             
             case MGET:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleMGet(region, args);
             
             case MSET:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleMSet(region, args);
             
             case INCR:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleIncr(region, args);
             
             case INCRBY:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleIncrBy(region, args);
             
             case DECR:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleDecr(region, args);
             
             case DECRBY:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleDecrBy(region, args);
             
             case APPEND:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleAppend(region, args);
             
             case STRLEN:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleStrlen(region, args);
             
             case GETSET:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleGetSet(region, args);
             
-            // Key commands
+            // Key commands - DELETE
             case DEL:
+                if (!canDelete(session, region)) return permissionDenied("DELETE", region);
                 return handleDel(region, args);
             
+            // Key commands - READ
             case EXISTS:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleExists(region, args);
             
+            // Key commands - WRITE (TTL operations)
             case EXPIRE:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleExpire(region, args);
             
             case TTL:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleTtl(region, args);
             
             case PERSIST:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handlePersist(region, args);
             
             case TYPE:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleType(region, args);
             
             case KEYS:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleKeys(region, args);
             
             case SCAN:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleScan(region, args);
             
             case RENAME:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleRename(region, args);
             
-            // Hash commands
+            // Hash commands - READ
             case HGET:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleHGet(region, args);
             
+            // Hash commands - WRITE
             case HSET:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleHSet(region, args);
             
             case HGETALL:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleHGetAll(region, args);
             
             case HDEL:
+                if (!canDelete(session, region)) return permissionDenied("DELETE", region);
                 return handleHDel(region, args);
             
             case HEXISTS:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleHExists(region, args);
             
             case HKEYS:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleHKeys(region, args);
             
             case HVALS:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleHVals(region, args);
             
             case HLEN:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleHLen(region, args);
             
-            // JSON commands (Kuber extension)
+            // JSON commands (Kuber extension) - WRITE
             case JSET:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleJSet(region, args);
             
+            // JSON commands - READ
             case JGET:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleJGet(region, args);
             
             case JUPDATE:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleJUpdate(region, args);
             
             case JREMOVE:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleJRemove(region, args);
             
             case JSEARCH:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleJSearch(region, args);
             
             case JDEL:
+                if (!canDelete(session, region)) return permissionDenied("DELETE", region);
                 return handleJDel(region, args);
             
-            // Key search command (Kuber extension)
+            // Key search command (Kuber extension) - READ
             case KSEARCH:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleKSearch(region, args);
             
-            // Region commands (Kuber extension)
+            // Region commands (Kuber extension) - ADMIN only
             case REGIONS:
                 return handleRegions();
             
             case RCREATE:
+                if (!isAdmin(session)) return RedisResponse.error("NOPERM admin permission required to create regions");
                 return handleRCreate(args);
             
             case RDROP:
+                if (!isAdmin(session)) return RedisResponse.error("NOPERM admin permission required to drop regions");
                 return handleRDrop(args);
             
             case RPURGE:
+                if (!canDelete(session, region)) return permissionDenied("DELETE", region);
                 return handleRPurge(args);
             
             case RINFO:
@@ -387,12 +438,15 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
                 return handleRSelect(session, args);
             
             case RSETMAP:
+                if (!canWrite(session, region)) return permissionDenied("WRITE", region);
                 return handleRSetMap(region, args);
             
             case RGETMAP:
+                if (!canRead(session, region)) return permissionDenied("READ", region);
                 return handleRGetMap(region, args);
             
             case RCLEARMAP:
+                if (!canDelete(session, region)) return permissionDenied("DELETE", region);
                 return handleRClearMap(region, args);
             
             // Server commands
@@ -485,13 +539,79 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
             ApiKey key = validatedKey.get();
             session.setAttribute(SESSION_AUTHENTICATED, true);
             session.setAttribute(SESSION_AUTH_USER, key.getUserId());
-            log.info("Redis client authenticated via API key: {} ({}) from {}", 
-                    key.getKeyId(), key.getName(), session.getRemoteAddress());
+            session.setAttribute(SESSION_API_KEY, key);
+            log.info("Redis client authenticated via API key: {} ({}) for user '{}' from {}", 
+                    key.getKeyId(), key.getName(), key.getUserId(), session.getRemoteAddress());
             return RedisResponse.ok();
         }
         
         log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
         return RedisResponse.error("invalid API key");
+    }
+    
+    // ==================== RBAC Authorization ====================
+    
+    /**
+     * Check if session user has read permission for region
+     */
+    private boolean canRead(IoSession session, String region) {
+        if (!properties.getSecurity().isRbacEnabled()) {
+            return true;
+        }
+        String userId = (String) session.getAttribute(SESSION_AUTH_USER);
+        if (userId == null) {
+            return false;
+        }
+        return authorizationService.hasPermission(userId, region, KuberPermission.READ);
+    }
+    
+    /**
+     * Check if session user has write permission for region
+     */
+    private boolean canWrite(IoSession session, String region) {
+        if (!properties.getSecurity().isRbacEnabled()) {
+            return true;
+        }
+        String userId = (String) session.getAttribute(SESSION_AUTH_USER);
+        if (userId == null) {
+            return false;
+        }
+        return authorizationService.hasPermission(userId, region, KuberPermission.WRITE);
+    }
+    
+    /**
+     * Check if session user has delete permission for region
+     */
+    private boolean canDelete(IoSession session, String region) {
+        if (!properties.getSecurity().isRbacEnabled()) {
+            return true;
+        }
+        String userId = (String) session.getAttribute(SESSION_AUTH_USER);
+        if (userId == null) {
+            return false;
+        }
+        return authorizationService.hasPermission(userId, region, KuberPermission.DELETE);
+    }
+    
+    /**
+     * Check if session user is admin
+     */
+    private boolean isAdmin(IoSession session) {
+        if (!properties.getSecurity().isRbacEnabled()) {
+            return true;
+        }
+        String userId = (String) session.getAttribute(SESSION_AUTH_USER);
+        if (userId == null) {
+            return false;
+        }
+        return authorizationService.isAdmin(userId);
+    }
+    
+    /**
+     * Return error for permission denied
+     */
+    private RedisResponse permissionDenied(String operation, String region) {
+        return RedisResponse.error("NOPERM " + operation + " permission denied for region '" + region + "'");
     }
     
     private RedisResponse handleGet(String region, List<String> args) {

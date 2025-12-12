@@ -31,6 +31,7 @@
                     <ul class="mb-0">
                         <li><strong>Request/Response Messaging (v1.7.1)</strong> - Access cache via Kafka, RabbitMQ, IBM MQ, ActiveMQ with broker controls</li>
                         <li><strong>C# / .NET Client (v1.7.1)</strong> - Complete .NET client with async/await, Redis protocol, REST API, and messaging</li>
+                        <li><strong>Dual Memory Management (v1.7.4)</strong> - Memory pressure eviction (heap) + count-based limits (20% or 10K per region)</li>
                         <li><strong>Backup & Restore (v1.5.0)</strong> - Automatic periodic backup and auto-restore for RocksDB/LMDB</li>
                         <li><strong>Async Writes (v1.3.10)</strong> - Memory updated first, disk write in background for 10-100x faster individual writes</li>
                         <li><strong>Batch Autoload (v1.3.9)</strong> - Bulk data import with configurable batch size for 10-50x faster loading</li>
@@ -192,6 +193,30 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSecurity">
+                                <i class="fas fa-shield-alt me-2 text-danger"></i>Security &amp; RBAC <span class="badge bg-danger ms-2">v1.7.4</span>
+                            </button>
+                        </h2>
+                        <div id="collapseSecurity" class="accordion-collapse collapse" data-bs-parent="#featuresAccordion">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li><strong>Role-Based Access Control</strong> - Fine-grained permissions per region</li>
+                                    <li><strong>4 Permission Types</strong> - READ, WRITE, DELETE, ADMIN</li>
+                                    <li><strong>Region-Specific Roles</strong> - Control access to individual cache regions</li>
+                                    <li><strong>Multiple Auth Methods</strong> - Form login, HTTP Basic, API Keys, Redis AUTH</li>
+                                    <li><strong>Hot Reload</strong> - Security changes without server restart</li>
+                                    <li><strong>Full Enforcement</strong> - Web UI, REST API, and Redis protocol</li>
+                                    <li>Admin protection - Reserved admin user and role</li>
+                                </ul>
+                                <a href="/help/security" class="btn btn-sm btn-outline-danger mt-2">
+                                    <i class="fas fa-book me-1"></i>Full Documentation
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Back to Help -->
@@ -208,7 +233,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.2</p>
+                    <p class="text-muted small mb-0">Version 1.7.4</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

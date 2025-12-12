@@ -16,6 +16,8 @@ import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheRegion;
 import com.kuber.core.util.JsonUtils;
 import com.kuber.server.cache.CacheService;
+import com.kuber.server.security.AuthorizationService;
+import com.kuber.server.security.KuberPermission;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -27,9 +29,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Controller for cache query and modification operations.
+ * Enforces RBAC permissions for all operations.
+ * 
+ * @version 1.7.4
  */
 @Controller
 @RequestMapping("/cache")
@@ -40,19 +46,55 @@ public class CacheController {
     private static final int MAX_LIMIT = 100000;
     
     private final CacheService cacheService;
+    private final AuthorizationService authorizationService;
     
     @ModelAttribute
     public void addCurrentPage(Model model) {
         model.addAttribute("currentPage", "cache");
     }
     
+    /**
+     * Get regions the current user can access (has any permission for).
+     */
+    private Collection<CacheRegion> getAccessibleRegions() {
+        return cacheService.getAllRegions().stream()
+                .filter(region -> authorizationService.canRead(region.getName()) ||
+                                  authorizationService.canWrite(region.getName()) ||
+                                  authorizationService.canDelete(region.getName()))
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get user's permissions for a region to pass to the view.
+     */
+    private void addPermissionsToModel(Model model, String regionName) {
+        model.addAttribute("canRead", authorizationService.canRead(regionName));
+        model.addAttribute("canWrite", authorizationService.canWrite(regionName));
+        model.addAttribute("canDelete", authorizationService.canDelete(regionName));
+        model.addAttribute("isAdmin", authorizationService.isAdmin());
+    }
+    
     @GetMapping
     public String cachePage(Model model, 
                            @RequestParam(defaultValue = "default") String region,
                            @RequestParam(required = false) Integer limit) {
-        Collection<CacheRegion> regions = cacheService.getAllRegions();
+        // Get only accessible regions
+        Collection<CacheRegion> regions = getAccessibleRegions();
         model.addAttribute("regions", regions);
         model.addAttribute("currentRegion", region);
+        
+        // Add permissions for current region
+        addPermissionsToModel(model, region);
+        
+        // Check read permission
+        if (!authorizationService.canRead(region)) {
+            model.addAttribute("error", "You do not have READ permission for region '" + region + "'");
+            model.addAttribute("keys", Set.of());
+            model.addAttribute("totalKeys", 0L);
+            model.addAttribute("hasMore", false);
+            model.addAttribute("resultCount", 0);
+            return "cache";
+        }
         
         // Determine effective limit
         int effectiveLimit = getEffectiveLimit(limit);
@@ -81,9 +123,10 @@ public class CacheController {
     
     @GetMapping("/query")
     public String queryPage(Model model) {
-        Collection<CacheRegion> regions = cacheService.getAllRegions();
+        Collection<CacheRegion> regions = getAccessibleRegions();
         model.addAttribute("regions", regions);
         model.addAttribute("defaultLimit", DEFAULT_LIMIT);
+        model.addAttribute("isAdmin", authorizationService.isAdmin());
         return "query";
     }
     
@@ -94,13 +137,22 @@ public class CacheController {
                               @RequestParam(required = false) String key,
                               @RequestParam(required = false) String jsonQuery,
                               @RequestParam(required = false) Integer limit) {
-        Collection<CacheRegion> regions = cacheService.getAllRegions();
+        Collection<CacheRegion> regions = getAccessibleRegions();
         model.addAttribute("regions", regions);
         model.addAttribute("queryRegion", region);
         model.addAttribute("queryType", queryType);
         model.addAttribute("queryKey", key);
         model.addAttribute("jsonQuery", jsonQuery);
         model.addAttribute("defaultLimit", DEFAULT_LIMIT);
+        
+        // Add permissions
+        addPermissionsToModel(model, region);
+        
+        // Check read permission
+        if (!authorizationService.canRead(region)) {
+            model.addAttribute("error", "You do not have READ permission for region '" + region + "'");
+            return "query";
+        }
         
         // Determine effective limit
         int effectiveLimit = getEffectiveLimit(limit);
@@ -180,6 +232,17 @@ public class CacheController {
     public String viewEntry(Model model,
                            @RequestParam String region,
                            @RequestParam String key) {
+        // Add permissions
+        addPermissionsToModel(model, region);
+        
+        // Check read permission
+        if (!authorizationService.canRead(region)) {
+            model.addAttribute("error", "You do not have READ permission for region '" + region + "'");
+            model.addAttribute("region", region);
+            model.addAttribute("key", key);
+            return "entry";
+        }
+        
         String value = cacheService.get(region, key);
         JsonNode jsonValue = null;
         String type = cacheService.type(region, key);
@@ -202,15 +265,32 @@ public class CacheController {
     @GetMapping("/insert")
     public String insertPage(Model model,
                             @RequestParam(defaultValue = "default") String region) {
-        Collection<CacheRegion> regions = cacheService.getAllRegions();
+        // Get only regions with write permission
+        Collection<CacheRegion> regions = cacheService.getAllRegions().stream()
+                .filter(r -> authorizationService.canWrite(r.getName()))
+                .collect(Collectors.toList());
         model.addAttribute("regions", regions);
         model.addAttribute("currentRegion", region);
+        addPermissionsToModel(model, region);
+        
+        // Check write permission
+        if (!authorizationService.canWrite(region)) {
+            model.addAttribute("error", "You do not have WRITE permission for region '" + region + "'");
+        }
+        
         return "insert";
     }
     
     @PostMapping("/insert")
     public String insertEntry(@ModelAttribute EntryForm form,
                              RedirectAttributes redirectAttributes) {
+        // Check write permission
+        if (!authorizationService.canWrite(form.getRegion())) {
+            redirectAttributes.addFlashAttribute("error", 
+                    "You do not have WRITE permission for region '" + form.getRegion() + "'");
+            return "redirect:/cache?region=" + form.getRegion();
+        }
+        
         try {
             if ("json".equals(form.getValueType())) {
                 JsonNode json = JsonUtils.parse(form.getValue());
@@ -232,6 +312,13 @@ public class CacheController {
     public String deleteEntry(@RequestParam String region,
                              @RequestParam String key,
                              RedirectAttributes redirectAttributes) {
+        // Check delete permission
+        if (!authorizationService.canDelete(region)) {
+            redirectAttributes.addFlashAttribute("error", 
+                    "You do not have DELETE permission for region '" + region + "'");
+            return "redirect:/cache?region=" + region;
+        }
+        
         try {
             boolean deleted = cacheService.delete(region, key);
             if (deleted) {
@@ -249,6 +336,13 @@ public class CacheController {
     @PostMapping("/update")
     public String updateEntry(@ModelAttribute EntryForm form,
                              RedirectAttributes redirectAttributes) {
+        // Check write permission
+        if (!authorizationService.canWrite(form.getRegion())) {
+            redirectAttributes.addFlashAttribute("error", 
+                    "You do not have WRITE permission for region '" + form.getRegion() + "'");
+            return "redirect:/cache/entry?region=" + form.getRegion() + "&key=" + form.getKey();
+        }
+        
         try {
             if ("json".equals(form.getValueType())) {
                 JsonNode json = JsonUtils.parse(form.getValue());

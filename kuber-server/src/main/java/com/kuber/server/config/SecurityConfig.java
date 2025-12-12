@@ -12,7 +12,7 @@
 package com.kuber.server.config;
 
 import com.kuber.server.security.ApiKeyAuthenticationFilter;
-import com.kuber.server.security.JsonUserDetailsService;
+import com.kuber.server.security.KuberUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,13 +28,18 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 /**
  * Security configuration for Kuber web interface.
  * Supports both username/password and API Key authentication.
+ * Implements Role-Based Access Control (RBAC) for fine-grained authorization.
  * 
  * Authentication methods:
  * 1. Form login (web UI)
  * 2. HTTP Basic (REST API)
  * 3. API Key (X-API-Key header, Authorization: ApiKey, or api_key query param)
+ * 
+ * Authorization:
+ * - Admin role required for /admin/** paths
+ * - RBAC checks performed by AuthorizationService for cache operations
  *
- * @version 1.5.0
+ * @version 1.7.4
  */
 @Configuration
 @EnableWebSecurity
@@ -42,7 +47,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 @RequiredArgsConstructor
 public class SecurityConfig {
     
-    private final JsonUserDetailsService userDetailsService;
+    private final KuberUserService userService;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     
     @Bean
@@ -85,7 +90,7 @@ public class SecurityConfig {
                 .maximumSessions(5)
                 .maxSessionsPreventsLogin(false)
             )
-            .userDetailsService(userDetailsService)
+            .userDetailsService(userService)
             // Add API Key filter before username/password authentication
             .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         

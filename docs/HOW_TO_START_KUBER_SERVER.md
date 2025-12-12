@@ -1,6 +1,6 @@
 # How to Start Kuber Server
 
-**Version 1.7.1**
+**Version 1.7.4**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -98,7 +98,7 @@ mvn clean install
 
 After successful build, the server JAR is located at:
 ```
-kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
+kuber-server/target/kuber-server-1.7.4-SNAPSHOT.jar
 ```
 
 ### Build Specific Module
@@ -127,17 +127,17 @@ dotnet build
 ```bash
 # Basic start (includes required JVM options)
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
+     -jar kuber-server/target/kuber-server-1.7.4-SNAPSHOT.jar
 
 # With specific memory settings
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
      -Xms512m -Xmx2g \
-     -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
+     -jar kuber-server/target/kuber-server-1.7.4-SNAPSHOT.jar
 
 # With garbage collector tuning (for large heaps)
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
      -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
-     -jar kuber-server/target/kuber-server-1.7.1-SNAPSHOT.jar
+     -jar kuber-server/target/kuber-server-1.7.4-SNAPSHOT.jar
 ```
 
 ### Method 2: Using Maven (Recommended for Development)
@@ -247,9 +247,102 @@ Place security-sensitive files in the `secure` folder:
 
 ```
 ./secure/
-├── users.json              # User accounts
+├── users.json              # User accounts with role assignments
+├── roles.json              # RBAC role definitions (v1.7.3)
 ├── apikeys.json            # API keys
 └── request_response.json   # Messaging configuration
+```
+
+**Sample users.json:**
+
+```json
+{
+  "users": [
+    {
+      "userId": "admin",
+      "password": "admin123",
+      "fullName": "System Administrator",
+      "roles": ["admin"],
+      "enabled": true,
+      "systemUser": true
+    },
+    {
+      "userId": "operator",
+      "password": "operator123",
+      "fullName": "Cache Operator",
+      "roles": ["default_full", "test_readwrite"],
+      "enabled": true
+    }
+  ]
+}
+```
+
+**Sample roles.json:**
+
+```json
+{
+  "roles": [
+    {
+      "name": "admin",
+      "displayName": "System Administrator",
+      "region": "*",
+      "permissions": ["READ", "WRITE", "DELETE", "ADMIN"],
+      "systemRole": true
+    },
+    {
+      "name": "default_readonly",
+      "region": "default",
+      "permissions": ["READ"]
+    },
+    {
+      "name": "default_full",
+      "region": "default",
+      "permissions": ["READ", "WRITE", "DELETE"]
+    }
+  ]
+}
+```
+
+**RBAC Permission Types:**
+
+| Permission | Operations | Description |
+|------------|------------|-------------|
+| `READ` | GET, EXISTS, KEYS, SCAN, SEARCH | View and search entries |
+| `WRITE` | SET, SETEX, INCR, APPEND, HSET | Create and update entries |
+| `DELETE` | DEL, HDEL, JDEL, FLUSHDB | Remove entries |
+| `ADMIN` | Region create/delete, user/role mgmt | Full system control |
+
+**Role Naming Convention:**
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `admin` | `admin` | Reserved system admin role |
+| `{region}_readonly` | `orders_readonly` | Read-only access to region |
+| `{region}_readwrite` | `orders_readwrite` | Read and write access |
+| `{region}_full` | `orders_full` | Full access (read, write, delete) |
+
+**Hot Reload:**
+
+Security files are automatically reloaded without server restart:
+- Changes detected every 30 seconds
+- When `users.json` OR `roles.json` changes, BOTH are reloaded
+- Use Admin UI "Reload" button for immediate effect
+
+**Default File Creation:**
+
+If files are missing at startup:
+- `users.json` missing → Created with `admin` user (password: `admin123`)
+- `roles.json` missing → Created with `admin` role
+
+> ⚠️ **Important**: Change default admin password immediately!
+
+**Sample Files:**
+
+Copy from `secure-sample/` for comprehensive examples:
+```bash
+cp secure-sample/users.json.sample secure/users.json
+cp secure-sample/roles.json.sample secure/roles.json
+# Edit with your configuration
 ```
 
 ---
@@ -278,6 +371,11 @@ java -jar kuber-server.jar \
 | `--kuber.network.bind-address=0.0.0.0` | 0.0.0.0 | Network interface |
 | `--kuber.cache.max-memory-entries=100000` | 100000 | Max entries per region |
 | `--kuber.cache.global-max-memory-entries=500000` | 0 | Global max (0=unlimited) |
+| `--kuber.cache.memory-watcher-enabled=true` | true | Enable heap-based eviction |
+| `--kuber.cache.memory-high-watermark-percent=85` | 85 | Start evicting when heap exceeds % |
+| `--kuber.cache.value-cache-limit-enabled=true` | true | Enable count-based limiting (v1.7.4) |
+| `--kuber.cache.value-cache-max-percent=20` | 20 | Max % of keys to cache values |
+| `--kuber.cache.value-cache-max-entries=10000` | 10000 | Max values per region |
 | `--kuber.persistence.type=lmdb` | lmdb | Persistence backend |
 | `--kuber.persistence.rocksdb.path=./data` | ./data/rocksdb | Data directory |
 | `--kuber.secure.folder=./secure` | ./secure | Secure config folder |
@@ -346,7 +444,7 @@ docker run -d \
   -e SPRING_SECURITY_USER_PASSWORD=secret \
   -p 8080:8080 \
   -p 6380:6380 \
-  kuber-server:1.7.1
+  kuber-server:1.7.4
 ```
 
 ---
@@ -499,7 +597,7 @@ Create `start-kuber.sh`:
 KUBER_HOME=/opt/kuber
 # Required: --add-opens for LMDB persistence on Java 9+
 JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -Xms4g -Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-KUBER_JAR="${KUBER_HOME}/kuber-server-1.7.1-SNAPSHOT.jar"
+KUBER_JAR="${KUBER_HOME}/kuber-server-1.7.4-SNAPSHOT.jar"
 CONFIG_DIR="${KUBER_HOME}/config"
 LOG_DIR="${KUBER_HOME}/logs"
 PID_FILE="${KUBER_HOME}/kuber.pid"
@@ -658,7 +756,7 @@ java -jar kuber-server.jar \
 
 ```bash
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server-1.7.1-SNAPSHOT.jar
+     -jar kuber-server-1.7.4-SNAPSHOT.jar
 ```
 
 ### Typical Production Start

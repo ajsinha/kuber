@@ -2,148 +2,166 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Kuber v1.7.4 - User Detail Management
   -->
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{layout :: head('User Details')}"></head>
+<head th:replace="~{layout :: head('User Detail')}"></head>
 <body class="d-flex flex-column min-vh-100">
-
 <nav th:replace="~{layout :: navbar}"></nav>
-
 <main class="flex-fill">
     <div th:replace="~{layout :: alerts}"></div>
-    
     <div class="container-fluid py-4">
-        <nav aria-label="breadcrumb" class="mb-3">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
-                <li class="breadcrumb-item"><a th:href="@{/admin/users}">Users</a></li>
-                <li class="breadcrumb-item active" th:text="${user.userId}">User</li>
-            </ol>
-        </nav>
-        
-        <div class="row">
-            <div class="col-lg-6">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="mb-0">
-                            <i class="fas fa-user me-2 text-primary"></i>
-                            User Details
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-borderless">
-                            <tr>
-                                <th class="text-muted" style="width: 150px;">User ID</th>
-                                <td><strong th:text="${user.userId}">admin</strong></td>
-                            </tr>
-                            <tr>
-                                <th class="text-muted">Full Name</th>
-                                <td th:text="${user.fullName}">Administrator</td>
-                            </tr>
-                            <tr>
-                                <th class="text-muted">Password</th>
-                                <td>
-                                    <code>••••••••</code>
-                                    <small class="text-muted ms-2">(stored in users.json)</small>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-muted">Roles</th>
-                                <td>
-                                    <span th:each="role : ${user.roles}" 
-                                          th:class="'badge me-1 ' + (${role == 'ADMIN'} ? 'bg-danger' : (${role == 'OPERATOR'} ? 'bg-warning text-dark' : 'bg-secondary'))"
-                                          th:text="${role}">ROLE</span>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div class="card-footer bg-white border-0">
-                        <a th:href="@{/admin/users}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-1"></i> Back to Users
-                        </a>
-                    </div>
-                </div>
+        <div class="row mb-4">
+            <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
+                        <li class="breadcrumb-item"><a th:href="@{/admin/users}">Users</a></li>
+                        <li class="breadcrumb-item active" th:text="${user.userId}">user</li>
+                    </ol>
+                </nav>
+                <h2 class="mb-0">
+                    <i th:class="'fas me-2 ' + (${user.admin} ? 'fa-user-shield text-danger' : 'fa-user')"></i>
+                    <span th:text="${user.fullName}">User Name</span>
+                    <span th:if="${user.systemUser}" class="badge bg-secondary ms-2">System User</span>
+                </h2>
             </div>
-            
-            <div class="col-lg-6">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="mb-0">
-                            <i class="fas fa-shield-alt me-2 text-success"></i>
-                            Role Permissions
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                <span><strong>ADMIN</strong> - Full system access</span>
-                                <span th:if="${#lists.contains(user.roles, 'ADMIN')}" class="badge bg-success">Granted</span>
-                                <span th:unless="${#lists.contains(user.roles, 'ADMIN')}" class="badge bg-light text-dark">Not granted</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                <span><strong>OPERATOR</strong> - Manage regions and cache</span>
-                                <span th:if="${#lists.contains(user.roles, 'OPERATOR')}" class="badge bg-success">Granted</span>
-                                <span th:unless="${#lists.contains(user.roles, 'OPERATOR')}" class="badge bg-light text-dark">Not granted</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                <span><strong>USER</strong> - Read/write cache entries</span>
-                                <span th:if="${#lists.contains(user.roles, 'USER')}" class="badge bg-success">Granted</span>
-                                <span th:unless="${#lists.contains(user.roles, 'USER')}" class="badge bg-light text-dark">Not granted</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                <span><strong>READONLY</strong> - Read-only access</span>
-                                <span th:if="${#lists.contains(user.roles, 'READONLY')}" class="badge bg-success">Granted</span>
-                                <span th:unless="${#lists.contains(user.roles, 'READONLY')}" class="badge bg-light text-dark">Not granted</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+            <div class="col-auto">
+                <a th:href="@{/admin/users}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Users
+                </a>
             </div>
         </div>
-        
-        <!-- Glossary Card -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card border-0 shadow-sm bg-light">
+
+        <div class="row">
+            <!-- User Info Card -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white"><h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>User Information</h5></div>
                     <div class="card-body">
-                        <h6 class="card-title text-muted mb-3">
-                            <i class="fas fa-question-circle me-2"></i>Role Permissions
-                        </h6>
-                        <div class="row small">
-                            <div class="col-md-3">
-                                <dl class="mb-0">
-                                    <dt>ADMIN</dt>
-                                    <dd class="text-muted">Full system access including user management, configuration, and all cache operations.</dd>
-                                </dl>
+                        <form th:action="@{/admin/users/{id}/update(id=${user.userId})}" method="post">
+                            <div class="mb-3">
+                                <label class="form-label">User ID</label>
+                                <input type="text" class="form-control" th:value="${user.userId}" disabled>
                             </div>
-                            <div class="col-md-3">
-                                <dl class="mb-0">
-                                    <dt>OPERATOR</dt>
-                                    <dd class="text-muted">Manage regions, insert/delete entries, view statistics. Cannot manage users.</dd>
-                                </dl>
+                            <div class="mb-3">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" name="fullName" class="form-control" th:value="${user.fullName}" th:disabled="${user.admin}">
                             </div>
-                            <div class="col-md-3">
-                                <dl class="mb-0">
-                                    <dt>USER</dt>
-                                    <dd class="text-muted">Browse cache, insert and delete entries. Cannot create or delete regions.</dd>
-                                </dl>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email" class="form-control" th:value="${user.email}" th:disabled="${user.admin}">
                             </div>
-                            <div class="col-md-3">
-                                <dl class="mb-0">
-                                    <dt>READONLY</dt>
-                                    <dd class="text-muted">View-only access. Can browse and query but cannot modify anything.</dd>
-                                </dl>
+                            <div class="mb-3">
+                                <label class="form-label">New Password</label>
+                                <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current" th:disabled="${user.admin}">
+                            </div>
+                            <button type="submit" class="btn btn-primary" th:disabled="${user.admin}">
+                                <i class="fas fa-save me-1"></i> Save Changes
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Status Card -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white"><h5 class="mb-0"><i class="fas fa-toggle-on me-2"></i>Account Status</h5></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="d-grid">
+                                    <span th:if="${user.enabled}" class="badge bg-success p-2 mb-2"><i class="fas fa-check me-1"></i>Enabled</span>
+                                    <span th:if="${!user.enabled}" class="badge bg-warning text-dark p-2 mb-2"><i class="fas fa-ban me-1"></i>Disabled</span>
+                                    <form th:if="${user.enabled && !user.admin}" th:action="@{/admin/users/{id}/disable(id=${user.userId})}" method="post">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">Disable User</button>
+                                    </form>
+                                    <form th:if="${!user.enabled}" th:action="@{/admin/users/{id}/enable(id=${user.userId})}" method="post">
+                                        <button type="submit" class="btn btn-sm btn-outline-success w-100">Enable User</button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="d-grid">
+                                    <span th:if="${user.locked}" class="badge bg-danger p-2 mb-2"><i class="fas fa-lock me-1"></i>Locked</span>
+                                    <span th:if="${!user.locked}" class="badge bg-success p-2 mb-2"><i class="fas fa-unlock me-1"></i>Unlocked</span>
+                                    <form th:if="${user.locked}" th:action="@{/admin/users/{id}/unlock(id=${user.userId})}" method="post">
+                                        <button type="submit" class="btn btn-sm btn-outline-success w-100">Unlock User</button>
+                                    </form>
+                                    <form th:if="${!user.locked && !user.admin}" th:action="@{/admin/users/{id}/lock(id=${user.userId})}" method="post">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">Lock User</button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
+                        <hr th:if="${!user.admin && !user.systemUser}">
+                        <form th:if="${!user.admin && !user.systemUser}" th:action="@{/admin/users/{id}/delete(id=${user.userId})}" method="post" onsubmit="return confirm('Delete this user permanently?');">
+                            <button type="submit" class="btn btn-danger w-100"><i class="fas fa-trash me-1"></i> Delete User</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roles Card -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white"><h5 class="mb-0"><i class="fas fa-user-tag me-2"></i>Assigned Roles</h5></div>
+                    <div class="card-body">
+                        <form th:action="@{/admin/users/{id}/roles(id=${user.userId})}" method="post">
+                            <div class="mb-3">
+                                <label class="form-label">Select Roles</label>
+                                <select name="roles" class="form-select" multiple size="10" th:disabled="${user.admin}">
+                                    <th:block th:each="role : ${allRoles}">
+                                        <option th:value="${role.name}" 
+                                                th:text="${role.displayName + ' (' + role.region + ')'}"
+                                                th:selected="${user.roles.contains(role.name)}"
+                                                th:disabled="${role.name == 'admin' && !user.admin}">Role</option>
+                                    </th:block>
+                                </select>
+                                <div class="form-text">Hold Ctrl/Cmd to select multiple roles</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" th:disabled="${user.admin}">
+                                <i class="fas fa-save me-1"></i> Update Roles
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Current Roles Display -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white"><h5 class="mb-0"><i class="fas fa-key me-2"></i>Current Permissions</h5></div>
+                    <div class="card-body">
+                        <th:block th:if="${user.admin}">
+                            <div class="alert alert-danger mb-0">
+                                <i class="fas fa-shield-alt me-2"></i>
+                                <strong>Administrator</strong> - Full system access to all regions and operations
+                            </div>
+                        </th:block>
+                        <th:block th:if="${!user.admin}">
+                            <table class="table table-sm mb-0" th:if="${!#lists.isEmpty(user.roles)}">
+                                <thead><tr><th>Role</th><th>Region</th><th>Permissions</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="roleName : ${user.roles}">
+                                        <td><code th:text="${roleName}">role</code></td>
+                                        <td th:each="role : ${allRoles}" th:if="${role.name == roleName}">
+                                            <span th:text="${role.region}">region</span>
+                                        </td>
+                                        <td th:each="role : ${allRoles}" th:if="${role.name == roleName}">
+                                            <span th:each="perm : ${role.permissions}" 
+                                                  th:class="'badge me-1 ' + (${perm.name() == 'READ'} ? 'bg-success' : (${perm.name() == 'WRITE'} ? 'bg-warning text-dark' : 'bg-danger'))"
+                                                  th:text="${perm.name()}">PERM</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p th:if="${#lists.isEmpty(user.roles)}" class="text-muted mb-0">No roles assigned</p>
+                        </th:block>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </main>
-
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
-
 </body>
 </html>

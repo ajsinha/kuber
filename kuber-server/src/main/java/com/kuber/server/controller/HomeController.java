@@ -17,6 +17,7 @@ import com.kuber.server.config.KuberProperties;
 import com.kuber.server.network.RedisProtocolServer;
 import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.security.AuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -25,9 +26,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controller for the main dashboard and home pages.
+ * Shows only regions the user has access to.
+ * 
+ * @version 1.7.4
  */
 @Controller
 @RequiredArgsConstructor
@@ -37,6 +42,7 @@ public class HomeController {
     private final KuberProperties properties;
     private final RedisProtocolServer redisServer;
     private final PersistenceStore persistenceStore;
+    private final AuthorizationService authorizationService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -57,18 +63,42 @@ public class HomeController {
         model.addAttribute("isPrimary", isPrimary);
         model.addAttribute("replicationMode", mode);
         
-        // Regions
-        Collection<CacheRegion> regions = cacheService.getAllRegions();
-        model.addAttribute("regions", regions);
-        model.addAttribute("regionCount", regions.size());
+        // Authorization info
+        boolean isAdmin = authorizationService.isAdmin();
+        model.addAttribute("isAdmin", isAdmin);
+        
+        // Regions - filter to only accessible ones for non-admins
+        Collection<CacheRegion> allRegions = cacheService.getAllRegions();
+        Collection<CacheRegion> accessibleRegions;
+        
+        if (isAdmin) {
+            accessibleRegions = allRegions;
+        } else {
+            accessibleRegions = allRegions.stream()
+                    .filter(region -> authorizationService.canRead(region.getName()) ||
+                                      authorizationService.canWrite(region.getName()) ||
+                                      authorizationService.canDelete(region.getName()))
+                    .collect(Collectors.toList());
+        }
+        
+        model.addAttribute("regions", accessibleRegions);
+        model.addAttribute("regionCount", accessibleRegions.size());
+        model.addAttribute("totalRegionCount", allRegions.size());
         
         // Connection stats
         model.addAttribute("activeConnections", redisServer.getActiveConnections());
         model.addAttribute("serverRunning", redisServer.isRunning());
         model.addAttribute("redisPort", properties.getNetwork().getPort());
         
-        // Cache stats
-        long totalEntries = cacheService.dbSize(null);
+        // Cache stats - for non-admins, only count entries in accessible regions
+        long totalEntries;
+        if (isAdmin) {
+            totalEntries = cacheService.dbSize(null);
+        } else {
+            totalEntries = accessibleRegions.stream()
+                    .mapToLong(r -> cacheService.dbSize(r.getName()))
+                    .sum();
+        }
         model.addAttribute("totalEntries", totalEntries);
         model.addAttribute("maxMemoryEntries", properties.getCache().getMaxMemoryEntries());
         model.addAttribute("persistentMode", properties.getCache().isPersistentMode());
@@ -105,6 +135,9 @@ public class HomeController {
         // Replication status for navbar
         boolean isPrimary = replicationManager == null || replicationManager.isPrimary();
         model.addAttribute("isPrimary", isPrimary);
+        
+        // Authorization info
+        model.addAttribute("isAdmin", authorizationService.isAdmin());
         
         return "about";
     }

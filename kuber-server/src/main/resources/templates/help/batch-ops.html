@@ -92,12 +92,12 @@ MGET user:1001 user:1002 user:1003 user:9999
     client.set("user:1003", "Charlie");
     
     // Get multiple keys at once
-    List<String> values = client.mget("user:1001", "user:1002", "user:1003", "user:9999");
+    List&lt;String&gt; values = client.mget("user:1001", "user:1002", "user:1003", "user:9999");
     System.out.println("Values: " + values);
     // [Alice, Bob, Charlie, null]
     
     // Or use List
-    List<String> keys = Arrays.asList("user:1001", "user:1002", "user:1003");
+    List&lt;String&gt; keys = Arrays.asList("user:1001", "user:1002", "user:1003");
     values = client.mget(keys.toArray(new String[0]));
 }</code></pre>
                             </div>
@@ -163,7 +163,7 @@ MGET user:1001 user:1002 user:1003
                             <div class="tab-pane fade" id="mset-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
     // Set multiple keys using Map
-    Map<String, String> keyValues = new HashMap<>();
+    Map&lt;String, String&gt; keyValues = new HashMap&lt;&gt;();
     keyValues.put("user:1001", "Alice");
     keyValues.put("user:1002", "Bob");
     keyValues.put("user:1003", "Charlie");
@@ -172,7 +172,7 @@ MGET user:1001 user:1002 user:1003
     client.mset(keyValues);
     
     // Verify
-    List<String> values = client.mget("user:1001", "user:1002", "user:1003");
+    List&lt;String&gt; values = client.mget("user:1001", "user:1002", "user:1003");
     System.out.println("Values: " + values);
 }</code></pre>
                             </div>
@@ -180,7 +180,7 @@ MGET user:1001 user:1002 user:1003
 <pre class="bg-dark text-light p-3 rounded"><code>using var client = new KuberClient("localhost", 6380, "kub_xxx");
 
 // Set multiple keys using Dictionary
-var keyValues = new Dictionary<string, string> {
+var keyValues = new Dictionary&lt;string, string&gt; {
     ["user:1001"] = "Alice",
     ["user:1002"] = "Bob",
     ["user:1003"] = "Charlie",
@@ -242,7 +242,7 @@ GET newkey4
                             <div class="tab-pane fade" id="msetnx-java">
 <pre class="bg-dark text-light p-3 rounded"><code>try (KuberClient client = new KuberClient("localhost", 6380, "kub_xxx")) {
     // First call - success
-    Map<String, String> first = Map.of(
+    Map&lt;String, String&gt; first = Map.of(
         "newkey1", "value1",
         "newkey2", "value2",
         "newkey3", "value3"
@@ -251,7 +251,7 @@ GET newkey4
     System.out.println("First MSETNX: " + result);  // true
     
     // Second call - fails (newkey1 exists)
-    Map<String, String> second = Map.of(
+    Map&lt;String, String&gt; second = Map.of(
         "newkey1", "updated",
         "newkey4", "value4"
     );
@@ -263,7 +263,7 @@ GET newkey4
 <pre class="bg-dark text-light p-3 rounded"><code>using var client = new KuberClient("localhost", 6380, "kub_xxx");
 
 // First call - success
-var first = new Dictionary<string, string> {
+var first = new Dictionary&lt;string, string&gt; {
     ["newkey1"] = "value1",
     ["newkey2"] = "value2",
     ["newkey3"] = "value3"
@@ -272,7 +272,7 @@ bool result = await client.MSetNxAsync(first);
 Console.WriteLine($"First MSETNX: {result}");  // true
 
 // Second call - fails (newkey1 exists)
-var second = new Dictionary<string, string> {
+var second = new Dictionary&lt;string, string&gt; {
     ["newkey1"] = "updated",
     ["newkey4"] = "value4"
 };
@@ -325,7 +325,7 @@ DEL session:abc session:def session:ghi</code></pre>
     System.out.println("Deleted: " + deleted);  // 3
     
     // Delete by pattern (two-step)
-    Set<String> keys = client.keys("session:*");
+    Set&lt;String&gt; keys = client.keys("session:*");
     if (!keys.isEmpty()) {
         deleted = client.del(keys.toArray(new String[0]));
         System.out.println("Deleted " + deleted + " session keys");
@@ -383,7 +383,7 @@ def batch_load(client, key_values, batch_size=500):
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.4</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

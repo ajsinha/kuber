@@ -13,22 +13,23 @@ package com.kuber.server.controller;
 
 import com.kuber.core.model.CacheRegion;
 import com.kuber.server.cache.CacheService;
+import com.kuber.server.security.AuthorizationService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Collection;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controller for region management operations.
+ * Enforces RBAC permissions for all operations.
  * 
- * @version 1.5.0
+ * @version 1.7.4
  */
 @Slf4j
 @Controller
@@ -37,23 +38,48 @@ import java.util.Map;
 public class RegionController {
     
     private final CacheService cacheService;
+    private final AuthorizationService authorizationService;
     
     @ModelAttribute
-    public void addCurrentPage(Model model) {
+    public void addCommonAttributes(Model model) {
         model.addAttribute("currentPage", "regions");
+        model.addAttribute("isAdmin", authorizationService.isAdmin());
     }
     
     @GetMapping
     public String listRegions(Model model) {
-        Collection<CacheRegion> regions = cacheService.getAllRegions();
-        log.debug("Listing {} regions: {}", regions.size(), 
-                regions.stream().map(CacheRegion::getName).toList());
+        Collection<CacheRegion> allRegions = cacheService.getAllRegions();
+        
+        // Filter to accessible regions for non-admins
+        Collection<CacheRegion> regions;
+        if (authorizationService.isAdmin()) {
+            regions = allRegions;
+        } else {
+            regions = allRegions.stream()
+                    .filter(region -> authorizationService.canRead(region.getName()) ||
+                                      authorizationService.canWrite(region.getName()) ||
+                                      authorizationService.canDelete(region.getName()))
+                    .collect(Collectors.toList());
+        }
+        
+        log.debug("Listing {} accessible regions out of {} total", regions.size(), allRegions.size());
         model.addAttribute("regions", regions);
         return "regions";
     }
     
     @GetMapping("/{name}")
-    public String viewRegion(@PathVariable String name, Model model) {
+    public String viewRegion(@PathVariable String name, Model model,
+                            RedirectAttributes redirectAttributes) {
+        // Check if user has any access to this region
+        if (!authorizationService.isAdmin() &&
+            !authorizationService.canRead(name) && 
+            !authorizationService.canWrite(name) && 
+            !authorizationService.canDelete(name)) {
+            redirectAttributes.addFlashAttribute("error", 
+                    "You do not have permission to view region '" + name + "'");
+            return "redirect:/regions";
+        }
+        
         CacheRegion region = cacheService.getRegion(name);
         if (region == null) {
             return "redirect:/regions";
@@ -63,20 +89,34 @@ public class RegionController {
         model.addAttribute("stats", cacheService.getStatistics(name));
         model.addAttribute("entryCount", cacheService.dbSize(name));
         
+        // Add permission flags for the view
+        model.addAttribute("canRead", authorizationService.canRead(name));
+        model.addAttribute("canWrite", authorizationService.canWrite(name));
+        model.addAttribute("canDelete", authorizationService.canDelete(name));
+        
         return "region-detail";
     }
     
     @GetMapping("/create")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
-    public String createRegionForm(Model model) {
+    public String createRegionForm(Model model, RedirectAttributes redirectAttributes) {
+        // Only admin can create regions
+        if (!authorizationService.isAdmin()) {
+            redirectAttributes.addFlashAttribute("error", "Admin permission required to create regions");
+            return "redirect:/regions";
+        }
         model.addAttribute("regionForm", new RegionForm());
         return "region-create";
     }
     
     @PostMapping("/create")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
     public String createRegion(@ModelAttribute RegionForm form,
                               RedirectAttributes redirectAttributes) {
+        // Only admin can create regions
+        if (!authorizationService.isAdmin()) {
+            redirectAttributes.addFlashAttribute("error", "Admin permission required to create regions");
+            return "redirect:/regions";
+        }
+        
         try {
             cacheService.createRegion(form.getName(), form.getDescription());
             redirectAttributes.addFlashAttribute("success", 
@@ -89,9 +129,15 @@ public class RegionController {
     }
     
     @PostMapping("/{name}/purge")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
     public String purgeRegion(@PathVariable String name,
                              RedirectAttributes redirectAttributes) {
+        // Require DELETE permission to purge
+        if (!authorizationService.canDelete(name)) {
+            redirectAttributes.addFlashAttribute("error", 
+                    "You do not have DELETE permission for region '" + name + "'");
+            return "redirect:/regions/" + name;
+        }
+        
         try {
             cacheService.purgeRegion(name);
             redirectAttributes.addFlashAttribute("success", 
@@ -103,9 +149,14 @@ public class RegionController {
     }
     
     @PostMapping("/{name}/delete")
-    @PreAuthorize("hasRole('ADMIN')")
     public String deleteRegion(@PathVariable String name,
                               RedirectAttributes redirectAttributes) {
+        // Only admin can delete regions
+        if (!authorizationService.isAdmin()) {
+            redirectAttributes.addFlashAttribute("error", "Admin permission required to delete regions");
+            return "redirect:/regions/" + name;
+        }
+        
         try {
             cacheService.deleteRegion(name);
             redirectAttributes.addFlashAttribute("success", 

@@ -19,7 +19,7 @@
                 <pre class="bg-dark text-light p-3 rounded"><code># Required JVM options for LMDB persistence on Java 9+
 java --add-opens=java.base/java.nio=ALL-UNNAMED \
      --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server-1.7.1.jar
+     -jar kuber-server-1.7.4.jar
 
 # Or use the startup script (includes all required JVM options)
 ./scripts/kuber-start.sh</code></pre>
@@ -58,14 +58,14 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
                     <div class="col-md-6 mb-4">
                         <div class="card h-100 border-success">
                             <div class="card-header bg-success text-white">
-                                <i class="fas fa-memory me-2"></i>Memory Management
+                                <i class="fas fa-memory me-2"></i>Memory Management <span class="badge bg-light text-dark">v1.7.4</span>
                             </div>
                             <div class="card-body">
                                 <ul class="mb-0">
                                     <li><strong>Hybrid Architecture:</strong> All keys always in memory, values can overflow to disk</li>
-                                    <li><strong>Auto-Protection:</strong> Memory Watcher evicts values when heap exceeds 85%</li>
+                                    <li><strong>Memory Pressure:</strong> Auto-evicts when heap exceeds 85%</li>
+                                    <li><strong>Count-Based Limits:</strong> Max 20% of keys or 10,000 values per region</li>
                                     <li><strong>No OOM Crashes:</strong> Values are persisted before eviction</li>
-                                    <li><strong>O(1) EXISTS:</strong> Key lookups never hit disk</li>
                                 </ul>
                             </div>
                         </div>
@@ -150,6 +150,22 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100" style="border-color: #dc3545;">
+                            <div class="card-header text-white" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                                <i class="fas fa-shield-alt me-2"></i>Role-Based Access Control <span class="badge bg-light text-dark">v1.7.4</span>
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    <li><strong>4 Permissions:</strong> READ, WRITE, DELETE, ADMIN</li>
+                                    <li><strong>Region-Specific:</strong> Control access per cache region</li>
+                                    <li><strong>Hot Reload:</strong> No restart needed for security changes</li>
+                                    <li><strong>Full Enforcement:</strong> Web UI, REST API, Redis protocol</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="alert alert-success mt-4">
@@ -158,6 +174,7 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
                     documentation on memory management, persistence, thread model, and data safety. 
                     See <a href="/help/publishing" class="alert-link">Event Publishing</a> for outbound events.
                     See <a href="/help/messaging" class="alert-link">Request/Response Messaging</a> for cache access via message brokers.
+                    See <a href="/help/security" class="alert-link">Security &amp; RBAC</a> for role-based access control.
                 </div>
                 
                 <div class="mt-5 text-center">
@@ -168,7 +185,7 @@ curl -u admin:admin123 http://localhost:8080/api/cache/default/user:1001</code><
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.4</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

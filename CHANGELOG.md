@@ -2,6 +2,238 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.7.4] - 2025-12-12 - COUNT-BASED VALUE CACHE LIMITING
+
+### 🎯 Major New Feature: Count-Based Value Cache Limiting
+
+**v1.7.4 introduces proactive count-based eviction to complement memory pressure-based eviction.**
+
+The new ValueCacheLimitService enforces per-region limits on values kept in memory, independent
+of JVM heap pressure. This provides predictable memory usage and prevents any single region
+from consuming excessive memory resources.
+
+### How It Works
+
+The effective limit is the **LOWER** of:
+1. **Percentage-based limit**: `valueCacheMaxPercent` % of total keys in region
+2. **Absolute limit**: `valueCacheMaxEntries` maximum values per region
+
+| Region Size | 20% Limit | Max Entries | Effective Limit |
+|-------------|-----------|-------------|-----------------|
+| 100,000 keys | 20,000 | 10,000 | **10,000** |
+| 50,000 keys | 10,000 | 10,000 | **10,000** |
+| 1,000 keys | 200 | 10,000 | **200** |
+
+### New Configuration Properties
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.cache.value-cache-limit-enabled` | `true` | Enable count-based limiting |
+| `kuber.cache.value-cache-max-percent` | `20` | Max % of keys to cache values |
+| `kuber.cache.value-cache-max-entries` | `10000` | Max values per region |
+| `kuber.cache.value-cache-limit-check-interval-ms` | `30000` | Check interval |
+
+### Dual Eviction Strategy
+
+Kuber now has two complementary eviction mechanisms:
+
+| Strategy | Trigger | Purpose |
+|----------|---------|---------|
+| **Memory Pressure** | Heap > 85% | Reactive - prevents OOM |
+| **Count-Based** | Values > limit | Proactive - ensures fair distribution |
+
+Both strategies can run simultaneously. Memory pressure eviction takes priority during
+heap pressure situations.
+
+### New Components
+
+| Component | Description |
+|-----------|-------------|
+| `ValueCacheLimitService` | Enforces count-based limits per region |
+| `CacheService.evictValuesFromRegion()` | Evicts values from specific region |
+| `CacheService.getKeyCount()` | Returns total keys in region |
+| `CacheService.getValueCacheSize()` | Returns values in memory for region |
+
+### Benefits
+
+- **Predictable Memory Usage**: Know exactly how many values can be in memory
+- **Fair Resource Distribution**: No single region can dominate memory
+- **Complementary to Memory Watcher**: Works alongside heap-based eviction
+- **Fully Configurable**: Tune percentage and absolute limits per deployment
+
+---
+
+## [1.7.3] - 2025-12-11 - ENTERPRISE RBAC SYSTEM
+
+### 🔐 Major New Feature: Role-Based Access Control (RBAC)
+
+**v1.7.3 introduces enterprise-grade fine-grained authorization for all cache operations.**
+
+Users are now managed with role-based permissions that control access to specific regions.
+This is a complete overhaul of the authentication and authorization system.
+
+### Core Components
+
+| Component | Description |
+|-----------|-------------|
+| `KuberUser` | User model with id, password, fullName, email, roles |
+| `KuberRole` | Role model with name, region, permissions (READ, WRITE, DELETE) |
+| `KuberUserService` | User management with JSON persistence |
+| `KuberRoleService` | Role management with JSON persistence |
+| `AuthorizationService` | Permission checking for all operations |
+
+### Permission Types
+
+| Permission | Operations Allowed |
+|------------|-------------------|
+| `READ` | GET, EXISTS, KEYS, SCAN, SEARCH, JSEARCH, JGET |
+| `WRITE` | SET, SETEX, INCR, APPEND, HSET, JSET, JUPDATE |
+| `DELETE` | DEL, HDEL, JDEL, JREMOVE, FLUSH |
+| `ADMIN` | Region create/delete, user/role management |
+
+### Role Naming Convention
+
+| Role Pattern | Description |
+|--------------|-------------|
+| `admin` | Reserved - full system access |
+| `{region}_readonly` | Read-only access to region |
+| `{region}_readwrite` | Read and write access to region |
+| `{region}_full` | Full access (read, write, delete) to region |
+
+### Configuration Files
+
+**users.json** (secure/users.json):
+```json
+{
+  "users": [
+    {
+      "userId": "admin",
+      "password": "admin123",
+      "fullName": "System Administrator",
+      "roles": ["admin"],
+      "enabled": true,
+      "systemUser": true
+    }
+  ]
+}
+```
+
+**roles.json** (secure/roles.json):
+```json
+{
+  "roles": [
+    {
+      "name": "admin",
+      "displayName": "System Administrator",
+      "region": "*",
+      "permissions": ["READ", "WRITE", "DELETE", "ADMIN"],
+      "systemRole": true
+    },
+    {
+      "name": "default_readonly",
+      "region": "default",
+      "permissions": ["READ"]
+    }
+  ]
+}
+```
+
+### New Properties
+
+```properties
+# RBAC configuration (v1.7.3)
+kuber.security.roles-file=${kuber.secure.folder}/roles.json
+kuber.security.rbac-enabled=true
+kuber.security.auto-create-region-roles=true
+```
+
+### Admin UI Features
+
+- **User Management**: Create, update, enable/disable, lock/unlock users
+- **Role Management**: Create, delete, activate/deactivate roles
+- **Role Assignment**: Assign/remove roles from users
+- **Auto Role Creation**: Roles auto-created when new regions are created
+
+### Hot Reload & Default Files
+
+**Automatic Reload:**
+- Changes to `users.json` OR `roles.json` trigger reload of BOTH files
+- Changes detected every 30 seconds (or immediately via Admin UI reload)
+- Full periodic reload every 5 minutes for consistency
+- No server restart required for security configuration changes
+
+**Default File Creation:**
+- If `users.json` is missing, default is created with only `admin` user
+- If `roles.json` is missing, default is created with only `admin` role
+- Default admin password is `admin123` - **CHANGE IMMEDIATELY**
+- Warning banner displayed when default files are created
+
+### Sample Files
+
+Detailed sample configurations in `secure-sample/`:
+- `users.json.sample` - Comprehensive user examples with all field descriptions
+- `roles.json.sample` - Complete role examples for multiple regions
+
+### Authorization Flow
+
+1. User authenticates via form login, HTTP Basic, or API Key
+2. On each operation, AuthorizationService checks user's roles
+3. Role is matched against region + permission required
+4. Access granted if any role grants the permission
+5. Admin users bypass all permission checks
+
+### Authorization Enforcement
+
+RBAC is enforced at all application layers:
+
+| Layer | Controller | Enforcement |
+|-------|------------|-------------|
+| Web UI - Cache | `CacheController` | Region dropdown filtering, operation checks |
+| Web UI - Regions | `RegionController` | List filtering, create/delete/purge checks |
+| Web UI - Dashboard | `HomeController` | Region list and entry count filtering |
+| REST API | `ApiController` | All /api/* endpoints return HTTP 403 if denied |
+| Redis Protocol | `RedisProtocolHandler` | NOPERM error on unauthorized commands |
+
+**Permission Matrix:**
+
+| Operation | Required Permission |
+|-----------|-------------------|
+| View keys, get values, search, stats | READ |
+| Set values, update entries, reload, warm | WRITE |
+| Delete entries, purge region | DELETE |
+| Create/delete regions, attribute mapping mgmt | ADMIN |
+
+### Breaking Changes
+
+- `JsonUserDetailsService` replaced by `KuberUserService`
+- Security files moved to `secure/` folder
+- New configuration properties required
+
+### Migration Guide
+
+1. Move `users.json` to `secure/users.json`
+2. Move `apikeys.json` to `secure/apikeys.json`
+3. Add roles to users in `users.json`
+4. Create `roles.json` with role definitions
+5. Update `application.properties` with new paths
+
+---
+
+## [1.7.2] - 2025-12-11 - JUPDATE & JREMOVE COMMANDS
+
+### New JSON Commands
+
+- **JUPDATE**: Update/merge JSON documents (upsert with deep merge)
+- **JREMOVE**: Remove specified attributes from JSON documents
+
+### Documentation
+
+- Comprehensive HTML help pages with tabbed examples (Redis CLI, Python, Java, C#)
+- Complete Redis protocol command reference (60+ commands)
+- Updated all client library documentation
+
+---
+
 ## [1.7.1] - 2025-12-10 - REQUEST/RESPONSE MESSAGING
 
 ### 🚀 Major New Feature: Request/Response via Message Brokers

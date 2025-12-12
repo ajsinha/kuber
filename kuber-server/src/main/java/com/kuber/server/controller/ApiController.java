@@ -19,9 +19,11 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.dto.GenericSearchRequest;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.security.AuthorizationService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +34,9 @@ import java.util.stream.Collectors;
 
 /**
  * REST API controller for programmatic cache access.
+ * Enforces RBAC permissions for all operations.
+ * 
+ * @version 1.7.4
  */
 @RestController
 @RequestMapping("/api")
@@ -40,6 +45,7 @@ public class ApiController {
     
     private final CacheService cacheService;
     private final KuberProperties properties;
+    private final AuthorizationService authorizationService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -67,12 +73,32 @@ public class ApiController {
     // ==================== Region Operations ====================
     
     @GetMapping("/regions")
-    public ResponseEntity<Collection<CacheRegion>> listRegions() {
-        return ResponseEntity.ok(cacheService.getAllRegions());
+    public ResponseEntity<?> listRegions() {
+        // Filter to accessible regions
+        Collection<CacheRegion> allRegions = cacheService.getAllRegions();
+        if (authorizationService.isAdmin()) {
+            return ResponseEntity.ok(allRegions);
+        }
+        
+        Collection<CacheRegion> accessible = allRegions.stream()
+                .filter(r -> authorizationService.canRead(r.getName()) ||
+                             authorizationService.canWrite(r.getName()) ||
+                             authorizationService.canDelete(r.getName()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(accessible);
     }
     
     @GetMapping("/regions/{name}")
-    public ResponseEntity<CacheRegion> getRegion(@PathVariable String name) {
+    public ResponseEntity<?> getRegion(@PathVariable String name) {
+        // Check if user has any access to this region
+        if (!authorizationService.isAdmin() && 
+            !authorizationService.canRead(name) && 
+            !authorizationService.canWrite(name) && 
+            !authorizationService.canDelete(name)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Access denied to region: " + name));
+        }
+        
         CacheRegion region = cacheService.getRegion(name);
         if (region == null) {
             return ResponseEntity.notFound().build();
@@ -81,19 +107,34 @@ public class ApiController {
     }
     
     @PostMapping("/regions")
-    public ResponseEntity<CacheRegion> createRegion(@RequestBody RegionRequest request) {
+    public ResponseEntity<?> createRegion(@RequestBody RegionRequest request) {
+        // Only admin can create regions
+        if (!authorizationService.isAdmin()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Admin permission required to create regions"));
+        }
         CacheRegion region = cacheService.createRegion(request.getName(), request.getDescription());
         return ResponseEntity.ok(region);
     }
     
     @DeleteMapping("/regions/{name}")
-    public ResponseEntity<Void> deleteRegion(@PathVariable String name) {
+    public ResponseEntity<?> deleteRegion(@PathVariable String name) {
+        // Only admin can delete regions
+        if (!authorizationService.isAdmin()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Admin permission required to delete regions"));
+        }
         cacheService.deleteRegion(name);
         return ResponseEntity.ok().build();
     }
     
     @PostMapping("/regions/{name}/purge")
-    public ResponseEntity<Void> purgeRegion(@PathVariable String name) {
+    public ResponseEntity<?> purgeRegion(@PathVariable String name) {
+        // Require DELETE permission to purge
+        if (!authorizationService.canDelete(name)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "DELETE permission denied for region: " + name));
+        }
         cacheService.purgeRegion(name);
         return ResponseEntity.ok().build();
     }
@@ -118,7 +159,13 @@ public class ApiController {
      * @return Map with reload statistics
      */
     @PostMapping("/regions/{name}/reload")
-    public ResponseEntity<Map<String, Object>> reloadRegionFromPersistence(@PathVariable String name) {
+    public ResponseEntity<?> reloadRegionFromPersistence(@PathVariable String name) {
+        // Require WRITE permission to reload
+        if (!authorizationService.canWrite(name)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + name));
+        }
+        
         int entriesLoaded = cacheService.reloadRegionFromPersistence(name);
         
         Map<String, Object> result = new LinkedHashMap<>();
@@ -140,7 +187,13 @@ public class ApiController {
      * @return Map with warming statistics
      */
     @PostMapping("/regions/{name}/warm")
-    public ResponseEntity<Map<String, Object>> warmRegionCache(@PathVariable String name) {
+    public ResponseEntity<?> warmRegionCache(@PathVariable String name) {
+        // Require WRITE permission to warm
+        if (!authorizationService.canWrite(name)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + name));
+        }
+        
         int entriesWarmed = cacheService.warmRegionCache(name);
         
         Map<String, Object> result = new LinkedHashMap<>();
@@ -153,7 +206,12 @@ public class ApiController {
     }
     
     @GetMapping("/regions/{name}/stats")
-    public ResponseEntity<Map<String, Object>> getRegionStats(@PathVariable String name) {
+    public ResponseEntity<?> getRegionStats(@PathVariable String name) {
+        // Require READ permission to view stats
+        if (!authorizationService.canRead(name)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + name));
+        }
         return ResponseEntity.ok(cacheService.getStatistics(name));
     }
     
@@ -164,7 +222,12 @@ public class ApiController {
      * Returns the current attribute mapping configuration.
      */
     @GetMapping("/regions/{name}/attributemapping")
-    public ResponseEntity<Map<String, String>> getAttributeMapping(@PathVariable String name) {
+    public ResponseEntity<?> getAttributeMapping(@PathVariable String name) {
+        // Require READ permission
+        if (!authorizationService.canRead(name)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + name));
+        }
         Map<String, String> mapping = cacheService.getAttributeMapping(name);
         return ResponseEntity.ok(mapping);
     }
@@ -178,8 +241,13 @@ public class ApiController {
      * {"firstName": "first_name", "lastName": "last_name", "emailAddress": "email"}
      */
     @PutMapping("/regions/{name}/attributemapping")
-    public ResponseEntity<Void> setAttributeMapping(@PathVariable String name,
+    public ResponseEntity<?> setAttributeMapping(@PathVariable String name,
                                                      @RequestBody Map<String, String> mapping) {
+        // Require admin permission to modify attribute mapping
+        if (!authorizationService.isAdmin()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Admin permission required to modify attribute mapping"));
+        }
         cacheService.setAttributeMapping(name, mapping);
         return ResponseEntity.ok().build();
     }
@@ -188,7 +256,12 @@ public class ApiController {
      * Clear attribute mapping for a region.
      */
     @DeleteMapping("/regions/{name}/attributemapping")
-    public ResponseEntity<Void> clearAttributeMapping(@PathVariable String name) {
+    public ResponseEntity<?> clearAttributeMapping(@PathVariable String name) {
+        // Require admin permission to clear attribute mapping
+        if (!authorizationService.isAdmin()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Admin permission required to clear attribute mapping"));
+        }
         cacheService.clearAttributeMapping(name);
         return ResponseEntity.ok().build();
     }
@@ -196,8 +269,13 @@ public class ApiController {
     // ==================== Key/Value Operations ====================
     
     @GetMapping("/cache/{region}/keys")
-    public ResponseEntity<Set<String>> getKeys(@PathVariable String region,
+    public ResponseEntity<?> getKeys(@PathVariable String region,
                                                @RequestParam(defaultValue = "*") String pattern) {
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
         return ResponseEntity.ok(cacheService.keys(region, pattern));
     }
     
@@ -206,16 +284,27 @@ public class ApiController {
      * Different from /keys which uses glob pattern and returns only keys.
      */
     @GetMapping("/cache/{region}/ksearch")
-    public ResponseEntity<List<Map<String, Object>>> searchKeysByRegex(
+    public ResponseEntity<?> searchKeysByRegex(
             @PathVariable String region,
             @RequestParam String pattern,
             @RequestParam(defaultValue = "1000") int limit) {
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
         return ResponseEntity.ok(cacheService.searchKeysByRegex(region, pattern, limit));
     }
     
     @GetMapping("/cache/{region}/{key}")
-    public ResponseEntity<Map<String, Object>> getValue(@PathVariable String region,
+    public ResponseEntity<?> getValue(@PathVariable String region,
                                                         @PathVariable String key) {
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
         String value = cacheService.get(region, key);
         if (value == null) {
             return ResponseEntity.notFound().build();
@@ -231,9 +320,15 @@ public class ApiController {
     }
     
     @PutMapping("/cache/{region}/{key}")
-    public ResponseEntity<Map<String, Object>> setValue(@PathVariable String region,
+    public ResponseEntity<?> setValue(@PathVariable String region,
                                                         @PathVariable String key,
                                                         @RequestBody ValueRequest request) {
+        // Require WRITE permission
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        
         long ttl = request.getTtl() != null ? request.getTtl() : -1;
         
         if (request.getJson() != null) {
@@ -251,8 +346,14 @@ public class ApiController {
     }
     
     @DeleteMapping("/cache/{region}/{key}")
-    public ResponseEntity<Map<String, Object>> deleteValue(@PathVariable String region,
+    public ResponseEntity<?> deleteValue(@PathVariable String region,
                                                            @PathVariable String key) {
+        // Require DELETE permission
+        if (!authorizationService.canDelete(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "DELETE permission denied for region: " + region));
+        }
+        
         boolean deleted = cacheService.delete(region, key);
         
         Map<String, Object> result = new HashMap<>();
@@ -265,9 +366,15 @@ public class ApiController {
     // ==================== JSON Operations ====================
     
     @GetMapping("/cache/{region}/{key}/json")
-    public ResponseEntity<JsonNode> getJson(@PathVariable String region,
+    public ResponseEntity<?> getJson(@PathVariable String region,
                                            @PathVariable String key,
                                            @RequestParam(defaultValue = "$") String path) {
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
         JsonNode json = cacheService.jsonGet(region, key, path);
         if (json == null) {
             return ResponseEntity.notFound().build();
@@ -276,10 +383,16 @@ public class ApiController {
     }
     
     @PutMapping("/cache/{region}/{key}/json")
-    public ResponseEntity<Map<String, Object>> setJson(@PathVariable String region,
+    public ResponseEntity<?> setJson(@PathVariable String region,
                                                        @PathVariable String key,
                                                        @RequestParam(defaultValue = "$") String path,
                                                        @RequestBody Object value) {
+        // Require WRITE permission
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        
         JsonNode json = JsonUtils.parse(JsonUtils.toJson(value));
         long ttl = -1;
         cacheService.jsonSet(region, key, path, json, ttl);
@@ -293,8 +406,14 @@ public class ApiController {
     }
     
     @PostMapping("/cache/{region}/search")
-    public ResponseEntity<List<Map<String, Object>>> searchJson(@PathVariable String region,
+    public ResponseEntity<?> searchJson(@PathVariable String region,
                                                                 @RequestBody SearchRequest request) {
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
         List<CacheEntry> entries = cacheService.jsonSearch(region, request.getQuery());
         
         List<Map<String, Object>> results = new ArrayList<>();
@@ -335,6 +454,14 @@ public class ApiController {
         }
         
         String region = request.getRegion();
+        
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of(
+                Map.of("error", "READ permission denied for region: " + region)
+            ));
+        }
+        
         int limit = request.getLimitOrDefault();
         List<String> fields = request.getFields();
         List<Map<String, Object>> results = new ArrayList<>();

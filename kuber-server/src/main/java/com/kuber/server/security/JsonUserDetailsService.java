@@ -40,9 +40,13 @@ import java.util.stream.Collectors;
  * Uses cleartext password comparison for simplicity.
  * 
  * @version 1.6.5 - Added secure folder creation and required users.json validation
+ * @deprecated As of v1.7.3, replaced by {@link KuberUserService} which provides
+ *             enterprise RBAC with region-specific permissions. This class is
+ *             retained for backward compatibility but will be removed in a future version.
  */
+@Deprecated(since = "1.7.3", forRemoval = true)
 @Slf4j
-@Service
+@Service("legacyUserDetailsService")
 public class JsonUserDetailsService implements UserDetailsService {
     
     private final KuberProperties properties;

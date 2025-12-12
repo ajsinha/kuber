@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.2
+Version 1.7.4
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,6 +13,7 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
+- **Role-Based Access Control (v1.7.3)**: Enterprise RBAC with region-specific permissions (READ/WRITE/DELETE)
 - **Off-Heap Key Index (v1.3.2 - segmented, >2GB)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
 - **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
 - **Redis Protocol Compatibility**: Connect using any Redis client
@@ -109,6 +110,39 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Authentication | User management and API keys with role-based access |
 | Statistics | Comprehensive metrics and monitoring |
 
+### Memory Management (v1.7.4)
+
+Kuber provides dual eviction strategies for optimal memory management:
+
+| Strategy | Trigger | Default | Description |
+|----------|---------|---------|-------------|
+| **Memory Pressure** | Heap > 85% | Enabled | Reactive - evicts when JVM heap is constrained |
+| **Count-Based** | Values > limit | Enabled | Proactive - limits values per region |
+
+**Count-Based Limiting (v1.7.4):**
+
+The effective limit per region is the **LOWER** of:
+- `valueCacheMaxPercent` % of total keys (default: 20%)
+- `valueCacheMaxEntries` absolute max (default: 10,000)
+
+| Region Keys | 20% Limit | Max Entries | Effective Limit |
+|-------------|-----------|-------------|-----------------|
+| 100,000 | 20,000 | 10,000 | **10,000** |
+| 1,000 | 200 | 10,000 | **200** |
+
+**Configuration:**
+```properties
+# Memory Pressure Eviction
+kuber.cache.memory-watcher-enabled=true
+kuber.cache.memory-high-watermark-percent=85
+kuber.cache.memory-low-watermark-percent=50
+
+# Count-Based Eviction (v1.7.4)
+kuber.cache.value-cache-limit-enabled=true
+kuber.cache.value-cache-max-percent=20
+kuber.cache.value-cache-max-entries=10000
+```
+
 ## Quick Start
 
 ### Prerequisites
@@ -136,7 +170,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-1.7.2-SNAPSHOT.jar
+        -jar kuber-server/target/kuber-server-1.7.3-SNAPSHOT.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -604,9 +638,34 @@ kuber:
 
 ## Security
 
-### Authentication
+### Role-Based Access Control (RBAC) - v1.7.3
 
-Users configured in `users.json`:
+Kuber implements enterprise-grade RBAC with region-specific permissions:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Authorization Flow                            │
+│                                                                  │
+│   User ──> Roles ──> Permissions ──> Regions                    │
+│                                                                  │
+│   admin ──> [admin] ──> ALL ──> *                               │
+│   operator ──> [default_full, test_readwrite] ──> R/W/D, R/W    │
+│   readonly ──> [default_readonly] ──> READ ──> default          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Permission Types
+
+| Permission | Operations | Description |
+|------------|------------|-------------|
+| `READ` | GET, EXISTS, KEYS, SCAN, SEARCH, JGET, JSEARCH | View and search entries |
+| `WRITE` | SET, SETEX, INCR, APPEND, HSET, JSET, JUPDATE | Create and update entries |
+| `DELETE` | DEL, HDEL, JDEL, JREMOVE, FLUSHDB | Remove entries |
+| `ADMIN` | Region create/delete, user/role management | Full system control |
+
+### Configuration Files
+
+**users.json** (secure/users.json):
 
 ```json
 {
@@ -615,28 +674,128 @@ Users configured in `users.json`:
       "userId": "admin",
       "password": "admin123",
       "fullName": "System Administrator",
-      "roles": ["ADMIN", "OPERATOR", "USER"]
+      "email": "admin@localhost",
+      "roles": ["admin"],
+      "enabled": true,
+      "systemUser": true
+    },
+    {
+      "userId": "operator",
+      "password": "operator123",
+      "fullName": "Cache Operator",
+      "roles": ["default_full", "test_readwrite"],
+      "enabled": true
     }
   ]
 }
 ```
+
+**roles.json** (secure/roles.json):
+
+```json
+{
+  "roles": [
+    {
+      "name": "admin",
+      "displayName": "System Administrator",
+      "region": "*",
+      "permissions": ["READ", "WRITE", "DELETE", "ADMIN"],
+      "systemRole": true
+    },
+    {
+      "name": "default_readonly",
+      "displayName": "Default Read Only",
+      "region": "default",
+      "permissions": ["READ"]
+    },
+    {
+      "name": "default_full",
+      "displayName": "Default Full Access",
+      "region": "default",
+      "permissions": ["READ", "WRITE", "DELETE"]
+    }
+  ]
+}
+```
+
+### Role Naming Convention
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `admin` | `admin` | Reserved system admin role |
+| `{region}_readonly` | `customers_readonly` | Read-only access to region |
+| `{region}_readwrite` | `customers_readwrite` | Read and write access |
+| `{region}_full` | `customers_full` | Full access (read, write, delete) |
 
 ### API Keys
 
 Generate API keys from Admin UI for programmatic access:
 
 ```bash
-curl -H "X-API-Key: your-api-key" http://localhost:8080/api/v1/cache/default/key
+# Using API key header
+curl -H "X-API-Key: kub_your_api_key" http://localhost:8080/api/v1/cache/default/key
+
+# Using Authorization header
+curl -H "Authorization: ApiKey kub_your_api_key" http://localhost:8080/api/v1/cache/default/key
 ```
 
-### Roles
+API keys inherit permissions from the associated user's roles.
 
-| Role | Permissions |
-|------|-------------|
-| ADMIN | Full access, user management |
-| OPERATOR | Create/delete regions, purge |
-| USER | Read/write cache entries |
-| READONLY | Read-only access |
+### RBAC Configuration Properties
+
+```properties
+# Enable RBAC authorization (default: true)
+kuber.security.rbac-enabled=true
+
+# Auto-create region roles when new region is created (default: true)
+kuber.security.auto-create-region-roles=true
+
+# Configuration file paths
+kuber.security.users-file=${kuber.secure.folder}/users.json
+kuber.security.roles-file=${kuber.secure.folder}/roles.json
+kuber.security.api-keys-file=${kuber.secure.folder}/apikeys.json
+```
+
+### Hot Reload
+
+Security configuration files are automatically reloaded without server restart:
+
+- **Change Detection**: Every 30 seconds
+- **Linked Reload**: When `users.json` OR `roles.json` changes, BOTH are reloaded
+- **Admin UI**: Immediate reload via "Reload" button
+
+### Default File Creation
+
+If configuration files are missing at startup:
+
+| Missing File | Default Created |
+|--------------|-----------------|
+| `users.json` | Admin user only (password: `admin123`) |
+| `roles.json` | Admin role only |
+
+> ⚠️ **CRITICAL**: Change default admin password immediately!
+
+### Sample Files
+
+Comprehensive examples available in `secure-sample/`:
+
+```bash
+cp secure-sample/users.json.sample secure/users.json
+cp secure-sample/roles.json.sample secure/roles.json
+# Edit with your configuration
+```
+
+### Authorization Enforcement
+
+RBAC is enforced on:
+
+| Layer | Operations |
+|-------|------------|
+| **Web UI** | Cache browsing, region management, inserts/deletes |
+| **REST API** | All `/api/*` endpoints |
+| **Redis Protocol** | All commands after AUTH |
+
+Users only see regions they have access to in the UI.
 
 ## Monitoring
 

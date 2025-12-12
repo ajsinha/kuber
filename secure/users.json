@@ -4,25 +4,13 @@
       "userId": "admin",
       "password": "admin123",
       "fullName": "System Administrator",
-      "roles": ["ADMIN", "OPERATOR", "USER"]
-    },
-    {
-      "userId": "operator",
-      "password": "operator123",
-      "fullName": "Cache Operator",
-      "roles": ["OPERATOR", "USER"]
-    },
-    {
-      "userId": "user",
-      "password": "user123",
-      "fullName": "Regular User",
-      "roles": ["USER"]
-    },
-    {
-      "userId": "readonly",
-      "password": "readonly123",
-      "fullName": "Read Only User",
-      "roles": ["READONLY"]
+      "email": "admin@localhost",
+      "roles": ["admin"],
+      "enabled": true,
+      "locked": false,
+      "systemUser": true,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "system"
     }
   ]
 }

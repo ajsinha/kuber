@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.7.2**
+**Version 1.7.4**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -1359,28 +1359,149 @@ API keys provide secure, revocable authentication for programmatic access:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 13.4 User Configuration
+### 13.4 User Configuration (v1.7.3)
 
-Users are configured in `users.json`:
+Users are configured in `secure/users.json`:
 
 ```json
 {
   "users": [
     {
-      "username": "admin",
-      "password": "hashed_password",
-      "roles": ["ADMIN", "USER"],
-      "enabled": true
+      "userId": "admin",
+      "password": "admin123",
+      "fullName": "System Administrator",
+      "email": "admin@localhost",
+      "roles": ["admin"],
+      "enabled": true,
+      "systemUser": true
     },
     {
-      "username": "readonly",
-      "password": "hashed_password", 
-      "roles": ["READER"],
+      "userId": "operator",
+      "password": "operator123",
+      "fullName": "Cache Operator",
+      "roles": ["default_full", "test_readwrite"],
       "enabled": true
     }
   ]
 }
 ```
+
+### 13.5 Role-Based Access Control (v1.7.3)
+
+Kuber implements enterprise-grade RBAC with region-specific permissions:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    RBAC Authorization Flow                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────┐      ┌────────────┐      ┌─────────────────────┐    │
+│  │  User  │──────│   Roles    │──────│   Permissions       │    │
+│  └────────┘      └────────────┘      └─────────────────────┘    │
+│                                                                  │
+│  admin ────────> [admin] ──────────> ALL (*) ──────> All Regions │
+│                                                                  │
+│  operator ────> [default_full]       READ, WRITE, DELETE         │
+│                  [test_readwrite] ──> READ, WRITE ──> test       │
+│                                                                  │
+│  readonly ────> [default_readonly] ─> READ ──────> default       │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Roles are configured in `secure/roles.json`:
+
+```json
+{
+  "roles": [
+    {
+      "name": "admin",
+      "displayName": "System Administrator",
+      "region": "*",
+      "permissions": ["READ", "WRITE", "DELETE", "ADMIN"],
+      "systemRole": true
+    },
+    {
+      "name": "default_readonly",
+      "displayName": "Default Read Only",
+      "region": "default",
+      "permissions": ["READ"]
+    },
+    {
+      "name": "default_full",
+      "displayName": "Default Full Access",
+      "region": "default",
+      "permissions": ["READ", "WRITE", "DELETE"]
+    }
+  ]
+}
+```
+
+**Permission Types:**
+
+| Permission | Operations | Description |
+|------------|------------|-------------|
+| `READ` | GET, EXISTS, KEYS, SCAN, SEARCH, JGET | View and search entries |
+| `WRITE` | SET, SETEX, INCR, APPEND, HSET, JSET | Create and update entries |
+| `DELETE` | DEL, HDEL, JDEL, FLUSHDB | Remove entries |
+| `ADMIN` | Region create/delete, user/role management | Full system control |
+
+**Core RBAC Components:**
+
+| Component | Description |
+|-----------|-------------|
+| `KuberUser` | User model with id, password, fullName, roles |
+| `KuberRole` | Role model with name, region, permissions |
+| `KuberUserService` | User management with JSON persistence |
+| `KuberRoleService` | Role management with JSON persistence |
+| `AuthorizationService` | Permission checking for all operations |
+
+**Hot Reload (v1.7.3):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Security File Hot Reload                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  SecurityFileWatcher monitors:                                   │
+│  • secure/users.json                                             │
+│  • secure/roles.json                                             │
+│  • secure/apikeys.json                                           │
+│                                                                  │
+│  Behavior:                                                       │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  • users.json OR roles.json changes → BOTH reloaded      │   │
+│  │  • apikeys.json changes → Only apikeys reloaded          │   │
+│  │  • Check interval: 30 seconds                             │   │
+│  │  • Full periodic reload: 5 minutes                        │   │
+│  │  • No server restart required                             │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Authorization Enforcement:**
+
+| Layer | Enforcement |
+|-------|-------------|
+| Web UI Controllers | `CacheController`, `RegionController`, `HomeController` |
+| REST API | `ApiController` - all endpoints |
+| Redis Protocol | `RedisProtocolHandler` after AUTH |
+
+Users only see regions they have access to in the Web UI.
+
+**Internal Services (No RBAC):**
+
+These system services bypass RBAC and operate with full privileges:
+
+| Service | Purpose |
+|---------|---------|
+| `AutoloadService` | Bulk data import from files |
+| `BackupRestoreService` | Backup and restore operations |
+| `ReplicationService` | Primary/Secondary data sync |
+| `StartupOrchestrator` | System initialization |
+
+This is intentional - internal system processes need unrestricted access to function properly.
 
 ---
 
@@ -1743,12 +1864,46 @@ Kuber employs a **Hybrid Memory Architecture** inspired by Aerospike:
    - Configurable per-region size limits
    - When full, LRU eviction to disk
 
-3. **Memory Watcher Service**
+3. **Memory Watcher Service (Reactive)**
    - Monitors JVM heap every 5 seconds
    - When heap > 85% (high watermark), starts eviction
    - Evicts values (not keys) in batches of 1000
    - Continues until heap < 50% (low watermark)
    - **Guarantee**: No OOM crashes in 24x7 operation
+
+4. **Value Cache Limit Service (v1.7.4 - Proactive)**
+   - Enforces count-based limits per region every 30 seconds
+   - Effective limit = MIN(percentage-based, absolute)
+   - Default: 20% of keys OR 10,000 values (whichever is lower)
+   - Ensures fair memory distribution across regions
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                    DUAL EVICTION STRATEGY (v1.7.4)                     │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  MEMORY PRESSURE (Reactive)        COUNT-BASED (Proactive)             │
+│  ┌──────────────────────┐          ┌──────────────────────┐            │
+│  │ Heap > 85%? ─────────┼──Yes──→  │ Values > limit? ─────┼──Yes──→    │
+│  │        │             │          │        │             │            │
+│  │        No            │          │        No            │            │
+│  │        ↓             │          │        ↓             │            │
+│  │   Wait 5 seconds     │          │   Wait 30 seconds    │            │
+│  └──────────────────────┘          └──────────────────────┘            │
+│            │                                │                          │
+│            └────────────────┬───────────────┘                          │
+│                             ↓                                          │
+│                    ┌────────────────┐                                  │
+│                    │ Evict Values   │                                  │
+│                    │ to Persistence │                                  │
+│                    └────────────────┘                                  │
+│                                                                        │
+│  Configuration:                                                        │
+│  memory-high-watermark-percent=85    value-cache-max-percent=20        │
+│  memory-low-watermark-percent=50     value-cache-max-entries=10000     │
+│  memory-eviction-batch-size=1000     value-cache-limit-check-ms=30000  │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Off-Heap Key Index Architecture (v1.3.2)
 
