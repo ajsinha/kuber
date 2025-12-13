@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  * - Admin users have full access to all operations
  * - Other users need specific roles granting READ/WRITE/DELETE
  *
- * @version 1.7.4
+ * @version 1.7.5
  */
 @Slf4j
 @Component
@@ -64,6 +64,8 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     private static final String SESSION_IN_MULTI = "inMulti";
     private static final String SESSION_QUEUED_COMMANDS = "queuedCommands";
     private static final String SESSION_SUBSCRIPTIONS = "subscriptions";
+    private static final String SESSION_CLIENT_NAME = "clientName";
+    private static final String SESSION_TIMEOUT_SECONDS = "timeoutSeconds";
     
     private final CacheService cacheService;
     private final KuberProperties properties;
@@ -492,6 +494,10 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
             case REPLINFO:
                 return handleReplInfo();
             
+            // Connection/Client commands
+            case CLIENT:
+                return handleClient(session, args);
+            
             default:
                 return RedisResponse.error(String.format(KuberConstants.ERR_UNKNOWN_COMMAND, cmd));
         }
@@ -547,6 +553,165 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
         
         log.warn("Invalid API key authentication attempt from {}", session.getRemoteAddress());
         return RedisResponse.error("invalid API key");
+    }
+    
+    /**
+     * Handle CLIENT command with subcommands.
+     * 
+     * Supported subcommands:
+     * - CLIENT LIST: List connected clients
+     * - CLIENT GETNAME: Get current client name
+     * - CLIENT SETNAME name: Set client name
+     * - CLIENT GETTIMEOUT: Get session timeout in seconds
+     * - CLIENT SETTIMEOUT seconds: Set session timeout (60-86400 seconds)
+     * - CLIENT KEEPALIVE: Reset idle timer
+     * - CLIENT ID: Get session ID
+     * - CLIENT INFO: Get current client info
+     * 
+     * @version 1.7.5
+     */
+    private RedisResponse handleClient(IoSession session, List<String> args) {
+        if (args.isEmpty()) {
+            return RedisResponse.error("ERR wrong number of arguments for 'CLIENT' command");
+        }
+        
+        String subCmd = args.get(0).toUpperCase();
+        
+        switch (subCmd) {
+            case "LIST":
+                return handleClientList();
+                
+            case "GETNAME":
+                String name = (String) session.getAttribute(SESSION_CLIENT_NAME);
+                return name != null ? RedisResponse.bulkString(name) : RedisResponse.nullBulkString();
+                
+            case "SETNAME":
+                if (args.size() < 2) {
+                    return RedisResponse.error("ERR wrong number of arguments for 'CLIENT SETNAME'");
+                }
+                String clientName = args.get(1);
+                session.setAttribute(SESSION_CLIENT_NAME, clientName);
+                log.debug("Client {} set name to '{}'", session.getRemoteAddress(), clientName);
+                return RedisResponse.ok();
+                
+            case "GETTIMEOUT":
+                Integer timeout = (Integer) session.getAttribute(SESSION_TIMEOUT_SECONDS);
+                if (timeout == null) {
+                    timeout = (int) (properties.getNetwork().getConnectionTimeoutMs() / 1000);
+                }
+                return RedisResponse.integer(timeout);
+                
+            case "SETTIMEOUT":
+                if (args.size() < 2) {
+                    return RedisResponse.error("ERR wrong number of arguments for 'CLIENT SETTIMEOUT'");
+                }
+                try {
+                    int timeoutSeconds = Integer.parseInt(args.get(1));
+                    // Allow 60 seconds to 24 hours (86400 seconds), or 0 to disable timeout
+                    if (timeoutSeconds != 0 && (timeoutSeconds < 60 || timeoutSeconds > 86400)) {
+                        return RedisResponse.error("ERR timeout must be 0 (no timeout) or between 60 and 86400 seconds");
+                    }
+                    session.setAttribute(SESSION_TIMEOUT_SECONDS, timeoutSeconds);
+                    // Update MINA session idle time
+                    session.getConfig().setIdleTime(IdleStatus.BOTH_IDLE, timeoutSeconds);
+                    log.info("Client {} set timeout to {} seconds", session.getRemoteAddress(), timeoutSeconds);
+                    return RedisResponse.ok();
+                } catch (NumberFormatException e) {
+                    return RedisResponse.error("ERR invalid timeout value");
+                }
+                
+            case "KEEPALIVE":
+                // Reset the idle time by updating last activity - MINA handles this automatically
+                // but we can explicitly reset by setting idle time again
+                Integer currentTimeout = (Integer) session.getAttribute(SESSION_TIMEOUT_SECONDS);
+                if (currentTimeout == null) {
+                    currentTimeout = (int) (properties.getNetwork().getConnectionTimeoutMs() / 1000);
+                }
+                session.getConfig().setIdleTime(IdleStatus.BOTH_IDLE, currentTimeout);
+                return RedisResponse.simpleString("PONG");
+                
+            case "ID":
+                return RedisResponse.integer(session.getId());
+                
+            case "INFO":
+                return handleClientInfo(session);
+                
+            case "HELP":
+                return handleClientHelp();
+                
+            default:
+                return RedisResponse.error("ERR unknown CLIENT subcommand '" + subCmd + "'. Try CLIENT HELP.");
+        }
+    }
+    
+    /**
+     * Handle CLIENT LIST - return info about all connected clients
+     */
+    private RedisResponse handleClientList() {
+        StringBuilder sb = new StringBuilder();
+        for (IoSession s : activeSessions.values()) {
+            sb.append("id=").append(s.getId());
+            sb.append(" addr=").append(s.getRemoteAddress());
+            String clientName = (String) s.getAttribute(SESSION_CLIENT_NAME);
+            if (clientName != null) {
+                sb.append(" name=").append(clientName);
+            }
+            String user = (String) s.getAttribute(SESSION_AUTH_USER);
+            if (user != null) {
+                sb.append(" user=").append(user);
+            }
+            String region = (String) s.getAttribute(SESSION_REGION);
+            sb.append(" db=").append(region);
+            Integer timeout = (Integer) s.getAttribute(SESSION_TIMEOUT_SECONDS);
+            if (timeout != null) {
+                sb.append(" timeout=").append(timeout);
+            }
+            sb.append("\n");
+        }
+        return RedisResponse.bulkString(sb.toString());
+    }
+    
+    /**
+     * Handle CLIENT INFO - return info about current client
+     */
+    private RedisResponse handleClientInfo(IoSession session) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("id=").append(session.getId());
+        sb.append(" addr=").append(session.getRemoteAddress());
+        String clientName = (String) session.getAttribute(SESSION_CLIENT_NAME);
+        if (clientName != null) {
+            sb.append(" name=").append(clientName);
+        }
+        String user = (String) session.getAttribute(SESSION_AUTH_USER);
+        if (user != null) {
+            sb.append(" user=").append(user);
+        }
+        String region = (String) session.getAttribute(SESSION_REGION);
+        sb.append(" db=").append(region);
+        Integer timeout = (Integer) session.getAttribute(SESSION_TIMEOUT_SECONDS);
+        if (timeout == null) {
+            timeout = (int) (properties.getNetwork().getConnectionTimeoutMs() / 1000);
+        }
+        sb.append(" timeout=").append(timeout);
+        sb.append(" idle=").append(session.getIdleCount(IdleStatus.BOTH_IDLE));
+        return RedisResponse.bulkString(sb.toString());
+    }
+    
+    /**
+     * Handle CLIENT HELP - return help text
+     */
+    private RedisResponse handleClientHelp() {
+        List<RedisResponse> help = new ArrayList<>();
+        help.add(RedisResponse.bulkString("CLIENT LIST -- List connected clients"));
+        help.add(RedisResponse.bulkString("CLIENT ID -- Get current client ID"));
+        help.add(RedisResponse.bulkString("CLIENT INFO -- Get current client info"));
+        help.add(RedisResponse.bulkString("CLIENT GETNAME -- Get client name"));
+        help.add(RedisResponse.bulkString("CLIENT SETNAME <name> -- Set client name"));
+        help.add(RedisResponse.bulkString("CLIENT GETTIMEOUT -- Get session timeout in seconds"));
+        help.add(RedisResponse.bulkString("CLIENT SETTIMEOUT <seconds> -- Set session timeout (0=no timeout, 60-86400)"));
+        help.add(RedisResponse.bulkString("CLIENT KEEPALIVE -- Reset idle timer (returns PONG)"));
+        help.add(RedisResponse.bulkString("CLIENT HELP -- Show this help"));
+        return RedisResponse.array(help);
     }
     
     // ==================== RBAC Authorization ====================

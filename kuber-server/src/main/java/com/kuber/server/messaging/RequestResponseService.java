@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  *   <li>API key authentication for all requests</li>
  * </ul>
  * 
- * @version 1.7.0
+ * @version 1.7.5
  */
 @Slf4j
 @Service
@@ -62,6 +62,7 @@ public class RequestResponseService {
     private final CacheService cacheService;
     private final ApiKeyService apiKeyService;
     private final ObjectMapper objectMapper;
+    private final RequestResponseLogger requestResponseLogger;
     
     // Configuration
     private MessagingConfig config;
@@ -74,6 +75,7 @@ public class RequestResponseService {
     private BlockingQueue<PendingRequest> requestQueue;
     private ExecutorService processorPool;
     private Thread queueMonitorThread;
+    private Thread statsLoggerThread;
     
     // State
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -100,11 +102,13 @@ public class RequestResponseService {
     public RequestResponseService(KuberProperties properties, 
                                    CacheService cacheService,
                                    ApiKeyService apiKeyService,
-                                   ObjectMapper objectMapper) {
+                                   ObjectMapper objectMapper,
+                                   @Autowired(required = false) RequestResponseLogger requestResponseLogger) {
         this.properties = properties;
         this.cacheService = cacheService;
         this.apiKeyService = apiKeyService;
         this.objectMapper = objectMapper;
+        this.requestResponseLogger = requestResponseLogger;
     }
     
     @PostConstruct
@@ -152,11 +156,17 @@ public class RequestResponseService {
             return t;
         });
         
+        // CRITICAL: Set running BEFORE starting processors, otherwise they exit immediately
+        running.set(true);
+        
         // Start queue processor
         startQueueProcessor();
         
         // Start queue monitor (for backpressure)
         startQueueMonitor();
+        
+        // Start periodic stats logger
+        startStatsLogger();
         
         // Connect to brokers and subscribe
         connectAndSubscribe();
@@ -164,7 +174,13 @@ public class RequestResponseService {
         // Start file watcher for hot-reload
         startFileWatcher();
         
-        running.set(true);
+        // Configure request/response logger
+        if (requestResponseLogger != null) {
+            requestResponseLogger.configure(config.getMaxLogMessages(), config.isLoggingEnabled());
+            log.info("Request/Response logging: {} (max {} messages per file)", 
+                    config.isLoggingEnabled() ? "ENABLED" : "DISABLED",
+                    config.getMaxLogMessages());
+        }
         
         log.info("╔════════════════════════════════════════════════════════════════════╗");
         log.info("║  Request/Response Messaging Service Started                         ║");
@@ -226,6 +242,17 @@ public class RequestResponseService {
         if (!configFile.exists()) {
             logBigAlertMessage();
             createDefaultConfig();
+            // Now try to load the created config
+            if (configFile.exists()) {
+                try {
+                    config = objectMapper.readValue(configFile, MessagingConfig.class);
+                    log.info("Loaded default Request/Response configuration: enabled={}", config.isEnabled());
+                    return true;  // Config loaded (but service disabled by default)
+                } catch (Exception e) {
+                    log.error("Failed to load default configuration: {}", e.getMessage());
+                    return false;
+                }
+            }
             return false;
         }
         
@@ -409,13 +436,47 @@ public class RequestResponseService {
      * Backpressure is managed by pausing broker consumption.
      */
     private void handleMessage(MessageBrokerAdapter.ReceivedMessage message) {
-        requestsReceived.incrementAndGet();
+        // Ensure the service is properly initialized
+        if (requestQueue == null) {
+            log.error("Request queue not initialized - message dropped from topic: {}. " +
+                     "Ensure the messaging service is fully started.", message.getTopic());
+            return;
+        }
+        
+        long count = requestsReceived.incrementAndGet();
+        int queueDepth = requestQueue.size();
+        
+        // Log received message details
+        log.info("📥 MESSAGE RECEIVED #{} from topic '{}' | Queue depth: {} | Key: {}",
+                count, message.getTopic(), queueDepth, message.getMessageId());
+        
+        // Log message content (truncated if too long)
+        String content = message.getMessage();
+        if (content != null) {
+            if (content.length() > 200) {
+                log.debug("   Content: {}...", content.substring(0, 200));
+            } else {
+                log.debug("   Content: {}", content);
+            }
+        }
+        
+        // Use the source adapter (the adapter that received this message) for sending responses
+        // This ensures responses go back through the same broker the request came from
+        MessageBrokerAdapter sourceAdapter = message.getSourceAdapter();
+        if (sourceAdapter == null) {
+            // Fallback to topic-based lookup (for backward compatibility)
+            sourceAdapter = findAdapterForTopic(message.getTopic());
+            log.warn("Message has no sourceAdapter, falling back to topic lookup. Found: {}", 
+                    sourceAdapter != null ? sourceAdapter.getBrokerType() : "NULL");
+        } else {
+            log.info("   Source adapter: {} ({})", sourceAdapter.getBrokerName(), sourceAdapter.getBrokerType());
+        }
         
         PendingRequest pending = new PendingRequest(
             message.getMessage(),
             message.getTopic(),
             message.getResponseTopic(),
-            findAdapterForTopic(message.getTopic()),
+            sourceAdapter,
             Instant.now()
         );
         
@@ -423,6 +484,7 @@ public class RequestResponseService {
             // Blocking put - will wait until space is available
             // Backpressure pauses consumption before queue is full, so this rarely blocks
             requestQueue.put(pending);
+            log.debug("   Queued successfully. New queue depth: {}", requestQueue.size());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted while queuing request from topic: {}", message.getTopic());
@@ -431,6 +493,7 @@ public class RequestResponseService {
     
     /**
      * Find adapter that is subscribed to the given topic.
+     * Used as fallback when sourceAdapter is not available.
      */
     private MessageBrokerAdapter findAdapterForTopic(String topic) {
         for (MessageBrokerAdapter adapter : adapters.values()) {
@@ -519,16 +582,91 @@ public class RequestResponseService {
     }
     
     /**
+     * Start periodic stats logger (every 60 seconds).
+     * Logs queue depth, received/processed counts, and broker status.
+     */
+    private void startStatsLogger() {
+        if (statsLoggerThread != null && statsLoggerThread.isAlive()) {
+            return;  // Already running
+        }
+        
+        statsLoggerThread = new Thread(() -> {
+            while (running.get()) {
+                try {
+                    Thread.sleep(60000);  // Log every 60 seconds
+                    
+                    if (!running.get()) break;
+                    
+                    int queueDepth = requestQueue != null ? requestQueue.size() : 0;
+                    long received = requestsReceived.get();
+                    long processed = requestsProcessed.get();
+                    long pending = received - processed;
+                    long errors = processingErrors.get();
+                    
+                    log.info("╔════════════════════════════════════════════════════════════════════╗");
+                    log.info("║  REQUEST/RESPONSE MESSAGING STATS (1-minute interval)              ║");
+                    log.info("╠════════════════════════════════════════════════════════════════════╣");
+                    log.info("║  Queue Depth: {}  │  Backpressure: {}                       ║",
+                            String.format("%6d", queueDepth), 
+                            String.format("%-5s", backpressureActive.get() ? "ON" : "OFF"));
+                    log.info("║  Received:    {}  │  Processed:    {}  │  Pending: {}  ║",
+                            String.format("%6d", received), 
+                            String.format("%6d", processed), 
+                            String.format("%6d", pending));
+                    log.info("║  Errors:      {}  │  Auth Failures: {}                      ║",
+                            String.format("%6d", errors), 
+                            String.format("%5d", authFailures.get()));
+                    log.info("║  Connected Brokers: {}  │  Failed Subscriptions: {}           ║",
+                            String.format("%3d", adapters.size()), 
+                            String.format("%3d", failedSubscriptions.size()));
+                    log.info("╚════════════════════════════════════════════════════════════════════╝");
+                    
+                    // Log per-broker stats
+                    for (Map.Entry<String, MessageBrokerAdapter> entry : adapters.entrySet()) {
+                        MessageBrokerAdapter.BrokerStats stats = entry.getValue().getStats();
+                        log.info("  Broker '{}': received={}, published={}, errors={}, paused={}",
+                                stats.getBrokerName(), stats.getMessagesReceived(), 
+                                stats.getMessagesPublished(), stats.getErrors(), stats.isPaused());
+                    }
+                    
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }, "messaging-stats-logger");
+        statsLoggerThread.setDaemon(true);
+        statsLoggerThread.start();
+        log.info("Started messaging stats logger (60-second interval)");
+    }
+    
+    /**
      * Process a single request.
      */
     private void processRequest(PendingRequest pending) {
         Instant processStart = Instant.now();
+        long processed = requestsProcessed.get() + 1;
+        
+        log.debug("🔄 PROCESSING REQUEST #{} from topic '{}'", processed, pending.getRequestTopic());
+        
+        // Log raw JSON for debugging authentication issues
+        if (log.isDebugEnabled() && pending.getRequestJson() != null) {
+            String json = pending.getRequestJson();
+            if (json.length() > 500) {
+                log.debug("🔄 Raw JSON (truncated): {}...", json.substring(0, 500));
+            } else {
+                log.debug("🔄 Raw JSON: {}", json);
+            }
+        }
         
         try {
             // Parse request
             CacheRequest request;
             try {
                 request = objectMapper.readValue(pending.getRequestJson(), CacheRequest.class);
+                log.debug("   Parsed: operation={}, region={}, key={}, api_key present={}", 
+                        request.getOperation(), request.getRegion(), request.getKey(),
+                        request.getApiKey() != null && !request.getApiKey().isEmpty());
             } catch (Exception e) {
                 log.error("Failed to parse request: {}", e.getMessage());
                 sendErrorResponse(pending, CacheResponse.ErrorCode.PARSE_ERROR, 
@@ -543,14 +681,24 @@ public class RequestResponseService {
                 return;
             }
             
-            // Authenticate
-            Optional<ApiKey> apiKeyOpt = apiKeyService.validateKey(request.getApiKey());
+            // Authenticate (use validateKeyOnly - no save for performance/security)
+            String receivedApiKey = request.getApiKey();
+            log.info("🔑 Authenticating request with API key: {}", 
+                    receivedApiKey != null ? ApiKeyService.maskKeyValue(receivedApiKey) : "null");
+            
+            Optional<ApiKey> apiKeyOpt = apiKeyService.validateKeyOnly(receivedApiKey);
             if (apiKeyOpt.isEmpty()) {
                 authFailures.incrementAndGet();
+                log.warn("🔑 Authentication FAILED for API key: {} (cache size: {})", 
+                        receivedApiKey != null ? ApiKeyService.maskKeyValue(receivedApiKey) : "null",
+                        apiKeyService.getKeyCount());
                 sendErrorResponse(pending, request, CacheResponse.ErrorCode.AUTHENTICATION_FAILED, 
                     "Invalid API key");
                 return;
             }
+            
+            log.info("🔑 Authentication SUCCESS for key '{}' (user: {})", 
+                    apiKeyOpt.get().getName(), apiKeyOpt.get().getUserId());
             
             // Validate batch limits for MGET
             if (request.isBatchGet()) {
@@ -938,16 +1086,69 @@ public class RequestResponseService {
      * Send response to the response topic.
      */
     private void sendResponse(PendingRequest pending, CacheResponse response) {
+        // Detailed logging for debugging
+        log.info("📤 sendResponse() called");
+        log.info("   pending.getAdapter() = {}", pending.getAdapter() != null ? pending.getAdapter().getClass().getSimpleName() : "NULL");
+        log.info("   pending.getResponseTopic() = {}", pending.getResponseTopic());
+        
         if (pending.getAdapter() == null) {
-            log.error("No adapter available to send response");
+            log.error("❌ No adapter available to send response - adapter is NULL!");
+            log.error("   Request topic was: {}", pending.getRequestTopic());
+            return;
+        }
+        
+        if (!pending.getAdapter().isConnected()) {
+            log.error("❌ Adapter is not connected! Type: {}", pending.getAdapter().getClass().getSimpleName());
             return;
         }
         
         try {
             String responseJson = objectMapper.writeValueAsString(response);
-            pending.getAdapter().publish(pending.getResponseTopic(), responseJson);
+            
+            // Log response details
+            String messageId = response.getRequest() != null ? response.getRequest().getMessageId() : "unknown";
+            String operation = response.getRequest() != null ? response.getRequest().getOperation() : "unknown";
+            boolean isSuccess = response.getResponse() != null && response.getResponse().isSuccess();
+            
+            log.info("📤 RESPONSE SENDING | message_id: {} | topic: {} | operation: {} | success: {}",
+                    messageId, pending.getResponseTopic(), operation, isSuccess);
+            
+            // Log full response JSON for debugging
+            if (responseJson.length() > 500) {
+                log.info("📤 RESPONSE JSON (truncated): {}...", responseJson.substring(0, 500));
+            } else {
+                log.info("📤 RESPONSE JSON: {}", responseJson);
+            }
+            
+            log.info("📤 Calling adapter.publish() on {} adapter...", pending.getAdapter().getBrokerType());
+            
+            boolean publishSuccess = pending.getAdapter().publish(pending.getResponseTopic(), responseJson);
+            
+            if (publishSuccess) {
+                log.info("📤 ✅ RESPONSE PUBLISHED SUCCESSFULLY to topic: {}", pending.getResponseTopic());
+                
+                // Log request/response pair asynchronously
+                if (requestResponseLogger != null) {
+                    String brokerName = pending.getAdapter() != null ? 
+                            pending.getAdapter().getBrokerName() : "unknown";
+                    requestResponseLogger.logRequestResponse(
+                            brokerName,
+                            pending.getRequestTopic(),
+                            response.getRequest(),
+                            response
+                    );
+                }
+            } else {
+                log.error("📤 ❌ RESPONSE PUBLISH FAILED to topic: {}", pending.getResponseTopic());
+            }
+            
+            if (!isSuccess) {
+                String error = response.getResponse() != null ? response.getResponse().getError() : "unknown";
+                log.info("   Error in response: {}", error);
+            }
+            
         } catch (Exception e) {
-            log.error("Failed to send response: {}", e.getMessage());
+            log.error("❌ Failed to send response: {}", e.getMessage(), e);
         }
     }
     
@@ -1038,6 +1239,27 @@ public class RequestResponseService {
         try {
             MessagingConfig newConfig = objectMapper.readValue(configFile, MessagingConfig.class);
             
+            // Ensure service infrastructure is initialized if we're about to connect brokers
+            if (newConfig.isEnabled() && (requestQueue == null || processorPool == null)) {
+                log.info("Initializing service infrastructure during config reload");
+                int maxQueueDepth = newConfig.getMaxQueueDepth() > 0 ? newConfig.getMaxQueueDepth() : 100;
+                requestQueue = new LinkedBlockingQueue<>(maxQueueDepth);
+                
+                int poolSize = newConfig.getThreadPoolSize() > 0 ? newConfig.getThreadPoolSize() : 10;
+                processorPool = Executors.newFixedThreadPool(poolSize, r -> {
+                    Thread t = new Thread(r, "request-processor");
+                    t.setDaemon(true);
+                    return t;
+                });
+                
+                // CRITICAL: Set running BEFORE starting processors
+                running.set(true);
+                
+                startQueueProcessor();
+                startQueueMonitor();
+                startStatsLogger();
+            }
+            
             // Determine what changed
             Set<String> currentBrokers = new HashSet<>(adapters.keySet());
             Set<String> newBrokers = new HashSet<>(newConfig.getBrokers().keySet());
@@ -1120,6 +1342,13 @@ public class RequestResponseService {
      */
     public MessagingConfig getConfig() {
         return config;
+    }
+    
+    /**
+     * Get the request/response logger.
+     */
+    public RequestResponseLogger getLogger() {
+        return requestResponseLogger;
     }
     
     /**
@@ -1467,6 +1696,30 @@ public class RequestResponseService {
         if (config == null || !config.getBrokers().containsKey(brokerName)) {
             log.warn("Broker '{}' not found in configuration", brokerName);
             return false;
+        }
+        
+        // Ensure the service infrastructure is initialized
+        if (requestQueue == null || processorPool == null) {
+            log.info("Initializing service infrastructure for broker '{}'", brokerName);
+            int maxQueueDepth = config.getMaxQueueDepth() > 0 ? config.getMaxQueueDepth() : 100;
+            requestQueue = new LinkedBlockingQueue<>(maxQueueDepth);
+            
+            int poolSize = config.getThreadPoolSize() > 0 ? config.getThreadPoolSize() : 10;
+            processorPool = Executors.newFixedThreadPool(poolSize, r -> {
+                Thread t = new Thread(r, "request-processor");
+                t.setDaemon(true);
+                return t;
+            });
+            
+            // CRITICAL: Set running BEFORE starting processors, otherwise they exit immediately
+            running.set(true);
+            
+            startQueueProcessor();
+            startQueueMonitor();
+            startStatsLogger();  // Start periodic stats logging
+            
+            log.info("Service infrastructure initialized: queue={}, pool={}, running={}",
+                    maxQueueDepth, poolSize, running.get());
         }
         
         // Check if already connected

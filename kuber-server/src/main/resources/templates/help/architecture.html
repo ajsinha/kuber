@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.7.4</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.7.5</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -284,7 +284,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.7.4                                     ║
+║   SYSTEM READY - Version 1.7.5                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -641,8 +641,45 @@ External Applications
                             <tr><td><strong>API Key Auth</strong></td><td>All requests must include valid API key for authentication</td></tr>
                             <tr><td><strong>Full Operations</strong></td><td>All cache operations supported: GET, SET, DELETE, MGET, MSET, JSON ops, etc.</td></tr>
                             <tr><td><strong>Admin UI</strong></td><td>Web interface for broker management and queue monitoring</td></tr>
+                            <tr><td><strong>Test Clients <span class="badge bg-success">v1.7.5</span></strong></td><td>Python, Java, C# test clients for all 4 broker types</td></tr>
                         </tbody>
                     </table>
+                    
+                    <h4 class="mt-4">Test Clients <span class="badge bg-success">v1.7.5</span></h4>
+                    <p>Ready-to-use test clients demonstrate request/response messaging for all brokers:</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr><th>Broker</th><th>Python</th><th>Java</th><th>C#</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Kafka</strong></td>
+                                    <td><code>kafka_request_response_test.py</code></td>
+                                    <td><code>KafkaRequestResponseTest.java</code></td>
+                                    <td><code>KafkaRequestResponseTest.cs</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>ActiveMQ</strong></td>
+                                    <td><code>activemq_request_response_test.py</code></td>
+                                    <td><code>ActiveMqRequestResponseTest.java</code></td>
+                                    <td><code>ActiveMqRequestResponseTest.cs</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>RabbitMQ</strong></td>
+                                    <td><code>rabbitmq_request_response_test.py</code></td>
+                                    <td><code>RabbitMqRequestResponseTest.java</code></td>
+                                    <td><code>RabbitMqRequestResponseTest.cs</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>IBM MQ</strong></td>
+                                    <td><code>ibmmq_request_response_test.py</code></td>
+                                    <td><code>IbmMqRequestResponseTest.java</code></td>
+                                    <td><code>IbmMqRequestResponseTest.cs</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     
                     <h4 class="mt-4">Request/Response Flow</h4>
                     <div class="row">
@@ -747,7 +784,7 @@ AUTH password</code></pre>
                         <li><strong>Audit</strong>: Track last-used timestamps</li>
                     </ul>
                     
-                    <h4 class="mt-4"><i class="fas fa-user-shield me-2"></i>Role-Based Access Control (v1.7.4)</h4>
+                    <h4 class="mt-4"><i class="fas fa-user-shield me-2"></i>Role-Based Access Control (v1.7.5)</h4>
                     <p>Kuber implements enterprise-grade RBAC with region-specific permissions:</p>
                     
                     <div class="card mb-3">
@@ -991,7 +1028,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.4</p>
+                    <p class="text-muted small mb-0">Version 1.7.5</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

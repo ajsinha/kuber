@@ -1,11 +1,11 @@
 [ {
-  "keyId" : "key_7db46831",
-  "keyValue" : "kub_27d6eb2319ad721472f8c1b740e5b97188efa45e8830cfe193606714887e798d",
+  "keyId" : "key_1826aee9",
+  "keyValue" : "kub_d427a1192ad2e45e8376e518f958b882cbdd98fdbded654ecb4e0efe70968d08",
   "name" : "admin2",
   "userId" : "admin",
   "roles" : [ "USER", "OPERATOR", "ADMIN" ],
-  "createdAt" : "2025-12-12T22:08:41.590556084Z",
-  "lastUsedAt" : "2025-12-12T22:09:06.525864560Z",
+  "createdAt" : "2025-12-13T21:46:30.646543274Z",
+  "lastUsedAt" : null,
   "expiresAt" : null,
   "active" : true
 } ]

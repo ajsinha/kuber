@@ -2,6 +2,108 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.7.5] - 2025-12-13 - SESSION & CONNECTION MANAGEMENT
+
+### 🔌 Major New Feature: CLIENT Command for Session Management
+
+**v1.7.5 introduces comprehensive session management via the CLIENT command, enabling runtime control of connection timeouts and keepalive behavior.**
+
+### CLIENT Command Subcommands
+
+| Subcommand | Syntax | Description | Compatibility |
+|------------|--------|-------------|---------------|
+| `LIST` | `CLIENT LIST` | List all connected clients | Redis Compatible |
+| `ID` | `CLIENT ID` | Get current session ID | Redis Compatible |
+| `INFO` | `CLIENT INFO` | Get current client details | Redis Compatible |
+| `GETNAME` | `CLIENT GETNAME` | Get client name | Redis Compatible |
+| `SETNAME` | `CLIENT SETNAME <n>` | Set client name for debugging | Redis Compatible |
+| `GETTIMEOUT` | `CLIENT GETTIMEOUT` | Get session timeout (seconds) | Kuber Extension |
+| `SETTIMEOUT` | `CLIENT SETTIMEOUT <sec>` | Set timeout (0=no timeout, 60-86400) | Kuber Extension |
+| `KEEPALIVE` | `CLIENT KEEPALIVE` | Reset idle timer, returns PONG | Kuber Extension |
+| `HELP` | `CLIENT HELP` | Show available subcommands | Redis Compatible |
+
+### Usage Examples
+
+```bash
+# Connect and authenticate
+redis-cli -p 6380
+> AUTH kub_your_api_key
+OK
+
+# Check current timeout
+> CLIENT GETTIMEOUT
+(integer) 300
+
+# Set longer timeout (1 hour)
+> CLIENT SETTIMEOUT 3600
+OK
+
+# Disable timeout (persistent connection)
+> CLIENT SETTIMEOUT 0
+OK
+
+# Send keepalive (resets idle timer)
+> CLIENT KEEPALIVE
+PONG
+
+# Name your connection for debugging
+> CLIENT SETNAME my-app-connection
+OK
+```
+
+### Configuration Changes
+
+| Property | Old Default | New Default | Description |
+|----------|-------------|-------------|-------------|
+| `kuber.network.connection-timeout-ms` | 30000 (30s) | 300000 (5min) | Session idle timeout |
+
+### New Components
+
+| Component | Description |
+|-----------|-------------|
+| `RedisProtocolCodecFactory` | Proper RESP protocol codec for Apache MINA |
+| `RedisProtocolEncoder` | Writes RESP responses without extra delimiters |
+| `RedisProtocolDecoder` | Parses RESP array format and inline commands |
+| `CLIENT` command handler | Full session management in `RedisProtocolHandler` |
+
+### Bug Fixes
+
+- **RESP Protocol**: Fixed `redis-cli` compatibility issue ("Protocol error, got '\n'")
+- **CSRF Token**: Fixed "Access Denied" when deleting API keys from admin UI
+- **Request/Response Messaging - CRITICAL**: Fixed message processing failure where messages were received but never processed. Root cause: `running.set(true)` was called AFTER `startQueueProcessor()`, causing worker threads to exit immediately because `running.get()` returned false.
+- **Request/Response Messaging**: Fixed NPE when enabling Kafka broker from Admin UI before service was fully initialized. The `requestQueue` is now lazily initialized when brokers are enabled via UI or config hot-reload.
+
+### New Features
+
+- **Messaging Stats Logger**: Added periodic stats logging (every 60 seconds) showing:
+  - Queue depth and backpressure status
+  - Received/Processed/Pending message counts
+  - Error and auth failure counts
+  - Per-broker statistics
+
+- **Enhanced Messaging Logging**: Added detailed logging for:
+  - Each message received (topic, message ID, queue depth)
+  - Each response sent (message ID, operation, success/error)
+  - Request processing start/completion
+
+### New Files
+
+- `kuber-client-python/examples/session_management_example.py` - Python example for CLIENT commands
+- `kuber-client-python/examples/kafka_request_response_test.py` - Kafka pub/sub test client (Python)
+- `kuber-client-python/examples/activemq_request_response_test.py` - ActiveMQ pub/sub test client (Python)
+- `kuber-client-java/.../examples/KafkaRequestResponseTest.java` - Kafka pub/sub test client (Java)
+- `kuber-client-java/.../examples/ActiveMqRequestResponseTest.java` - ActiveMQ pub/sub test client (Java)
+- `kuber-client-csharp/examples/KafkaRequestResponseTest.cs` - Kafka pub/sub test client (C#)
+- `kuber-client-csharp/examples/ActiveMqRequestResponseTest.cs` - ActiveMQ pub/sub test client (C#)
+
+### Documentation Updates
+
+- Added "Connection Management" section to Redis Protocol help page
+- Added "Session & Connection Management" section to System Internals help page
+- Updated all version references across documentation
+
+---
+
 ## [1.7.4] - 2025-12-12 - COUNT-BASED VALUE CACHE LIMITING
 
 ### 🎯 Major New Feature: Count-Based Value Cache Limiting

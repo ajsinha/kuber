@@ -37,7 +37,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for Kafka topics.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 1.7.0
+ * @version 1.7.5
  */
 @Slf4j
 public class KafkaBrokerAdapter implements MessageBrokerAdapter {
@@ -84,6 +84,8 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
                 return false;
             }
             
+            log.info("[{}] Connecting to Kafka at: {}", brokerName, bootstrapServers);
+            
             // Consumer properties
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -103,14 +105,17 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
             }
             
             consumer = new KafkaConsumer<>(consumerProps);
+            log.info("[{}] Consumer created with group_id: {}", brokerName, config.getGroupId());
             
             // Producer properties
             Properties producerProps = new Properties();
             producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            producerProps.put(ProducerConfig.ACKS_CONFIG, "1");
+            producerProps.put(ProducerConfig.ACKS_CONFIG, "all");  // Changed from "1" to "all" for stronger guarantees
             producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+            producerProps.put(ProducerConfig.LINGER_MS_CONFIG, 0);  // Don't batch, send immediately
+            producerProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 0);  // Don't batch
             
             // Add any additional connection properties
             for (String key : config.getConnection().keySet()) {
@@ -120,15 +125,69 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
             }
             
             producer = new KafkaProducer<>(producerProps);
+            log.info("[{}] Producer created with acks=all", brokerName);
             
             connected.set(true);
-            log.info("[{}] Connected to Kafka at {}", brokerName, bootstrapServers);
+            log.info("[{}] ✅ Connected to Kafka at {}", brokerName, bootstrapServers);
+            
+            // Test publish to verify producer works
+            testPublish();
+            
             return true;
             
         } catch (Exception e) {
-            log.error("[{}] Failed to connect to Kafka: {}", brokerName, e.getMessage(), e);
+            log.error("[{}] ❌ Failed to connect to Kafka: {}", brokerName, e.getMessage(), e);
             errors.incrementAndGet();
             return false;
+        }
+    }
+    
+    /**
+     * Test publish to verify producer connectivity.
+     */
+    private void testPublish() {
+        String testTopic = "ccs_cache_response";  // Same topic we'll use for responses
+        String testMessage = "{\"type\":\"KUBER_TEST\",\"timestamp\":\"" + java.time.Instant.now() + "\",\"message\":\"Kuber producer connectivity test\"}";
+        
+        log.info("[{}] ========================================", brokerName);
+        log.info("[{}] 🔬 STARTUP TEST: Publishing to '{}'", brokerName, testTopic);
+        log.info("[{}] 🔬 This verifies Kafka producer is working", brokerName);
+        log.info("[{}] ========================================", brokerName);
+        
+        try {
+            log.info("[{}] 🔬 Creating test ProducerRecord...", brokerName);
+            ProducerRecord<String, String> record = new ProducerRecord<>(testTopic, "kuber-test", testMessage);
+            
+            log.info("[{}] 🔬 Calling producer.send()...", brokerName);
+            java.util.concurrent.Future<org.apache.kafka.clients.producer.RecordMetadata> future = producer.send(record);
+            
+            log.info("[{}] 🔬 Calling producer.flush()...", brokerName);
+            producer.flush();
+            
+            log.info("[{}] 🔬 Waiting for Kafka confirmation (10s timeout)...", brokerName);
+            org.apache.kafka.clients.producer.RecordMetadata metadata = future.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            
+            log.info("[{}] ========================================", brokerName);
+            log.info("[{}] 🔬 ✅ TEST PUBLISH SUCCESSFUL", brokerName);
+            log.info("[{}] 🔬    Topic: {}", brokerName, testTopic);
+            log.info("[{}] 🔬    Partition: {}", brokerName, metadata.partition());
+            log.info("[{}] 🔬    Offset: {}", brokerName, metadata.offset());
+            log.info("[{}] 🔬 Kafka producer is WORKING!", brokerName);
+            log.info("[{}] ========================================", brokerName);
+            
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.error("[{}] ========================================", brokerName);
+            log.error("[{}] 🔬 ❌ TEST PUBLISH TIMEOUT after 10 seconds!", brokerName);
+            log.error("[{}] 🔬 Kafka broker may be unreachable or slow", brokerName);
+            log.error("[{}] ========================================", brokerName);
+        } catch (Exception e) {
+            log.error("[{}] ========================================", brokerName);
+            log.error("[{}] 🔬 ❌ TEST PUBLISH FAILED: {}", brokerName, e.getMessage());
+            log.error("[{}] 🔬 Exception type: {}", brokerName, e.getClass().getName());
+            if (e.getCause() != null) {
+                log.error("[{}] 🔬 Cause: {}", brokerName, e.getCause().getMessage());
+            }
+            log.error("[{}] ========================================", brokerName, e);
         }
     }
     
@@ -186,14 +245,30 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
                     if (paused.get()) break;
                     
                     try {
+                        String messageKey = record.key() != null ? record.key() : String.valueOf(record.offset());
+                        long count = messagesReceived.incrementAndGet();
+                        
+                        // Log received message details
+                        log.info("[{}] 📥 MESSAGE RECEIVED #{} from topic '{}' | Partition: {} | Offset: {} | Key: {}",
+                                brokerName, count, record.topic(), record.partition(), record.offset(), messageKey);
+                        
+                        // Log message content (truncated if too long)
+                        String value = record.value();
+                        if (value != null) {
+                            if (value.length() > 200) {
+                                log.debug("[{}]    Content: {}...", brokerName, value.substring(0, 200));
+                            } else {
+                                log.debug("[{}]    Content: {}", brokerName, value);
+                            }
+                        }
+                        
                         ReceivedMessage msg = new ReceivedMessage(
                             record.topic(),
                             record.value(),
-                            record.key() != null ? record.key() : String.valueOf(record.offset()),
-                            record.timestamp()
+                            messageKey,
+                            record.timestamp(),
+                            KafkaBrokerAdapter.this  // Pass this adapter as the source
                         );
-                        
-                        messagesReceived.incrementAndGet();
                         
                         if (messageHandler != null) {
                             messageHandler.accept(msg);
@@ -243,26 +318,65 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean publish(String responseTopic, String message) {
-        if (!connected.get() || producer == null) {
-            log.error("[{}] Cannot publish - not connected", brokerName);
+        log.info("[{}] ========== PUBLISH ATTEMPT ==========", brokerName);
+        log.info("[{}] Target topic: '{}'", brokerName, responseTopic);
+        log.info("[{}] Message length: {} bytes", brokerName, message.length());
+        log.info("[{}] connected.get() = {}", brokerName, connected.get());
+        log.info("[{}] producer = {}", brokerName, producer != null ? "NOT NULL" : "NULL");
+        
+        if (!connected.get()) {
+            log.error("[{}] ❌ PUBLISH ABORTED - connected=false", brokerName);
+            return false;
+        }
+        
+        if (producer == null) {
+            log.error("[{}] ❌ PUBLISH ABORTED - producer is NULL", brokerName);
             return false;
         }
         
         try {
+            log.info("[{}] 📤 Creating ProducerRecord for topic '{}'", brokerName, responseTopic);
+            
+            // Log message content for debugging (truncate if too long)
+            if (message.length() > 500) {
+                log.info("[{}] 📤 MESSAGE CONTENT (first 500 chars): {}", brokerName, message.substring(0, 500));
+            } else {
+                log.info("[{}] 📤 MESSAGE CONTENT: {}", brokerName, message);
+            }
+            
             ProducerRecord<String, String> record = new ProducerRecord<>(responseTopic, message);
-            producer.send(record, (metadata, exception) -> {
-                if (exception != null) {
-                    log.error("[{}] Failed to publish to {}: {}", brokerName, responseTopic, exception.getMessage());
-                    errors.incrementAndGet();
-                } else {
-                    messagesPublished.incrementAndGet();
-                }
-            });
+            log.info("[{}] 📤 ProducerRecord created, calling producer.send()...", brokerName);
+            
+            // Use synchronous send with get() to ensure message is actually sent
+            java.util.concurrent.Future<org.apache.kafka.clients.producer.RecordMetadata> future = producer.send(record);
+            log.info("[{}] 📤 producer.send() returned future, calling flush()...", brokerName);
+            
+            // Flush to ensure message is sent immediately
+            producer.flush();
+            log.info("[{}] 📤 flush() complete, calling future.get() with 5s timeout...", brokerName);
+            
+            // Wait for confirmation (with timeout)
+            org.apache.kafka.clients.producer.RecordMetadata metadata = future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            
+            long count = messagesPublished.incrementAndGet();
+            log.info("[{}] ✅ MESSAGE PUBLISHED #{} | topic='{}' | partition={} | offset={} | bytes={}",
+                    brokerName, count, responseTopic, metadata.partition(), metadata.offset(), message.length());
+            log.info("[{}] ========== PUBLISH SUCCESS ==========", brokerName);
             
             return true;
             
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.error("[{}] ❌ TIMEOUT waiting for Kafka ack after 5 seconds", brokerName);
+            log.error("[{}] ❌ This usually means Kafka broker is not responding", brokerName);
+            errors.incrementAndGet();
+            return false;
+        } catch (java.util.concurrent.ExecutionException e) {
+            log.error("[{}] ❌ EXECUTION EXCEPTION during publish: {}", brokerName, e.getMessage());
+            log.error("[{}] ❌ Cause: {}", brokerName, e.getCause() != null ? e.getCause().getMessage() : "unknown");
+            errors.incrementAndGet();
+            return false;
         } catch (Exception e) {
-            log.error("[{}] Failed to publish to {}: {}", brokerName, responseTopic, e.getMessage());
+            log.error("[{}] ❌ UNEXPECTED EXCEPTION during publish: {} - {}", brokerName, e.getClass().getSimpleName(), e.getMessage(), e);
             errors.incrementAndGet();
             return false;
         }

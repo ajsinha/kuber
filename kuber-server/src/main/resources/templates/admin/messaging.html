@@ -45,6 +45,9 @@
                     <a href="/admin/messaging/queue" class="btn btn-outline-info me-2">
                         <i class="fas fa-list-ol me-1"></i>View Queue
                     </a>
+                    <a href="/admin/messaging/logs" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-file-alt me-1"></i>View Logs
+                    </a>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBrokerModal">
                         <i class="fas fa-plus me-1"></i>Add Broker
                     </button>
@@ -270,6 +273,13 @@
                                                 title="Reconnect to broker">
                                             <i class="fas fa-sync me-1"></i>Reconnect
                                         </button>
+                                        
+                                        <!-- View Logs button -->
+                                        <a th:href="@{/admin/messaging/logs(broker=${entry.key})}" 
+                                           class="btn btn-outline-secondary btn-sm ms-auto"
+                                           title="View request/response logs">
+                                            <i class="fas fa-file-alt me-1"></i>View Logs
+                                        </a>
                                     </div>
                                     
                                     <h6>Request Topics:</h6>
@@ -443,7 +453,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.4</p>
+                    <p class="text-muted small mb-0">Version 1.7.5</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

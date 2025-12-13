@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.7.4";
+    private String version = "1.7.5";
     
     /**
      * Unique node identifier
@@ -158,10 +158,13 @@ public class KuberProperties {
         private int decoderMaxLineLength = 1048576; // 1MB
         
         /**
-         * Connection timeout in milliseconds
+         * Connection/session idle timeout in milliseconds.
+         * Sessions are closed after this period of inactivity.
+         * Can be adjusted per-session using CLIENT SETTIMEOUT command.
+         * Set to 0 to disable timeout (not recommended).
          */
-        @Min(1000)
-        private int connectionTimeoutMs = 30000;
+        @Min(0)
+        private int connectionTimeoutMs = 300000; // 5 minutes
         
         /**
          * Read timeout in milliseconds

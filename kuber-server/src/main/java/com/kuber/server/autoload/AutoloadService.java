@@ -121,7 +121,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * with compaction operations. Acquires region locks during file processing.
  * Write operations wait for autoload to complete before proceeding.
  * 
- * @version 1.7.4
+ * @version 1.7.5
  */
 @Service
 @Slf4j

@@ -671,4 +671,154 @@ public class MessagingController {
         
         return ResponseEntity.ok(status);
     }
+    
+    // ==================== Request/Response Logs ====================
+    
+    /**
+     * Request/Response logs viewer page.
+     */
+    @GetMapping("/admin/messaging/logs")
+    public String messagingLogs(
+            @RequestParam(required = false) String broker,
+            @RequestParam(required = false) String topic,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset,
+            Model model) {
+        
+        if (messagingService == null || messagingService.getLogger() == null) {
+            model.addAttribute("serviceAvailable", false);
+            model.addAttribute("loggerAvailable", false);
+            return "admin/messaging-logs";
+        }
+        
+        var logger = messagingService.getLogger();
+        
+        model.addAttribute("serviceAvailable", true);
+        model.addAttribute("loggerAvailable", true);
+        model.addAttribute("availableBrokers", logger.getAvailableBrokers());
+        model.addAttribute("selectedBroker", broker);
+        model.addAttribute("selectedTopic", topic);
+        model.addAttribute("limit", limit);
+        model.addAttribute("offset", offset);
+        model.addAttribute("logStats", logger.getStats());
+        
+        if (broker != null && !broker.isEmpty()) {
+            model.addAttribute("availableTopics", logger.getAvailableTopics(broker));
+            
+            if (topic != null && !topic.isEmpty()) {
+                var messages = logger.getRecentMessages(broker, topic, limit, offset);
+                model.addAttribute("messages", messages);
+                model.addAttribute("totalCount", logger.getTotalMessageCount(broker, topic));
+                model.addAttribute("logFiles", logger.getLogFiles(broker, topic));
+            }
+        }
+        
+        return "admin/messaging-logs";
+    }
+    
+    /**
+     * API: Get available brokers with logs.
+     */
+    @GetMapping("/api/v1/messaging/logs/brokers")
+    @ResponseBody
+    public ResponseEntity<?> getLogBrokers() {
+        if (messagingService == null || messagingService.getLogger() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Request/Response logger not available"
+            ));
+        }
+        
+        return ResponseEntity.ok(Map.of(
+            "brokers", messagingService.getLogger().getAvailableBrokers()
+        ));
+    }
+    
+    /**
+     * API: Get available topics for a broker.
+     */
+    @GetMapping("/api/v1/messaging/logs/brokers/{brokerName}/topics")
+    @ResponseBody
+    public ResponseEntity<?> getLogTopics(@PathVariable String brokerName) {
+        if (messagingService == null || messagingService.getLogger() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Request/Response logger not available"
+            ));
+        }
+        
+        return ResponseEntity.ok(Map.of(
+            "broker", brokerName,
+            "topics", messagingService.getLogger().getAvailableTopics(brokerName)
+        ));
+    }
+    
+    /**
+     * API: Get logged messages for a broker/topic.
+     */
+    @GetMapping("/api/v1/messaging/logs/brokers/{brokerName}/topics/{topic}/messages")
+    @ResponseBody
+    public ResponseEntity<?> getLogMessages(
+            @PathVariable String brokerName,
+            @PathVariable String topic,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        
+        if (messagingService == null || messagingService.getLogger() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Request/Response logger not available"
+            ));
+        }
+        
+        var logger = messagingService.getLogger();
+        var messages = logger.getRecentMessages(brokerName, topic, limit, offset);
+        int totalCount = logger.getTotalMessageCount(brokerName, topic);
+        
+        return ResponseEntity.ok(Map.of(
+            "broker", brokerName,
+            "topic", topic,
+            "messages", messages,
+            "totalCount", totalCount,
+            "limit", limit,
+            "offset", offset,
+            "hasMore", offset + limit < totalCount
+        ));
+    }
+    
+    /**
+     * API: Get log files for a broker/topic.
+     */
+    @GetMapping("/api/v1/messaging/logs/brokers/{brokerName}/topics/{topic}/files")
+    @ResponseBody
+    public ResponseEntity<?> getLogFiles(
+            @PathVariable String brokerName,
+            @PathVariable String topic) {
+        
+        if (messagingService == null || messagingService.getLogger() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Request/Response logger not available"
+            ));
+        }
+        
+        var files = messagingService.getLogger().getLogFiles(brokerName, topic);
+        
+        return ResponseEntity.ok(Map.of(
+            "broker", brokerName,
+            "topic", topic,
+            "files", files
+        ));
+    }
+    
+    /**
+     * API: Get logging statistics.
+     */
+    @GetMapping("/api/v1/messaging/logs/stats")
+    @ResponseBody
+    public ResponseEntity<?> getLogStats() {
+        if (messagingService == null || messagingService.getLogger() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Request/Response logger not available"
+            ));
+        }
+        
+        return ResponseEntity.ok(messagingService.getLogger().getStats());
+    }
 }

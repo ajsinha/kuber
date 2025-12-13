@@ -89,6 +89,20 @@ public class MessagingConfig {
     private int maxSearchResults = 10000;
     
     /**
+     * Enable request/response logging to files.
+     * Default: true
+     */
+    @JsonProperty("logging_enabled")
+    private boolean loggingEnabled = true;
+    
+    /**
+     * Maximum number of messages per log file before rolling.
+     * Default: 1000
+     */
+    @JsonProperty("max_log_messages")
+    private int maxLogMessages = 1000;
+    
+    /**
      * Map of broker configurations keyed by broker name.
      */
     private Map<String, BrokerConfig> brokers = new HashMap<>();

@@ -5,6 +5,8 @@
   "max_batch_get_size": 128,
   "max_batch_set_size": 128,
   "max_search_results": 10000,
+  "logging_enabled": true,
+  "max_log_messages": 1000,
   "brokers": {
     "local_kafka": {
       "enabled": true,
@@ -16,9 +18,7 @@
         "auto_offset_reset": "earliest"
       },
       "request_topics": [
-        "ccs_request",
-        "agg_request",
-        "calc_request"
+        "ccs_cache_request"
       ]
     }
   }

@@ -110,18 +110,30 @@ public interface MessageBrokerAdapter {
         private final String message;
         private final String messageId;
         private final long timestamp;
+        private final MessageBrokerAdapter sourceAdapter;  // The adapter that received this message
         
         public ReceivedMessage(String topic, String message, String messageId, long timestamp) {
+            this(topic, message, messageId, timestamp, null);
+        }
+        
+        public ReceivedMessage(String topic, String message, String messageId, long timestamp, MessageBrokerAdapter sourceAdapter) {
             this.topic = topic;
             this.message = message;
             this.messageId = messageId;
             this.timestamp = timestamp;
+            this.sourceAdapter = sourceAdapter;
         }
         
         public String getTopic() { return topic; }
         public String getMessage() { return message; }
         public String getMessageId() { return messageId; }
         public long getTimestamp() { return timestamp; }
+        
+        /**
+         * Get the adapter that received this message.
+         * Response should be sent through this same adapter.
+         */
+        public MessageBrokerAdapter getSourceAdapter() { return sourceAdapter; }
         
         /**
          * Get the inferred response topic.

@@ -104,11 +104,22 @@ public class ApiKeyService {
         
         try {
             List<ApiKey> keys = objectMapper.readValue(file, new TypeReference<List<ApiKey>>() {});
+            int validKeys = 0;
             for (ApiKey key : keys) {
-                keyValueCache.put(key.getKeyValue(), key);
-                keyIdCache.put(key.getKeyId(), key);
+                if (key.getKeyValue() != null && !key.getKeyValue().isEmpty()) {
+                    keyValueCache.put(key.getKeyValue(), key);
+                    keyIdCache.put(key.getKeyId(), key);
+                    validKeys++;
+                    log.info("Loaded API key '{}' ({}): {} [active={}]", 
+                            key.getName(), key.getKeyId(), maskKeyValue(key.getKeyValue()), key.isActive());
+                } else {
+                    log.error("⚠️ API key '{}' ({}) has NULL or EMPTY keyValue - cannot be used for authentication!", 
+                            key.getName(), key.getKeyId());
+                    keyIdCache.put(key.getKeyId(), key);  // Still put in ID cache for management
+                }
             }
-            log.info("Loaded {} API keys from {}", keys.size(), apiKeysFilePath);
+            log.info("✅ Loaded {} API keys from {} (valid keys in cache: {})", 
+                    keys.size(), apiKeysFilePath, validKeys);
         } catch (IOException e) {
             log.error("Failed to load API keys: {}", e.getMessage());
         }
@@ -251,6 +262,56 @@ public class ApiKeyService {
     }
     
     /**
+     * Validate API key without saving/updating lastUsedAt.
+     * Use this for high-throughput operations like messaging where
+     * saving on every request would be a performance and security issue.
+     * 
+     * @param keyValue the API key value to validate
+     * @return Optional containing the ApiKey if valid, empty otherwise
+     */
+    public Optional<ApiKey> validateKeyOnly(String keyValue) {
+        if (keyValue == null) {
+            log.warn("validateKeyOnly: keyValue is null");
+            return Optional.empty();
+        }
+        
+        // Trim whitespace that might come from message parsing
+        String trimmedKey = keyValue.trim();
+        
+        if (!trimmedKey.startsWith(API_KEY_PREFIX)) {
+            log.warn("validateKeyOnly: key doesn't start with prefix '{}'. Key: {}", 
+                    API_KEY_PREFIX, maskKeyValue(trimmedKey));
+            return Optional.empty();
+        }
+        
+        log.debug("validateKeyOnly: keyValueCache has {} entries", keyValueCache.size());
+        
+        // Try with trimmed key
+        ApiKey apiKey = keyValueCache.get(trimmedKey);
+        if (apiKey == null) {
+            log.warn("validateKeyOnly: key NOT FOUND in cache. Looking for: {} (cache size: {})", 
+                    maskKeyValue(trimmedKey), keyValueCache.size());
+            // Log cached keys for comparison (limit to prevent log spam)
+            if (keyValueCache.size() <= 10) {
+                keyValueCache.forEach((k, v) -> 
+                    log.info("  cached key: {} -> '{}' (active={})", 
+                            maskKeyValue(k), v.getName(), v.isActive()));
+            }
+            return Optional.empty();
+        }
+        
+        if (!apiKey.isValid()) {
+            log.warn("validateKeyOnly: key found but not valid (active={}, expired={})", 
+                    apiKey.isActive(), apiKey.isExpired());
+            return Optional.empty();
+        }
+        
+        log.debug("validateKeyOnly: key validated successfully for '{}'", apiKey.getName());
+        // Note: Does NOT update lastUsedAt or save - for performance/security
+        return Optional.of(apiKey);
+    }
+    
+    /**
      * Get all API keys (without exposing full key values)
      */
     public List<ApiKey> getAllKeys() {
@@ -326,6 +387,13 @@ public class ApiKeyService {
      */
     public void reloadKeys() {
         loadApiKeys();
+    }
+    
+    /**
+     * Get the number of keys in the value cache.
+     */
+    public int getKeyCount() {
+        return keyValueCache.size();
     }
     
     /**

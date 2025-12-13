@@ -31,7 +31,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for ActiveMQ queues/topics.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 1.7.0
+ * @version 1.7.5
  */
 @Slf4j
 public class ActiveMqBrokerAdapter implements MessageBrokerAdapter {
@@ -175,15 +175,28 @@ public class ActiveMqBrokerAdapter implements MessageBrokerAdapter {
             }
             
             messageId = message.getJMSMessageID();
+            long count = messagesReceived.incrementAndGet();
+            
+            // Log received message details
+            log.info("[{}] 📥 MESSAGE RECEIVED #{} from queue/topic '{}' | JMSMessageID: {}",
+                    brokerName, count, topic, messageId);
+            
+            // Log message content (truncated if too long)
+            if (messageText != null) {
+                if (messageText.length() > 200) {
+                    log.debug("[{}]    Content: {}...", brokerName, messageText.substring(0, 200));
+                } else {
+                    log.debug("[{}]    Content: {}", brokerName, messageText);
+                }
+            }
             
             ReceivedMessage receivedMessage = new ReceivedMessage(
                 topic,
                 messageText,
                 messageId != null ? messageId : String.valueOf(System.currentTimeMillis()),
-                message.getJMSTimestamp()
+                message.getJMSTimestamp(),
+                ActiveMqBrokerAdapter.this  // Pass this adapter as the source
             );
-            
-            messagesReceived.incrementAndGet();
             
             if (messageHandler != null) {
                 messageHandler.accept(receivedMessage);
@@ -239,7 +252,10 @@ public class ActiveMqBrokerAdapter implements MessageBrokerAdapter {
             msgProducer.send(textMessage);
             msgProducer.close();
             
-            messagesPublished.incrementAndGet();
+            long count = messagesPublished.incrementAndGet();
+            log.debug("[{}] 📤 MESSAGE PUBLISHED #{} to '{}' | Length: {} bytes",
+                    brokerName, count, responseTopic, message.length());
+            
             return true;
             
         } catch (Exception e) {

@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.4
+Version 1.7.5
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -438,6 +438,8 @@ Create `secure/request_response.json`:
   "enabled": true,
   "max_queue_depth": 100,
   "thread_pool_size": 10,
+  "logging_enabled": true,
+  "max_log_messages": 1000,
   "brokers": {
     "kafka_primary": {
       "enabled": true,
@@ -451,6 +453,73 @@ Create `secure/request_response.json`:
     }
   }
 }
+```
+
+### Test Clients (v1.7.5)
+
+Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
+
+| Broker | Python | Java | C# |
+|--------|--------|------|-----|
+| **Kafka** | `kafka_request_response_test.py` | `KafkaRequestResponseTest.java` | `KafkaRequestResponseTest.cs` |
+| **ActiveMQ** | `activemq_request_response_test.py` | `ActiveMqRequestResponseTest.java` | `ActiveMqRequestResponseTest.cs` |
+| **RabbitMQ** | `rabbitmq_request_response_test.py` | `RabbitMqRequestResponseTest.java` | `RabbitMqRequestResponseTest.cs` |
+| **IBM MQ** | `ibmmq_request_response_test.py` | `IbmMqRequestResponseTest.java` | `IbmMqRequestResponseTest.cs` |
+
+**Location:**
+- Python: `kuber-client-python/examples/`
+- Java: `kuber-client-java/examples/` (standalone, not compiled with main library)
+- C#: `kuber-client-csharp/examples-standalone/` (standalone, not compiled with main library)
+
+**Run Python Test Clients:**
+```bash
+# Install dependencies
+pip install kafka-python stomp.py pika pymqi
+
+# Run tests
+cd kuber-client-python/examples
+python kafka_request_response_test.py
+python activemq_request_response_test.py    # STOMP on port 61613
+python rabbitmq_request_response_test.py
+python ibmmq_request_response_test.py       # Requires MQ client
+```
+
+**Kafka Diagnostics Tool:**
+```bash
+# Check Kafka connectivity and message flow
+python kafka_diagnostics.py                 # Basic diagnostics
+python kafka_diagnostics.py --from-beginning --count 20  # Read messages
+python kafka_diagnostics.py --live --watch-only          # Live watch mode
+```
+
+> **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
+
+### Request/Response Logging (v1.7.5)
+
+All request/response pairs can be logged to files for debugging and auditing:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `logging_enabled` | true | Enable/disable request/response logging |
+| `max_log_messages` | 1000 | Messages per file before rolling |
+
+**Features:**
+- **Async Writing**: Non-blocking file writes to avoid impacting message processing
+- **Rolling Files**: Up to 10 file versions per broker/topic (oldest deleted automatically)
+- **JSON Format**: Easy to parse and analyze
+- **Web UI**: View logs at `/admin/messaging/logs` with broker/topic filters
+
+**Log Location:**
+```
+<secure_folder>/request_response/<broker_name>/<topic>_YYYYMMDD_HHMMSS.json
+```
+
+**API Endpoints:**
+```bash
+GET /api/v1/messaging/logs/brokers                     # List brokers with logs
+GET /api/v1/messaging/logs/brokers/{broker}/topics     # List topics for broker
+GET /api/v1/messaging/logs/brokers/{broker}/topics/{topic}/messages  # Get messages
+GET /api/v1/messaging/logs/stats                       # Get logging statistics
 ```
 
 ## JVM Requirements

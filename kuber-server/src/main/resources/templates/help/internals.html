@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.7.4</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
+                    <strong>Version 1.7.5</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
                     architecture and operational mechanics.
                 </div>
 
@@ -1279,6 +1279,85 @@ CacheService.set() / delete()
                     </div>
                 </section>
 
+                <!-- 10. Session & Connection Management (v1.7.5) -->
+                <section id="session-management" class="mb-5">
+                    <div class="card shadow-sm">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);">
+                            <h2 class="mb-0"><i class="fas fa-plug me-2"></i>10. Session &amp; Connection Management (v1.7.5)</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>Kuber v1.7.5 introduces comprehensive session management via the CLIENT command, allowing runtime control of connection timeouts and keepalive behavior.</p>
+                            
+                            <h4>10.1 Session Attributes</h4>
+                            <p>Each Redis protocol session maintains the following attributes:</p>
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Attribute</th><th>Description</th><th>Default</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><code>currentRegion</code></td><td>Active region/database</td><td>default</td></tr>
+                                    <tr><td><code>authenticated</code></td><td>Authentication status</td><td>false (if auth enabled)</td></tr>
+                                    <tr><td><code>authUser</code></td><td>Authenticated user ID</td><td>null</td></tr>
+                                    <tr><td><code>clientName</code></td><td>Client-provided name</td><td>null</td></tr>
+                                    <tr><td><code>timeoutSeconds</code></td><td>Session idle timeout</td><td>300 (5 minutes)</td></tr>
+                                </tbody>
+                            </table>
+                            
+                            <h4 class="mt-4">10.2 CLIENT Command</h4>
+                            <p>The CLIENT command provides runtime session management:</p>
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr><th>Subcommand</th><th>Syntax</th><th>Description</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><span class="badge bg-success">LIST</span></td><td><code>CLIENT LIST</code></td><td>List all connected clients</td></tr>
+                                    <tr><td><span class="badge bg-success">ID</span></td><td><code>CLIENT ID</code></td><td>Get current session ID</td></tr>
+                                    <tr><td><span class="badge bg-success">INFO</span></td><td><code>CLIENT INFO</code></td><td>Get current client details</td></tr>
+                                    <tr><td><span class="badge bg-success">GETNAME</span></td><td><code>CLIENT GETNAME</code></td><td>Get client name</td></tr>
+                                    <tr><td><span class="badge bg-success">SETNAME</span></td><td><code>CLIENT SETNAME &lt;name&gt;</code></td><td>Set client name for debugging</td></tr>
+                                    <tr><td><span class="badge bg-primary">GETTIMEOUT</span></td><td><code>CLIENT GETTIMEOUT</code></td><td>Get session timeout (seconds)</td></tr>
+                                    <tr><td><span class="badge bg-primary">SETTIMEOUT</span></td><td><code>CLIENT SETTIMEOUT &lt;sec&gt;</code></td><td>Set timeout (0=no timeout, 60-86400)</td></tr>
+                                    <tr><td><span class="badge bg-primary">KEEPALIVE</span></td><td><code>CLIENT KEEPALIVE</code></td><td>Reset idle timer, returns PONG</td></tr>
+                                </tbody>
+                            </table>
+                            <p class="text-muted"><span class="badge bg-success">Green</span> = Redis compatible, <span class="badge bg-primary">Blue</span> = Kuber extension</p>
+                            
+                            <h4 class="mt-4">10.3 Timeout Configuration</h4>
+                            <pre class="bg-dark text-white p-3 rounded">
+# application.properties
+# Default session idle timeout (milliseconds)
+kuber.network.connection-timeout-ms=300000  # 5 minutes
+
+# Runtime adjustment via CLIENT command:
+CLIENT SETTIMEOUT 3600   # 1 hour
+CLIENT SETTIMEOUT 0      # No timeout (persistent connection)</pre>
+                            
+                            <h4 class="mt-4">10.4 Keepalive Pattern</h4>
+                            <p>For long-running connections, use periodic keepalive:</p>
+                            <pre class="bg-dark text-white p-3 rounded">
+# Python example - send keepalive every 60 seconds
+import redis
+import threading
+
+client = redis.Redis(host='localhost', port=6380, password='kub_xxx')
+client.execute_command('CLIENT', 'SETTIMEOUT', '300')  # 5 min timeout
+
+def keepalive():
+    while True:
+        time.sleep(60)
+        client.execute_command('CLIENT', 'KEEPALIVE')
+
+threading.Thread(target=keepalive, daemon=True).start()</pre>
+                            
+                            <div class="alert alert-info mt-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Best Practice:</strong> Set timeout longer than your expected idle period, or use <code>CLIENT KEEPALIVE</code> 
+                                periodically for connections that need to stay open indefinitely.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Navigation -->
                 <div class="mt-5 text-center">
                     <a href="/help/architecture" class="btn btn-outline-primary">
@@ -1299,7 +1378,7 @@ CacheService.set() / delete()
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.4</p>
+                    <p class="text-muted small mb-0">Version 1.7.5</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

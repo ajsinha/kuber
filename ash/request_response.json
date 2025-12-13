@@ -1,0 +1,57 @@
+{
+  "enabled" : true,
+  "brokers" : {
+    "activemq_example" : {
+      "enabled" : true,
+      "type" : "activemq",
+      "connection" : {
+        "password" : "admin",
+        "broker_url" : "tcp://localhost:61616",
+        "username" : "admin"
+      },
+      "groupId" : "kuber-request-processor",
+      "host" : "localhost",
+      "port" : 5672,
+      "channel" : null,
+      "password" : "admin",
+      "username" : "admin",
+      "virtualHost" : "/",
+      "queueManager" : null,
+      "bootstrapServers" : null,
+      "brokerUrl" : "tcp://localhost:61616",
+      "autoOffsetReset" : "earliest",
+      "connName" : null,
+      "connectionSummary" : "tcp://localhost:61616",
+      "display_name" : "Example ActiveMQ",
+      "request_topics" : [ "ccs_cache_request" ]
+    },
+    "kafka_example" : {
+      "enabled" : true,
+      "type" : "kafka",
+      "connection" : {
+        "group_id" : "kuber-request-processor",
+        "bootstrap_servers" : "localhost:9092"
+      },
+      "groupId" : "kuber-request-processor",
+      "host" : "localhost",
+      "port" : 5672,
+      "channel" : null,
+      "password" : null,
+      "username" : null,
+      "virtualHost" : "/",
+      "queueManager" : null,
+      "bootstrapServers" : "localhost:9092",
+      "brokerUrl" : null,
+      "autoOffsetReset" : "earliest",
+      "connName" : null,
+      "connectionSummary" : "kafka://localhost:9092",
+      "display_name" : "Example Kafka",
+      "request_topics" : [ "ccs_cache_request" ]
+    }
+  },
+  "max_queue_depth" : 100,
+  "thread_pool_size" : 10,
+  "max_batch_get_size" : 128,
+  "max_batch_set_size" : 128,
+  "max_search_results" : 10000
+}
