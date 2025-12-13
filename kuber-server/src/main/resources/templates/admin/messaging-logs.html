@@ -172,7 +172,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="msg : ${messages}">
+                                <tr th:each="msg, msgStat : ${messages}">
                                     <td>
                                         <small th:text="${#temporals.format(msg.timestamp, 'yyyy-MM-dd HH:mm:ss')}">2025-01-01 12:00:00</small>
                                     </td>
@@ -200,8 +200,7 @@
                                     <td>
                                         <button class="btn btn-sm btn-outline-secondary" 
                                                 type="button"
-                                                th:data-request="${msg.request != null} ? ${#strings.replace(msg.request.toString(), '''', '&apos;')} : '{}'"
-                                                th:data-response="${msg.response != null} ? ${#strings.replace(msg.response.toString(), '''', '&apos;')} : '{}'"
+                                                th:data-index="${msgStat.index}"
                                                 onclick="showMessageDetails(this)">
                                             <i class="fas fa-eye me-1"></i>View
                                         </button>
@@ -341,7 +340,16 @@
     </div>
 </div>
 
-<script>
+<script th:inline="javascript">
+// Messages data from server (pre-serialized JSON string)
+var messagesJson = /*[[${messagesJson != null ? messagesJson : '[]'}]]*/ '[]';
+var messagesData = [];
+try {
+    messagesData = JSON.parse(messagesJson);
+} catch (e) {
+    console.error('Failed to parse messages JSON:', e);
+}
+
 // Update topics when broker changes
 function updateTopics() {
     const brokerSelect = document.getElementById('brokerSelect');
@@ -374,20 +382,16 @@ function updateTopics() {
 // Show message details in modal
 function showMessageDetails(button) {
     try {
-        const requestData = button.getAttribute('data-request') || '{}';
-        const responseData = button.getAttribute('data-response') || '{}';
+        const index = parseInt(button.getAttribute('data-index'));
+        const msg = messagesData[index];
         
-        let requestJson, responseJson;
-        try {
-            requestJson = JSON.stringify(JSON.parse(requestData.replace(/&apos;/g, "'")), null, 2);
-        } catch (e) {
-            requestJson = requestData;
+        if (!msg) {
+            alert('Message not found at index ' + index);
+            return;
         }
-        try {
-            responseJson = JSON.stringify(JSON.parse(responseData.replace(/&apos;/g, "'")), null, 2);
-        } catch (e) {
-            responseJson = responseData;
-        }
+        
+        const requestJson = msg.request ? JSON.stringify(msg.request, null, 2) : '{}';
+        const responseJson = msg.response ? JSON.stringify(msg.response, null, 2) : '{}';
         
         document.getElementById('requestJson').textContent = requestJson;
         document.getElementById('responseJson').textContent = responseJson;

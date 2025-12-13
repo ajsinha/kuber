@@ -60,7 +60,7 @@ REQUEST_QUEUE = '/queue/ccs_cache_request'
 RESPONSE_QUEUE = '/queue/ccs_cache_response'
 
 # Your Kuber API key (replace with actual key)
-API_KEY = 'kub_27d6eb2319ad721472f8c1b740e5b97188efa45e8830cfe193606714887e798d'
+API_KEY = 'kub_d427a1192ad2e45e8376e518f958b882cbdd98fdbded654ecb4e0efe70968d08'
 
 # Region to test
 TEST_REGION = 'default'

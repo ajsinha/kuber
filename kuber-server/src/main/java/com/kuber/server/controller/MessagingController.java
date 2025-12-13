@@ -710,6 +710,17 @@ public class MessagingController {
                 model.addAttribute("messages", messages);
                 model.addAttribute("totalCount", logger.getTotalMessageCount(broker, topic));
                 model.addAttribute("logFiles", logger.getLogFiles(broker, topic));
+                
+                // Serialize messages to JSON for safe JavaScript embedding
+                try {
+                    String messagesJson = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                            .writeValueAsString(messages);
+                    model.addAttribute("messagesJson", messagesJson);
+                } catch (Exception e) {
+                    log.warn("Failed to serialize messages to JSON: {}", e.getMessage());
+                    model.addAttribute("messagesJson", "[]");
+                }
             }
         }
         
