@@ -17,7 +17,7 @@
 
     <groupId>com.kuber</groupId>
     <artifactId>kuber-parent</artifactId>
-    <version>1.7.5-SNAPSHOT</version>
+    <version>1.7.6-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Kuber Distributed Cache</name>
@@ -54,10 +54,26 @@
         <hikaricp.version>5.1.0</hikaricp.version>
         <postgresql.version>42.7.2</postgresql.version>
         <rocksdb.version>9.11.2</rocksdb.version>
+        <aerospike-client-version>8.0.0</aerospike-client-version>
+        <redis.clients-version>7.0.0</redis.clients-version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- https://mvnrepository.com/artifact/com.aerospike/aerospike-client -->
+            <dependency>
+                <groupId>com.aerospike</groupId>
+                <artifactId>aerospike-client</artifactId>
+                <version>${aerospike-client-version}</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/redis.clients/jedis -->
+            <dependency>
+                <groupId>redis.clients</groupId>
+                <artifactId>jedis</artifactId>
+                <version>${redis.clients-version}</version>
+            </dependency>
+
             <!-- Apache MINA -->
             <dependency>
                 <groupId>org.apache.mina</groupId>

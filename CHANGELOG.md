@@ -2,6 +2,111 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.7.6] - 2025-12-22 - WARM OBJECTS, PROMETHEUS & UI REFRESH
+
+### 🔥 Major New Feature: Per-Region Warm Object Configuration
+
+**v1.7.6 introduces configurable warm object counts per region, ensuring frequently accessed data remains in memory for optimal read performance.**
+
+The new WarmObjectService proactively maintains a minimum number of "warm" (in-memory) objects per region, loading from disk if necessary. This works in coordination with eviction services to prevent thrashing.
+
+### How It Works
+
+| Component | Purpose |
+|-----------|---------|
+| **WarmObjectService** | Loads values to meet minimum threshold (floor) |
+| **ValueCacheLimitService** | Evicts values to stay under max limit (ceiling) |
+| **MemoryWatcherService** | Evicts during heap pressure (takes priority) |
+
+### Configuration
+
+```yaml
+kuber:
+  cache:
+    warm-objects-enabled: true
+    warm-object-check-interval-ms: 60000
+    warm-object-load-batch-size: 1000
+    region-warm-object-counts:
+      trade: 100000
+      reference: 50000
+      session: 10000
+```
+
+### New Configuration Properties
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.cache.warm-objects-enabled` | `true` | Enable warm object maintenance |
+| `kuber.cache.warm-object-check-interval-ms` | `60000` | Check interval (1 minute) |
+| `kuber.cache.warm-object-load-batch-size` | `1000` | Batch size for loading from disk |
+| `kuber.cache.region-warm-object-counts.<region>` | `0` | Minimum warm objects per region |
+
+### New Components
+
+| Component | Description |
+|-----------|-------------|
+| `WarmObjectService` | Maintains warm object counts per region |
+| `CacheService.getColdKeys()` | Gets keys not currently in value cache |
+| `CacheService.warmObject()` | Loads entry into value cache |
+| `KuberProperties.getWarmObjectCountForRegion()` | Gets configured count for region |
+
+### 📊 New Feature: Prometheus Monitoring Integration
+
+**Native Prometheus metrics integration for comprehensive monitoring and alerting.**
+
+Kuber now exposes metrics in Prometheus format via Spring Actuator at `/actuator/prometheus`.
+
+#### Key Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `kuber_cache_gets_total` | Total GET operations |
+| `kuber_cache_sets_total` | Total SET operations |
+| `kuber_cache_hit_rate` | Cache hit rate (0.0 to 1.0) |
+| `kuber_cache_evictions_total` | Total evictions |
+| `kuber_heap_used_bytes` | JVM heap memory used |
+| `kuber_heap_usage_ratio` | Heap usage ratio |
+| `kuber_region_keys{region}` | Keys per region |
+| `kuber_total_keys` | Total keys all regions |
+
+#### Prometheus Configuration
+
+```properties
+kuber.prometheus.enabled=true
+kuber.prometheus.update-interval-ms=5000
+kuber.prometheus.include-region-metrics=true
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+```
+
+#### New Components
+
+| Component | Description |
+|-----------|-------------|
+| `PrometheusMetricsService` | Registers and updates Kuber metrics |
+| `KuberProperties.Prometheus` | Prometheus configuration settings |
+
+### 🎨 UI Refresh: BMO Dark Blue Theme
+
+Updated the color scheme to a professional dark blue theme (inspired by BMO):
+- Primary color: `#0079c1` (BMO Blue)
+- Dark shade: `#005a8e`
+- Navy: `#003366`
+- Gradient: `#0079c1` → `#005a8e` → `#003366`
+- Consistent styling across login, navigation, buttons, and forms
+- Improved visual hierarchy and modern enterprise appearance
+
+### Benefits
+
+- **Prometheus Integration**: Industry-standard monitoring with Grafana dashboards
+- **Guaranteed Performance**: Frequently accessed data stays warm
+- **Configurable Per Region**: Different workloads get appropriate cache sizes
+- **Automatic Maintenance**: Background service handles loading
+- **Works with Eviction**: Respects memory limits while maintaining minimums
+- **Zero Configuration**: Falls back to default behavior if not configured
+- **Professional UI**: Modern dark blue enterprise theme
+
+---
+
 ## [1.7.5] - 2025-12-13 - SESSION & CONNECTION MANAGEMENT
 
 ### 🔌 Major New Feature: CLIENT Command for Session Management

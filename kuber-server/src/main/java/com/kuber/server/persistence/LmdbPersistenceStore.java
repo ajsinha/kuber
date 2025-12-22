@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * - {basePath}/{regionName}/data.mdb - LMDB data file
  * - {basePath}/{regionName}/lock.mdb - LMDB lock file
  * 
- * @version 1.7.5
+ * @version 1.7.6
  */
 @Slf4j
 public class LmdbPersistenceStore extends AbstractPersistenceStore {

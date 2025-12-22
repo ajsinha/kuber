@@ -15,6 +15,8 @@ import com.kuber.server.autoload.AutoloadService;
 import com.kuber.server.cache.CacheMetricsService;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.cache.MemoryWatcherService;
+import com.kuber.server.cache.ValueCacheLimitService;
+import com.kuber.server.cache.WarmObjectService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.messaging.RequestResponseService;
 import com.kuber.server.network.RedisProtocolServer;
@@ -99,6 +101,12 @@ public class ShutdownOrchestrator {
     
     @Autowired(required = false)
     private RocksDbCompactionService compactionService;
+    
+    @Autowired(required = false)
+    private ValueCacheLimitService valueCacheLimitService;
+    
+    @Autowired(required = false)
+    private WarmObjectService warmObjectService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -476,6 +484,32 @@ public class ShutdownOrchestrator {
                 stopped++;
             } catch (Exception e) {
                 log.warn("  ⚠ Error stopping compaction service: {}", e.getMessage());
+            }
+        } else {
+            notConfigured++;
+        }
+        
+        // Stop Value Cache Limit Service (v1.7.4)
+        if (valueCacheLimitService != null) {
+            try {
+                valueCacheLimitService.shutdown();
+                log.info("  ✓ Value cache limit service stopped");
+                stopped++;
+            } catch (Exception e) {
+                log.warn("  ⚠ Error stopping value cache limit service: {}", e.getMessage());
+            }
+        } else {
+            notConfigured++;
+        }
+        
+        // Stop Warm Object Service (v1.7.6)
+        if (warmObjectService != null) {
+            try {
+                warmObjectService.shutdown();
+                log.info("  ✓ Warm object service stopped");
+                stopped++;
+            } catch (Exception e) {
+                log.warn("  ⚠ Error stopping warm object service: {}", e.getMessage());
             }
         } else {
             notConfigured++;

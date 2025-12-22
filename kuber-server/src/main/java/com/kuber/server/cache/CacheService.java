@@ -3396,6 +3396,71 @@ public class CacheService {
     }
     
     /**
+     * Get keys that are in the key index but NOT in the value cache (cold keys).
+     * These are keys whose values are on disk only.
+     * Used by WarmObjectService to identify keys that need to be warmed.
+     * 
+     * @param region Region name
+     * @param maxCount Maximum number of cold keys to return
+     * @return List of cold key names
+     * @since 1.7.6
+     */
+    public List<String> getColdKeys(String region, int maxCount) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex == null || valueCache == null) {
+            return Collections.emptyList();
+        }
+        
+        List<String> coldKeys = new ArrayList<>();
+        Set<String> warmKeys = valueCache.asMap().keySet();
+        
+        // Iterate through all keys in the index
+        for (String key : keyIndex.getAllKeys()) {
+            if (!warmKeys.contains(key)) {
+                coldKeys.add(key);
+                if (coldKeys.size() >= maxCount) {
+                    break;
+                }
+            }
+        }
+        
+        return coldKeys;
+    }
+    
+    /**
+     * Warm an object by putting it into the value cache.
+     * Used by WarmObjectService to load objects from disk into memory.
+     * 
+     * @param region Region name
+     * @param entry The cache entry to warm
+     * @since 1.7.6
+     */
+    public void warmObject(String region, CacheEntry entry) {
+        if (entry == null || entry.isExpired()) {
+            return;
+        }
+        
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        if (valueCache == null) {
+            return;
+        }
+        
+        // Record access time
+        entry.recordAccess();
+        
+        // Put into value cache
+        valueCache.put(entry.getKey(), entry);
+        
+        // Update key index to mark as in-memory
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        if (keyIndex != null) {
+            keyIndex.updateLocation(entry.getKey(), KeyIndexEntry.ValueLocation.MEMORY);
+        }
+    }
+    
+    /**
      * Get total number of entries across all regions in memory.
      */
     public long getTotalMemoryEntries() {

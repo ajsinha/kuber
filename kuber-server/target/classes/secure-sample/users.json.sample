@@ -1,0 +1,167 @@
+{
+  "_comment": [
+    "===================================================================================",
+    "Kuber v1.7.3 - users.json Sample Configuration",
+    "===================================================================================",
+    "",
+    "This file defines user accounts for Kuber cache authentication and authorization.",
+    "",
+    "IMPORTANT NOTES:",
+    "  - The 'admin' user is RESERVED and cannot be deleted or have its role removed",
+    "  - When either users.json OR roles.json changes, BOTH files are reloaded",
+    "  - Changes take effect within 30 seconds (auto-reload) or immediately via Admin UI",
+    "  - If this file is missing, a default with only 'admin' user is created",
+    "",
+    "FIELD DESCRIPTIONS:",
+    "  userId      - Unique login identifier (required, alphanumeric/underscore/hyphen)",
+    "  password    - Authentication password (required, stored in cleartext)",
+    "  fullName    - Display name shown in UI (required)",
+    "  email       - Email address (optional)",
+    "  roles       - Array of role names granting permissions (required, see roles.json)",
+    "  enabled     - Account is active and can log in (default: true)",
+    "  locked      - Account is locked due to failed logins (default: false)",
+    "  systemUser  - System account that cannot be deleted (default: false)",
+    "  createdAt   - ISO timestamp of account creation (auto-set)",
+    "  createdBy   - User who created this account (auto-set)",
+    "",
+    "ROLE ASSIGNMENT EXAMPLES:",
+    "  [\"admin\"]                           - Full system access to all regions",
+    "  [\"default_readonly\"]                - Read-only access to 'default' region",
+    "  [\"default_full\"]                    - Full access to 'default' region",
+    "  [\"orders_readonly\", \"products_full\"]- Read orders, full access to products",
+    "",
+    "SECURITY RECOMMENDATIONS:",
+    "  - Change default admin password immediately",
+    "  - Use strong passwords (8+ chars, mixed case, numbers, symbols)",
+    "  - Apply principle of least privilege (minimal required roles)",
+    "  - Regularly audit user accounts and role assignments",
+    "==================================================================================="
+  ],
+  "users": [
+    {
+      "_comment": "System administrator with full access - CANNOT BE DELETED",
+      "userId": "admin",
+      "password": "admin123",
+      "fullName": "System Administrator",
+      "email": "admin@example.com",
+      "roles": ["admin"],
+      "enabled": true,
+      "locked": false,
+      "systemUser": true,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "system"
+    },
+    {
+      "_comment": "Operations user with full access to default and orders regions",
+      "userId": "operator",
+      "password": "operator123",
+      "fullName": "Operations Manager",
+      "email": "operator@example.com",
+      "roles": [
+        "default_full",
+        "orders_full",
+        "products_readwrite"
+      ],
+      "enabled": true,
+      "locked": false,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    },
+    {
+      "_comment": "Developer with read/write access to test regions",
+      "userId": "developer",
+      "password": "dev123",
+      "fullName": "Development User",
+      "email": "dev@example.com",
+      "roles": [
+        "default_readwrite",
+        "test_full",
+        "staging_full"
+      ],
+      "enabled": true,
+      "locked": false,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    },
+    {
+      "_comment": "Read-only monitoring account",
+      "userId": "monitor",
+      "password": "monitor123",
+      "fullName": "Monitoring Service",
+      "email": "monitor@example.com",
+      "roles": [
+        "default_readonly",
+        "orders_readonly",
+        "products_readonly"
+      ],
+      "enabled": true,
+      "locked": false,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    },
+    {
+      "_comment": "Service account for order processing application",
+      "userId": "order_service",
+      "password": "order_svc_pass_2025",
+      "fullName": "Order Processing Service",
+      "email": "order-service@example.com",
+      "roles": [
+        "orders_full",
+        "products_readonly",
+        "inventory_readwrite"
+      ],
+      "enabled": true,
+      "locked": false,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    },
+    {
+      "_comment": "Service account for analytics/reporting (read-only across multiple regions)",
+      "userId": "analytics",
+      "password": "analytics_pass_2025",
+      "fullName": "Analytics Service",
+      "email": "analytics@example.com",
+      "roles": [
+        "default_readonly",
+        "orders_readonly",
+        "products_readonly",
+        "customers_readonly"
+      ],
+      "enabled": true,
+      "locked": false,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    },
+    {
+      "_comment": "Example of disabled account (cannot log in)",
+      "userId": "former_employee",
+      "password": "disabled_user",
+      "fullName": "Former Employee",
+      "email": "former@example.com",
+      "roles": ["default_readonly"],
+      "enabled": false,
+      "locked": false,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    },
+    {
+      "_comment": "Example of locked account (too many failed login attempts)",
+      "userId": "locked_user",
+      "password": "locked123",
+      "fullName": "Locked User Example",
+      "email": "locked@example.com",
+      "roles": ["default_readonly"],
+      "enabled": true,
+      "locked": true,
+      "systemUser": false,
+      "createdAt": "2025-01-01T00:00:00Z",
+      "createdBy": "admin"
+    }
+  ]
+}

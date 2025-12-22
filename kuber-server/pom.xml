@@ -18,7 +18,7 @@
     <parent>
         <groupId>com.kuber</groupId>
         <artifactId>kuber-parent</artifactId>
-        <version>1.7.5-SNAPSHOT</version>
+        <version>1.7.6-SNAPSHOT</version>
     </parent>
 
     <artifactId>kuber-server</artifactId>
@@ -206,6 +206,12 @@
             <groupId>com.ibm.mq</groupId>
             <artifactId>com.ibm.mq.allclient</artifactId>
             <version>9.3.4.1</version>
+        </dependency>
+
+        <!-- Micrometer Prometheus Registry for Metrics -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
         <!-- Test dependencies -->

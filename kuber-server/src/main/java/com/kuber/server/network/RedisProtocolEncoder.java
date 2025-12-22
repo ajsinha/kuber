@@ -17,7 +17,7 @@ import java.nio.charset.StandardCharsets;
  * Writes response strings directly without adding extra delimiters.
  * The response string already contains proper RESP formatting with \r\n.
  * 
- * @version 1.7.5
+ * @version 1.7.6
  */
 public class RedisProtocolEncoder extends ProtocolEncoderAdapter {
     

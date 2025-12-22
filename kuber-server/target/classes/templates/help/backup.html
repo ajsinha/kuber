@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Backup & Restore')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Backup & Restore</li>
+            </ol>
+        </nav>
+
+        <!-- Content -->
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h1 class="display-5 mb-4"><i class="fas fa-database me-3 text-success"></i>Backup & Restore</h1>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>v1.5.0 Feature:</strong> Automatic backup and restore for RocksDB and LMDB persistence stores.
+                    SQL databases (SQLite, PostgreSQL) have their own backup mechanisms.
+                </div>
+                
+                <h3>Overview</h3>
+                <p>Kuber provides automatic scheduled backup of all regions (using cron expressions) and automatic restore when backup files are placed in the restore directory.</p>
+                
+                <h3 class="mt-4">Configuration</h3>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber:
+  backup:
+    enabled: true                    # Enable backup/restore service
+    backup-directory: ./backup       # Where backup files are stored
+    restore-directory: ./restore     # Monitor this for restore files
+    cron: "0 0 23 * * *"            # Schedule: 11:00 PM daily (default)
+    max-backups-per-region: 10       # Keep last 10 backups per region
+    compress: true                   # Gzip compression (recommended)
+    batch-size: 10000               # Entries per batch during backup/restore
+    file-encoding: UTF-8
+    create-directories: true</code></pre>
+                
+                <h5>Cron Expression Examples</h5>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Expression</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>0 0 23 * * *</code></td><td>11:00 PM daily (default)</td></tr>
+                        <tr><td><code>0 0 2 * * *</code></td><td>2:00 AM daily</td></tr>
+                        <tr><td><code>0 0 */6 * * *</code></td><td>Every 6 hours</td></tr>
+                        <tr><td><code>0 30 1 * * SUN</code></td><td>1:30 AM every Sunday</td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4">Backup</h3>
+                <p>Backups run automatically according to the cron schedule. Each region is backed up to a separate file.</p>
+                
+                <h5>File Naming</h5>
+                <pre class="bg-light p-3 rounded"><code>&lt;region&gt;.&lt;timestamp&gt;.backup.gz
+
+Examples:
+  customers.20251207_230000.backup.gz
+  products.20251207_230003.backup.gz
+  default.20251207_230005.backup.gz</code></pre>
+                
+                <h5>File Format</h5>
+                <pre class="bg-light p-3 rounded"><code># KUBER_BACKUP_HEADER: {"version":"1.4.2","region":"customers","timestamp":"..."}
+{"id":"...","key":"cust001","region":"customers","valueType":"JSON",...}
+{"id":"...","key":"cust002","region":"customers","valueType":"JSON",...}
+...</code></pre>
+                
+                <h5>Manual Backup</h5>
+                <p>Trigger immediate backup in two ways:</p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-desktop me-2"></i>
+                    <strong>Admin Dashboard:</strong> Go to <a href="/admin">Admin Dashboard</a>, select a region (or "All Regions") from the dropdown, and click the 
+                    <button class="btn btn-sm btn-info text-white" disabled><i class="fas fa-download me-1"></i>Backup</button> 
+                    button in the Backup &amp; Restore card.
+                </div>
+                
+                <p>Or via REST API:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code># Backup all regions
+curl -X POST http://localhost:8080/api/admin/backup \
+     -H "X-API-Key: your-api-key"
+
+# Backup single region
+curl -X POST http://localhost:8080/api/admin/backup/customers \
+     -H "X-API-Key: your-api-key"</code></pre>
+                
+                <h3 class="mt-4">Restore</h3>
+                <p>To restore a region, place the backup file in the restore directory. The service automatically detects and processes it.</p>
+                
+                <h5>Restore Process</h5>
+                <ol>
+                    <li>Place backup file in <code>./restore</code> directory</li>
+                    <li>Service detects file within 30 seconds</li>
+                    <li>Region name is inferred from file name</li>
+                    <li><strong>Region is LOCKED</strong> - all operations blocked</li>
+                    <li>Existing data is purged</li>
+                    <li>Backup data is restored in batches</li>
+                    <li>Region is unlocked</li>
+                    <li>Processed file moved to backup directory</li>
+                </ol>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-lock me-2"></i>
+                    <strong>Region Locking:</strong> During restore, all GET, SET, DELETE operations on the region will receive an error:
+                    <code>"Region 'xxx' is currently being restored. Please wait for restore to complete."</code>
+                </div>
+                
+                <h5>Restore Example</h5>
+                <pre class="bg-dark text-light p-3 rounded"><code># Copy backup to restore directory
+cp ./backup/customers.20251207_143022.backup.gz ./restore/
+
+# Check logs for progress
+tail -f logs/kuber.log
+
+# Expected output:
+# Starting restore of region 'customers' from customers.20251207_143022.backup.gz
+# [customers] Purging existing data before restore...
+# [customers] Restored 10000 entries so far...
+# [customers] Restored 20000 entries so far...
+# [customers] RESTORE COMPLETED: 25432 entries, 4521678 bytes, 1523 ms</code></pre>
+                
+                <h3 class="mt-4">Retention Policy</h3>
+                <p>Old backups are automatically deleted based on <code>max-backups-per-region</code> setting.</p>
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Setting</th><th>Behavior</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>max-backups-per-region: 10</code></td><td>Keep last 10 backups per region</td></tr>
+                        <tr><td><code>max-backups-per-region: 0</code></td><td>Keep all backups (no cleanup)</td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4">Supported Persistence Stores</h3>
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Store</th><th>Supported</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>RocksDB</td><td><span class="badge bg-success">Yes</span></td><td>Full support</td></tr>
+                        <tr><td>LMDB</td><td><span class="badge bg-success">Yes</span></td><td>Full support</td></tr>
+                        <tr><td>SQLite</td><td><span class="badge bg-secondary">No</span></td><td>Use SQLite's .backup command</td></tr>
+                        <tr><td>PostgreSQL</td><td><span class="badge bg-secondary">No</span></td><td>Use pg_dump/pg_restore</td></tr>
+                        <tr><td>MongoDB</td><td><span class="badge bg-secondary">No</span></td><td>Use mongodump/mongorestore</td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4">Directory Structure</h3>
+                <pre class="bg-light p-3 rounded"><code>./backup/
+├── customers.20251207_143022.backup.gz
+├── customers.20251207_113022.backup.gz
+├── products.20251207_143025.backup.gz
+└── restored_20251207_150000_customers.20251207_143022.backup.gz
+
+./restore/
+└── (place backup files here to trigger restore)</code></pre>
+                
+                <h3 class="mt-4">Statistics</h3>
+                <p>View backup/restore statistics via REST API:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>curl http://localhost:8080/api/admin/backup/stats \
+     -H "X-API-Key: your-api-key"
+
+# Response:
+{
+  "enabled": true,
+  "backupDirectory": "./backup",
+  "restoreDirectory": "./restore",
+  "intervalMinutes": 30,
+  "maxBackupsPerRegion": 10,
+  "compression": true,
+  "totals": {
+    "backups": 15,
+    "restores": 2,
+    "backupBytes": 45678901,
+    "restoreBytes": 12345678,
+    "lastBackupTime": "2025-12-07T14:30:22Z",
+    "lastRestoreTime": "2025-12-07T12:15:00Z"
+  },
+  "regionsBeingRestored": []
+}</code></pre>
+                
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

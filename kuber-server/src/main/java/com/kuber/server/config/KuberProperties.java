@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.7.5";
+    private String version = "1.7.6";
     
     /**
      * Unique node identifier
@@ -113,6 +113,12 @@ public class KuberProperties {
      * Shutdown configuration
      */
     private Shutdown shutdown = new Shutdown();
+    
+    /**
+     * Prometheus metrics configuration
+     * @since 1.7.6
+     */
+    private Prometheus prometheus = new Prometheus();
     
     @Data
     public static class Base {
@@ -402,6 +408,77 @@ public class KuberProperties {
          */
         @Min(1000)
         private int valueCacheLimitCheckIntervalMs = 30000;
+        
+        // ==================== Warm Object Configuration (v1.7.6) ====================
+        
+        /**
+         * Enable warm object maintenance per region.
+         * When enabled, the system proactively maintains a minimum number of
+         * "warm" (in-memory) objects per region, loading from disk if necessary.
+         * This ensures frequently accessed data remains in memory for fast access.
+         * 
+         * @since 1.7.6
+         */
+        private boolean warmObjectsEnabled = true;
+        
+        /**
+         * Per-region warm object counts. Keys are region names, values are minimum
+         * number of objects to keep warm (in-memory) for that region.
+         * 
+         * Example configuration:
+         *   kuber.cache.region-warm-object-counts.trade=100000
+         *   kuber.cache.region-warm-object-counts.reference=50000
+         *   kuber.cache.region-warm-object-counts.session=10000
+         * 
+         * If a region is not specified here, it falls back to default behavior
+         * (no guaranteed minimum, subject to normal eviction policies).
+         * 
+         * Note: The warm object count cannot exceed the total keys in the region.
+         * If configured higher, it will be capped at the region's key count.
+         * 
+         * @since 1.7.6
+         */
+        private java.util.Map<String, Integer> regionWarmObjectCounts = new java.util.HashMap<>();
+        
+        /**
+         * Interval in milliseconds for warm object maintenance checks.
+         * The warm object service runs at this interval to ensure regions
+         * have their configured minimum warm objects in memory.
+         * 
+         * @since 1.7.6
+         */
+        @Min(1000)
+        private int warmObjectCheckIntervalMs = 60000;
+        
+        /**
+         * Batch size for loading warm objects from disk.
+         * When the warm object service needs to load objects from disk
+         * to meet the warm object target, it loads them in batches of this size.
+         * 
+         * @since 1.7.6
+         */
+        @Min(100)
+        private int warmObjectLoadBatchSize = 1000;
+        
+        /**
+         * Get the warm object count for a specific region.
+         * Returns the region-specific count if configured, otherwise 0 (no minimum).
+         * 
+         * @since 1.7.6
+         */
+        public int getWarmObjectCountForRegion(String regionName) {
+            return regionWarmObjectCounts.getOrDefault(regionName, 0);
+        }
+        
+        /**
+         * Check if a region has a configured warm object count.
+         * 
+         * @since 1.7.6
+         */
+        public boolean hasWarmObjectConfig(String regionName) {
+            return regionWarmObjectCounts.containsKey(regionName) 
+                    && regionWarmObjectCounts.get(regionName) > 0;
+        }
     }
     
     @Data
@@ -1352,5 +1429,58 @@ public class KuberProperties {
          */
         @Min(1)
         private int phaseDelaySeconds = 5;
+    }
+    
+    /**
+     * Prometheus metrics configuration.
+     * @since 1.7.6
+     */
+    @Data
+    public static class Prometheus {
+        /**
+         * Enable Prometheus metrics endpoint.
+         * When enabled, metrics are exposed at /actuator/prometheus
+         */
+        private boolean enabled = true;
+        
+        /**
+         * Metrics update interval in milliseconds.
+         * How often to refresh cache metrics.
+         * Default: 5000ms (5 seconds)
+         */
+        @Min(1000)
+        private long updateIntervalMs = 5000;
+        
+        /**
+         * Include JVM metrics.
+         * When enabled, JVM memory, GC, and thread metrics are exported.
+         */
+        private boolean includeJvmMetrics = true;
+        
+        /**
+         * Include per-region metrics.
+         * When enabled, individual region statistics are exported.
+         */
+        private boolean includeRegionMetrics = true;
+        
+        /**
+         * Custom metric prefix.
+         * All Kuber metrics will use this prefix.
+         * Default: kuber
+         */
+        private String metricPrefix = "kuber";
+        
+        /**
+         * Include operation latency histograms.
+         * When enabled, detailed latency distribution is tracked.
+         * Note: May increase memory usage.
+         */
+        private boolean includeLatencyHistograms = false;
+        
+        /**
+         * Histogram bucket boundaries in microseconds for latency metrics.
+         * Only used when includeLatencyHistograms is true.
+         */
+        private double[] latencyBuckets = {100, 500, 1000, 5000, 10000, 50000, 100000};
     }
 }

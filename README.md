@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.5
+Version 1.7.6
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -142,6 +142,71 @@ kuber.cache.value-cache-limit-enabled=true
 kuber.cache.value-cache-max-percent=20
 kuber.cache.value-cache-max-entries=10000
 ```
+
+### Warm Objects (v1.7.6)
+
+Kuber can maintain a minimum number of "warm" (in-memory) objects per region, ensuring frequently accessed data stays in memory for optimal read performance:
+
+| Component | Purpose |
+|-----------|---------|
+| **WarmObjectService** | Loads values to meet minimum threshold (floor) |
+| **ValueCacheLimitService** | Evicts values to stay under max limit (ceiling) |
+| **MemoryWatcherService** | Evicts during heap pressure (takes priority) |
+
+**Configuration:**
+```properties
+# Enable warm object maintenance
+kuber.cache.warm-objects-enabled=true
+kuber.cache.warm-object-check-interval-ms=60000
+kuber.cache.warm-object-load-batch-size=1000
+
+# Per-region warm object counts
+kuber.cache.region-warm-object-counts.trade=100000
+kuber.cache.region-warm-object-counts.reference=50000
+kuber.cache.region-warm-object-counts.session=10000
+```
+
+**Benefits:**
+- Frequently accessed data stays warm in memory
+- Different workloads get appropriate cache sizes
+- Background service handles loading automatically
+- Works with eviction services (respects memory limits)
+- Falls back to default behavior if not configured
+
+### Prometheus Monitoring (v1.7.6)
+
+Kuber integrates with Prometheus for comprehensive metrics monitoring:
+
+```properties
+# Enable Prometheus endpoint
+kuber.prometheus.enabled=true
+kuber.prometheus.update-interval-ms=5000
+
+# Expose actuator endpoints
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+```
+
+**Key Metrics:**
+
+| Metric | Description |
+|--------|-------------|
+| `kuber_cache_hit_rate` | Cache hit rate (0.0 to 1.0) |
+| `kuber_cache_gets_total` | Total GET operations |
+| `kuber_cache_sets_total` | Total SET operations |
+| `kuber_heap_usage_ratio` | JVM heap usage ratio |
+| `kuber_region_keys{region}` | Keys per region |
+| `kuber_total_keys` | Total keys all regions |
+
+**Prometheus scrape config:**
+```yaml
+scrape_configs:
+  - job_name: 'kuber-cache'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['kuber-server:8080']
+```
+
+See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Grafana dashboards and alerting rules.
 
 ## Quick Start
 
@@ -455,7 +520,7 @@ Create `secure/request_response.json`:
 }
 ```
 
-### Test Clients (v1.7.5)
+### Test Clients (v1.7.6)
 
 Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
 
@@ -494,7 +559,7 @@ python kafka_diagnostics.py --live --watch-only          # Live watch mode
 
 > **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
 
-### Request/Response Logging (v1.7.5)
+### Request/Response Logging (v1.7.6)
 
 All request/response pairs can be logged to files for debugging and auditing:
 

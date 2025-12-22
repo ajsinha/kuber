@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Starting the Server')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active">Starting the Server</li>
+            </ol>
+        </nav>
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h1 class="display-5 mb-4"><i class="fas fa-play-circle me-3 text-success"></i>How to Start Kuber Server</h1>
+                
+                <p class="lead">This guide covers all methods for starting the Kuber server, including configuration options and command-line property overrides.</p>
+
+                <!-- Table of Contents -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <i class="fas fa-list me-2"></i>Table of Contents
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ol>
+                                    <li><a href="#prerequisites">Prerequisites</a></li>
+                                    <li><a href="#building">Building the Project</a></li>
+                                    <li><a href="#running">Running the Server</a></li>
+                                    <li><a href="#config-methods">Configuration Methods</a></li>
+                                </ol>
+                            </div>
+                            <div class="col-md-6">
+                                <ol start="5">
+                                    <li><a href="#command-line">Command Line Overrides</a></li>
+                                    <li><a href="#env-vars">Environment Variables</a></li>
+                                    <li><a href="#examples">Common Examples</a></li>
+                                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prerequisites -->
+                <h2 id="prerequisites" class="mt-5 border-bottom pb-2"><i class="fas fa-check-circle me-2 text-primary"></i>1. Prerequisites</h2>
+                
+                <div class="table-responsive mt-3">
+                    <table class="table table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Software</th>
+                                <th>Minimum</th>
+                                <th>Recommended</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Java JDK</strong></td>
+                                <td>17</td>
+                                <td>21</td>
+                                <td>Runtime environment</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Maven</strong></td>
+                                <td>3.8</td>
+                                <td>3.9+</td>
+                                <td>Build tool</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 class="mt-4">Verify Installation</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code># Check Java version
+java -version
+# Expected: openjdk version "17.x.x" or higher
+
+# Check Maven version
+mvn -version
+# Expected: Apache Maven 3.8.x or higher
+
+# Check JAVA_HOME
+echo $JAVA_HOME</code></pre>
+
+                <!-- Building -->
+                <h2 id="building" class="mt-5 border-bottom pb-2"><i class="fas fa-hammer me-2 text-warning"></i>2. Building the Project</h2>
+                
+                <pre class="bg-dark text-light p-3 rounded"><code># Build all modules
+mvn clean install -DskipTests
+
+# Build with tests
+mvn clean install
+
+# Build only server module
+mvn clean install -pl kuber-server -am -DskipTests</code></pre>
+
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    After successful build, the JAR is at: <code>kuber-server/target/kuber-server-1.5.0-SNAPSHOT.jar</code>
+                </div>
+
+                <!-- Running -->
+                <h2 id="running" class="mt-5 border-bottom pb-2"><i class="fas fa-rocket me-2 text-success"></i>3. Running the Server</h2>
+
+                <div class="accordion mt-4" id="runMethods">
+                    <!-- Method 1: JAR -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#methodJar">
+                                <i class="fas fa-file-archive me-2"></i>Method 1: Using JAR File (Production)
+                            </button>
+                        </h2>
+                        <div id="methodJar" class="accordion-collapse collapse show" data-bs-parent="#runMethods">
+                            <div class="accordion-body">
+                                <pre class="bg-dark text-light p-3 rounded"><code># Basic start
+java -jar kuber-server/target/kuber-server-1.5.0-SNAPSHOT.jar
+
+# With memory settings
+java -Xms512m -Xmx2g -jar kuber-server-1.5.0-SNAPSHOT.jar
+
+# With GC tuning (large heaps)
+java -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
+     -jar kuber-server-1.5.0-SNAPSHOT.jar</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Method 2: Maven -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#methodMaven">
+                                <i class="fab fa-java me-2"></i>Method 2: Using Maven (Development)
+                            </button>
+                        </h2>
+                        <div id="methodMaven" class="accordion-collapse collapse" data-bs-parent="#runMethods">
+                            <div class="accordion-body">
+                                <pre class="bg-dark text-light p-3 rounded"><code># From kuber-server directory
+cd kuber-server
+mvn spring-boot:run
+
+# With profile
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+
+# With JVM arguments
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xms512m -Xmx2g"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Method 3: IDE -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#methodIde">
+                                <i class="fas fa-code me-2"></i>Method 3: From IDE
+                            </button>
+                        </h2>
+                        <div id="methodIde" class="accordion-collapse collapse" data-bs-parent="#runMethods">
+                            <div class="accordion-body">
+                                <p><strong>IntelliJ IDEA:</strong></p>
+                                <ol>
+                                    <li>Import as Maven project</li>
+                                    <li>Navigate to <code>KuberApplication.java</code></li>
+                                    <li>Right-click → Run 'KuberApplication'</li>
+                                </ol>
+                                <p><strong>Eclipse:</strong></p>
+                                <ol>
+                                    <li>Import as Maven project</li>
+                                    <li>Right-click <code>KuberApplication.java</code> → Run As → Java Application</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Methods -->
+                <h2 id="config-methods" class="mt-5 border-bottom pb-2"><i class="fas fa-cogs me-2 text-secondary"></i>4. Configuration Methods</h2>
+
+                <h4 class="mt-4">Configuration Precedence (Highest to Lowest)</h4>
+                <ol>
+                    <li>Command line arguments (<code>--property=value</code>)</li>
+                    <li>Java system properties (<code>-Dproperty=value</code>)</li>
+                    <li>Environment variables (<code>PROPERTY_NAME=value</code>)</li>
+                    <li><code>application.yml</code> in current directory</li>
+                    <li><code>application.yml</code> inside JAR (default)</li>
+                </ol>
+
+                <h4 class="mt-4">External Configuration File</h4>
+                <p>Create <code>application.yml</code> in the same directory as the JAR:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber:
+  network:
+    port: 6380
+    bind-address: 0.0.0.0
+  
+  cache:
+    max-memory-entries: 100000
+    cache-implementation: CAFFEINE
+    collections-implementation: DEFAULT
+  
+  persistence:
+    type: rocksdb
+    rocksdb:
+      path: ./data/rocksdb
+
+spring:
+  security:
+    user:
+      name: admin
+      password: your-secure-password</code></pre>
+
+                <h4 class="mt-4">Using Spring Profiles</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code># Activate a profile
+java -jar kuber-server.jar --spring.profiles.active=prod
+
+# Using environment variable
+export SPRING_PROFILES_ACTIVE=prod
+java -jar kuber-server.jar</code></pre>
+
+                <!-- Command Line Overrides -->
+                <h2 id="command-line" class="mt-5 border-bottom pb-2"><i class="fas fa-terminal me-2 text-info"></i>5. Command Line Property Overrides</h2>
+
+                <h4 class="mt-4">Double-Dash Syntax (Recommended)</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server.jar \
+  --kuber.network.port=6380 \
+  --kuber.network.bind-address=0.0.0.0 \
+  --kuber.cache.max-memory-entries=500000 \
+  --kuber.persistence.type=lmdb \
+  --kuber.persistence.rocksdb.path=/data/kuber \
+  --spring.security.user.name=admin \
+  --spring.security.user.password=secret123</code></pre>
+
+                <h4 class="mt-4">Java System Properties (-D Syntax)</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code>java -Dkuber.network.port=6380 \
+     -Dkuber.cache.max-memory-entries=500000 \
+     -Dspring.security.user.password=secret123 \
+     -jar kuber-server.jar</code></pre>
+
+                <h4 class="mt-4">Common Property Reference</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Property</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>--server.port</code></td>
+                                <td>8080</td>
+                                <td>HTTP/REST API port</td>
+                            </tr>
+                            <tr>
+                                <td><code>--kuber.network.port</code></td>
+                                <td>6380</td>
+                                <td>Redis protocol port</td>
+                            </tr>
+                            <tr>
+                                <td><code>--kuber.network.bind-address</code></td>
+                                <td>0.0.0.0</td>
+                                <td>Network interface to bind</td>
+                            </tr>
+                            <tr>
+                                <td><code>--kuber.cache.max-memory-entries</code></td>
+                                <td>100000</td>
+                                <td>Max entries per region</td>
+                            </tr>
+                            <tr>
+                                <td><code>--kuber.cache.global-max-memory-entries</code></td>
+                                <td>0</td>
+                                <td>Global max (0=unlimited)</td>
+                            </tr>
+                            <tr>
+                                <td><code>--kuber.persistence.type</code></td>
+                                <td>rocksdb</td>
+                                <td>rocksdb, lmdb, mongodb, postgresql, sqlite, memory</td>
+                            </tr>
+                            <tr>
+                                <td><code>--kuber.persistence.sync-individual-writes</code></td>
+                                <td>false</td>
+                                <td>true=sync, false=async writes</td>
+                            </tr>
+                            <tr>
+                                <td><code>--spring.security.user.name</code></td>
+                                <td>admin</td>
+                                <td>Web UI / REST API username</td>
+                            </tr>
+                            <tr>
+                                <td><code>--spring.security.user.password</code></td>
+                                <td>admin</td>
+                                <td>Web UI / REST API password</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 class="mt-4">Persistence Configuration Examples</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">RocksDB (Recommended)</div>
+                            <div class="card-body">
+                                <pre class="bg-dark text-light p-2 rounded small"><code>--kuber.persistence.type=lmdb \
+--kuber.persistence.rocksdb.path=/var/kuber/data</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">LMDB</div>
+                            <div class="card-body">
+                                <pre class="bg-dark text-light p-2 rounded small"><code>--kuber.persistence.type=lmdb \
+--kuber.persistence.lmdb.path=/var/kuber/lmdb</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-info text-white">MongoDB</div>
+                            <div class="card-body">
+                                <pre class="bg-dark text-light p-2 rounded small"><code>--kuber.persistence.type=mongodb \
+--kuber.mongo.uri=mongodb://localhost:27017</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-warning">In-Memory Only</div>
+                            <div class="card-body">
+                                <pre class="bg-dark text-light p-2 rounded small"><code>--kuber.persistence.type=memory</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Environment Variables -->
+                <h2 id="env-vars" class="mt-5 border-bottom pb-2"><i class="fas fa-globe me-2 text-success"></i>6. Environment Variables</h2>
+
+                <p>Spring Boot maps environment variables to properties by:</p>
+                <ol>
+                    <li>Replacing dots (<code>.</code>) with underscores (<code>_</code>)</li>
+                    <li>Removing dashes (<code>-</code>)</li>
+                    <li>Converting to uppercase</li>
+                </ol>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Property</th>
+                                <th>Environment Variable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>kuber.network.port</code></td>
+                                <td><code>KUBER_NETWORK_PORT</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>kuber.cache.max-memory-entries</code></td>
+                                <td><code>KUBER_CACHE_MAXMEMORYENTRIES</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>kuber.persistence.type</code></td>
+                                <td><code>KUBER_PERSISTENCE_TYPE</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>spring.security.user.password</code></td>
+                                <td><code>SPRING_SECURITY_USER_PASSWORD</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 class="mt-4">Usage Example</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code># Set environment variables
+export KUBER_NETWORK_PORT=6380
+export KUBER_CACHE_MAXMEMORYENTRIES=500000
+export KUBER_PERSISTENCE_TYPE=rocksdb
+export SPRING_SECURITY_USER_PASSWORD=secret123
+
+# Run the server
+java -jar kuber-server.jar</code></pre>
+
+                <!-- Common Examples -->
+                <h2 id="examples" class="mt-5 border-bottom pb-2"><i class="fas fa-lightbulb me-2 text-warning"></i>7. Common Configuration Examples</h2>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="fas fa-laptop-code me-2"></i>Development Setup
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-dark text-light p-3 rounded mb-0"><code>java -jar kuber-server.jar \
+  --spring.profiles.active=dev \
+  --kuber.persistence.type=memory \
+  --logging.level.com.kuber=DEBUG</code></pre>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-server me-2"></i>Production Setup
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-dark text-light p-3 rounded mb-0"><code>java -Xms4g -Xmx8g -XX:+UseG1GC \
+  -jar kuber-server.jar \
+  --kuber.network.port=6380 \
+  --kuber.cache.max-memory-entries=1000000 \
+  --kuber.persistence.type=lmdb \
+  --kuber.persistence.rocksdb.path=/var/kuber/data \
+  --kuber.backup.enabled=true \
+  --kuber.backup.cron="0 0 2 * * ?" \
+  --spring.security.user.password=${KUBER_PASSWORD}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-info text-white">
+                        <i class="fas fa-network-wired me-2"></i>High-Availability with ZooKeeper
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-dark text-light p-3 rounded mb-0"><code>java -jar kuber-server.jar \
+  --kuber.node-id=node1 \
+  --kuber.zookeeper.enabled=true \
+  --kuber.zookeeper.connect-string=zk1:2181,zk2:2181,zk3:2181 \
+  --kuber.persistence.type=lmdb</code></pre>
+                    </div>
+                </div>
+
+                <!-- Troubleshooting -->
+                <h2 id="troubleshooting" class="mt-5 border-bottom pb-2"><i class="fas fa-bug me-2 text-danger"></i>8. Troubleshooting</h2>
+
+                <div class="accordion mt-4" id="troubleshootingAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#issue1">
+                                Port Already in Use
+                            </button>
+                        </h2>
+                        <div id="issue1" class="accordion-collapse collapse show" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <pre class="bg-dark text-light p-3 rounded"><code># Find process using port
+lsof -i :8080
+lsof -i :6380
+
+# Kill process
+kill -9 &lt;PID&gt;
+
+# Or use different ports
+java -jar kuber-server.jar --server.port=9080 --kuber.network.port=7380</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#issue2">
+                                Insufficient Memory
+                            </button>
+                        </h2>
+                        <div id="issue2" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <pre class="bg-dark text-light p-3 rounded"><code># Increase heap size
+java -Xms1g -Xmx2g -jar kuber-server.jar</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#issue3">
+                                Enable Debug Logging
+                            </button>
+                        </h2>
+                        <div id="issue3" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <pre class="bg-dark text-light p-3 rounded"><code># Enable debug logging
+java -jar kuber-server.jar --logging.level.com.kuber=DEBUG
+
+# Log to file
+java -jar kuber-server.jar \
+  --logging.file.name=/var/log/kuber/kuber.log \
+  --logging.level.com.kuber=DEBUG</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#issue4">
+                                Verify Server is Running
+                            </button>
+                        </h2>
+                        <div id="issue4" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <pre class="bg-dark text-light p-3 rounded"><code># Check if process is running
+ps aux | grep kuber-server
+
+# Check listening ports
+ss -tlnp | grep -E "8080|6380"
+
+# Health check
+curl http://localhost:8080/actuator/health
+
+# Redis ping
+redis-cli -p 6380 -a admin:admin PING</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Reference -->
+                <div class="card mt-5 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-bookmark me-2"></i>Quick Reference
+                    </div>
+                    <div class="card-body">
+                        <h5>Minimum Start Command</h5>
+                        <pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server-1.5.0-SNAPSHOT.jar</code></pre>
+                        
+                        <h5 class="mt-4">Typical Production Start</h5>
+                        <pre class="bg-dark text-light p-3 rounded"><code>java -Xms2g -Xmx4g \
+  -jar kuber-server.jar \
+  --kuber.persistence.type=lmdb \
+  --kuber.persistence.rocksdb.path=/var/kuber/data \
+  --spring.security.user.password=${KUBER_PASSWORD}</code></pre>
+
+                        <h5 class="mt-4">Key URLs</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td><code>http://localhost:8080</code></td>
+                                        <td>Web UI</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>http://localhost:8080/api/info</code></td>
+                                        <td>Server Info API</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>http://localhost:8080/actuator/health</code></td>
+                                        <td>Health Check</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>localhost:6380</code></td>
+                                        <td>Redis Protocol Port</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="d-flex justify-content-between mt-5">
+                    <a href="/help/quickstart" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-2"></i>Quick Start
+                    </a>
+                    <a href="/help/config" class="btn btn-outline-primary">
+                        Configuration Reference<i class="fas fa-arrow-right ms-2"></i>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</main>
+<footer th:replace="~{layout :: footer}"></footer>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

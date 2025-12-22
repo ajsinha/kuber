@@ -31,7 +31,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for IBM MQ queues.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 1.7.5
+ * @version 1.7.6
  */
 @Slf4j
 public class IbmMqBrokerAdapter implements MessageBrokerAdapter {

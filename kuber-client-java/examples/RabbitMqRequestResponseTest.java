@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Kuber RabbitMQ Request/Response Test Client (v1.7.5)
+ * Kuber RabbitMQ Request/Response Test Client (v1.7.6)
  * 
  * Tests the Kuber Request/Response messaging feature via RabbitMQ AMQP.
  * Publishes cache operation requests and subscribes to responses.
@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Test client for Kuber's RabbitMQ-based Request/Response messaging.
  * 
- * @version 1.7.5
+ * @version 1.7.6
  */
 public class RabbitMqRequestResponseTest {
     

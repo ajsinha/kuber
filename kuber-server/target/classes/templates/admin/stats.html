@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Statistics')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
+                <li class="breadcrumb-item active">Statistics</li>
+            </ol>
+        </nav>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <h2 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Cache Statistics
+                </h2>
+            </div>
+        </div>
+        
+        <!-- Server Info -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0">
+                    <i class="fas fa-server me-2 text-primary"></i>
+                    Server Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group list-group-flush">
+                            <li th:each="entry : ${serverInfo}" class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted" th:text="${entry.key}">Key</span>
+                                <span th:text="${entry.value}">Value</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Replication Info -->
+        <div th:if="${replicationInfo}" class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0">
+                    <i class="fas fa-sync me-2 text-success"></i>
+                    Replication Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group list-group-flush">
+                            <li th:each="entry : ${replicationInfo}" class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted" th:text="${entry.key}">Key</span>
+                                <span th:text="${entry.value}">Value</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div th:unless="${replicationInfo}" class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0">
+                    <i class="fas fa-sync me-2 text-secondary"></i>
+                    Replication Status
+                </h5>
+            </div>
+            <div class="card-body text-center py-4 text-muted">
+                <i class="fas fa-info-circle fa-2x mb-2 d-block"></i>
+                Running in standalone mode (replication disabled)
+            </div>
+        </div>
+        
+        <!-- Glossary Card -->
+        <div class="card border-0 shadow-sm bg-light">
+            <div class="card-body">
+                <h6 class="card-title text-muted mb-3">
+                    <i class="fas fa-question-circle me-2"></i>Glossary
+                </h6>
+                <div class="row small">
+                    <div class="col-md-4">
+                        <dl class="mb-0">
+                            <dt>Hits</dt>
+                            <dd class="text-muted">Cache lookups that found data (successful reads).</dd>
+                            <dt>Misses</dt>
+                            <dd class="text-muted">Cache lookups where data was not found.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <dl class="mb-0">
+                            <dt>Sets</dt>
+                            <dd class="text-muted">Write operations creating or updating entries.</dd>
+                            <dt>Deletes</dt>
+                            <dd class="text-muted">Operations that removed entries from the cache.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <dl class="mb-0">
+                            <dt>Expired</dt>
+                            <dd class="text-muted">Entries automatically removed after TTL expiration.</dd>
+                            <dt>Evicted</dt>
+                            <dd class="text-muted">Entries moved from memory to persistence to free heap.</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

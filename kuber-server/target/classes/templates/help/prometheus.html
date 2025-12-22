@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Prometheus Integration')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div class="container-fluid py-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Prometheus Integration</li>
+            </ol>
+        </nav>
+
+        <!-- Content -->
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h1 class="display-5 mb-4"><i class="fas fa-chart-line me-3 text-primary"></i>Prometheus Integration</h1>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Version 1.7.6</strong> - Monitor <span th:text="${appName} ?: 'Kuber'">Kuber</span> metrics with Prometheus and Grafana.
+                </div>
+
+                <!-- Overview -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><span th:text="${appName} ?: 'Kuber'">Kuber</span> v1.7.6 includes native Prometheus integration for comprehensive metrics monitoring. 
+                           The integration exposes cache operations, memory usage, and performance metrics in 
+                           Prometheus format at <code>/actuator/prometheus</code>.</p>
+                        
+                        <div class="row mt-4">
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100">
+                                    <h6><i class="fas fa-tachometer-alt text-primary me-2"></i>Cache Metrics</h6>
+                                    <p class="mb-0 small text-muted">Track GET/SET/DELETE operations, hit rates, evictions, and expirations</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100">
+                                    <h6><i class="fas fa-memory text-success me-2"></i>Memory Metrics</h6>
+                                    <p class="mb-0 small text-muted">Monitor heap usage, value cache size, and per-region memory</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100">
+                                    <h6><i class="fas fa-clock text-warning me-2"></i>Performance Metrics</h6>
+                                    <p class="mb-0 small text-muted">Measure operation latencies and requests per second</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>application.properties</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code># Enable Prometheus metrics endpoint
+kuber.prometheus.enabled=true
+
+# Metrics refresh interval (milliseconds)
+kuber.prometheus.update-interval-ms=5000
+
+# Include JVM metrics (memory, GC, threads)
+kuber.prometheus.include-jvm-metrics=true
+
+# Include per-region metrics
+kuber.prometheus.include-region-metrics=true
+
+# Custom metric prefix (default: kuber)
+kuber.prometheus.metric-prefix=kuber
+
+# Include latency histograms (increases memory)
+kuber.prometheus.include-latency-histograms=false</code></pre>
+
+                        <h6 class="mt-4">Actuator Configuration</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code># Expose prometheus endpoint
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+management.metrics.tags.application=kuber</code></pre>
+                    </div>
+                </div>
+
+                <!-- Available Metrics -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Available Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Metric Name</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>kuber_cache_gets_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total number of GET operations</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_sets_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total number of SET operations</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_deletes_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total number of DELETE operations</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_hits_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total cache hits</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_misses_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total cache misses</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_hit_rate</code></td>
+                                        <td>Gauge</td>
+                                        <td>Cache hit rate (0.0 to 1.0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_evictions_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total evictions from memory</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_expirations_total</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total TTL expirations</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_get_latency_microseconds</code></td>
+                                        <td>Gauge</td>
+                                        <td>Average GET operation latency</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_cache_set_latency_microseconds</code></td>
+                                        <td>Gauge</td>
+                                        <td>Average SET operation latency</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_value_cache_size</code></td>
+                                        <td>Gauge</td>
+                                        <td>Current entries in value cache</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_value_cache_limit</code></td>
+                                        <td>Gauge</td>
+                                        <td>Maximum value cache entries</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_heap_used_bytes</code></td>
+                                        <td>Gauge</td>
+                                        <td>JVM heap memory used</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_heap_max_bytes</code></td>
+                                        <td>Gauge</td>
+                                        <td>JVM heap memory maximum</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_heap_usage_ratio</code></td>
+                                        <td>Gauge</td>
+                                        <td>Heap usage ratio (0.0 to 1.0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_total_keys</code></td>
+                                        <td>Gauge</td>
+                                        <td>Total keys across all regions</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_regions_count</code></td>
+                                        <td>Gauge</td>
+                                        <td>Number of active regions</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_region_keys{region="..."}</code></td>
+                                        <td>Gauge</td>
+                                        <td>Keys per region</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_region_memory_bytes{region="..."}</code></td>
+                                        <td>Gauge</td>
+                                        <td>Estimated memory per region</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kuber_server_info</code></td>
+                                        <td>Gauge</td>
+                                        <td>Server info (version, persistence type)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prometheus Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-server me-2"></i>Prometheus Server Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>prometheus.yml</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'kuber-cache'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['kuber-server:8080']
+        labels:
+          environment: 'production'
+          cluster: 'primary'
+    
+  # Multiple Kuber instances
+  - job_name: 'kuber-cluster'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'kuber-node1:8080'
+          - 'kuber-node2:8080'
+          - 'kuber-node3:8080'
+        labels:
+          environment: 'production'</code></pre>
+                    </div>
+                </div>
+
+                <!-- Grafana Dashboard -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Grafana Dashboard Examples</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Example PromQL Queries</h6>
+                        
+                        <div class="mb-4">
+                            <strong>Cache Hit Rate</strong>
+                            <pre class="bg-dark text-light p-3 rounded"><code>kuber_cache_hit_rate{application="kuber"}</code></pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <strong>Operations Per Second</strong>
+                            <pre class="bg-dark text-light p-3 rounded"><code>rate(kuber_cache_gets_total[5m]) + rate(kuber_cache_sets_total[5m])</code></pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <strong>Memory Usage Percentage</strong>
+                            <pre class="bg-dark text-light p-3 rounded"><code>kuber_heap_usage_ratio * 100</code></pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <strong>Keys Per Region</strong>
+                            <pre class="bg-dark text-light p-3 rounded"><code>kuber_region_keys{application="kuber"}</code></pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <strong>Eviction Rate (per minute)</strong>
+                            <pre class="bg-dark text-light p-3 rounded"><code>rate(kuber_cache_evictions_total[1m]) * 60</code></pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <strong>Average Latency Comparison</strong>
+                            <pre class="bg-dark text-light p-3 rounded"><code># GET vs SET latency
+kuber_cache_get_latency_microseconds{application="kuber"}
+kuber_cache_set_latency_microseconds{application="kuber"}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerting -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Alert Rules</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>prometheus-alerts.yml</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>groups:
+  - name: kuber-alerts
+    rules:
+      # Low cache hit rate alert
+      - alert: KuberLowHitRate
+        expr: kuber_cache_hit_rate &lt; 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate on {{ $labels.instance }}"
+          description: "Hit rate is {{ $value | humanizePercentage }}"
+
+      # High heap usage alert
+      - alert: KuberHighHeapUsage
+        expr: kuber_heap_usage_ratio &gt; 0.85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High heap usage on {{ $labels.instance }}"
+          description: "Heap usage is {{ $value | humanizePercentage }}"
+
+      # High eviction rate alert
+      - alert: KuberHighEvictionRate
+        expr: rate(kuber_cache_evictions_total[5m]) &gt; 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High eviction rate on {{ $labels.instance }}"
+          description: "Evicting {{ $value | humanize }} entries/sec"
+
+      # Kuber instance down
+      - alert: KuberInstanceDown
+        expr: up{job="kuber-cache"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kuber instance {{ $labels.instance }} is down"
+
+      # High GET latency
+      - alert: KuberHighGetLatency
+        expr: kuber_cache_get_latency_microseconds &gt; 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GET latency on {{ $labels.instance }}"
+          description: "Average GET latency is {{ $value }}µs"</code></pre>
+                    </div>
+                </div>
+
+                <!-- Docker Compose Example -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fab fa-docker me-2"></i>Docker Compose Setup</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code>version: '3.8'
+
+services:
+  kuber:
+    image: kuber-cache:1.7.6
+    ports:
+      - "8080:8080"
+      - "6380:6380"
+    environment:
+      - KUBER_PROMETHEUS_ENABLED=true
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-alerts.yml:/etc/prometheus/alerts.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  grafana-data:</code></pre>
+                    </div>
+                </div>
+
+                <!-- Quick Access -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-link me-2"></i>Quick Access</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Endpoints</h6>
+                                <ul>
+                                    <li><a href="/actuator/prometheus" target="_blank">/actuator/prometheus</a> - Prometheus metrics</li>
+                                    <li><a href="/actuator/metrics" target="_blank">/actuator/metrics</a> - All metrics list</li>
+                                    <li><a href="/actuator/health" target="_blank">/actuator/health</a> - Health check</li>
+                                    <li><a href="/actuator/info" target="_blank">/actuator/info</a> - Application info</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Related Documentation</h6>
+                                <ul>
+                                    <li><a href="/help/architecture">Architecture Overview</a></li>
+                                    <li><a href="/help/properties">Configuration Reference</a></li>
+                                    <li><a href="/help/internals">Cache Internals</a></li>
+                                    <li><a href="/admin/stats">Statistics Dashboard</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Back Button -->
+                <div class="mt-5 text-center">
+                    <a href="/help" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Help Index
+                    </a>
+                    <a href="/help/architecture" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-sitemap me-2"></i>Architecture
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="py-4 mt-5 border-top">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                    <p class="text-muted small mb-0">Version 1.7.6</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="text-muted small mb-0">
+                        Copyright &copy; 2025-2030, All Rights Reserved<br>
+                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                        <span class="badge bg-warning text-dark">Patent Pending</span>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</main>
+
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>

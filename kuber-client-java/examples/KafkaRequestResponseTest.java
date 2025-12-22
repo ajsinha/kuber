@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Kuber Kafka Request/Response Test Client (v1.7.5)
+ * Kuber Kafka Request/Response Test Client (v1.7.6)
  * 
  * Tests the Kuber Request/Response messaging feature via Apache Kafka.
  * Publishes cache operation requests and subscribes to responses.
@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Correlate requests with responses using message IDs</li>
  * </ul>
  * 
- * @version 1.7.5
+ * @version 1.7.6
  */
 public class KafkaRequestResponseTest {
     
