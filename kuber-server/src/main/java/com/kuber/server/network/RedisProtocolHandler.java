@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  * - Admin users have full access to all operations
  * - Other users need specific roles granting READ/WRITE/DELETE
  *
- * @version 1.7.6
+ * @version 1.7.7
  */
 @Slf4j
 @Component
@@ -568,7 +568,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
      * - CLIENT ID: Get session ID
      * - CLIENT INFO: Get current client info
      * 
-     * @version 1.7.6
+     * @version 1.7.7
      */
     private RedisResponse handleClient(IoSession session, List<String> args) {
         if (args.isEmpty()) {

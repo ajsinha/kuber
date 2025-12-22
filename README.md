@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.6
+Version 1.7.7
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -143,7 +143,7 @@ kuber.cache.value-cache-max-percent=20
 kuber.cache.value-cache-max-entries=10000
 ```
 
-### Warm Objects (v1.7.6)
+### Warm Objects (v1.7.7)
 
 Kuber can maintain a minimum number of "warm" (in-memory) objects per region, ensuring frequently accessed data stays in memory for optimal read performance:
 
@@ -173,7 +173,7 @@ kuber.cache.region-warm-object-counts.session=10000
 - Works with eviction services (respects memory limits)
 - Falls back to default behavior if not configured
 
-### Prometheus Monitoring (v1.7.6)
+### Prometheus Monitoring (v1.7.7)
 
 Kuber integrates with Prometheus for comprehensive metrics monitoring:
 
@@ -208,6 +208,62 @@ scrape_configs:
 
 See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Grafana dashboards and alerting rules.
 
+### Generic Search API (v1.7.7)
+
+Enhanced search API with multiple search modes and flexible JSON attribute querying:
+
+```json
+// Multi-key lookup
+{
+  "apiKey": "your-api-key",
+  "region": "users",
+  "keys": ["user:1", "user:2", "user:3"]
+}
+
+// Multi-pattern regex search
+{
+  "apiKey": "your-api-key",
+  "region": "logs",
+  "keyPatterns": ["error:.*", "warning:.*"]
+}
+
+// JSON criteria search with AND logic
+{
+  "apiKey": "your-api-key",
+  "region": "orders",
+  "type": "json",
+  "criteria": {
+    "status": ["pending", "processing"],
+    "total": {"gte": 100},
+    "customer.email": {"regex": ".*@company\\.com"}
+  },
+  "fields": ["orderId", "total", "status"],
+  "limit": 100
+}
+```
+
+**Search Modes:**
+
+| Mode | Description |
+|------|-------------|
+| Single Key | `{"key": "user:123"}` - Exact lookup |
+| Multi-Key | `{"keys": ["k1", "k2"]}` - Batch lookup |
+| Key Pattern | `{"keyPattern": "user:.*"}` - Regex search |
+| Multi-Pattern | `{"keyPatterns": ["a:.*", "b:.*"]}` - Multiple regex |
+| JSON Criteria | `{"type": "json", "criteria": {...}}` - Attribute search |
+
+**JSON Operators:**
+
+| Operator | Example |
+|----------|---------|
+| Equality | `"status": "active"` |
+| IN | `"country": ["USA", "UK"]` |
+| Regex | `"email": {"regex": ".*@.*\\.com"}` |
+| Comparison | `"age": {"gte": 18, "lte": 65}` |
+| Not Equal | `"status": {"ne": "deleted"}` |
+
+See [docs/GENERIC_SEARCH_API.md](docs/GENERIC_SEARCH_API.md) for complete documentation.
+
 ## Quick Start
 
 ### Prerequisites
@@ -235,7 +291,7 @@ See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Gr
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-1.7.3-SNAPSHOT.jar
+        -jar kuber-server/target/kuber-server-1.7.7.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -520,7 +576,7 @@ Create `secure/request_response.json`:
 }
 ```
 
-### Test Clients (v1.7.6)
+### Test Clients (v1.7.7)
 
 Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
 
@@ -559,7 +615,7 @@ python kafka_diagnostics.py --live --watch-only          # Live watch mode
 
 > **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
 
-### Request/Response Logging (v1.7.6)
+### Request/Response Logging (v1.7.7)
 
 All request/response pairs can be logged to files for debugging and auditing:
 

@@ -1,2 +1,5 @@
 /kuberdata/
 /.idea/
+/.venv/
+*.class
+*.iml

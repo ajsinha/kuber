@@ -17,11 +17,15 @@
     --kuber-gradient: linear-gradient(135deg, #0079c1 0%, #005a8e 50%, #003366 100%);
     --kuber-gradient-hover: linear-gradient(135deg, #005a8e 0%, #004570 50%, #002244 100%);
     --kuber-gradient-subtle: linear-gradient(135deg, #e6f4fb 0%, #cce9f7 100%);
+    
+    /* Professional Light Blue Page Background */
+    --kuber-bg-page: linear-gradient(180deg, #f0f4f8 0%, #e8eef4 100%);
 }
 
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background-color: #f5fafd;
+    background: var(--kuber-bg-page);
+    background-attachment: fixed;
 }
 
 /* ============================================
@@ -36,7 +40,7 @@ body {
 }
 
 /* ============================================
-   Cards
+   Cards - Original styling
    ============================================ */
 .card {
     transition: box-shadow 0.2s ease-in-out;

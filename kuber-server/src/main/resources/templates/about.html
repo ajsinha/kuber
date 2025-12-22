@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.7.6</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.7.7</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -652,530 +652,47 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.7.1</span>
-                                    <span class="text-muted small">Current - Request/Response Messaging & C# Client</span>
+                                    <span class="badge bg-primary me-2">v1.7.7</span>
+                                    <span class="text-muted small">Current - Enhanced Generic Search API</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
-                                    <li><strong>Request/Response Messaging</strong>: Access cache via message brokers (Kafka, RabbitMQ, IBM MQ, ActiveMQ)</li>
-                                    <li><strong>Broker Controls</strong>: Enable/Disable/Pause/Resume broker connections from Admin UI</li>
-                                    <li><strong>C# / .NET Client</strong>: Complete client library with Redis protocol, REST API, and messaging support</li>
-                                    <li><strong>Batch Operations</strong>: MGET/MSET support in messaging with key-value pair response format</li>
-                                    <li><strong>Backpressure Management</strong>: Automatic pause/resume based on queue depth (no message rejection)</li>
-                                    <li><strong>Client Examples</strong>: Python, Java, and C# messaging examples for all brokers</li>
-                                    <li><strong>Enhanced Help System</strong>: Comprehensive glossary, C# client docs, messaging documentation</li>
+                                    <li><strong>Multi-Key Search</strong>: Search by single key or list of keys in one request</li>
+                                    <li><strong>Multi-Pattern Search</strong>: Search using multiple regex patterns for keys (OR logic)</li>
+                                    <li><strong>Advanced JSON Search</strong>: Flexible attribute matching with AND logic across all criteria</li>
+                                    <li><strong>Attribute Value Lists</strong>: Match attribute against single value or list of values (IN operator)</li>
+                                    <li><strong>Attribute Regex</strong>: Use regex patterns for JSON attribute matching</li>
+                                    <li><strong>Comparison Operators</strong>: Support for gt, gte, lt, lte, ne, eq operators in JSON search</li>
+                                    <li><strong>API Key in Body</strong>: Pass apiKey directly in JSON request body for POST requests</li>
+                                    <li><strong>New Criteria Format</strong>: Cleaner JSON search syntax with 'criteria' object</li>
+                                    <li><strong>Backward Compatible</strong>: Legacy 'values' format still supported</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.6.5</span>
-                                    <span class="text-muted small">API Key Only Authentication</span>
+                                    <span class="badge bg-secondary me-2">v1.7.6</span>
+                                    <span class="text-muted small">Prometheus Monitoring & BMO Dark Blue Theme</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
-                                    <li><strong>BREAKING</strong>: All programmatic access requires API Key (username/password only for Web UI)</li>
-                                    <li><strong>Redis Protocol</strong>: Only AUTH kub_xxx or AUTH APIKEY kub_xxx accepted</li>
-                                    <li><strong>REST API</strong>: Only X-API-Key header authentication</li>
-                                    <li><strong>Clients Updated</strong>: Java and Python clients now require api_key parameter</li>
+                                    <li><strong>Prometheus Integration</strong>: Native metrics export at /actuator/prometheus endpoint</li>
+                                    <li><strong>20+ Metrics</strong>: Cache operations, hit rates, evictions, memory usage, per-region stats</li>
+                                    <li><strong>Grafana Ready</strong>: Pre-built PromQL queries for dashboards and alerting</li>
+                                    <li><strong>BMO Dark Blue Theme</strong>: Professional enterprise color scheme (#0079c1 primary)</li>
+                                    <li><strong>PrometheusMetricsService</strong>: Scheduled metrics updates with configurable intervals</li>
+                                    <li><strong>Alert Rules</strong>: Example Prometheus alert configurations included</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.6.4</span>
-                                    <span class="text-muted small">Secure Folder Configuration</span>
+                                    <span class="badge bg-secondary me-2">v1.7.5</span>
+                                    <span class="text-muted small">Warm Objects & Eviction Protection</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
-                                    <li><strong>Secure Folder</strong>: New kuber.secure.folder property for sensitive files (default: ./secure)</li>
-                                    <li><strong>Auto-Create</strong>: Secure folder created automatically if missing</li>
-                                    <li><strong>Required users.json</strong>: Application fails to start if users.json missing (no default admin)</li>
-                                    <li><strong>Security Paths</strong>: users.json and apikeys.json moved to ${kuber.secure.folder}</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.6.3</span>
-                                    <span class="text-muted small">Streaming Startup & Shutdown Safety</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Streaming Startup</strong>: Large databases load without timeout/OOM (uses forEachEntry)</li>
-                                    <li><strong>Shutdown Detection</strong>: Warming and autoload check for shutdown in progress</li>
-                                    <li><strong>Graceful Stop</strong>: Background warming stops at batch boundaries</li>
-                                    <li><strong>Data Safety</strong>: Autoload flushes pending batches to persistence before stopping</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.6.2</span>
-                                    <span class="text-muted small">Batched Async Persistence</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Batched Writes</strong>: Entries buffered and saved in batches (5-20x throughput)</li>
-                                    <li><strong>Configurable</strong>: persistence-batch-size (100), persistence-interval-ms (1000)</li>
-                                    <li><strong>Reduced I/O</strong>: One WAL write per batch, sequential disk patterns</li>
-                                    <li><strong>Graceful Shutdown</strong>: All pending batches flushed before close</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.6.1</span>
-                                    <span class="text-muted small">RocksDB Durability & Warm Percentage</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>RocksDB Durability Fix</strong>: User threads for async saves (not daemon threads), sync=true during shutdown</li>
-                                    <li><strong>Warm Percentage</strong>: Configurable cache pre-warming (default 10%), set to 0 for lazy-load only</li>
-                                    <li><strong>Memory Optimization</strong>: Startup/reload/restore respect warm percentage for reduced heap pressure</li>
-                                    <li><strong>Shutdown Safety</strong>: prepareForShutdown() ensures batch writes sync before close</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.5.0</span>
-                                    <span class="text-muted small">Cron-Based Backup</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Cron Scheduling</strong>: Backup at configurable cron schedule (default: 11 PM daily)</li>
-                                    <li><strong>Auto Restore</strong>: Place backup file in ./restore to trigger restore</li>
-                                    <li><strong>Region Locking</strong>: Operations blocked during restore</li>
-                                    <li><strong>Admin Dashboard</strong>: Region selector + Backup button for manual trigger</li>
-                                    <li><strong>Compression</strong>: Gzip compression enabled by default</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.10</span>
-                                    <span class="text-muted small">Async Individual Writes (Default)</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>ASYNC Mode (default)</strong>: Memory updated first, disk write in background - 10-100x faster</li>
-                                    <li><strong>Configurable</strong>: kuber.persistence.sync-individual-writes (false=async, true=sync)</li>
-                                    <li><strong>Eventually Consistent</strong>: Data readable immediately, persisted asynchronously</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.9</span>
-                                    <span class="text-muted small">Batch Writes for Autoload</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Batch Writes</strong>: Records written in batches (default 8192) for 10-50x faster autoload</li>
-                                    <li><strong>Progress Logging</strong>: INFO logs after each batch showing records processed</li>
-                                    <li><strong>Configurable</strong>: kuber.autoload.batch-size setting</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.8</span>
-                                    <span class="text-muted small">Synchronous Saves & Parallelism Removed</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Sync Saves First</strong>: Disk write now happens BEFORE KeyIndex update - fixes "key in index but not on disk"</li>
-                                    <li><strong>Parallelism Removed</strong>: All parallel processing removed for stability</li>
-                                    <li><strong>Sequential Only</strong>: Autoload and region loading are now strictly sequential</li>
-                                    <li><strong>Data Consistency</strong>: No more race conditions between index and persistence</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.7</span>
-                                    <span class="text-muted small">RocksDB Shutdown Fix & Double Shutdown Guard</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>ShutdownInProgress Fix</strong>: Fixed RocksDB flush() failing - now flushes BEFORE canceling background work</li>
-                                    <li><strong>Async Executor Order</strong>: Shutdown async executor FIRST in all persistence stores</li>
-                                    <li><strong>Double Shutdown Guard</strong>: Added alreadyShutdown flag to prevent duplicate calls</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.6</span>
-                                    <span class="text-muted small">Complete Shutdown Orchestration & RocksDB Durability</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Task Scheduler Shutdown</strong>: Immediately stops Spring TaskScheduler to halt all @Scheduled methods</li>
-                                    <li><strong>RocksDB Write Protection</strong>: ReadWriteLock prevents concurrent writes during database close</li>
-                                    <li><strong>WriteOptions Sync</strong>: Critical writes use sync=true for immediate durability</li>
-                                    <li><strong>Caffeine Synchronous Executor</strong>: Prevents ForkJoinPool.commonPool issues during shutdown</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.5</span>
-                                    <span class="text-muted small">RocksDB Durability & Management Scripts</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>RocksDB Graceful Shutdown</strong>: Proper background work cancellation, memtable flush, WAL sync before close</li>
-                                    <li><strong>Corruption Detection &amp; Repair</strong>: Automatic backup and recovery on startup corruption</li>
-                                    <li><strong>Pre/Post Sync Phases</strong>: Shutdown orchestrator syncs before and after cache persist</li>
-                                    <li><strong>Startup Scripts</strong>: kuber-start.sh/bat with JVM options, daemon mode, custom ports</li>
-                                    <li><strong>Shutdown Scripts</strong>: kuber-shutdown.sh/bat with file/API methods</li>
-                                    <li><strong>Status Script</strong>: kuber-status.sh to check server health</li>
-                                    <li><strong>Scripts Folder</strong>: All scripts organized in scripts/ directory</li>
-                                    <li>Configurable phase delays and extended wait before persistence close</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.3</span>
-                                    <span class="text-muted small">Concurrency Safety & Graceful Shutdown</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Persistence Operation Lock</strong>: Centralized lock prevents concurrent compaction, cleanup, and autoload</li>
-                                    <li><strong>Shutdown Orchestrator</strong>: Orderly shutdown in reverse startup order with delays</li>
-                                    <li><strong>Region Loading Guards</strong>: Queries wait for regions to finish loading</li>
-                                    <li><strong>RocksDB Corruption Fix</strong>: Proper database closure prevents file corruption</li>
-                                    <li>Exclusive global lock for compaction/shutdown operations</li>
-                                    <li>Per-region locks for autoload file processing</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.2</span>
-                                    <span class="text-muted small">Segmented Off-Heap Buffers (>2GB support)</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Segmented Buffers</strong>: Off-heap key index now supports >2GB using multiple 1GB segments</li>
-                                    <li><strong>No Size Cap</strong>: Removed 2047MB limit - configure up to 8GB+ per region</li>
-                                    <li><strong>Long Offsets</strong>: All offset calculations use long arithmetic</li>
-                                    <li><strong>Dynamic Segments</strong>: New segments allocated automatically as data grows</li>
-                                    <li>Full property support: kuber.cache.off-heap-key-index-max-size-mb=8192</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.1</span>
-                                    <span class="text-muted small">Autoload Improvements</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Autoload Service</strong>: Enhanced file processing for bulk data import</li>
-                                    <li>Thread pool for autoload scan processing</li>
-                                    <li>Note: Parallel processing removed in v1.5.0 for stability</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.3.0</span>
-                                    <span class="text-muted small">Off-Heap Fix</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Bug Fix</strong>: Fixed integer overflow in off-heap key index</li>
-                                    <li>Note: Concurrent startup removed in v1.5.0 for stability</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.8</span>
-                                    <span class="text-muted small">Centralized Event Publishing</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Centralized Broker Definitions</strong>: Define brokers once, reference from multiple regions</li>
-                                    <li><strong>Multi-Destination Publishing</strong>: One region can publish to multiple brokers simultaneously</li>
-                                    <li><strong>5 Publisher Types</strong>: Kafka, RabbitMQ, IBM MQ, ActiveMQ, File</li>
-                                    <li>BrokerDefinition with full configuration for each broker type</li>
-                                    <li>DestinationConfig linking regions to brokers with overrides</li>
-                                    <li>JMS compatibility fixes (javax.jms for ActiveMQ/IBM MQ)</li>
-                                    <li>Connection pooling per broker for efficiency</li>
-                                    <li>Non-blocking async publishing with configurable thread pool</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.7</span>
-                                    <span class="text-muted small">Event Publishing Foundation</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>EventPublisher Interface</strong>: Pluggable architecture for event publishers</li>
-                                    <li><strong>PublisherRegistry</strong>: Central registry for managing all publishers</li>
-                                    <li><strong>RegionEventPublishingService</strong>: Coordinates publishing across regions</li>
-                                    <li>CachePublishingEvent model for event messages</li>
-                                    <li>Integration with CacheService for insert/update/delete events</li>
-                                    <li>Startup orchestration for topic/queue creation</li>
-                                    <li>Publishing Help page with comprehensive documentation</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.6</span>
-                                    <span class="text-muted small">Startup Orchestration</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Configurable API Keys Path</strong>: kuber.security.api-keys-file property</li>
-                                    <li><strong>Improved Startup Orchestration</strong>: Database maintenance now runs within Spring context</li>
-                                    <li>New startup sequence: Spring → 10s wait → Compaction → 2s → Cache Init → 2s → Redis → 2s → Autoload → 2s → Ready</li>
-                                    <li>PersistenceMaintenanceService for RocksDB compaction and SQLite vacuum</li>
-                                    <li>Pre-startup compaction deprecated in favor of in-context maintenance</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.5</span>
-                                    <span class="text-muted small">API Key Authentication</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>API Key Authentication</strong>: Generate and manage API keys for programmatic access</li>
-                                    <li>Admin UI for key generation, revocation, and management</li>
-                                    <li>REST API: X-API-Key header, Authorization: ApiKey, query param support</li>
-                                    <li>Redis Protocol: AUTH APIKEY command support</li>
-                                    <li>Role-based access control with optional key expiration</li>
-                                    <li>Python, Java, and REST client support for API keys</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.4</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Startup Race Condition Fix</strong>: Fixed critical race condition in application startup</li>
-                                    <li>Redis server now starts AFTER cache service initialization and data recovery</li>
-                                    <li>Clients cannot connect until cache is fully ready with recovered data</li>
-                                    <li>Memory watcher service waits for cache initialization</li>
-                                    <li>Guaranteed startup order: Spring → Wait 10s → Cache Recovery → Redis Server → Autoload</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.3</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Architecture Help Page</strong>: Comprehensive system architecture documentation</li>
-                                    <li>High-level architecture diagrams and component descriptions</li>
-                                    <li>Hybrid memory architecture explanation</li>
-                                    <li>Persistence layer comparison and protocol design</li>
-                                    <li>Accessible to non-authenticated users</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.2</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Off-Heap Key Index (DRAM)</strong>: Optional storage of keys in direct memory outside Java heap</li>
-                                    <li>Zero GC pressure for key storage - no heap scans for keys</li>
-                                    <li>Configurable via <code>kuber.cache.off-heap-key-index=true</code></li>
-                                    <li>Automatic buffer management with compaction</li>
-                                    <li>Proper memory cleanup on shutdown</li>
-                                    <li>KeyIndexInterface for pluggable key storage implementations</li>
-                                    <li><strong>TXT File Support</strong>: Autoload now supports .txt files (processed same as CSV)</li>
-                                    <li><strong>Composite Keys</strong>: Autoload supports composite keys with "/" separator</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.1</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>Hybrid Memory Architecture</strong>: All keys always in memory (Aerospike-like)</li>
-                                    <li>EXISTS and KEYS operations NEVER hit disk - pure O(1) memory lookups</li>
-                                    <li>KeyIndex per region: tracks key metadata, TTL, value location</li>
-                                    <li>Values can overflow to disk while keys stay in memory</li>
-                                    <li>DBSIZE returns instant O(1) exact count from KeyIndex</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.2.0</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li><strong>LMDB Persistence Store</strong>: Lightning Memory-Mapped Database support</li>
-                                    <li>LMDB features: zero-copy reads, ACID transactions, crash-safe</li>
-                                    <li>Six persistence backends: RocksDB, LMDB, MongoDB, PostgreSQL, SQLite, Memory</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.18</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fixed RocksDB lock error during concurrent autoload operations</li>
-                                    <li>Fixed SQLite connection race condition during concurrent operations</li>
-                                    <li>Proper double-checked locking for database/connection creation</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.17</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Major performance optimizations for GET operations</li>
-                                    <li>Negative cache to skip persistence lookups for missing keys</li>
-                                    <li>Batch loading for MGET (RocksDB multiGet, SQLite IN clause)</li>
-                                    <li>Fast path for memory cache hits (skip unnecessary checks)</li>
-                                    <li>Optimized exists() with negative cache check</li>
-                                    <li>Fixed Thymeleaf template parsing errors (XML-safe operators)</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.16</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Custom error pages with detailed error information</li>
-                                    <li>Status-specific icons and suggestions (404, 403, 500, etc.)</li>
-                                    <li>Exception details and collapsible stack traces</li>
-                                    <li>System status display for server errors</li>
-                                    <li>Request ID tracking for debugging</li>
-                                    <li>JSON error responses for API requests</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.15</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Pre-startup database compaction/vacuum before Spring context</li>
-                                    <li>Standalone PreStartupCompaction class (non-Spring)</li>
-                                    <li>RocksDB compaction runs BEFORE web server starts</li>
-                                    <li>SQLite VACUUM runs BEFORE web server starts</li>
-                                    <li>No resource contention - databases optimized before any requests</li>
-                                    <li>Progress output with size savings displayed</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.14</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fixed TTL Expiration Service card not loading on admin dashboard</li>
-                                    <li>Removed duplicate expiration cards causing JavaScript conflicts</li>
-                                    <li>Consolidated maintenance cards (Compaction + Expiration) in single row</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.13</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fast entry count estimates using RocksDB native properties</li>
-                                    <li>Dashboard and login pages now load instantly with large datasets</li>
-                                    <li>O(1) entry counting instead of O(n) iteration</li>
-                                    <li>Fixes slow page loads with 1M+ entries</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.12</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Cron-based RocksDB compaction scheduling (default: 2:00 AM daily)</li>
-                                    <li>Configurable cron expression for off-hours maintenance</li>
-                                    <li>Manual compaction trigger via API and UI</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.11</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Global memory limit configuration - cap total entries across all regions</li>
-                                    <li>Per-region memory limits - configure memory allocation per region</li>
-                                    <li>Smart memory allocation - proportional distribution based on data size</li>
-                                    <li>Removed RocksDB metadata database - relies solely on folder discovery</li>
-                                    <li>Region metadata stored as JSON file in each region directory</li>
-                                    <li>Smart cache priming - loads most recently accessed entries first</li>
-                                    <li>Fixed critical bug: cache now properly reloads from disk on restart</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.9</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Separate database instance per region for RocksDB and SQLite</li>
-                                    <li>Improved concurrency - parallel I/O across regions with no lock contention</li>
-                                    <li>Better isolation - issues in one region don't affect others</li>
-                                    <li>Per-region compaction - compact individual regions independently</li>
-                                    <li>New API endpoint: POST /api/monitoring/compaction/trigger/{region}</li>
-                                    <li>Region name validation: alphanumeric and underscore only</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.8</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fixed entry counting bug - persistence is now source of truth</li>
-                                    <li>Stats page showing correct counts dynamically calculated</li>
-                                    <li>RocksDB automatic compaction service with 30-minute intervals</li>
-                                    <li>Admin dashboard compaction UI with manual trigger</li>
-                                    <li>New API endpoints for compaction management</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.1.7</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Added pluggable persistence layer with 5 backends: MongoDB, SQLite, PostgreSQL, RocksDB, In-Memory</li>
-                                    <li>Admin dashboard now displays active persistence backend details</li>
-                                    <li>Enhanced help documentation with comprehensive backend selection guide</li>
-                                    <li>Added standalone Python clients (Redis protocol and REST API)</li>
-                                    <li>Added standalone Java clients (Redis protocol and REST API)</li>
-                                    <li>Comprehensive examples for all search operations (GET, MGET, KEYS, JSEARCH)</li>
-                                    <li>JSON storage to specific regions with TTL support</li>
-                                    <li>Cross-region JSON deep search capabilities</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.0.9</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fixed compilation errors in CacheService</li>
-                                    <li>Added conditional bean loading for persistence backends</li>
-                                    <li>Fixed Thymeleaf template configuration</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.0.8</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Implemented PersistenceStore abstraction layer</li>
-                                    <li>Added SQLite, PostgreSQL, RocksDB, and In-Memory persistence stores</li>
-                                    <li>Configuration-based persistence backend selection</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.0.4</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Added KSEARCH command for regex-based key search</li>
-                                    <li>Fixed entry count not decrementing on TTL expiration</li>
-                                    <li>Added REST API endpoint for regex key search</li>
-                                    <li>Updated Web UI query interface with KSEARCH support</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.0.3</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fixed region persistence issues</li>
-                                    <li>Fixed MongoDB Date to Instant conversion errors</li>
-                                    <li>Fixed Thymeleaf HashMap property access</li>
-                                    <li>Added admin stats and config pages</li>
-                                    <li>Implemented graceful shutdown with data persistence</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.0.2</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Fixed circular dependency issues</li>
-                                    <li>Migrated YAML to properties configuration</li>
-                                    <li>Implemented JSON-based authentication</li>
-                                    <li>Fixed Thymeleaf 3.1+ template compatibility</li>
-                                </ul>
-                            </div>
-                            <div class="mb-4">
-                                <h6 class="mb-1">
-                                    <span class="badge bg-secondary me-2">v1.0.1</span>
-                                </h6>
-                                <ul class="small text-muted mb-0">
-                                    <li>Initial public release</li>
-                                    <li>Core cache functionality</li>
-                                    <li>Redis protocol support</li>
-                                    <li>MongoDB persistence</li>
-                                    <li>Web UI management console</li>
+                                    <li><strong>Warm Objects</strong>: Protect frequently accessed keys from eviction</li>
+                                    <li><strong>Access Tracking</strong>: Track access counts and last access time per key</li>
+                                    <li><strong>Configurable Thresholds</strong>: Set min access count and time window for warm status</li>
+                                    <li><strong>Per-Region Config</strong>: Enable/disable warm objects per region</li>
+                                    <li><strong>Eviction Coordination</strong>: WarmObjectService coordinates with eviction to protect hot data</li>
+                                    <li><strong>Admin Visibility</strong>: View warm object statistics in admin dashboard</li>
                                 </ul>
                             </div>
                         </div>
@@ -1227,7 +744,66 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.7.6
+                                <strong>Version:</strong> 1.7.7
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Copyright Footer -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center py-4">
+                        <p class="mb-2">
+                            <i class="fas fa-database fa-2x text-primary mb-3 d-block"></i>
+                        </p>
+                        <h5 class="mb-1"><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h5>
+                        <p class="text-muted mb-2">High-Performance Caching for Modern Applications</p>
+                        <p class="small text-muted mb-0">
+                            Copyright © 2025-2030, All Rights Reserved | Ashutosh Sinha | 
+                            <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a>
+                        </p>
+                        <p class="small text-muted mt-1 mb-0">
+                            <em>Patent Pending</em>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+</body>
+</html>
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="mb-0"><i class="fas fa-envelope me-2"></i>Contact</h4>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-3">
+                                <i class="fas fa-user fa-fw text-primary me-2"></i>
+                                <strong>Author:</strong> Ashutosh Sinha
+                            </li>
+                            <li class="mb-3">
+                                <i class="fas fa-envelope fa-fw text-primary me-2"></i>
+                                <strong>Email:</strong> 
+                                <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a>
+                            </li>
+                            <li class="mb-3">
+                                <i class="fas fa-calendar fa-fw text-primary me-2"></i>
+                                <strong>Copyright:</strong> © 2025-2030, All Rights Reserved
+                            </li>
+                            <li class="mb-0">
+                                <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
+                                <strong>Version:</strong> 1.7.7
                             </li>
                         </ul>
                     </div>

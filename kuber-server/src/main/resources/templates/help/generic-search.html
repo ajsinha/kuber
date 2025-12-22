@@ -1,54 +1,381 @@
 <!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Generic Search API')}"></head>
 <body class="d-flex flex-column min-vh-100">
+
 <nav th:replace="~{layout :: navbar}"></nav>
+
 <main class="flex-fill">
     <div class="container-fluid py-4">
+        <!-- Breadcrumb -->
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
-                <li class="breadcrumb-item active">Generic Search API</li>
+                <li class="breadcrumb-item active" aria-current="page">Generic Search API</li>
             </ol>
         </nav>
+
+        <!-- Content -->
         <div class="row">
             <div class="col-lg-10 mx-auto">
-                <h1 class="display-5 mb-4"><i class="fas fa-search-plus me-3"></i>Generic Search API</h1>
+                <h1 class="display-5 mb-4"><i class="fas fa-search-plus me-3 text-primary"></i>Generic Search API</h1>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Version 1.7.7 Enhanced</strong> - Unified search API with multi-key, multi-pattern, and advanced JSON search capabilities.
+                </div>
 
-                <h3>Overview</h3>
-                <p>Unified search API supporting key patterns, JSON queries, and field projection.</p>
-                
-                <h3 class="mt-4">Request Body</h3>
-                <pre class="bg-dark text-light p-3 rounded"><code>{
-    "region": "users",           // Required
-    "key": "user:1001",          // Mode 1: Exact key
-    "keypattern": "user:\\d+",  // Mode 2: Regex pattern
-    "type": "json",              // Mode 3: JSON search
-    "values": [{"status": "active"}],  // JSON conditions
-    "fields": ["name", "email"], // Field projection
-    "limit": 100                 // Max results
+                <!-- Overview -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>The Generic Search API provides a flexible, unified endpoint for querying cache data. 
+                           All requests use POST with a JSON body containing the search criteria and API key.</p>
+                        
+                        <h6 class="mt-3">Endpoint</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>POST /api/genericsearch
+POST /api/v1/genericsearch
+POST /api/v2/genericsearch</code></pre>
+
+                        <h6 class="mt-3">Key Features (v1.7.7)</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul>
+                                    <li>Single key or list of keys lookup</li>
+                                    <li>Single or multiple regex patterns for keys</li>
+                                    <li>API key in request body</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul>
+                                    <li>Advanced JSON attribute search</li>
+                                    <li>AND logic across all criteria</li>
+                                    <li>Field projection support</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Request Format -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Request Format</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_your_api_key",      // Required: API key for authentication
+    "region": "users",                  // Required: Region to search
+    
+    // Key Search (choose one or combine with JSON search)
+    "key": "user:1001",                 // Mode 1: Single exact key
+    "keys": ["user:1001", "user:1002"], // Mode 2: Multiple exact keys
+    "keypattern": "user:\\d+",          // Mode 3: Single regex pattern
+    "keypatterns": ["user_.*", "admin_.*"], // Mode 4: Multiple regex patterns
+    
+    // JSON Attribute Search
+    "type": "json",                     // Enable JSON search
+    "criteria": {                       // v1.7.7 format
+        "status": "active",             // Equality match
+        "role": ["admin", "manager"],   // IN operator (match any)
+        "email": {"regex": ".*@company\\.com"}, // Regex match
+        "age": {"gte": 18, "lte": 65}   // Range comparison
+    },
+    
+    // Options
+    "fields": ["name", "email"],        // Field projection
+    "limit": 100                        // Max results (default: 1000)
 }</code></pre>
-                
-                <h3 class="mt-4">Search Modes</h3>
-                <ul>
-                    <li><strong>Key lookup</strong>: Single key retrieval</li>
-                    <li><strong>Key pattern</strong>: Regex-based key search</li>
-                    <li><strong>JSON search</strong>: Query by attribute values</li>
-                    <li><strong>Field projection</strong>: Return only specified fields</li>
-                </ul>
+                    </div>
+                </div>
+
+                <!-- Search Modes -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Search Modes</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Mode 1: Single Key -->
+                        <h6 class="text-primary">Mode 1: Single Key Lookup</h6>
+                        <p>Retrieve a specific key by exact match.</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "users",
+    "key": "user:1001"
+}</code></pre>
+
+                        <!-- Mode 2: Multiple Keys -->
+                        <h6 class="text-primary mt-4">Mode 2: Multiple Keys Lookup <span class="badge bg-success">NEW in v1.7.7</span></h6>
+                        <p>Retrieve multiple specific keys at once.</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "users",
+    "keys": ["user:1001", "user:1002", "user:1003"]
+}</code></pre>
+
+                        <!-- Mode 3: Single Pattern -->
+                        <h6 class="text-primary mt-4">Mode 3: Single Key Pattern (Regex)</h6>
+                        <p>Search keys matching a regex pattern.</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "users",
+    "keypattern": "user:\\d{4}"
+}</code></pre>
+
+                        <!-- Mode 4: Multiple Patterns -->
+                        <h6 class="text-primary mt-4">Mode 4: Multiple Key Patterns <span class="badge bg-success">NEW in v1.7.7</span></h6>
+                        <p>Search keys matching any of multiple regex patterns (OR logic between patterns).</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "users",
+    "keypatterns": ["user_.*", "admin_.*", "guest_.*"]
+}</code></pre>
+
+                        <!-- Mode 5: JSON Search -->
+                        <h6 class="text-primary mt-4">Mode 5: JSON Attribute Search <span class="badge bg-success">Enhanced in v1.7.7</span></h6>
+                        <p>Search JSON documents by attribute values. All criteria use AND logic.</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "users",
+    "type": "json",
+    "criteria": {
+        "status": "active",
+        "department": ["engineering", "sales"],
+        "email": {"regex": ".*@company\\.com"}
+    }
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- JSON Search Operators -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>JSON Search Operators</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Operator</th>
+                                        <th>Syntax</th>
+                                        <th>Description</th>
+                                        <th>Example</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>equality</code></td>
+                                        <td><code>"field": "value"</code></td>
+                                        <td>Exact match</td>
+                                        <td><code>"status": "active"</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>in</code></td>
+                                        <td><code>"field": [values]</code></td>
+                                        <td>Match any value in list</td>
+                                        <td><code>"role": ["admin", "user"]</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>regex</code></td>
+                                        <td><code>"field": {"regex": "pattern"}</code></td>
+                                        <td>Regex pattern match</td>
+                                        <td><code>"email": {"regex": ".*@gmail\\.com"}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>gt</code></td>
+                                        <td><code>"field": {"gt": value}</code></td>
+                                        <td>Greater than</td>
+                                        <td><code>"age": {"gt": 18}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>gte</code></td>
+                                        <td><code>"field": {"gte": value}</code></td>
+                                        <td>Greater than or equal</td>
+                                        <td><code>"score": {"gte": 80}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>lt</code></td>
+                                        <td><code>"field": {"lt": value}</code></td>
+                                        <td>Less than</td>
+                                        <td><code>"price": {"lt": 100}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>lte</code></td>
+                                        <td><code>"field": {"lte": value}</code></td>
+                                        <td>Less than or equal</td>
+                                        <td><code>"quantity": {"lte": 50}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>ne</code></td>
+                                        <td><code>"field": {"ne": value}</code></td>
+                                        <td>Not equal</td>
+                                        <td><code>"status": {"ne": "deleted"}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>range</code></td>
+                                        <td><code>"field": {"gte": a, "lte": b}</code></td>
+                                        <td>Combined range</td>
+                                        <td><code>"age": {"gte": 18, "lte": 65}</code></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Combined Searches -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Combined Searches</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>You can combine key patterns with JSON attribute search for powerful filtering:</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "orders",
+    "keypatterns": ["order_2024.*"],
+    "type": "json",
+    "criteria": {
+        "status": ["pending", "processing"],
+        "total": {"gte": 100},
+        "customer.country": "USA"
+    },
+    "fields": ["orderId", "status", "total", "customer.name"],
+    "limit": 50
+}</code></pre>
+                        <p class="text-muted mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            This searches for orders from 2024 that are pending/processing, total >= $100, from USA customers.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Response Format -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-reply me-2"></i>Response Format</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Successful responses return an array of key-value pairs:</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>[
+    {
+        "key": "user:1001",
+        "value": {
+            "name": "John Doe",
+            "email": "john@example.com",
+            "status": "active"
+        }
+    },
+    {
+        "key": "user:1002",
+        "value": {
+            "name": "Jane Smith",
+            "email": "jane@example.com",
+            "status": "active"
+        }
+    }
+]</code></pre>
+
+                        <h6 class="mt-4">Error Response</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>[
+    {
+        "error": "API key is required. Include 'apiKey' in request body."
+    }
+]</code></pre>
+                    </div>
+                </div>
+
+                <!-- cURL Examples -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-terminal me-2"></i>cURL Examples</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Single Key Lookup</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST http://localhost:8080/api/genericsearch \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey":"kub_xxx","region":"users","key":"user:1001"}'</code></pre>
+
+                        <h6 class="mt-4">Multiple Keys</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST http://localhost:8080/api/genericsearch \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey":"kub_xxx","region":"users","keys":["user:1001","user:1002"]}'</code></pre>
+
+                        <h6 class="mt-4">JSON Search with Criteria</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST http://localhost:8080/api/genericsearch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "kub_xxx",
+    "region": "products",
+    "type": "json",
+    "criteria": {
+        "category": ["electronics", "computers"],
+        "price": {"lte": 500},
+        "inStock": true
+    }
+  }'</code></pre>
+                    </div>
+                </div>
+
+                <!-- Field Projection -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-columns me-2"></i>Field Projection</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Use the <code>fields</code> array to return only specific fields. Supports nested paths with dot notation.</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_xxx",
+    "region": "users",
+    "keypattern": "user:.*",
+    "fields": ["name", "email", "address.city", "address.country"]
+}</code></pre>
+                        <p class="text-muted mt-2">
+                            Returns only name, email, and nested address fields (city, country) for each result.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Back Button -->
                 <div class="mt-5 text-center">
-                    <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                    <a href="/help" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Help Index
+                    </a>
+                    <a href="/help/rest-api" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-code me-2"></i>REST API
+                    </a>
                 </div>
             </div>
         </div>
+
+        <!-- Footer -->
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.6</p></div>
-                <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                    <p class="text-muted small mb-0">Version 1.7.7</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="text-muted small mb-0">
+                        Copyright &copy; 2025-2030, All Rights Reserved<br>
+                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                        <span class="badge bg-warning text-dark">Patent Pending</span>
+                    </p>
+                </div>
             </div>
         </footer>
     </div>
 </main>
+
 <th:block th:replace="~{layout :: scripts}"></th:block>
+
 </body>
 </html>

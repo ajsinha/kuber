@@ -19,6 +19,7 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.dto.GenericSearchRequest;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.security.ApiKeyService;
 import com.kuber.server.security.AuthorizationService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 1.7.6
+ * @version 1.7.7
  */
 @RestController
 @RequestMapping("/api")
@@ -46,6 +47,7 @@ public class ApiController {
     private final CacheService cacheService;
     private final KuberProperties properties;
     private final AuthorizationService authorizationService;
+    private final ApiKeyService apiKeyService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -427,25 +429,53 @@ public class ApiController {
         return ResponseEntity.ok(results);
     }
     
-    // ==================== Generic Search API ====================
+    // ==================== Generic Search API (v1.7.7 Enhanced) ====================
     
     /**
-     * Generic search endpoint that supports multiple search modes:
+     * Enhanced generic search endpoint (v1.7.7) supporting multiple search modes.
      * 
-     * 1. Simple key lookup: {"region": "test", "key": "ABC"}
-     * 2. Key pattern (regex): {"region": "test", "keypattern": "ABC.*"}
-     * 3. JSON attribute search: {"region": "test", "type": "json", "values": [...]}
+     * <h2>Authentication</h2>
+     * API key must be provided in the request body:
+     * <pre>{"apiKey": "your-api-key", ...}</pre>
      * 
-     * JSON attribute conditions support:
-     * - Equality: {"fieldName": "value"}
-     * - Regex: {"fieldName": "pattern", "type": "regex"}
-     * - IN operator: {"fieldName": ["value1", "value2"]}
+     * <h2>Search Modes</h2>
      * 
-     * @param request The search request
+     * 1. Single key lookup: {"apiKey": "xxx", "region": "test", "key": "ABC"}
+     * 2. Multiple keys lookup: {"apiKey": "xxx", "region": "test", "keys": ["A", "B", "C"]}
+     * 3. Single key pattern (regex): {"apiKey": "xxx", "region": "test", "keyPattern": "user:.*"}
+     * 4. Multiple key patterns: {"apiKey": "xxx", "region": "test", "keyPatterns": ["user:.*", "admin:.*"]}
+     * 5. JSON attribute search with criteria (AND logic):
+     *    {
+     *      "apiKey": "xxx",
+     *      "region": "test",
+     *      "type": "json",
+     *      "criteria": {
+     *        "status": "active",                          // equality
+     *        "country": ["USA", "Canada"],                // IN operator
+     *        "email": {"regex": ".*@company\\.com"},      // regex match
+     *        "age": {"gte": 18, "lte": 65}                // range comparison
+     *      }
+     *    }
+     * 
+     * @param request The search request with apiKey
      * @return List of matching key-value pairs as JSON array
      */
-    @PostMapping({"/genericsearch", "/v1/genericsearch"})
+    @PostMapping({"/genericsearch", "/v1/genericsearch", "/v2/genericsearch"})
     public ResponseEntity<List<Map<String, Object>>> genericSearch(@RequestBody GenericSearchRequest request) {
+        // Validate API key
+        if (!request.hasApiKey()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(List.of(
+                Map.of("error", "API key is required. Include 'apiKey' in request body.")
+            ));
+        }
+        
+        // Validate API key against configured keys
+        if (!isValidApiKey(request.getApiKey())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(List.of(
+                Map.of("error", "Invalid API key")
+            ));
+        }
+        
         // Validate region
         if (request.getRegion() == null || request.getRegion().isEmpty()) {
             return ResponseEntity.badRequest().body(List.of(
@@ -455,10 +485,10 @@ public class ApiController {
         
         String region = request.getRegion();
         
-        // Require READ permission
-        if (!authorizationService.canRead(region)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of(
-                Map.of("error", "READ permission denied for region: " + region)
+        // Check if region exists
+        if (!cacheService.regionExists(region)) {
+            return ResponseEntity.badRequest().body(List.of(
+                Map.of("error", "Region does not exist: " + region)
             ));
         }
         
@@ -468,40 +498,32 @@ public class ApiController {
         
         try {
             if (request.isKeyLookup()) {
-                // Mode 1: Simple key lookup
-                String value = cacheService.get(region, request.getKey());
-                if (value != null) {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("key", request.getKey());
-                    
-                    // Try to parse as JSON
-                    try {
-                        JsonNode jsonValue = JsonUtils.parse(value);
-                        // Apply field projection if requested
-                        if (request.hasFieldProjection()) {
-                            item.put("value", projectFields(jsonValue, fields));
-                        } else {
-                            item.put("value", jsonValue);
-                        }
-                    } catch (Exception e) {
-                        item.put("value", value);
-                    }
-                    
-                    results.add(item);
-                }
+                // Mode 1: Single key lookup
+                results = performSingleKeyLookup(region, request.getKey(), fields);
+                
+            } else if (request.isMultiKeyLookup()) {
+                // Mode 2: Multiple keys lookup (v1.7.7)
+                results = performMultiKeyLookup(region, request.getKeys(), limit, fields);
+                
             } else if (request.isKeyPatternSearch()) {
-                // Mode 2: Key pattern (regex) search
-                results = cacheService.searchKeysByRegex(region, request.getKeyPattern(), limit);
-                // Apply field projection if requested
-                if (request.hasFieldProjection()) {
-                    results = applyFieldProjection(results, fields);
-                }
+                // Mode 3: Single key pattern (regex) search
+                results = performKeyPatternSearch(region, request.getKeyPattern(), limit, fields);
+                
+            } else if (request.isMultiKeyPatternSearch()) {
+                // Mode 4: Multiple key patterns search (v1.7.7)
+                results = performMultiKeyPatternSearch(region, request.getKeyPatterns(), limit, fields);
+                
+            } else if (request.isJsonCriteriaSearch()) {
+                // Mode 5: JSON attribute search with new criteria format (v1.7.7)
+                results = performJsonCriteriaSearch(region, request.getCriteria(), limit, fields);
+                
             } else if (request.isJsonSearch()) {
-                // Mode 3: JSON attribute search
+                // Mode 5 (legacy): JSON attribute search with values format
                 results = performJsonAttributeSearch(region, request.getValues(), limit, fields);
+                
             } else {
                 return ResponseEntity.badRequest().body(List.of(
-                    Map.of("error", "Invalid search request. Provide 'key', 'keypattern', or 'type'='json' with 'values'")
+                    Map.of("error", "Invalid search request. Provide one of: 'key', 'keys', 'keyPattern', 'keyPatterns', or 'type'='json' with 'criteria'/'values'")
                 ));
             }
             
@@ -516,6 +538,233 @@ public class ApiController {
                 Map.of("error", "Search failed: " + e.getMessage())
             ));
         }
+    }
+    
+    /**
+     * Validate API key using ApiKeyService.
+     */
+    private boolean isValidApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            return false;
+        }
+        // Use ApiKeyService for validation (without updating lastUsedAt for performance)
+        return apiKeyService.validateKeyOnly(apiKey).isPresent();
+    }
+    
+    /**
+     * Mode 1: Single key lookup.
+     */
+    private List<Map<String, Object>> performSingleKeyLookup(String region, String key, List<String> fields) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        String value = cacheService.get(region, key);
+        if (value != null) {
+            results.add(buildResultItem(key, value, fields));
+        }
+        return results;
+    }
+    
+    /**
+     * Mode 2: Multiple keys lookup (v1.7.7).
+     */
+    private List<Map<String, Object>> performMultiKeyLookup(String region, List<String> keys, int limit, List<String> fields) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (String key : keys) {
+            if (results.size() >= limit) break;
+            String value = cacheService.get(region, key);
+            if (value != null) {
+                results.add(buildResultItem(key, value, fields));
+            }
+        }
+        return results;
+    }
+    
+    /**
+     * Mode 3: Single key pattern (regex) search.
+     */
+    private List<Map<String, Object>> performKeyPatternSearch(String region, String pattern, int limit, List<String> fields) {
+        List<Map<String, Object>> results = cacheService.searchKeysByRegex(region, pattern, limit);
+        if (fields != null && !fields.isEmpty()) {
+            return applyFieldProjection(results, fields);
+        }
+        return results;
+    }
+    
+    /**
+     * Mode 4: Multiple key patterns search (v1.7.7).
+     * Returns keys matching ANY of the patterns (OR logic between patterns).
+     */
+    private List<Map<String, Object>> performMultiKeyPatternSearch(String region, List<String> patterns, int limit, List<String> fields) {
+        Set<String> matchedKeys = new LinkedHashSet<>();
+        List<Pattern> compiledPatterns = patterns.stream()
+            .map(Pattern::compile)
+            .collect(Collectors.toList());
+        
+        // Get all keys in region
+        Set<String> allKeys = cacheService.keys(region, "*");
+        
+        for (String key : allKeys) {
+            if (matchedKeys.size() >= limit) break;
+            // Check if key matches any pattern
+            for (Pattern p : compiledPatterns) {
+                if (p.matcher(key).matches()) {
+                    matchedKeys.add(key);
+                    break;
+                }
+            }
+        }
+        
+        // Build results
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (String key : matchedKeys) {
+            String value = cacheService.get(region, key);
+            if (value != null) {
+                results.add(buildResultItem(key, value, fields));
+            }
+        }
+        return results;
+    }
+    
+    /**
+     * Mode 5: JSON attribute search with new criteria format (v1.7.7).
+     * Uses AND logic - all criteria must match.
+     */
+    private List<Map<String, Object>> performJsonCriteriaSearch(String region, Map<String, Object> criteria, int limit, List<String> fields) {
+        Set<String> keys = cacheService.keys(region, "*");
+        List<Map<String, Object>> results = new ArrayList<>();
+        
+        for (String key : keys) {
+            if (results.size() >= limit) break;
+            
+            JsonNode json = cacheService.jsonGet(region, key, "$");
+            if (json == null) continue;
+            
+            // Check if all criteria match (AND logic)
+            if (matchesAllCriteria(json, criteria)) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("key", key);
+                if (fields != null && !fields.isEmpty()) {
+                    item.put("value", projectFields(json, fields));
+                } else {
+                    item.put("value", json);
+                }
+                results.add(item);
+            }
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Check if JSON document matches all criteria (AND logic).
+     */
+    private boolean matchesAllCriteria(JsonNode json, Map<String, Object> criteria) {
+        for (Map.Entry<String, Object> entry : criteria.entrySet()) {
+            String fieldPath = entry.getKey();
+            Object criteriaValue = entry.getValue();
+            
+            JsonNode fieldValue = getJsonField(json, fieldPath);
+            
+            if (!matchesCriterion(fieldValue, criteriaValue)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * Check if a field value matches a single criterion.
+     * Supports: equality, list (IN), regex, and comparison operators.
+     */
+    @SuppressWarnings("unchecked")
+    private boolean matchesCriterion(JsonNode fieldValue, Object criteriaValue) {
+        if (fieldValue == null || fieldValue.isNull() || fieldValue.isMissingNode()) {
+            return false;
+        }
+        
+        String actualValue = fieldValue.asText();
+        
+        // Case 1: List of values (IN operator)
+        if (criteriaValue instanceof List) {
+            List<?> valueList = (List<?>) criteriaValue;
+            return valueList.stream()
+                .map(String::valueOf)
+                .anyMatch(v -> v.equals(actualValue));
+        }
+        
+        // Case 2: Map with operators (regex, comparison)
+        if (criteriaValue instanceof Map) {
+            Map<String, Object> operators = (Map<String, Object>) criteriaValue;
+            
+            // Regex operator
+            if (operators.containsKey("regex")) {
+                String pattern = String.valueOf(operators.get("regex"));
+                return Pattern.matches(pattern, actualValue);
+            }
+            
+            // Comparison operators for numeric values
+            if (fieldValue.isNumber()) {
+                double numValue = fieldValue.asDouble();
+                
+                if (operators.containsKey("gt")) {
+                    double threshold = Double.parseDouble(String.valueOf(operators.get("gt")));
+                    if (numValue <= threshold) return false;
+                }
+                if (operators.containsKey("gte")) {
+                    double threshold = Double.parseDouble(String.valueOf(operators.get("gte")));
+                    if (numValue < threshold) return false;
+                }
+                if (operators.containsKey("lt")) {
+                    double threshold = Double.parseDouble(String.valueOf(operators.get("lt")));
+                    if (numValue >= threshold) return false;
+                }
+                if (operators.containsKey("lte")) {
+                    double threshold = Double.parseDouble(String.valueOf(operators.get("lte")));
+                    if (numValue > threshold) return false;
+                }
+                if (operators.containsKey("ne")) {
+                    double notEqual = Double.parseDouble(String.valueOf(operators.get("ne")));
+                    if (numValue == notEqual) return false;
+                }
+                if (operators.containsKey("eq")) {
+                    double equal = Double.parseDouble(String.valueOf(operators.get("eq")));
+                    if (numValue != equal) return false;
+                }
+                return true;
+            }
+            
+            // Not equals for strings
+            if (operators.containsKey("ne")) {
+                String notEqual = String.valueOf(operators.get("ne"));
+                return !actualValue.equals(notEqual);
+            }
+            
+            return false;
+        }
+        
+        // Case 3: Simple equality
+        String expectedValue = String.valueOf(criteriaValue);
+        return actualValue.equals(expectedValue);
+    }
+    
+    /**
+     * Build a result item with optional field projection.
+     */
+    private Map<String, Object> buildResultItem(String key, String value, List<String> fields) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("key", key);
+        
+        try {
+            JsonNode jsonValue = JsonUtils.parse(value);
+            if (fields != null && !fields.isEmpty()) {
+                item.put("value", projectFields(jsonValue, fields));
+            } else {
+                item.put("value", jsonValue);
+            }
+        } catch (Exception e) {
+            item.put("value", value);
+        }
+        
+        return item;
     }
     
     /**

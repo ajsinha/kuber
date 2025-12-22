@@ -2,11 +2,99 @@
 
 All notable changes to this project are documented in this file.
 
-## [1.7.6] - 2025-12-22 - WARM OBJECTS, PROMETHEUS & UI REFRESH
+## [1.7.7] - 2025-12-22 - ENHANCED GENERIC SEARCH API
+
+### 🔍 Major Feature: Enhanced Generic Search API
+
+**v1.7.7 introduces a powerful, flexible generic search API with multiple search modes and comprehensive JSON attribute querying capabilities.**
+
+The enhanced `/api/genericsearch` endpoint now supports multi-key lookups, multi-pattern regex searches, and advanced JSON attribute filtering with AND logic across all criteria.
+
+### Search Modes
+
+| Mode | Description | Example |
+|------|-------------|---------|
+| **Single Key** | Lookup by exact key | `{"key": "user:123"}` |
+| **Multi-Key** | Lookup multiple keys | `{"keys": ["user:1", "user:2"]}` |
+| **Single Pattern** | Regex key search | `{"keyPattern": "user:.*"}` |
+| **Multi-Pattern** | Multiple regex patterns | `{"keyPatterns": ["user:.*", "admin:.*"]}` |
+| **JSON Criteria** | Attribute search | `{"type": "json", "criteria": {...}}` |
+
+### JSON Search Capabilities
+
+```json
+{
+  "apiKey": "your-api-key",
+  "region": "users",
+  "type": "json",
+  "criteria": {
+    "status": "active",                          // Equality match
+    "country": ["USA", "Canada", "UK"],          // IN operator
+    "email": {"regex": ".*@company\\.com"},      // Regex match
+    "age": {"gte": 18, "lte": 65}                // Range comparison
+  },
+  "fields": ["name", "email"],                    // Field projection
+  "limit": 100
+}
+```
+
+### Supported Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| Equality | Exact match | `"status": "active"` |
+| IN | Match any in list | `"country": ["USA", "UK"]` |
+| regex | Pattern match | `"email": {"regex": ".*@.*\\.com"}` |
+| gt | Greater than | `"age": {"gt": 18}` |
+| gte | Greater or equal | `"age": {"gte": 18}` |
+| lt | Less than | `"age": {"lt": 65}` |
+| lte | Less or equal | `"age": {"lte": 65}` |
+| ne | Not equal | `"status": {"ne": "deleted"}` |
+| eq | Equal (numeric) | `"count": {"eq": 0}` |
+
+### API Key Authentication
+
+All requests now require API key in the request body:
+```json
+{
+  "apiKey": "your-configured-api-key",
+  "region": "test",
+  "keys": ["key1", "key2"]
+}
+```
+
+### Response Format
+
+All responses are JSON arrays:
+```json
+[
+  {"key": "user:1", "value": {"name": "John", "status": "active"}},
+  {"key": "user:2", "value": {"name": "Jane", "status": "active"}}
+]
+```
+
+### New/Updated Components
+
+| Component | Description |
+|-----------|-------------|
+| `GenericSearchRequest` | Enhanced DTO with new search fields |
+| `ApiController.genericSearch()` | Updated with new search modes |
+| `matchesAllCriteria()` | JSON criteria matching with AND logic |
+| `matchesCriterion()` | Individual criterion evaluation |
+
+### Backward Compatibility
+
+- Legacy `keypattern` field still supported (deprecated in favor of `keyPattern`)
+- Legacy `values` format still supported (deprecated in favor of `criteria`)
+- Existing API clients continue to work unchanged
+
+---
+
+## [1.7.6] - 2025-12-22 - PROMETHEUS MONITORING & BMO THEME
 
 ### 🔥 Major New Feature: Per-Region Warm Object Configuration
 
-**v1.7.6 introduces configurable warm object counts per region, ensuring frequently accessed data remains in memory for optimal read performance.**
+**v1.7.7 introduces configurable warm object counts per region, ensuring frequently accessed data remains in memory for optimal read performance.**
 
 The new WarmObjectService proactively maintains a minimum number of "warm" (in-memory) objects per region, loading from disk if necessary. This works in coordination with eviction services to prevent thrashing.
 
