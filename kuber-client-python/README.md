@@ -187,6 +187,33 @@ client = KuberClient(
 )
 ```
 
+## Test Data Generators (v1.7.7)
+
+The `testdata` module provides synthetic data generators for testing and development:
+
+### Trade Data Generator
+
+Generate realistic trade data for CCR (Counterparty Credit Risk) calculations:
+
+```bash
+# Generate 200,000 trades (default)
+python -m testdata.trade_generator
+
+# Custom options
+python -m testdata.trade_generator --count 500000 --output trades.csv --delimiter "|"
+
+# List all 88 available products
+python -m testdata.trade_generator --list-products
+```
+
+Features:
+- **88 Trading Products** across 5 asset classes (IR, FX, Credit, Equity, Commodity)
+- **70+ CCR-relevant attributes** including SA-CCR parameters
+- **Realistic data distribution** based on typical portfolio composition
+- Output formats: CSV (pipe-delimited) or JSON
+
+See [testdata/README.md](testdata/README.md) for full documentation.
+
 ## License
 
 Copyright © 2025-2030 Ashutosh Sinha. All Rights Reserved.
