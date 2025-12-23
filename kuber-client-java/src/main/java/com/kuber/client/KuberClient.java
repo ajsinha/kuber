@@ -666,7 +666,24 @@ public class KuberClient implements AutoCloseable {
     }
     
     /**
-     * Search JSON documents
+     * Search JSON documents by query string.
+     * 
+     * Query syntax:
+     * - Single value: field=value
+     * - IN clause: field=[value1|value2|value3]
+     * - Multiple conditions: field1=value1,field2=value2
+     * - Operators: =, !=, >, <, >=, <=, ~= (regex)
+     * 
+     * Examples:
+     * - "status=active" - match status equals "active"
+     * - "status=[active|pending]" - match status IN ("active", "pending")
+     * - "status=[active|pending],country=[USA|UK]" - IN clause on multiple attributes
+     * - "age>=18,age<=65" - numeric range
+     * 
+     * @param query Query string with conditions
+     * @return List of matching JSON documents
+     * @throws IOException If search fails
+     * @since 1.7.7 - Added IN clause support with [value1|value2|...] syntax
      */
     public List<JsonNode> jsonSearch(String query) throws IOException {
         List<String> results = sendCommandForList("JSEARCH", query);
@@ -688,6 +705,76 @@ public class KuberClient implements AutoCloseable {
             }
         }
         return nodes;
+    }
+    
+    /**
+     * Search JSON documents with IN clause support.
+     * 
+     * Convenience method for building queries with multiple attribute conditions,
+     * each potentially matching multiple values (IN clause).
+     * 
+     * Example:
+     * <pre>
+     * Map&lt;String, List&lt;String&gt;&gt; conditions = new LinkedHashMap&lt;&gt;();
+     * conditions.put("status", Arrays.asList("active", "pending"));
+     * conditions.put("country", Arrays.asList("USA", "UK", "CA"));
+     * List&lt;JsonNode&gt; results = client.jsonSearchIn(conditions);
+     * </pre>
+     * 
+     * This generates query: "status=[active|pending],country=[USA|UK|CA]"
+     * 
+     * @param conditions Map of field name to list of acceptable values
+     * @return List of matching JSON documents
+     * @throws IOException If search fails
+     * @since 1.7.7
+     */
+    public List<JsonNode> jsonSearchIn(Map<String, List<String>> conditions) throws IOException {
+        return jsonSearch(buildInClauseQuery(conditions));
+    }
+    
+    /**
+     * Build a query string with IN clause syntax from conditions map.
+     * 
+     * @param conditions Map of field name to list of acceptable values
+     * @return Query string in format: field1=[v1|v2],field2=[v3|v4]
+     * @since 1.7.7
+     */
+    public static String buildInClauseQuery(Map<String, List<String>> conditions) {
+        if (conditions == null || conditions.isEmpty()) {
+            return "";
+        }
+        
+        StringBuilder query = new StringBuilder();
+        boolean first = true;
+        
+        for (Map.Entry<String, List<String>> entry : conditions.entrySet()) {
+            String field = entry.getKey();
+            List<String> values = entry.getValue();
+            
+            if (field == null || values == null || values.isEmpty()) {
+                continue;
+            }
+            
+            if (!first) {
+                query.append(",");
+            }
+            first = false;
+            
+            query.append(field).append("=");
+            
+            if (values.size() == 1) {
+                query.append(values.get(0));
+            } else {
+                query.append("[");
+                for (int i = 0; i < values.size(); i++) {
+                    if (i > 0) query.append("|");
+                    query.append(values.get(i));
+                }
+                query.append("]");
+            }
+        }
+        
+        return query.toString();
     }
     
     // ==================== Generic Search (Convenience Methods) ====================

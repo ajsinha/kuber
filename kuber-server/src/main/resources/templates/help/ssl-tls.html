@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Kuber v1.7.7 - SSL/TLS Configuration Help
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('SSL/TLS Configuration')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+<div class="container-fluid py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+            <li class="breadcrumb-item active" aria-current="page">SSL/TLS Configuration</li>
+        </ol>
+    </nav>
+    
+    <h1 class="mb-4"><i class="fas fa-lock text-success me-2"></i>SSL/TLS Configuration Guide</h1>
+    
+    <div class="alert alert-info">
+        <i class="fas fa-shield-alt me-2"></i>
+        <strong>Secure Communications:</strong> This guide covers configuring SSL/TLS for both the Kuber server and client applications to ensure encrypted data transmission.
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Contents</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="text-primary">Server Configuration</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#overview">Overview</a></li>
+                        <li><a href="#certificates">Certificate Setup</a></li>
+                        <li><a href="#springboot-ssl">Spring Boot SSL Configuration</a></li>
+                        <li><a href="#server-https">HTTPS Configuration</a></li>
+                        <li><a href="#server-redis-ssl">Redis Protocol SSL</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-success">Client Configuration</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#java-client">Java Client (KuberClient)</a></li>
+                        <li><a href="#python-client">Python Client</a></li>
+                        <li><a href="#csharp-client">C# Client</a></li>
+                        <li><a href="#rest-clients">REST API Clients</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-warning">Advanced Topics</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#mutual-tls">Mutual TLS (mTLS)</a></li>
+                        <li><a href="#certificate-rotation">Certificate Rotation</a></li>
+                        <li><a href="#troubleshooting">Troubleshooting</a></li>
+                        <li><a href="#best-practices">Best Practices</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="card mb-4" id="overview">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-eye me-2"></i>Overview</h5>
+        </div>
+        <div class="card-body">
+            <p>Kuber supports SSL/TLS encryption for both its communication channels:</p>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card bg-light h-100">
+                        <div class="card-body">
+                            <h6><i class="fas fa-globe text-primary me-2"></i>HTTPS (REST API &amp; Web UI)</h6>
+                            <p class="mb-2">Encrypts HTTP traffic for:</p>
+                            <ul class="mb-0">
+                                <li>Web UI access</li>
+                                <li>REST API endpoints</li>
+                                <li>Generic Search/Update APIs</li>
+                                <li>Admin operations</li>
+                            </ul>
+                            <div class="mt-2">
+                                <span class="badge bg-info">Default Port: 8443</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-light h-100">
+                        <div class="card-body">
+                            <h6><i class="fas fa-network-wired text-success me-2"></i>Redis Protocol SSL</h6>
+                            <p class="mb-2">Encrypts Redis protocol traffic for:</p>
+                            <ul class="mb-0">
+                                <li>KuberClient connections</li>
+                                <li>Redis CLI with TLS</li>
+                                <li>High-performance cache operations</li>
+                                <li>JSON/JSEARCH commands</li>
+                            </ul>
+                            <div class="mt-2">
+                                <span class="badge bg-info">Default Port: 6380 (SSL: 6381)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-warning mt-3 mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Recommendation:</strong> In production environments, always enable SSL/TLS for both channels, especially when transmitting sensitive data or operating across untrusted networks.
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificate Setup -->
+    <div class="card mb-4" id="certificates">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fas fa-certificate me-2"></i>Certificate Setup</h5>
+        </div>
+        <div class="card-body">
+            <h6>Option 1: Self-Signed Certificate (Development/Testing)</h6>
+            <p>Generate a self-signed certificate using Java keytool:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># Generate a new keystore with self-signed certificate
+keytool -genkeypair \
+    -alias kuber \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 365 \
+    -keystore kuber-keystore.p12 \
+    -storetype PKCS12 \
+    -storepass changeit \
+    -keypass changeit \
+    -dname "CN=localhost, OU=Kuber, O=MyCompany, L=City, ST=State, C=US"
+
+# Verify the keystore
+keytool -list -keystore kuber-keystore.p12 -storetype PKCS12 -storepass changeit</code></pre>
+
+            <h6 class="mt-4">Option 2: CA-Signed Certificate (Production)</h6>
+            <p>For production, obtain a certificate from a trusted Certificate Authority:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># Step 1: Generate a key pair and CSR (Certificate Signing Request)
+keytool -genkeypair \
+    -alias kuber \
+    -keyalg RSA \
+    -keysize 2048 \
+    -keystore kuber-keystore.p12 \
+    -storetype PKCS12 \
+    -storepass YourSecurePassword \
+    -dname "CN=kuber.yourcompany.com, OU=IT, O=YourCompany, L=City, ST=State, C=US"
+
+# Step 2: Generate CSR
+keytool -certreq \
+    -alias kuber \
+    -keystore kuber-keystore.p12 \
+    -storetype PKCS12 \
+    -storepass YourSecurePassword \
+    -file kuber.csr
+
+# Step 3: Submit CSR to your CA and receive signed certificate
+
+# Step 4: Import CA certificate chain
+keytool -importcert \
+    -alias root-ca \
+    -keystore kuber-keystore.p12 \
+    -storetype PKCS12 \
+    -storepass YourSecurePassword \
+    -file root-ca.crt \
+    -trustcacerts
+
+# Step 5: Import signed certificate
+keytool -importcert \
+    -alias kuber \
+    -keystore kuber-keystore.p12 \
+    -storetype PKCS12 \
+    -storepass YourSecurePassword \
+    -file kuber-signed.crt</code></pre>
+
+            <h6 class="mt-4">Option 3: Using Existing PEM Files</h6>
+            <p>Convert existing PEM certificate and key files to PKCS12:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># Convert PEM to PKCS12
+openssl pkcs12 -export \
+    -in certificate.pem \
+    -inkey private-key.pem \
+    -out kuber-keystore.p12 \
+    -name kuber \
+    -password pass:YourSecurePassword
+
+# If you have a CA chain, include it
+openssl pkcs12 -export \
+    -in certificate.pem \
+    -inkey private-key.pem \
+    -certfile ca-chain.pem \
+    -out kuber-keystore.p12 \
+    -name kuber \
+    -password pass:YourSecurePassword</code></pre>
+
+            <div class="alert alert-info mt-3 mb-0">
+                <i class="fas fa-folder me-2"></i>
+                <strong>File Location:</strong> Place the keystore file in the Kuber configuration directory (e.g., <code>/opt/kuber/config/</code> or alongside <code>application.properties</code>).
+            </div>
+        </div>
+    </div>
+
+    <!-- Spring Boot SSL Configuration - Comprehensive Guide -->
+    <div class="card mb-4" id="springboot-ssl">
+        <div class="card-header" style="background: linear-gradient(135deg, #6db33f 0%, #5fa134 100%);">
+            <h5 class="mb-0 text-white"><i class="fab fa-java me-2"></i>Enable SSL using Spring Boot Configuration</h5>
+        </div>
+        <div class="card-body">
+            <p>Spring Boot provides comprehensive SSL/TLS configuration options. Since Kuber is built on Spring Boot, you can use any of these methods to enable secure connections.</p>
+            
+            <div class="alert alert-success">
+                <i class="fas fa-lightbulb me-2"></i>
+                <strong>Spring Boot 3.x:</strong> Supports both traditional keystore-based configuration and modern PEM file-based configuration (recommended for cloud-native deployments).
+            </div>
+
+            <!-- Configuration Methods Tabs -->
+            <ul class="nav nav-tabs" id="sslConfigTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="props-tab" data-bs-toggle="tab" data-bs-target="#props-content" type="button">application.properties</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="yaml-tab" data-bs-toggle="tab" data-bs-target="#yaml-content" type="button">application.yml</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="cmdline-tab" data-bs-toggle="tab" data-bs-target="#cmdline-content" type="button">Command Line</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="env-tab" data-bs-toggle="tab" data-bs-target="#env-content" type="button">Environment Variables</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="java-tab" data-bs-toggle="tab" data-bs-target="#java-content" type="button">Java System Properties</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content border border-top-0 p-3 rounded-bottom" id="sslConfigTabsContent">
+                <!-- application.properties Tab -->
+                <div class="tab-pane fade show active" id="props-content" role="tabpanel">
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# SPRING BOOT SSL CONFIGURATION - application.properties
+# =============================================================================
+
+# ------------------------------------------------------------------------------
+# BASIC SSL CONFIGURATION
+# ------------------------------------------------------------------------------
+server.port=8443
+server.ssl.enabled=true
+
+# ------------------------------------------------------------------------------
+# OPTION 1: PKCS12 KEYSTORE (Recommended for most deployments)
+# ------------------------------------------------------------------------------
+server.ssl.key-store=file:/opt/kuber/config/kuber-keystore.p12
+server.ssl.key-store-password=YourSecurePassword
+server.ssl.key-store-type=PKCS12
+server.ssl.key-alias=kuber
+server.ssl.key-password=YourKeyPassword
+
+# ------------------------------------------------------------------------------
+# OPTION 2: JKS KEYSTORE (Legacy Java KeyStore format)
+# ------------------------------------------------------------------------------
+# server.ssl.key-store=file:/opt/kuber/config/kuber-keystore.jks
+# server.ssl.key-store-password=YourSecurePassword
+# server.ssl.key-store-type=JKS
+# server.ssl.key-alias=kuber
+# server.ssl.key-password=YourKeyPassword
+
+# ------------------------------------------------------------------------------
+# OPTION 3: PEM FILES (Spring Boot 2.7+ / 3.x - Cloud Native)
+# ------------------------------------------------------------------------------
+# server.ssl.certificate=file:/opt/kuber/config/server-certificate.pem
+# server.ssl.certificate-private-key=file:/opt/kuber/config/server-private-key.pem
+# server.ssl.certificate-private-key-password=optional-key-password
+
+# With certificate chain (intermediate + root CA)
+# server.ssl.certificate=file:/opt/kuber/config/server-certificate.pem
+# server.ssl.certificate-private-key=file:/opt/kuber/config/server-private-key.pem
+# server.ssl.trust-certificate=file:/opt/kuber/config/ca-chain.pem
+
+# ------------------------------------------------------------------------------
+# OPTION 4: PEM BUNDLE (Multiple certs in one file)
+# ------------------------------------------------------------------------------
+# server.ssl.bundle.pem.server.keystore.certificate=file:/opt/kuber/config/fullchain.pem
+# server.ssl.bundle.pem.server.keystore.private-key=file:/opt/kuber/config/privkey.pem
+# server.ssl.bundle.pem.server.truststore.certificate=file:/opt/kuber/config/ca-bundle.pem
+
+# ------------------------------------------------------------------------------
+# TLS PROTOCOL CONFIGURATION
+# ------------------------------------------------------------------------------
+server.ssl.protocol=TLS
+server.ssl.enabled-protocols=TLSv1.2,TLSv1.3
+
+# ------------------------------------------------------------------------------
+# CIPHER SUITES (Strong ciphers only - adjust based on security requirements)
+# ------------------------------------------------------------------------------
+server.ssl.ciphers=TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+
+# ------------------------------------------------------------------------------
+# CLIENT AUTHENTICATION (Mutual TLS / mTLS)
+# ------------------------------------------------------------------------------
+# none = No client certificate required (default)
+# want = Client certificate requested but not required
+# need = Client certificate required (mTLS)
+server.ssl.client-auth=none
+
+# Trust store for validating client certificates (required for mTLS)
+# server.ssl.trust-store=file:/opt/kuber/config/truststore.p12
+# server.ssl.trust-store-password=TrustStorePassword
+# server.ssl.trust-store-type=PKCS12
+
+# Or use PEM for trust store
+# server.ssl.trust-certificate=file:/opt/kuber/config/client-ca-chain.pem
+
+# ------------------------------------------------------------------------------
+# ADVANCED OPTIONS
+# ------------------------------------------------------------------------------
+# Enable OCSP stapling (certificate revocation check)
+# server.ssl.enable-ocsp-stapling=true
+
+# HTTP Strict Transport Security (HSTS)
+# server.ssl.hsts.enabled=true
+# server.ssl.hsts.max-age=31536000
+# server.ssl.hsts.include-sub-domains=true</code></pre>
+                </div>
+                
+                <!-- application.yml Tab -->
+                <div class="tab-pane fade" id="yaml-content" role="tabpanel">
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# SPRING BOOT SSL CONFIGURATION - application.yml
+# =============================================================================
+
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    
+    # ----------------------------------------------------------------------
+    # OPTION 1: PKCS12 Keystore
+    # ----------------------------------------------------------------------
+    key-store: file:/opt/kuber/config/kuber-keystore.p12
+    key-store-password: YourSecurePassword
+    key-store-type: PKCS12
+    key-alias: kuber
+    key-password: YourKeyPassword
+    
+    # ----------------------------------------------------------------------
+    # OPTION 2: PEM Files (Spring Boot 3.x)
+    # ----------------------------------------------------------------------
+    # certificate: file:/opt/kuber/config/server-certificate.pem
+    # certificate-private-key: file:/opt/kuber/config/server-private-key.pem
+    # certificate-private-key-password: optional-key-password
+    # trust-certificate: file:/opt/kuber/config/ca-chain.pem
+    
+    # ----------------------------------------------------------------------
+    # TLS Protocol Configuration
+    # ----------------------------------------------------------------------
+    protocol: TLS
+    enabled-protocols:
+      - TLSv1.2
+      - TLSv1.3
+    
+    # ----------------------------------------------------------------------
+    # Cipher Suites
+    # ----------------------------------------------------------------------
+    ciphers:
+      - TLS_AES_256_GCM_SHA384
+      - TLS_AES_128_GCM_SHA256
+      - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+      - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    
+    # ----------------------------------------------------------------------
+    # Client Authentication (mTLS)
+    # ----------------------------------------------------------------------
+    client-auth: none  # none, want, need
+    
+    # Trust store for client certificate validation
+    # trust-store: file:/opt/kuber/config/truststore.p12
+    # trust-store-password: TrustStorePassword
+    # trust-store-type: PKCS12
+
+# SSL Bundle Configuration (Spring Boot 3.1+)
+spring:
+  ssl:
+    bundle:
+      pem:
+        server:
+          keystore:
+            certificate: file:/opt/kuber/config/fullchain.pem
+            private-key: file:/opt/kuber/config/privkey.pem
+          truststore:
+            certificate: file:/opt/kuber/config/ca-bundle.pem
+      jks:
+        server:
+          keystore:
+            location: file:/opt/kuber/config/keystore.jks
+            password: keystorePassword
+          truststore:
+            location: file:/opt/kuber/config/truststore.jks
+            password: truststorePassword</code></pre>
+                </div>
+                
+                <!-- Command Line Tab -->
+                <div class="tab-pane fade" id="cmdline-content" role="tabpanel">
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# COMMAND LINE SSL CONFIGURATION
+# =============================================================================
+
+# Basic PKCS12 Configuration
+java -jar kuber-server.jar \
+    --server.port=8443 \
+    --server.ssl.enabled=true \
+    --server.ssl.key-store=file:./kuber-keystore.p12 \
+    --server.ssl.key-store-password=YourSecurePassword \
+    --server.ssl.key-store-type=PKCS12 \
+    --server.ssl.key-alias=kuber
+
+# Using PEM Files (Spring Boot 3.x)
+java -jar kuber-server.jar \
+    --server.port=8443 \
+    --server.ssl.enabled=true \
+    --server.ssl.certificate=file:./server-cert.pem \
+    --server.ssl.certificate-private-key=file:./server-key.pem \
+    --server.ssl.trust-certificate=file:./ca-chain.pem
+
+# With TLS Protocol Configuration
+java -jar kuber-server.jar \
+    --server.port=8443 \
+    --server.ssl.enabled=true \
+    --server.ssl.key-store=file:./kuber-keystore.p12 \
+    --server.ssl.key-store-password=YourSecurePassword \
+    --server.ssl.key-store-type=PKCS12 \
+    --server.ssl.enabled-protocols=TLSv1.2,TLSv1.3 \
+    --server.ssl.ciphers=TLS_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+
+# With Mutual TLS (Client Certificate Required)
+java -jar kuber-server.jar \
+    --server.port=8443 \
+    --server.ssl.enabled=true \
+    --server.ssl.key-store=file:./kuber-keystore.p12 \
+    --server.ssl.key-store-password=YourSecurePassword \
+    --server.ssl.key-store-type=PKCS12 \
+    --server.ssl.client-auth=need \
+    --server.ssl.trust-store=file:./client-truststore.p12 \
+    --server.ssl.trust-store-password=TrustStorePassword
+
+# Using classpath resources (embedded in JAR)
+java -jar kuber-server.jar \
+    --server.ssl.enabled=true \
+    --server.ssl.key-store=classpath:ssl/keystore.p12 \
+    --server.ssl.key-store-password=YourSecurePassword
+
+# External config file
+java -jar kuber-server.jar \
+    --spring.config.additional-location=file:/etc/kuber/ssl.properties</code></pre>
+                </div>
+                
+                <!-- Environment Variables Tab -->
+                <div class="tab-pane fade" id="env-content" role="tabpanel">
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# ENVIRONMENT VARIABLES FOR SSL CONFIGURATION
+# (Ideal for Docker, Kubernetes, and cloud deployments)
+# =============================================================================
+
+# Basic SSL Configuration
+export SERVER_PORT=8443
+export SERVER_SSL_ENABLED=true
+
+# PKCS12 Keystore
+export SERVER_SSL_KEY_STORE=file:/opt/kuber/config/kuber-keystore.p12
+export SERVER_SSL_KEY_STORE_PASSWORD=YourSecurePassword
+export SERVER_SSL_KEY_STORE_TYPE=PKCS12
+export SERVER_SSL_KEY_ALIAS=kuber
+export SERVER_SSL_KEY_PASSWORD=YourKeyPassword
+
+# PEM Files (Spring Boot 3.x)
+export SERVER_SSL_CERTIFICATE=file:/opt/kuber/config/server-cert.pem
+export SERVER_SSL_CERTIFICATE_PRIVATE_KEY=file:/opt/kuber/config/server-key.pem
+export SERVER_SSL_CERTIFICATE_PRIVATE_KEY_PASSWORD=optional-password
+export SERVER_SSL_TRUST_CERTIFICATE=file:/opt/kuber/config/ca-chain.pem
+
+# TLS Protocol Configuration
+export SERVER_SSL_PROTOCOL=TLS
+export SERVER_SSL_ENABLED_PROTOCOLS=TLSv1.2,TLSv1.3
+
+# Cipher Suites
+export SERVER_SSL_CIPHERS=TLS_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+
+# Client Authentication (mTLS)
+export SERVER_SSL_CLIENT_AUTH=need
+export SERVER_SSL_TRUST_STORE=file:/opt/kuber/config/truststore.p12
+export SERVER_SSL_TRUST_STORE_PASSWORD=TrustStorePassword
+export SERVER_SSL_TRUST_STORE_TYPE=PKCS12
+
+# Docker Compose example
+# ---
+# services:
+#   kuber:
+#     image: kuber:1.7.7
+#     ports:
+#       - "8443:8443"
+#     environment:
+#       - SERVER_PORT=8443
+#       - SERVER_SSL_ENABLED=true
+#       - SERVER_SSL_KEY_STORE=file:/certs/keystore.p12
+#       - SERVER_SSL_KEY_STORE_PASSWORD=${SSL_PASSWORD}
+#       - SERVER_SSL_KEY_STORE_TYPE=PKCS12
+#     volumes:
+#       - ./certs:/certs:ro
+
+# Kubernetes Secret mount example
+# ---
+# env:
+#   - name: SERVER_SSL_KEY_STORE_PASSWORD
+#     valueFrom:
+#       secretKeyRef:
+#         name: kuber-ssl
+#         key: keystore-password</code></pre>
+                </div>
+                
+                <!-- Java System Properties Tab -->
+                <div class="tab-pane fade" id="java-content" role="tabpanel">
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# JAVA SYSTEM PROPERTIES FOR SSL CONFIGURATION
+# =============================================================================
+
+# JVM-level SSL/TLS settings (affects all Java SSL connections)
+java \
+    -Djavax.net.ssl.keyStore=/path/to/keystore.p12 \
+    -Djavax.net.ssl.keyStorePassword=keystorePassword \
+    -Djavax.net.ssl.keyStoreType=PKCS12 \
+    -Djavax.net.ssl.trustStore=/path/to/truststore.p12 \
+    -Djavax.net.ssl.trustStorePassword=truststorePassword \
+    -Djavax.net.ssl.trustStoreType=PKCS12 \
+    -jar kuber-server.jar
+
+# Combined with Spring Boot properties
+java \
+    -Djavax.net.ssl.trustStore=/path/to/truststore.p12 \
+    -Djavax.net.ssl.trustStorePassword=truststorePassword \
+    -jar kuber-server.jar \
+    --server.ssl.enabled=true \
+    --server.ssl.key-store=file:/path/to/keystore.p12 \
+    --server.ssl.key-store-password=keystorePassword
+
+# SSL Debugging (useful for troubleshooting)
+java \
+    -Djavax.net.debug=ssl:handshake \
+    -jar kuber-server.jar
+
+# More verbose SSL debugging
+java \
+    -Djavax.net.debug=ssl:handshake:verbose:keymanager:trustmanager \
+    -jar kuber-server.jar
+
+# Disable hostname verification (development only!)
+java \
+    -Djdk.internal.httpclient.disableHostnameVerification=true \
+    -jar kuber-server.jar
+
+# Enable specific TLS protocols at JVM level
+java \
+    -Djdk.tls.client.protocols=TLSv1.2,TLSv1.3 \
+    -Dhttps.protocols=TLSv1.2,TLSv1.3 \
+    -jar kuber-server.jar
+
+# SNI (Server Name Indication) settings
+java \
+    -Djsse.enableSNIExtension=true \
+    -jar kuber-server.jar</code></pre>
+                </div>
+            </div>
+
+            <!-- Complete Properties Reference Table -->
+            <h5 class="mt-4 mb-3"><i class="fas fa-table me-2"></i>Complete SSL Properties Reference</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Property</th>
+                            <th>Description</th>
+                            <th>Default</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-primary">
+                            <td colspan="4"><strong>Basic Configuration</strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>server.port</code></td>
+                            <td>HTTPS port number</td>
+                            <td>8080</td>
+                            <td>8443</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.enabled</code></td>
+                            <td>Enable/disable SSL</td>
+                            <td>false</td>
+                            <td>true</td>
+                        </tr>
+                        <tr class="table-primary">
+                            <td colspan="4"><strong>Keystore Configuration (PKCS12/JKS)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.key-store</code></td>
+                            <td>Path to keystore file</td>
+                            <td>-</td>
+                            <td>file:/opt/kuber/keystore.p12</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.key-store-password</code></td>
+                            <td>Keystore password</td>
+                            <td>-</td>
+                            <td>changeit</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.key-store-type</code></td>
+                            <td>Keystore format</td>
+                            <td>PKCS12</td>
+                            <td>PKCS12, JKS</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.key-store-provider</code></td>
+                            <td>Keystore provider</td>
+                            <td>-</td>
+                            <td>SUN, BC</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.key-alias</code></td>
+                            <td>Alias of key in keystore</td>
+                            <td>-</td>
+                            <td>kuber</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.key-password</code></td>
+                            <td>Password for the key (if different from keystore)</td>
+                            <td>keystore password</td>
+                            <td>keyPassword</td>
+                        </tr>
+                        <tr class="table-success">
+                            <td colspan="4"><strong>PEM File Configuration (Spring Boot 3.x)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.certificate</code></td>
+                            <td>Path to PEM certificate file</td>
+                            <td>-</td>
+                            <td>file:/opt/kuber/cert.pem</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.certificate-private-key</code></td>
+                            <td>Path to PEM private key file</td>
+                            <td>-</td>
+                            <td>file:/opt/kuber/key.pem</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.certificate-private-key-password</code></td>
+                            <td>Password for encrypted private key</td>
+                            <td>-</td>
+                            <td>keyPassword</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.trust-certificate</code></td>
+                            <td>Path to trusted CA certificates (PEM)</td>
+                            <td>-</td>
+                            <td>file:/opt/kuber/ca-chain.pem</td>
+                        </tr>
+                        <tr class="table-warning">
+                            <td colspan="4"><strong>Trust Store Configuration (mTLS)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.trust-store</code></td>
+                            <td>Path to trust store file</td>
+                            <td>-</td>
+                            <td>file:/opt/kuber/truststore.p12</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.trust-store-password</code></td>
+                            <td>Trust store password</td>
+                            <td>-</td>
+                            <td>changeit</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.trust-store-type</code></td>
+                            <td>Trust store format</td>
+                            <td>PKCS12</td>
+                            <td>PKCS12, JKS</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.trust-store-provider</code></td>
+                            <td>Trust store provider</td>
+                            <td>-</td>
+                            <td>SUN, BC</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.client-auth</code></td>
+                            <td>Client certificate requirement</td>
+                            <td>none</td>
+                            <td>none, want, need</td>
+                        </tr>
+                        <tr class="table-info">
+                            <td colspan="4"><strong>Protocol &amp; Cipher Configuration</strong></td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.protocol</code></td>
+                            <td>SSL protocol to use</td>
+                            <td>TLS</td>
+                            <td>TLS, TLSv1.2, TLSv1.3</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.enabled-protocols</code></td>
+                            <td>Enabled SSL protocols</td>
+                            <td>-</td>
+                            <td>TLSv1.2,TLSv1.3</td>
+                        </tr>
+                        <tr>
+                            <td><code>server.ssl.ciphers</code></td>
+                            <td>Supported SSL ciphers</td>
+                            <td>-</td>
+                            <td>TLS_AES_256_GCM_SHA384,...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PEM File Examples -->
+            <h5 class="mt-4 mb-3"><i class="fas fa-file-code me-2"></i>PEM File Configuration Examples</h5>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card bg-light mb-3">
+                        <div class="card-header"><i class="fas fa-file-certificate me-2"></i>Basic PEM Setup</div>
+                        <div class="card-body">
+<pre class="bg-dark text-light p-2 rounded small"><code># application.properties
+
+# Server certificate and private key
+server.ssl.certificate=file:/etc/kuber/ssl/server.crt
+server.ssl.certificate-private-key=file:/etc/kuber/ssl/server.key
+
+# Optional: CA chain for client verification
+server.ssl.trust-certificate=file:/etc/kuber/ssl/ca-bundle.crt</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-light mb-3">
+                        <div class="card-header"><i class="fas fa-certificate me-2"></i>Let's Encrypt PEM Files</div>
+                        <div class="card-body">
+<pre class="bg-dark text-light p-2 rounded small"><code># Using Let's Encrypt certificates
+
+# fullchain.pem contains cert + intermediate
+server.ssl.certificate=file:/etc/letsencrypt/live/kuber.example.com/fullchain.pem
+server.ssl.certificate-private-key=file:/etc/letsencrypt/live/kuber.example.com/privkey.pem
+
+# For client cert validation (optional)
+server.ssl.trust-certificate=file:/etc/letsencrypt/live/kuber.example.com/chain.pem</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card bg-light mb-3">
+                        <div class="card-header"><i class="fas fa-key me-2"></i>Encrypted Private Key</div>
+                        <div class="card-body">
+<pre class="bg-dark text-light p-2 rounded small"><code># If private key is password-protected
+
+server.ssl.certificate=file:/opt/kuber/ssl/cert.pem
+server.ssl.certificate-private-key=file:/opt/kuber/ssl/encrypted-key.pem
+server.ssl.certificate-private-key-password=YourKeyPassword
+
+# PEM key format (encrypted):
+# -----BEGIN ENCRYPTED PRIVATE KEY-----
+# ...</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-light mb-3">
+                        <div class="card-header"><i class="fas fa-shield-alt me-2"></i>Mutual TLS with PEM</div>
+                        <div class="card-body">
+<pre class="bg-dark text-light p-2 rounded small"><code># mTLS configuration with PEM files
+
+server.ssl.certificate=file:/opt/kuber/ssl/server-cert.pem
+server.ssl.certificate-private-key=file:/opt/kuber/ssl/server-key.pem
+
+# Require client certificates
+server.ssl.client-auth=need
+
+# Trust store with client CA certificates
+server.ssl.trust-certificate=file:/opt/kuber/ssl/client-ca-bundle.pem</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SSL Bundle Configuration -->
+            <h5 class="mt-4 mb-3"><i class="fas fa-layer-group me-2"></i>SSL Bundles (Spring Boot 3.1+)</h5>
+            <p>SSL Bundles provide a way to configure SSL material once and reuse it across multiple components:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># application.yml - SSL Bundle Configuration
+
+spring:
+  ssl:
+    bundle:
+      # PEM-based bundle
+      pem:
+        kuber-server:
+          keystore:
+            certificate: file:/opt/kuber/ssl/server-cert.pem
+            private-key: file:/opt/kuber/ssl/server-key.pem
+          truststore:
+            certificate: file:/opt/kuber/ssl/ca-bundle.pem
+        kuber-client:
+          keystore:
+            certificate: file:/opt/kuber/ssl/client-cert.pem
+            private-key: file:/opt/kuber/ssl/client-key.pem
+      
+      # JKS-based bundle
+      jks:
+        legacy-server:
+          keystore:
+            location: file:/opt/kuber/ssl/keystore.jks
+            password: keystorePassword
+            type: JKS
+          truststore:
+            location: file:/opt/kuber/ssl/truststore.jks
+            password: truststorePassword
+            type: JKS
+
+# Reference bundle in server configuration
+server:
+  ssl:
+    bundle: kuber-server</code></pre>
+
+            <!-- Quick Start Examples -->
+            <h5 class="mt-4 mb-3"><i class="fas fa-rocket me-2"></i>Quick Start Examples</h5>
+            
+            <div class="accordion" id="quickStartAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#example1">
+                            <i class="fas fa-laptop-code me-2"></i>Development: Self-Signed Certificate
+                        </button>
+                    </h2>
+                    <div id="example1" class="accordion-collapse collapse show" data-bs-parent="#quickStartAccordion">
+                        <div class="accordion-body">
+<pre class="bg-dark text-light p-3 rounded"><code># 1. Generate self-signed certificate
+keytool -genkeypair -alias kuber -keyalg RSA -keysize 2048 -validity 365 \
+    -keystore kuber-dev.p12 -storetype PKCS12 -storepass devpassword \
+    -dname "CN=localhost" -ext "SAN=DNS:localhost,IP:127.0.0.1"
+
+# 2. Create application-dev.properties
+server.port=8443
+server.ssl.enabled=true
+server.ssl.key-store=file:./kuber-dev.p12
+server.ssl.key-store-password=devpassword
+server.ssl.key-store-type=PKCS12
+
+# 3. Run with dev profile
+java -jar kuber-server.jar --spring.profiles.active=dev</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example2">
+                            <i class="fas fa-server me-2"></i>Production: CA-Signed with PEM Files
+                        </button>
+                    </h2>
+                    <div id="example2" class="accordion-collapse collapse" data-bs-parent="#quickStartAccordion">
+                        <div class="accordion-body">
+<pre class="bg-dark text-light p-3 rounded"><code># application-prod.properties
+
+server.port=8443
+server.ssl.enabled=true
+
+# PEM certificates from Let's Encrypt or your CA
+server.ssl.certificate=file:/etc/kuber/ssl/fullchain.pem
+server.ssl.certificate-private-key=file:/etc/kuber/ssl/privkey.pem
+
+# Strong TLS configuration
+server.ssl.enabled-protocols=TLSv1.2,TLSv1.3
+server.ssl.ciphers=TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+
+# Run with production profile
+java -jar kuber-server.jar --spring.profiles.active=prod</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example3">
+                            <i class="fab fa-docker me-2"></i>Docker/Kubernetes: Environment Variables
+                        </button>
+                    </h2>
+                    <div id="example3" class="accordion-collapse collapse" data-bs-parent="#quickStartAccordion">
+                        <div class="accordion-body">
+<pre class="bg-dark text-light p-3 rounded"><code># docker-compose.yml
+version: '3.8'
+services:
+  kuber:
+    image: kuber:1.7.7
+    ports:
+      - "8443:8443"
+    environment:
+      - SERVER_PORT=8443
+      - SERVER_SSL_ENABLED=true
+      - SERVER_SSL_CERTIFICATE=file:/certs/server.crt
+      - SERVER_SSL_CERTIFICATE_PRIVATE_KEY=file:/certs/server.key
+      - SERVER_SSL_ENABLED_PROTOCOLS=TLSv1.2,TLSv1.3
+    volumes:
+      - ./certs:/certs:ro
+    secrets:
+      - ssl_key_password
+
+secrets:
+  ssl_key_password:
+    file: ./secrets/ssl_password.txt</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example4">
+                            <i class="fas fa-user-shield me-2"></i>Enterprise: Mutual TLS (mTLS)
+                        </button>
+                    </h2>
+                    <div id="example4" class="accordion-collapse collapse" data-bs-parent="#quickStartAccordion">
+                        <div class="accordion-body">
+<pre class="bg-dark text-light p-3 rounded"><code># application-mtls.properties
+
+server.port=8443
+server.ssl.enabled=true
+
+# Server certificate
+server.ssl.certificate=file:/opt/kuber/ssl/server-cert.pem
+server.ssl.certificate-private-key=file:/opt/kuber/ssl/server-key.pem
+
+# Require client certificates
+server.ssl.client-auth=need
+
+# Trust store with allowed client CAs
+server.ssl.trust-certificate=file:/opt/kuber/ssl/client-ca-bundle.pem
+
+# Strong TLS only
+server.ssl.enabled-protocols=TLSv1.3
+server.ssl.ciphers=TLS_AES_256_GCM_SHA384</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-4 mb-0">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Security Note:</strong> Never commit passwords or private keys to version control. Use environment variables, secrets management (Vault, AWS Secrets Manager), or Kubernetes secrets for sensitive values.
+            </div>
+        </div>
+    </div>
+
+    <!-- Server HTTPS Configuration -->
+    <div class="card mb-4" id="server-https">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-globe me-2"></i>HTTPS Configuration (REST API &amp; Web UI)</h5>
+        </div>
+        <div class="card-body">
+            <p>Configure Spring Boot SSL in <code>application.properties</code>:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# SSL/TLS Configuration for HTTPS (REST API & Web UI)
+# =============================================================================
+
+# Enable HTTPS
+server.port=8443
+server.ssl.enabled=true
+
+# Keystore configuration
+server.ssl.key-store=file:/opt/kuber/config/kuber-keystore.p12
+server.ssl.key-store-password=YourSecurePassword
+server.ssl.key-store-type=PKCS12
+server.ssl.key-alias=kuber
+
+# TLS Protocol version (recommended: TLSv1.2 or TLSv1.3)
+server.ssl.protocol=TLS
+server.ssl.enabled-protocols=TLSv1.2,TLSv1.3
+
+# Cipher suites (strong ciphers only)
+server.ssl.ciphers=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,TLS_DHE_RSA_WITH_AES_128_GCM_SHA256
+
+# Optional: Redirect HTTP to HTTPS
+# server.ssl.redirect-http-to-https=true
+
+# Optional: HTTP port for redirect (if using redirect)
+# server.http.port=8080</code></pre>
+
+            <h6 class="mt-4">Environment Variable Override</h6>
+            <p>For containerized deployments, use environment variables:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># Docker / Kubernetes environment variables
+SERVER_PORT=8443
+SERVER_SSL_ENABLED=true
+SERVER_SSL_KEY_STORE=file:/opt/kuber/config/kuber-keystore.p12
+SERVER_SSL_KEY_STORE_PASSWORD=YourSecurePassword
+SERVER_SSL_KEY_STORE_TYPE=PKCS12
+SERVER_SSL_KEY_ALIAS=kuber
+SERVER_SSL_ENABLED_PROTOCOLS=TLSv1.2,TLSv1.3</code></pre>
+
+            <h6 class="mt-4">Command Line Override</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>java -jar kuber-server.jar \
+    --server.port=8443 \
+    --server.ssl.enabled=true \
+    --server.ssl.key-store=file:./kuber-keystore.p12 \
+    --server.ssl.key-store-password=YourSecurePassword \
+    --server.ssl.key-store-type=PKCS12</code></pre>
+
+            <div class="alert alert-success mt-3 mb-0">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Verification:</strong> After starting, access <code>https://localhost:8443</code> in your browser. You should see the Kuber Web UI with a secure connection (padlock icon).
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Redis Protocol SSL -->
+    <div class="card mb-4" id="server-redis-ssl">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>Redis Protocol SSL Configuration</h5>
+        </div>
+        <div class="card-body">
+            <p>Configure SSL for the Redis protocol port in <code>application.properties</code>:</p>
+            
+<pre class="bg-dark text-light p-3 rounded"><code># =============================================================================
+# SSL/TLS Configuration for Redis Protocol
+# =============================================================================
+
+# Redis protocol port (non-SSL)
+kuber.network.port=6380
+
+# Enable SSL for Redis protocol
+kuber.network.ssl.enabled=true
+kuber.network.ssl.port=6381
+
+# SSL keystore (can use same as HTTPS or separate)
+kuber.network.ssl.key-store=file:/opt/kuber/config/kuber-keystore.p12
+kuber.network.ssl.key-store-password=YourSecurePassword
+kuber.network.ssl.key-store-type=PKCS12
+
+# Truststore for client certificate validation (mTLS)
+# kuber.network.ssl.trust-store=file:/opt/kuber/config/kuber-truststore.p12
+# kuber.network.ssl.trust-store-password=TrustStorePassword
+# kuber.network.ssl.client-auth=REQUIRE
+
+# TLS protocol settings
+kuber.network.ssl.protocol=TLSv1.2
+kuber.network.ssl.ciphers=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</code></pre>
+
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Dual Port Setup:</strong> You can run both SSL and non-SSL Redis ports simultaneously. Use port 6380 for internal/trusted networks and 6381 (SSL) for external/untrusted networks.
+            </div>
+            
+            <h6 class="mt-3">Testing with Redis CLI</h6>
+<pre class="bg-dark text-light p-3 rounded"><code># Connect using redis-cli with TLS
+redis-cli -h localhost -p 6381 --tls \
+    --cert /path/to/client.crt \
+    --key /path/to/client.key \
+    --cacert /path/to/ca.crt
+
+# Or with just server certificate verification
+redis-cli -h localhost -p 6381 --tls --cacert /path/to/ca.crt
+
+# Skip certificate verification (development only!)
+redis-cli -h localhost -p 6381 --tls --insecure</code></pre>
+        </div>
+    </div>
+
+    <!-- Java Client SSL -->
+    <div class="card mb-4" id="java-client">
+        <div class="card-header" style="background: linear-gradient(135deg, #f89820 0%, #e76f00 100%);">
+            <h5 class="mb-0 text-white"><i class="fab fa-java me-2"></i>Java Client (KuberClient) SSL Configuration</h5>
+        </div>
+        <div class="card-body">
+            <h6>Option 1: Using System Properties</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>// Set SSL system properties before creating client
+System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore.p12");
+System.setProperty("javax.net.ssl.trustStorePassword", "TrustStorePassword");
+System.setProperty("javax.net.ssl.trustStoreType", "PKCS12");
+
+// For mutual TLS (client certificate)
+System.setProperty("javax.net.ssl.keyStore", "/path/to/client-keystore.p12");
+System.setProperty("javax.net.ssl.keyStorePassword", "KeyStorePassword");
+System.setProperty("javax.net.ssl.keyStoreType", "PKCS12");
+
+// Create client with SSL port
+try (KuberClient client = new KuberClient("kuber.example.com", 6381, "kub_your_api_key")) {
+    // SSL connection established
+    client.set("key", "value");
+    String value = client.get("key");
+}</code></pre>
+
+            <h6 class="mt-4">Option 2: Using SSLContext (Programmatic)</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>import javax.net.ssl.*;
+import java.security.KeyStore;
+import java.io.FileInputStream;
+
+public class SecureKuberClient {
+    
+    public static SSLSocketFactory createSSLSocketFactory() throws Exception {
+        // Load truststore
+        KeyStore trustStore = KeyStore.getInstance("PKCS12");
+        try (FileInputStream fis = new FileInputStream("/path/to/truststore.p12")) {
+            trustStore.load(fis, "TrustStorePassword".toCharArray());
+        }
+        
+        // Create TrustManager
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(
+            TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trustStore);
+        
+        // Optional: Load keystore for client certificate (mTLS)
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (FileInputStream fis = new FileInputStream("/path/to/client-keystore.p12")) {
+            keyStore.load(fis, "KeyStorePassword".toCharArray());
+        }
+        
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(
+            KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, "KeyStorePassword".toCharArray());
+        
+        // Create SSLContext
+        SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
+        sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+        
+        return sslContext.getSocketFactory();
+    }
+    
+    public static void main(String[] args) throws Exception {
+        SSLSocketFactory sslFactory = createSSLSocketFactory();
+        
+        // Use with KuberClient (extended version with SSL support)
+        try (KuberClient client = new KuberClient(
+                "kuber.example.com", 6381, "kub_your_api_key", sslFactory)) {
+            client.set("secure-key", "secure-value");
+        }
+    }
+}</code></pre>
+
+            <h6 class="mt-4">Option 3: Trust All Certificates (Development Only!)</h6>
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Warning:</strong> Never use this in production! This bypasses certificate validation.
+            </div>
+<pre class="bg-dark text-light p-3 rounded"><code>// DEVELOPMENT ONLY - Disable certificate validation
+TrustManager[] trustAllCerts = new TrustManager[] {
+    new X509TrustManager() {
+        public X509Certificate[] getAcceptedIssuers() { return null; }
+        public void checkClientTrusted(X509Certificate[] certs, String authType) { }
+        public void checkServerTrusted(X509Certificate[] certs, String authType) { }
+    }
+};
+
+SSLContext sc = SSLContext.getInstance("TLS");
+sc.init(null, trustAllCerts, new java.security.SecureRandom());
+
+// Set as default (affects all SSL connections!)
+SSLContext.setDefault(sc);</code></pre>
+        </div>
+    </div>
+
+    <!-- Python Client SSL -->
+    <div class="card mb-4" id="python-client">
+        <div class="card-header" style="background: linear-gradient(135deg, #306998 0%, #FFD43B 100%);">
+            <h5 class="mb-0 text-white"><i class="fab fa-python me-2"></i>Python Client SSL Configuration</h5>
+        </div>
+        <div class="card-body">
+            <h6>Redis Protocol with SSL</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>import ssl
+import socket
+from kuber import KuberClient
+
+# Option 1: Using SSL context with certificate verification
+ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+ssl_context.load_verify_locations('/path/to/ca-certificate.pem')
+
+# For mutual TLS (client certificate)
+ssl_context.load_cert_chain(
+    certfile='/path/to/client-certificate.pem',
+    keyfile='/path/to/client-private-key.pem',
+    password='key_password'  # Optional if key is encrypted
+)
+
+# Create client with SSL
+client = KuberClient(
+    host='kuber.example.com',
+    port=6381,
+    api_key='kub_your_api_key',
+    ssl_context=ssl_context
+)
+
+# Or use the connection context manager
+with KuberClient('kuber.example.com', 6381, 'kub_your_api_key', ssl_context=ssl_context) as client:
+    client.set('key', 'value')
+    value = client.get('key')
+    print(f"Retrieved: {value}")</code></pre>
+
+            <h6 class="mt-4">REST API with SSL (requests library)</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>import requests
+
+# Option 1: Verify server certificate with CA bundle
+response = requests.post(
+    'https://kuber.example.com:8443/api/genericsearch',
+    json={
+        'apiKey': 'kub_your_api_key',
+        'region': 'users',
+        'keyPattern': 'user:.*'
+    },
+    verify='/path/to/ca-certificate.pem'  # Path to CA cert
+)
+
+# Option 2: Mutual TLS with client certificate
+response = requests.post(
+    'https://kuber.example.com:8443/api/genericsearch',
+    json={
+        'apiKey': 'kub_your_api_key',
+        'region': 'users',
+        'key': 'user:123'
+    },
+    cert=('/path/to/client-cert.pem', '/path/to/client-key.pem'),
+    verify='/path/to/ca-certificate.pem'
+)
+
+# Option 3: Development only - disable verification
+response = requests.post(
+    'https://kuber.example.com:8443/api/genericsearch',
+    json={'apiKey': 'kub_your_api_key', 'region': 'users', 'key': 'user:123'},
+    verify=False  # WARNING: Never in production!
+)
+
+print(response.json())</code></pre>
+
+            <h6 class="mt-4">Using Environment Variables</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>import os
+
+# Set SSL certificate paths via environment
+os.environ['KUBER_SSL_CA_CERT'] = '/path/to/ca-certificate.pem'
+os.environ['KUBER_SSL_CLIENT_CERT'] = '/path/to/client-cert.pem'
+os.environ['KUBER_SSL_CLIENT_KEY'] = '/path/to/client-key.pem'
+
+# Client reads from environment
+from kuber import KuberClient
+client = KuberClient.from_environment()  # Automatically uses SSL settings</code></pre>
+        </div>
+    </div>
+
+    <!-- C# Client SSL -->
+    <div class="card mb-4" id="csharp-client">
+        <div class="card-header" style="background: linear-gradient(135deg, #68217a 0%, #512bd4 100%);">
+            <h5 class="mb-0 text-white"><i class="fab fa-microsoft me-2"></i>C# Client SSL Configuration</h5>
+        </div>
+        <div class="card-body">
+            <h6>Using StackExchange.Redis with SSL</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>using StackExchange.Redis;
+using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+
+// Option 1: Basic SSL configuration
+var options = new ConfigurationOptions
+{
+    EndPoints = { { "kuber.example.com", 6381 } },
+    Ssl = true,
+    SslProtocols = System.Security.Authentication.SslProtocols.Tls12,
+    Password = "your_password",  // If authentication required
+    AbortOnConnectFail = false
+};
+
+// Option 2: With certificate validation callback
+options.CertificateValidation += (sender, certificate, chain, sslPolicyErrors) =>
+{
+    // Custom certificate validation logic
+    if (sslPolicyErrors == SslPolicyErrors.None)
+        return true;
+    
+    // For development: Accept self-signed certificates
+    // WARNING: Never in production!
+    Console.WriteLine($"Certificate error: {sslPolicyErrors}");
+    return true;  // Accept anyway (development only!)
+};
+
+// Option 3: With client certificate (mTLS)
+options.CertificateSelection += (sender, targetHost, localCertificates, 
+                                  remoteCertificate, acceptableIssuers) =>
+{
+    var clientCert = new X509Certificate2(
+        "/path/to/client-certificate.pfx", 
+        "certificate_password"
+    );
+    return clientCert;
+};
+
+// Create connection
+var redis = ConnectionMultiplexer.Connect(options);
+var db = redis.GetDatabase();
+
+// Use with KuberClient wrapper
+using var client = new KuberClient(options);
+await client.SetAsync("key", "value");
+var value = await client.GetAsync("key");</code></pre>
+
+            <h6 class="mt-4">REST API with HttpClient</h6>
+<pre class="bg-dark text-light p-3 rounded"><code>using System.Net.Http;
+using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+
+// Option 1: Trust custom CA certificate
+var handler = new HttpClientHandler();
+handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+{
+    // Load your CA certificate
+    var caCert = new X509Certificate2("/path/to/ca-certificate.crt");
+    
+    // Verify the server certificate was signed by your CA
+    chain.ChainPolicy.ExtraStore.Add(caCert);
+    chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority;
+    
+    return chain.Build(new X509Certificate2(cert));
+};
+
+var httpClient = new HttpClient(handler);
+
+// Option 2: With client certificate (mTLS)
+var clientCert = new X509Certificate2("/path/to/client.pfx", "password");
+handler.ClientCertificates.Add(clientCert);
+
+// Make API call
+var response = await httpClient.PostAsync(
+    "https://kuber.example.com:8443/api/genericsearch",
+    new StringContent(
+        JsonSerializer.Serialize(new {
+            apiKey = "kub_your_api_key",
+            region = "users",
+            key = "user:123"
+        }),
+        Encoding.UTF8,
+        "application/json"
+    )
+);
+
+var result = await response.Content.ReadAsStringAsync();
+Console.WriteLine(result);</code></pre>
+        </div>
+    </div>
+
+    <!-- REST Clients -->
+    <div class="card mb-4" id="rest-clients">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-plug me-2"></i>REST API Clients (cURL, Postman, etc.)</h5>
+        </div>
+        <div class="card-body">
+            <h6>cURL Examples</h6>
+<pre class="bg-dark text-light p-3 rounded"><code># Basic HTTPS request with CA certificate
+curl -X POST https://kuber.example.com:8443/api/genericsearch \
+    --cacert /path/to/ca-certificate.pem \
+    -H "Content-Type: application/json" \
+    -d '{
+        "apiKey": "kub_your_api_key",
+        "region": "users",
+        "key": "user:123"
+    }'
+
+# With client certificate (mTLS)
+curl -X POST https://kuber.example.com:8443/api/genericsearch \
+    --cacert /path/to/ca-certificate.pem \
+    --cert /path/to/client-cert.pem \
+    --key /path/to/client-key.pem \
+    -H "Content-Type: application/json" \
+    -d '{
+        "apiKey": "kub_your_api_key",
+        "region": "products",
+        "keyPattern": "prod:.*"
+    }'
+
+# Skip certificate verification (development only!)
+curl -X POST https://kuber.example.com:8443/api/genericsearch \
+    -k \
+    -H "Content-Type: application/json" \
+    -d '{"apiKey": "kub_xxx", "region": "test", "key": "test:1"}'</code></pre>
+
+            <h6 class="mt-4">Postman Configuration</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6><i class="fas fa-cog me-2"></i>Settings → Certificates</h6>
+                            <ol class="mb-0">
+                                <li>Go to Settings → Certificates</li>
+                                <li>Add CA Certificate:
+                                    <ul>
+                                        <li>Host: kuber.example.com</li>
+                                        <li>Port: 8443</li>
+                                        <li>CA Certificate: Select your CA cert</li>
+                                    </ul>
+                                </li>
+                                <li>For mTLS, also add:
+                                    <ul>
+                                        <li>Client Certificate (CRT)</li>
+                                        <li>Client Key (KEY)</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6><i class="fas fa-toggle-on me-2"></i>Quick Settings</h6>
+                            <p class="mb-2">For development/testing:</p>
+                            <ol class="mb-0">
+                                <li>Settings → General</li>
+                                <li>Disable "SSL certificate verification"</li>
+                                <li><span class="text-danger">⚠️ Re-enable for production!</span></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mutual TLS -->
+    <div class="card mb-4" id="mutual-tls">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-handshake me-2"></i>Mutual TLS (mTLS)</h5>
+        </div>
+        <div class="card-body">
+            <p>Mutual TLS requires both server and client to present certificates, providing bidirectional authentication.</p>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-light">Server Configuration</div>
+                        <div class="card-body">
+<pre class="bg-dark text-light p-3 rounded mb-0"><code># application.properties
+server.ssl.client-auth=NEED
+
+# Trust store with allowed client CAs
+server.ssl.trust-store=file:/path/to/truststore.p12
+server.ssl.trust-store-password=TrustStorePassword
+server.ssl.trust-store-type=PKCS12
+
+# For Redis protocol
+kuber.network.ssl.client-auth=REQUIRE
+kuber.network.ssl.trust-store=file:/path/to/truststore.p12
+kuber.network.ssl.trust-store-password=TrustStorePassword</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-light">Client Certificate Generation</div>
+                        <div class="card-body">
+<pre class="bg-dark text-light p-3 rounded mb-0"><code># Generate client key and CSR
+openssl req -new -newkey rsa:2048 \
+    -keyout client-key.pem \
+    -out client.csr \
+    -nodes \
+    -subj "/CN=client-app/O=MyCompany"
+
+# Sign with your CA
+openssl x509 -req \
+    -in client.csr \
+    -CA ca-cert.pem \
+    -CAkey ca-key.pem \
+    -CAcreateserial \
+    -out client-cert.pem \
+    -days 365
+
+# Convert to PKCS12 (for Java/.NET)
+openssl pkcs12 -export \
+    -in client-cert.pem \
+    -inkey client-key.pem \
+    -out client.p12</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3 mb-0">
+                <i class="fas fa-shield-alt me-2"></i>
+                <strong>Use Case:</strong> mTLS is recommended for zero-trust environments, service-to-service communication, and high-security deployments where you need to verify client identity at the TLS layer.
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificate Rotation -->
+    <div class="card mb-4" id="certificate-rotation">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-sync-alt me-2"></i>Certificate Rotation</h5>
+        </div>
+        <div class="card-body">
+            <p>Best practices for rotating SSL certificates with minimal downtime:</p>
+            
+            <h6>1. Prepare New Certificate</h6>
+<pre class="bg-dark text-light p-3 rounded"><code># Generate new certificate well before expiry (30-60 days)
+keytool -genkeypair -alias kuber-new \
+    -keystore kuber-keystore.p12 \
+    -storetype PKCS12 \
+    -storepass YourSecurePassword \
+    -validity 365 \
+    -keyalg RSA -keysize 2048 \
+    -dname "CN=kuber.example.com"</code></pre>
+
+            <h6 class="mt-3">2. Update Configuration</h6>
+<pre class="bg-dark text-light p-3 rounded"><code># Update application.properties
+server.ssl.key-alias=kuber-new
+
+# Or use environment variable
+export SERVER_SSL_KEY_ALIAS=kuber-new</code></pre>
+
+            <h6 class="mt-3">3. Graceful Restart</h6>
+<pre class="bg-dark text-light p-3 rounded"><code># Using actuator endpoint (if enabled)
+curl -X POST http://localhost:8080/actuator/restart
+
+# Or rolling restart in Kubernetes
+kubectl rollout restart deployment/kuber
+
+# Or manual restart with graceful shutdown
+kill -TERM $(cat kuber.pid)
+java -jar kuber-server.jar</code></pre>
+
+            <h6 class="mt-3">4. Update Client Trust Stores</h6>
+            <p>If using a new CA or self-signed certificate, update client trust stores before server rotation.</p>
+            
+            <div class="alert alert-warning mb-0">
+                <i class="fas fa-clock me-2"></i>
+                <strong>Tip:</strong> Set up certificate expiry monitoring and alerts at least 30 days before expiration.
+            </div>
+        </div>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="card mb-4" id="troubleshooting">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="fas fa-bug me-2"></i>Troubleshooting</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Error</th>
+                            <th>Cause</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>PKIX path building failed</code></td>
+                            <td>Server certificate not trusted</td>
+                            <td>Add CA certificate to client truststore</td>
+                        </tr>
+                        <tr>
+                            <td><code>unable to find valid certification path</code></td>
+                            <td>Missing CA in trust chain</td>
+                            <td>Import intermediate and root CA certificates</td>
+                        </tr>
+                        <tr>
+                            <td><code>Certificate expired</code></td>
+                            <td>Certificate validity period ended</td>
+                            <td>Renew and deploy new certificate</td>
+                        </tr>
+                        <tr>
+                            <td><code>Hostname verification failed</code></td>
+                            <td>CN/SAN doesn't match hostname</td>
+                            <td>Generate certificate with correct CN or add SAN</td>
+                        </tr>
+                        <tr>
+                            <td><code>SSLHandshakeException</code></td>
+                            <td>Protocol/cipher mismatch</td>
+                            <td>Ensure client supports server's TLS version/ciphers</td>
+                        </tr>
+                        <tr>
+                            <td><code>Connection reset</code></td>
+                            <td>Client certificate required but not provided</td>
+                            <td>Configure client certificate for mTLS</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h6 class="mt-3">Debugging Commands</h6>
+<pre class="bg-dark text-light p-3 rounded"><code># Test SSL connection with OpenSSL
+openssl s_client -connect kuber.example.com:8443 -showcerts
+
+# Check certificate details
+openssl x509 -in certificate.pem -text -noout
+
+# Verify certificate chain
+openssl verify -CAfile ca-cert.pem server-cert.pem
+
+# List keystore contents
+keytool -list -v -keystore kuber-keystore.p12 -storetype PKCS12
+
+# Enable Java SSL debugging
+java -Djavax.net.debug=ssl:handshake -jar kuber-server.jar</code></pre>
+        </div>
+    </div>
+
+    <!-- Best Practices -->
+    <div class="card mb-4" id="best-practices">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fas fa-check-double me-2"></i>Best Practices</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-thumbs-up text-success me-2"></i>Do</h6>
+                    <ul>
+                        <li>Use TLS 1.2 or 1.3 (disable older versions)</li>
+                        <li>Use strong cipher suites (AES-GCM)</li>
+                        <li>Use CA-signed certificates in production</li>
+                        <li>Set certificate expiry alerts</li>
+                        <li>Rotate certificates before expiration</li>
+                        <li>Use separate certificates per environment</li>
+                        <li>Secure keystore passwords using secrets management</li>
+                        <li>Enable hostname verification</li>
+                        <li>Use 2048-bit or 4096-bit RSA keys (or ECDSA)</li>
+                        <li>Implement certificate pinning for sensitive apps</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-thumbs-down text-danger me-2"></i>Don't</h6>
+                    <ul>
+                        <li>Use self-signed certificates in production</li>
+                        <li>Disable certificate verification</li>
+                        <li>Use SSLv3, TLS 1.0, or TLS 1.1</li>
+                        <li>Hard-code passwords in source code</li>
+                        <li>Use weak ciphers (RC4, DES, 3DES)</li>
+                        <li>Share private keys between services</li>
+                        <li>Ignore certificate expiration warnings</li>
+                        <li>Use wildcard certificates unnecessarily</li>
+                        <li>Store private keys in version control</li>
+                        <li>Use the same certificate across environments</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="alert alert-success mt-3 mb-0">
+                <i class="fas fa-lightbulb me-2"></i>
+                <strong>Pro Tip:</strong> Use tools like <a href="https://www.ssllabs.com/ssltest/" target="_blank">SSL Labs</a> to test your SSL configuration and identify potential vulnerabilities.
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Reference -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Quick Reference</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Configuration</th>
+                            <th>Property</th>
+                            <th>Default</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>HTTPS Port</td>
+                            <td><code>server.port</code></td>
+                            <td>8080 (8443 with SSL)</td>
+                        </tr>
+                        <tr>
+                            <td>Enable HTTPS</td>
+                            <td><code>server.ssl.enabled</code></td>
+                            <td>false</td>
+                        </tr>
+                        <tr>
+                            <td>Keystore Path</td>
+                            <td><code>server.ssl.key-store</code></td>
+                            <td>(required)</td>
+                        </tr>
+                        <tr>
+                            <td>Redis SSL Port</td>
+                            <td><code>kuber.network.ssl.port</code></td>
+                            <td>6381</td>
+                        </tr>
+                        <tr>
+                            <td>TLS Protocols</td>
+                            <td><code>server.ssl.enabled-protocols</code></td>
+                            <td>TLSv1.2,TLSv1.3</td>
+                        </tr>
+                        <tr>
+                            <td>Client Auth (mTLS)</td>
+                            <td><code>server.ssl.client-auth</code></td>
+                            <td>none (WANT/NEED for mTLS)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<script th:replace="~{layout :: scripts}"></script>
+</body>
+</html>

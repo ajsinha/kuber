@@ -78,9 +78,130 @@ All responses are JSON arrays:
 | Component | Description |
 |-----------|-------------|
 | `GenericSearchRequest` | Enhanced DTO with new search fields |
+| `GenericUpdateRequest` | New DTO for generic update API |
 | `ApiController.genericSearch()` | Updated with new search modes |
+| `ApiController.genericUpdate()` | New unified SET/UPDATE endpoint |
 | `matchesAllCriteria()` | JSON criteria matching with AND logic |
 | `matchesCriterion()` | Individual criterion evaluation |
+| `JsonUtils.QueryCondition` | Enhanced to support IN clause with multiple values |
+| `JsonUtils.matchesInClause()` | New method for IN clause matching |
+| `ssl-tls.html` | Comprehensive SSL/TLS configuration help page |
+| `SSL_TLS_CONFIGURATION.md` | Detailed SSL documentation for server and clients |
+
+### 📖 New Documentation: SSL/TLS Configuration Guide
+
+**v1.7.7 includes comprehensive SSL/TLS documentation covering secure communications.**
+
+The new SSL/TLS Configuration Guide covers:
+- Server HTTPS configuration for REST API & Web UI
+- Redis protocol SSL configuration
+- Client SSL setup for Java, Python, and C#
+- REST API client SSL (cURL, Postman)
+- Mutual TLS (mTLS) configuration
+- Certificate generation and management
+- Troubleshooting common SSL issues
+- Security best practices
+
+Access the guide at: `/help/ssl-tls` or in `docs/SSL_TLS_CONFIGURATION.md`
+
+### 🔎 Enhanced Feature: JSEARCH IN Clause Support
+
+**v1.7.7 adds IN clause support to JSEARCH for matching multiple values per attribute.**
+
+The JSEARCH command now supports matching a field against multiple values using the syntax `field=[value1|value2|value3]`:
+
+```bash
+# Single value (existing)
+JSEARCH status=active
+
+# IN clause - match any of multiple values (NEW)
+JSEARCH status=[active|pending|processing]
+
+# Multiple attributes, each with IN clause (NEW)
+JSEARCH status=[active|pending],country=[USA|UK|CA]
+```
+
+### JSEARCH Query Syntax
+
+| Pattern | Description |
+|---------|-------------|
+| `field=value` | Match single value |
+| `field=[v1\|v2\|v3]` | IN clause - match any value in list |
+| `field1=[a\|b],field2=[x\|y]` | Multiple IN clauses (AND logic between attributes) |
+
+### Client Library Updates
+
+All client libraries now include:
+- `jsonSearchIn()` / `json_search_in()` / `JsonSearchInAsync()` - convenience method accepting conditions map/dict
+- `buildInClauseQuery()` / `build_in_clause_query()` / `BuildInClauseQuery()` - static helper to build query strings
+
+**Python:**
+```python
+conditions = {"status": ["active", "pending"], "country": ["USA", "UK"]}
+results = client.json_search_in(conditions)
+```
+
+**Java:**
+```java
+Map<String, List<String>> conditions = new LinkedHashMap<>();
+conditions.put("status", Arrays.asList("active", "pending"));
+results = client.jsonSearchIn(conditions);
+```
+
+**C#:**
+```csharp
+var conditions = new Dictionary<string, List<string>> {
+    { "status", new List<string> { "active", "pending" } }
+};
+var results = await client.JsonSearchInAsync<Trade>(conditions);
+```
+
+### 🔄 New Feature: Generic Update API
+
+**v1.7.7 introduces a unified SET/UPDATE endpoint with intelligent JSON merging.**
+
+The `/api/genericupdate` endpoint provides smart handling of both new entries and updates:
+
+```json
+{
+  "apiKey": "your-api-key",
+  "region": "users",
+  "key": "user:123",
+  "value": {"email": "new@email.com", "status": "active"},
+  "type": "json",
+  "ttl": 3600
+}
+```
+
+### Update Behavior
+
+| Key Exists | Type | Action |
+|------------|------|--------|
+| No | any | Creates new entry with value |
+| Yes | not "json" | Replaces value entirely |
+| Yes | "json" | Merges using JUPDATE logic |
+
+### JUPDATE Merge Logic
+
+When `type="json"` and key exists:
+- Existing fields not in request are **preserved**
+- Fields in request **overwrite** existing values
+- New fields are **added**
+- Nested objects are **deep merged**
+- Arrays are **replaced** (not merged)
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "operation": "created|replaced|merged",
+  "region": "users",
+  "key": "user:123",
+  "value": {"name": "John", "email": "new@email.com", "status": "active"},
+  "ttl": 3600
+}
+```
 
 ### Backward Compatibility
 

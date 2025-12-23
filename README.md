@@ -264,6 +264,47 @@ Enhanced search API with multiple search modes and flexible JSON attribute query
 
 See [docs/GENERIC_SEARCH_API.md](docs/GENERIC_SEARCH_API.md) for complete documentation.
 
+### Generic Update API (v1.7.7)
+
+Unified SET/UPDATE operation with intelligent JSON merging:
+
+```json
+// Create or replace a value
+{
+  "apiKey": "your-api-key",
+  "region": "users",
+  "key": "user:123",
+  "value": {"name": "John", "email": "john@example.com"},
+  "type": "json",
+  "ttl": 3600
+}
+```
+
+**Behavior:**
+
+| Key Exists | Type | Action |
+|------------|------|--------|
+| No | any | Creates new entry |
+| Yes | not "json" | Replaces value entirely |
+| Yes | "json" | Merges using JUPDATE (preserves existing fields, updates/adds new) |
+
+**Example - JSON Merge:**
+
+Existing: `{"name": "John", "email": "john@old.com", "age": 30}`
+
+Request:
+```json
+{
+  "apiKey": "xxx", "region": "users", "key": "user:1",
+  "value": {"email": "john@new.com", "city": "NYC"},
+  "type": "json"
+}
+```
+
+Result: `{"name": "John", "email": "john@new.com", "age": 30, "city": "NYC"}`
+
+See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete documentation.
+
 ## Quick Start
 
 ### Prerequisites
@@ -523,7 +564,7 @@ Access cache operations via message brokers for decoupled, asynchronous architec
 | Batch | MGET, MSET |
 | Keys | KEYS, EXISTS, TTL, EXPIRE |
 | Hashes | HGET, HSET, HGETALL, HMSET |
-| JSON | JSET, JGET, JSEARCH |
+| JSON | JSET, JGET, JSEARCH (with IN clause: `field=[v1\|v2]`) |
 | Admin | PING, INFO, REGIONS |
 
 ### Global Service Control (v1.7.1)
@@ -986,6 +1027,54 @@ RBAC is enforced on:
 | **Redis Protocol** | All commands after AUTH |
 
 Users only see regions they have access to in the UI.
+
+### SSL/TLS Configuration (v1.7.7)
+
+Kuber supports SSL/TLS encryption for secure communications:
+
+| Channel | Description | Default Port |
+|---------|-------------|--------------|
+| **HTTPS** | REST API & Web UI | 8443 |
+| **Redis Protocol SSL** | KuberClient connections | 6381 |
+
+**Server Configuration** (`application.properties`):
+
+```properties
+# Enable HTTPS for REST API & Web UI
+server.port=8443
+server.ssl.enabled=true
+server.ssl.key-store=file:/opt/kuber/config/kuber-keystore.p12
+server.ssl.key-store-password=YourSecurePassword
+server.ssl.key-store-type=PKCS12
+
+# Enable SSL for Redis protocol
+kuber.network.ssl.enabled=true
+kuber.network.ssl.port=6381
+kuber.network.ssl.key-store=file:/opt/kuber/config/kuber-keystore.p12
+kuber.network.ssl.key-store-password=YourSecurePassword
+```
+
+**Client Configuration**:
+
+```java
+// Java - Set truststore before creating client
+System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore.p12");
+System.setProperty("javax.net.ssl.trustStorePassword", "password");
+
+try (KuberClient client = new KuberClient("host", 6381, "kub_api_key")) {
+    // SSL connection
+}
+```
+
+```python
+# Python - Use SSL context
+import ssl
+ssl_ctx = ssl.create_default_context()
+ssl_ctx.load_verify_locations('/path/to/ca-cert.pem')
+client = KuberClient('host', 6381, 'kub_api_key', ssl_context=ssl_ctx)
+```
+
+> 📖 **Full Guide**: See `docs/SSL_TLS_CONFIGURATION.md` or `/help/ssl-tls` in the Web UI for comprehensive SSL/TLS setup including mTLS, certificate management, and troubleshooting.
 
 ## Monitoring
 

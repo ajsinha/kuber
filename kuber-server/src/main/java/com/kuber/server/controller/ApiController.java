@@ -18,6 +18,7 @@ import com.kuber.core.util.JsonUtils;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.dto.GenericSearchRequest;
+import com.kuber.server.dto.GenericUpdateRequest;
 import com.kuber.server.replication.ReplicationManager;
 import com.kuber.server.security.ApiKeyService;
 import com.kuber.server.security.AuthorizationService;
@@ -1012,6 +1013,122 @@ public class ApiController {
         } else {
             // Simple field
             return json.get(fieldPath);
+        }
+    }
+    
+    // ==================== Generic Update API (v1.7.7) ====================
+    
+    /**
+     * Generic Update API - Unified SET/UPDATE operation via REST API.
+     * 
+     * Behavior:
+     * 1. If key does NOT exist:
+     *    - Creates new entry with given value
+     *    - If type="json", stores as JSON data type
+     *    - Applies TTL if provided, else -1 (no expiry)
+     * 
+     * 2. If key EXISTS:
+     *    - If type != "json": Replaces value entirely
+     *    - If type = "json": Performs JUPDATE (merge/update JSON fields)
+     *
+     * @param request the update request containing apiKey, region, key, value, type, ttl
+     * @return response with status and resulting value
+     */
+    @PostMapping({"/genericupdate", "/v1/genericupdate", "/v2/genericupdate"})
+    public ResponseEntity<Map<String, Object>> genericUpdate(@RequestBody GenericUpdateRequest request) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        
+        // Validate API key
+        if (!request.hasApiKey()) {
+            response.put("success", false);
+            response.put("error", "API key is required. Include 'apiKey' in request body.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+        
+        // Validate API key against configured keys
+        if (!isValidApiKey(request.getApiKey())) {
+            response.put("success", false);
+            response.put("error", "Invalid API key");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+        
+        // Validate required fields
+        String validationError = request.getValidationError();
+        if (validationError != null) {
+            response.put("success", false);
+            response.put("error", validationError);
+            return ResponseEntity.badRequest().body(response);
+        }
+        
+        String region = request.getRegion();
+        String key = request.getKey();
+        Object value = request.getValue();
+        boolean isJsonType = request.isJsonType();
+        long ttl = request.getTtlOrDefault();
+        
+        // Check if region exists, create if not
+        if (!cacheService.regionExists(region)) {
+            try {
+                cacheService.createRegion(region, "Auto-created by genericupdate API");
+            } catch (Exception e) {
+                response.put("success", false);
+                response.put("error", "Failed to create region: " + e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+        
+        try {
+            // Check if key exists
+            boolean keyExists = cacheService.exists(region, key);
+            String operation;
+            Object resultValue;
+            
+            if (!keyExists) {
+                // Key doesn't exist: SET the value
+                operation = "created";
+                if (isJsonType) {
+                    // Store as JSON
+                    JsonNode jsonValue = JsonUtils.getObjectMapper().valueToTree(value);
+                    cacheService.jsonSet(region, key, "$", jsonValue, ttl);
+                    resultValue = jsonValue;
+                } else {
+                    // Store as string
+                    String stringValue = value instanceof String ? (String) value : JsonUtils.toJson(value);
+                    cacheService.set(region, key, stringValue, ttl);
+                    resultValue = stringValue;
+                }
+            } else {
+                // Key exists
+                if (!isJsonType) {
+                    // Non-JSON: simple replacement
+                    operation = "replaced";
+                    String stringValue = value instanceof String ? (String) value : JsonUtils.toJson(value);
+                    cacheService.set(region, key, stringValue, ttl > 0 ? ttl : -1);
+                    resultValue = stringValue;
+                } else {
+                    // JSON type: use JUPDATE merge logic
+                    operation = "merged";
+                    JsonNode jsonValue = JsonUtils.getObjectMapper().valueToTree(value);
+                    JsonNode mergedValue = cacheService.jsonUpdate(region, key, jsonValue, ttl > 0 ? ttl : -1);
+                    resultValue = mergedValue;
+                }
+            }
+            
+            response.put("success", true);
+            response.put("operation", operation);
+            response.put("region", region);
+            response.put("key", key);
+            response.put("value", resultValue);
+            if (ttl > 0) {
+                response.put("ttl", ttl);
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", "Update failed: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
     

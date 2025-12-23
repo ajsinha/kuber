@@ -393,9 +393,30 @@ class KuberClient:
         Search JSON documents using deep search.
         
         Query format examples:
-            - '$.field=value'
-            - '$.field1=value1,$.field2>value2'
-            - Operators: =, !=, >, <, >=, <=, LIKE, IN, CONTAINS
+            - 'field=value' - single value match
+            - 'field=[value1|value2|value3]' - IN clause (match any of the values)
+            - 'field1=value1,field2>value2' - multiple conditions (AND)
+            - 'status=[active|pending],country=[USA|UK]' - multiple IN clauses
+            - Operators: =, !=, >, <, >=, <=, ~= (regex)
+        
+        Args:
+            query: Query string with conditions
+            region: Optional region to search (uses current if not specified)
+        
+        Returns:
+            List of dicts with 'key' and 'value' for matching documents
+        
+        Example:
+            # Single value
+            results = client.json_search("status=active")
+            
+            # IN clause - multiple values for one field
+            results = client.json_search("status=[active|pending]")
+            
+            # Multiple attributes with IN clauses
+            results = client.json_search("status=[active|pending],country=[USA|UK|CA]")
+        
+        Since: 1.7.7 - Added IN clause support with [value1|value2|...] syntax
         """
         args = ['JSEARCH', query]
         if region:
@@ -418,6 +439,68 @@ class KuberClient:
                     logger.warning(f"Failed to parse JSON for key {key}")
         
         return documents
+    
+    def json_search_in(self, conditions: Dict[str, List[str]], region: str = None) -> List[Dict[str, Any]]:
+        """
+        Search JSON documents with IN clause support.
+        
+        Convenience method for building queries with multiple attribute conditions,
+        each potentially matching multiple values (IN clause).
+        
+        Args:
+            conditions: Dict mapping field names to lists of acceptable values
+            region: Optional region to search (uses current if not specified)
+        
+        Returns:
+            List of dicts with 'key' and 'value' for matching documents
+        
+        Example:
+            # Search for trades where status is active OR pending 
+            # AND country is USA OR UK OR CA
+            conditions = {
+                "status": ["active", "pending"],
+                "country": ["USA", "UK", "CA"]
+            }
+            results = client.json_search_in(conditions)
+        
+        Since: 1.7.7
+        """
+        query = self.build_in_clause_query(conditions)
+        return self.json_search(query, region)
+    
+    @staticmethod
+    def build_in_clause_query(conditions: Dict[str, List[str]]) -> str:
+        """
+        Build a query string with IN clause syntax from conditions dict.
+        
+        Args:
+            conditions: Dict mapping field names to lists of acceptable values
+        
+        Returns:
+            Query string in format: field1=[v1|v2],field2=[v3|v4]
+        
+        Example:
+            conditions = {"status": ["active", "pending"], "country": ["USA", "UK"]}
+            query = KuberClient.build_in_clause_query(conditions)
+            # Returns: "status=[active|pending],country=[USA|UK]"
+        
+        Since: 1.7.7
+        """
+        if not conditions:
+            return ""
+        
+        parts = []
+        for field, values in conditions.items():
+            if not field or not values:
+                continue
+            
+            if len(values) == 1:
+                parts.append(f"{field}={values[0]}")
+            else:
+                values_str = "|".join(str(v) for v in values)
+                parts.append(f"{field}=[{values_str}]")
+        
+        return ",".join(parts)
     
     def json_query(self, jsonpath: str, region: str = None) -> List[Dict[str, Any]]:
         """Query JSON documents using JSONPath expression."""

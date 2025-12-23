@@ -305,23 +305,84 @@ public final class JsonUtils {
     }
     
     /**
-     * Check if JSON matches all query conditions
+     * Check if JSON matches all query conditions.
+     * Supports IN clause for matching against multiple values.
+     * 
+     * @since 1.7.7 - Added IN clause support
      */
     public static boolean matchesAllQueries(JsonNode json, List<QueryCondition> conditions) {
         for (QueryCondition condition : conditions) {
-            if (!matchesQuery(json, condition.getField(), condition.getOperator(), condition.getValue())) {
-                return false;
+            if (condition.isInClause()) {
+                // IN clause: match if field equals ANY of the values
+                if (!matchesInClause(json, condition.getField(), condition.getOperator(), condition.getValues())) {
+                    return false;
+                }
+            } else {
+                if (!matchesQuery(json, condition.getField(), condition.getOperator(), condition.getValue())) {
+                    return false;
+                }
             }
         }
         return true;
     }
     
     /**
-     * Check if JSON matches any query condition
+     * Check if JSON field matches any of the values in an IN clause.
+     * 
+     * @param json The JSON node to check
+     * @param field The field path to check
+     * @param operator The operator (typically "=" or "==")
+     * @param values List of values to match against
+     * @return true if field value matches any of the values
+     * @since 1.7.7
      */
-    public static boolean matchesAnyQuery(JsonNode json, List<QueryCondition> conditions) {
-        for (QueryCondition condition : conditions) {
-            if (matchesQuery(json, condition.getField(), condition.getOperator(), condition.getValue())) {
+    public static boolean matchesInClause(JsonNode json, String field, String operator, List<String> values) {
+        JsonNode fieldValue = getPath(json, field);
+        if (fieldValue == null || fieldValue.isNull() || fieldValue.isMissingNode()) {
+            // For != operator with IN, null means NOT in list, so true
+            return "!=".equals(operator) || "<>".equals(operator);
+        }
+        
+        String actualValue = fieldValue.isTextual() ? fieldValue.asText() : fieldValue.toString();
+        
+        // For equality operators, check if actual value is in the list
+        if ("=".equals(operator) || "==".equals(operator)) {
+            for (String value : values) {
+                if (actualValue.equals(value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // For not-equals operators, check if actual value is NOT in the list
+        if ("!=".equals(operator) || "<>".equals(operator)) {
+            for (String value : values) {
+                if (actualValue.equals(value)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // For regex operator, check if actual value matches any pattern
+        if ("~=".equals(operator) || "regex".equals(operator)) {
+            for (String pattern : values) {
+                try {
+                    if (Pattern.compile(pattern).matcher(actualValue).matches()) {
+                        return true;
+                    }
+                } catch (Exception e) {
+                    // Invalid pattern, skip
+                }
+            }
+            return false;
+        }
+        
+        // For comparison operators, not typical with IN clause but support anyway
+        // Returns true if comparison is true for ANY value
+        for (String value : values) {
+            if (matchesQuery(json, field, operator, value)) {
                 return true;
             }
         }
@@ -329,8 +390,43 @@ public final class JsonUtils {
     }
     
     /**
-     * Parse query string into conditions
+     * Check if JSON matches any query condition.
+     * Supports IN clause for matching against multiple values.
+     * 
+     * @since 1.7.7 - Added IN clause support
+     */
+    public static boolean matchesAnyQuery(JsonNode json, List<QueryCondition> conditions) {
+        for (QueryCondition condition : conditions) {
+            if (condition.isInClause()) {
+                if (matchesInClause(json, condition.getField(), condition.getOperator(), condition.getValues())) {
+                    return true;
+                }
+            } else {
+                if (matchesQuery(json, condition.getField(), condition.getOperator(), condition.getValue())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Parse query string into conditions.
+     * 
      * Format: field1=value1,field2>value2,field3~=pattern
+     * 
+     * Supports IN clause for matching multiple values:
+     *   field=[value1|value2|value3]
+     * 
+     * Examples:
+     *   - "status=active" - single attribute, single value
+     *   - "status=[active|pending]" - single attribute, IN clause with multiple values
+     *   - "status=active,country=USA" - multiple attributes, single values each
+     *   - "status=[active|pending],country=[USA|UK|CA]" - multiple attributes, each with IN clause
+     *   - "age>=18,age<=65" - numeric range comparison
+     *   - "email~=.*@company\\.com" - regex matching
+     * 
+     * @since 1.7.7 - Added IN clause support with [value1|value2|...] syntax
      */
     public static List<QueryCondition> parseQuery(String query) {
         List<QueryCondition> conditions = new ArrayList<>();
@@ -351,7 +447,13 @@ public final class JsonUtils {
     }
     
     /**
-     * Parse a single condition
+     * Parse a single condition.
+     * 
+     * Supports:
+     * - Simple conditions: field=value, field>10, field~=pattern
+     * - IN clause: field=[value1|value2|value3]
+     * 
+     * @since 1.7.7 - Added IN clause support with [value1|value2|...] syntax
      */
     private static QueryCondition parseCondition(String condition) {
         String[] operators = {"~=", ">=", "<=", "!=", "<>", "==", "=", ">", "<"};
@@ -361,6 +463,23 @@ public final class JsonUtils {
             if (idx > 0) {
                 String field = condition.substring(0, idx).trim();
                 String value = condition.substring(idx + op.length()).trim();
+                
+                // Check for IN clause syntax: [value1|value2|value3]
+                if (value.startsWith("[") && value.endsWith("]")) {
+                    String innerValues = value.substring(1, value.length() - 1);
+                    String[] parts = innerValues.split("\\|");
+                    List<String> valueList = new ArrayList<>();
+                    for (String part : parts) {
+                        String trimmed = part.trim();
+                        if (!trimmed.isEmpty()) {
+                            valueList.add(trimmed);
+                        }
+                    }
+                    if (!valueList.isEmpty()) {
+                        return new QueryCondition(field, op, valueList);
+                    }
+                }
+                
                 return new QueryCondition(field, op, value);
             }
         }
@@ -414,17 +533,42 @@ public final class JsonUtils {
     }
     
     /**
-     * Query condition holder
+     * Query condition holder.
+     * Supports single value matching and IN clause with multiple values.
+     * 
+     * Syntax:
+     * - Single value: field=value, field>value, field~=pattern
+     * - Multiple values (IN): field=[value1|value2|value3]
+     * 
+     * @since 1.7.7 - Added support for IN clause with multiple values
      */
     public static class QueryCondition {
         private final String field;
         private final String operator;
-        private final String value;
+        private final String value;           // Single value (for backward compatibility)
+        private final List<String> values;    // Multiple values for IN clause
+        private final boolean isInClause;
         
+        /**
+         * Constructor for single value condition.
+         */
         public QueryCondition(String field, String operator, String value) {
             this.field = field;
             this.operator = operator;
             this.value = value;
+            this.values = null;
+            this.isInClause = false;
+        }
+        
+        /**
+         * Constructor for IN clause with multiple values.
+         */
+        public QueryCondition(String field, String operator, List<String> values) {
+            this.field = field;
+            this.operator = operator;
+            this.value = values.isEmpty() ? "" : values.get(0);
+            this.values = new ArrayList<>(values);
+            this.isInClause = true;
         }
         
         public String getField() {
@@ -437,6 +581,14 @@ public final class JsonUtils {
         
         public String getValue() {
             return value;
+        }
+        
+        public List<String> getValues() {
+            return values;
+        }
+        
+        public boolean isInClause() {
+            return isInClause;
         }
     }
     

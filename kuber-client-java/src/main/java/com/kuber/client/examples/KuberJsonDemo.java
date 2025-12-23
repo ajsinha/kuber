@@ -157,15 +157,20 @@ public class KuberJsonDemo {
      * 
      * Query syntax:
      * - field=value           : exact match
+     * - field=[v1|v2|v3]      : IN clause - match any value (v1.7.7)
      * - field!=value          : not equal
-     * - field>value           : greater than
-     * - field<value           : less than  
-     * - field>=value          : greater or equal
-     * - field<=value          : less or equal
+     * - field>[=]value        : greater than [or equal]
+     * - field<[=]value        : less than [or equal]
      * - field~=regex          : regex match
-     * - field contains value  : contains substring
      * 
-     * Multiple conditions: field1=value1,field2>value2
+     * Multiple conditions (AND logic): field1=value1,field2>value2
+     * Multiple IN clauses: field1=[a|b],field2=[x|y|z]
+     * 
+     * Examples:
+     * - "status=active"                     : exact match
+     * - "status=[active|pending]"           : IN clause (v1.7.7)
+     * - "status=[active|pending],country=[USA|UK]" : multiple IN clauses
+     * - "age>25,department=Engineering"     : multiple conditions
      */
     public List<Map<String, String>> jsonSearch(String query) throws IOException {
         String response = sendCommand("JSEARCH", query);
@@ -378,6 +383,59 @@ public class KuberJsonDemo {
         }
     }
     
+    public void demoC_InClauseSearch() throws IOException {
+        printHeader("C) JSON SEARCH - IN CLAUSE (v1.7.7)");
+        
+        System.out.println("\n  The IN clause allows matching a field against multiple values.");
+        System.out.println("  Syntax: field=[value1|value2|value3]");
+        System.out.println("  Logic: Returns records where field equals ANY of the values.");
+        
+        // IN clause - single attribute with multiple values
+        System.out.println("\n  Search: department=[Engineering|Sales]");
+        System.out.println("  (Find employees in Engineering OR Sales departments)");
+        List<Map<String, String>> results = jsonSearch("department=[Engineering|Sales]");
+        System.out.println("  Found " + results.size() + " results:");
+        for (Map<String, String> r : results) {
+            System.out.println("    - " + r.get("key"));
+        }
+        
+        // IN clause - multiple attributes, each with multiple values
+        System.out.println("\n  Search: department=[Engineering|Sales],address.state=[CA|NY]");
+        System.out.println("  (Find employees in (Engineering OR Sales) AND in (California OR New York))");
+        results = jsonSearch("department=[Engineering|Sales],address.state=[CA|NY]");
+        System.out.println("  Found " + results.size() + " results:");
+        for (Map<String, String> r : results) {
+            System.out.println("    - " + r.get("key"));
+        }
+        
+        // IN clause combined with comparison operator
+        System.out.println("\n  Search: department=[Engineering|Marketing],salary>80000");
+        System.out.println("  (Find high-earning employees in Engineering OR Marketing)");
+        results = jsonSearch("department=[Engineering|Marketing],salary>80000");
+        System.out.println("  Found " + results.size() + " results:");
+        for (Map<String, String> r : results) {
+            System.out.println("    - " + r.get("key"));
+        }
+        
+        // IN clause with three values
+        System.out.println("\n  Search: address.state=[CA|NY|TX]");
+        System.out.println("  (Find employees in California, New York, or Texas)");
+        results = jsonSearch("address.state=[CA|NY|TX]");
+        System.out.println("  Found " + results.size() + " results:");
+        for (Map<String, String> r : results) {
+            System.out.println("    - " + r.get("key"));
+        }
+        
+        // Building IN clause query programmatically
+        System.out.println("\n  Building query programmatically:");
+        String[] departments = {"Engineering", "Sales", "HR"};
+        String[] states = {"CA", "NY"};
+        String query = "department=[" + String.join("|", departments) + "],address.state=[" + String.join("|", states) + "]";
+        System.out.println("  Query: " + query);
+        results = jsonSearch(query);
+        System.out.println("  Found " + results.size() + " results");
+    }
+    
     public void demoD_RegexSearchJson() throws IOException {
         printHeader("D) REGEX SEARCH ON JSON ATTRIBUTE VALUES");
         
@@ -460,10 +518,11 @@ public class KuberJsonDemo {
 ║   a) Set key with JSON value                                         ║
 ║   b) Retrieve key with JSON value                                    ║
 ║   c) JSON search with single/multiple attributes                     ║
+║      - IN clause for matching multiple values (v1.7.7)               ║
 ║   d) Regex search on JSON attribute values                           ║
 ║   e) Search keys using regex                                         ║
 ║                                                                      ║
-║   v1.6.5 - API Key Authentication Required                           ║
+║   v1.7.7 - JSEARCH IN Clause: field=[value1|value2|value3]           ║
 ╚══════════════════════════════════════════════════════════════════════╝
         """);
         
@@ -499,6 +558,7 @@ public class KuberJsonDemo {
             demo.demoB_GetJson();
             demo.demoC_SearchSingleAttribute();
             demo.demoC_SearchMultipleAttributes();
+            demo.demoC_InClauseSearch();  // v1.7.7 - IN clause demo
             demo.demoD_RegexSearchJson();
             demo.demoE_KeyRegexSearch();
             

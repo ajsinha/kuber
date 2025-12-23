@@ -553,7 +553,7 @@
                                         </tr>
                                         <tr>
                                             <td><strong>Security</strong></td>
-                                            <td>Spring Security 6.x, API Keys</td>
+                                            <td>Spring Security 6.x, API Keys, RBAC, SSL/TLS</td>
                                         </tr>
                                         <tr>
                                             <td><strong>JSON Processing</strong></td>
@@ -653,30 +653,38 @@
                             <div class="mb-4">
                                 <h6 class="mb-1">
                                     <span class="badge bg-primary me-2">v1.7.7</span>
-                                    <span class="text-muted small">Current - Enhanced Generic Search API</span>
+                                    <span class="text-muted small">Current - Security, SSL/TLS & Enhanced Search APIs</span>
                                 </h6>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>December 2025</p>
                                 <ul class="small text-muted mb-0">
+                                    <li><strong>Security &amp; RBAC</strong>: Enterprise-grade role-based access control with region-level permissions</li>
+                                    <li><strong>SSL/TLS Configuration</strong>: Comprehensive guide for secure server and client connections</li>
+                                    <li><strong>Spring Boot SSL</strong>: Full configuration options via properties, YAML, command line, environment variables, and Java system properties</li>
+                                    <li><strong>PEM File Support</strong>: Direct PEM certificate/key configuration for cloud-native deployments (Spring Boot 3.x)</li>
+                                    <li><strong>SSL Bundles</strong>: Reusable SSL material configuration (Spring Boot 3.1+)</li>
+                                    <li><strong>JSEARCH IN Clause</strong>: Match multiple values per attribute with <code>[v1|v2|v3]</code> syntax</li>
+                                    <li><strong>Generic Update API</strong>: Unified SET/UPDATE endpoint with intelligent JSON merging (JUPDATE)</li>
                                     <li><strong>Multi-Key Search</strong>: Search by single key or list of keys in one request</li>
                                     <li><strong>Multi-Pattern Search</strong>: Search using multiple regex patterns for keys (OR logic)</li>
                                     <li><strong>Advanced JSON Search</strong>: Flexible attribute matching with AND logic across all criteria</li>
-                                    <li><strong>Attribute Value Lists</strong>: Match attribute against single value or list of values (IN operator)</li>
-                                    <li><strong>Attribute Regex</strong>: Use regex patterns for JSON attribute matching</li>
-                                    <li><strong>Comparison Operators</strong>: Support for gt, gte, lt, lte, ne, eq operators in JSON search</li>
+                                    <li><strong>Comparison Operators</strong>: Support for gt, gte, lt, lte, ne, eq, regex operators in JSON search</li>
                                     <li><strong>API Key in Body</strong>: Pass apiKey directly in JSON request body for POST requests</li>
-                                    <li><strong>New Criteria Format</strong>: Cleaner JSON search syntax with 'criteria' object</li>
-                                    <li><strong>Backward Compatible</strong>: Legacy 'values' format still supported</li>
+                                    <li><strong>Smart Merge</strong>: JSON updates preserve existing fields, add new ones, and deep merge nested objects</li>
+                                    <li><strong>Mutual TLS (mTLS)</strong>: Client certificate authentication with trust store configuration</li>
+                                    <li><strong>Client Library Updates</strong>: All 3 clients (Java, Python, C#) updated with <code>jsonSearchIn()</code> and SSL support</li>
+                                    <li><strong>Demo Code Updates</strong>: Python and Java JSON demos updated with IN clause examples</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
                                 <h6 class="mb-1">
                                     <span class="badge bg-secondary me-2">v1.7.6</span>
-                                    <span class="text-muted small">Prometheus Monitoring & BMO Dark Blue Theme</span>
+                                    <span class="text-muted small">Prometheus Monitoring &amp; Dark Blue Theme</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Prometheus Integration</strong>: Native metrics export at /actuator/prometheus endpoint</li>
                                     <li><strong>20+ Metrics</strong>: Cache operations, hit rates, evictions, memory usage, per-region stats</li>
                                     <li><strong>Grafana Ready</strong>: Pre-built PromQL queries for dashboards and alerting</li>
-                                    <li><strong>BMO Dark Blue Theme</strong>: Professional enterprise color scheme (#0079c1 primary)</li>
+                                    <li><strong>Dark Blue Theme</strong>: Professional enterprise color scheme (#0079c1 primary)</li>
                                     <li><strong>PrometheusMetricsService</strong>: Scheduled metrics updates with configurable intervals</li>
                                     <li><strong>Alert Rules</strong>: Example Prometheus alert configurations included</li>
                                 </ul>

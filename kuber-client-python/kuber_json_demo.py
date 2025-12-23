@@ -188,15 +188,20 @@ class KuberJsonClient:
         
         Query syntax:
         - field=value           : exact match
+        - field=[v1|v2|v3]      : IN clause - match any value (v1.7.7)
         - field!=value          : not equal
-        - field>value           : greater than
-        - field<value           : less than  
-        - field>=value          : greater or equal
-        - field<=value          : less or equal
+        - field>[=]value        : greater than [or equal]
+        - field<[=]value        : less than [or equal]
         - field~=regex          : regex match
-        - fieldcontains value : contains substring
         
-        Multiple conditions: field1=value1,field2>value2
+        Multiple conditions (AND logic): field1=value1,field2>value2
+        Multiple IN clauses: field1=[a|b],field2=[x|y|z]
+        
+        Examples:
+        - "status=active"                     : exact match
+        - "status=[active|pending]"           : IN clause (v1.7.7)
+        - "status=[active|pending],country=[USA|UK]" : multiple IN clauses
+        - "age>25,department=Engineering"     : multiple conditions
         """
         response = self._send_command('JSEARCH', query)
         return self._parse_search_results(response)
@@ -440,6 +445,57 @@ def demo_c_search_multiple_attributes(client: KuberJsonClient):
         addr = r['value'].get('address', {})
         print(f"    - {r['key']}: {r['value'].get('name', 'N/A')} in {addr.get('city', 'N/A')}, {addr.get('state', 'N/A')}")
 
+def demo_c_in_clause_search(client: KuberJsonClient):
+    """Demo c) JSON search with IN clause - v1.7.7 Feature."""
+    print_header("C) JSON SEARCH - IN CLAUSE (v1.7.7)")
+    
+    print("\n  The IN clause allows matching a field against multiple values.")
+    print("  Syntax: field=[value1|value2|value3]")
+    print("  Logic: Returns records where field equals ANY of the values.")
+    
+    # IN clause - single attribute with multiple values
+    print("\n  Search: department=[Engineering|Sales]")
+    print("  (Find employees in Engineering OR Sales departments)")
+    results = client.json_search("department=[Engineering|Sales]")
+    print(f"  Found {len(results)} results:")
+    for r in results:
+        print(f"    - {r['key']}: {r['value'].get('name', 'N/A')} ({r['value'].get('department', 'N/A')})")
+    
+    # IN clause - multiple attributes, each with multiple values
+    print("\n  Search: department=[Engineering|Sales],address.state=[CA|NY]")
+    print("  (Find employees in (Engineering OR Sales) AND in (California OR New York))")
+    results = client.json_search("department=[Engineering|Sales],address.state=[CA|NY]")
+    print(f"  Found {len(results)} results:")
+    for r in results:
+        addr = r['value'].get('address', {})
+        print(f"    - {r['key']}: {r['value'].get('name', 'N/A')} - {r['value'].get('department', 'N/A')} in {addr.get('state', 'N/A')}")
+    
+    # IN clause combined with comparison operator
+    print("\n  Search: department=[Engineering|Marketing],salary>80000")
+    print("  (Find high-earning employees in Engineering OR Marketing)")
+    results = client.json_search("department=[Engineering|Marketing],salary>80000")
+    print(f"  Found {len(results)} results:")
+    for r in results:
+        print(f"    - {r['key']}: {r['value'].get('name', 'N/A')} - {r['value'].get('department', 'N/A')} (${r['value'].get('salary', 0):,})")
+    
+    # IN clause with three values
+    print("\n  Search: address.state=[CA|NY|TX]")
+    print("  (Find employees in California, New York, or Texas)")
+    results = client.json_search("address.state=[CA|NY|TX]")
+    print(f"  Found {len(results)} results:")
+    for r in results:
+        addr = r['value'].get('address', {})
+        print(f"    - {r['key']}: {r['value'].get('name', 'N/A')} in {addr.get('city', 'N/A')}, {addr.get('state', 'N/A')}")
+    
+    # Building IN clause query programmatically
+    print("\n  Building query programmatically:")
+    departments = ["Engineering", "Sales", "HR"]
+    states = ["CA", "NY"]
+    query = f"department=[{'|'.join(departments)}],address.state=[{'|'.join(states)}]"
+    print(f"  Query: {query}")
+    results = client.json_search(query)
+    print(f"  Found {len(results)} results")
+
 def demo_d_regex_search_json(client: KuberJsonClient):
     """Demo d) Regex search on JSON attribute values."""
     print_header("D) REGEX SEARCH ON JSON ATTRIBUTE VALUES")
@@ -522,10 +578,11 @@ def main():
 ║   a) Set key with JSON value                                         ║
 ║   b) Retrieve key with JSON value                                    ║
 ║   c) JSON search with single/multiple attributes                     ║
+║      - IN clause for matching multiple values (v1.7.7)               ║
 ║   d) Regex search on JSON attribute values                           ║
 ║   e) Search keys using regex                                         ║
 ║                                                                      ║
-║   v1.6.5 - API Key Authentication Required                           ║
+║   v1.7.7 - JSEARCH IN Clause: field=[value1|value2|value3]           ║
 ╚══════════════════════════════════════════════════════════════════════╝
     """)
     
@@ -545,6 +602,7 @@ def main():
             demo_b_get_json(client)
             demo_c_search_single_attribute(client)
             demo_c_search_multiple_attributes(client)
+            demo_c_in_clause_search(client)  # v1.7.7 - IN clause demo
             demo_d_regex_search_json(client)
             demo_e_key_regex_search(client)
             

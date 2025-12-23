@@ -814,28 +814,105 @@ JGET user:1
 
 ### 8.4 Searching JSON (JSEARCH)
 
+**Query Syntax:**
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| `field=value` | Equals | `status=active` |
+| `field=[v1\|v2\|v3]` | IN clause (v1.7.7) | `status=[active\|pending]` |
+| `field!=value` | Not equals | `status!=deleted` |
+| `field>value` | Greater than | `age>25` |
+| `field>=value` | Greater or equal | `age>=18` |
+| `field<value` | Less than | `price<100` |
+| `field<=value` | Less or equal | `quantity<=10` |
+| `field~=pattern` | Regex match | `email~=.*@company\\.com` |
+
+**Multiple conditions** are separated by comma (AND logic):
+- `status=active,country=USA` - status is active AND country is USA
+- `status=[active\|pending],country=[USA\|UK]` - status IN (active,pending) AND country IN (USA,UK)
+
 **Python:**
 ```python
 # Find users over 25
-results = client.json_search('$.age>25', region='users')
+results = client.json_search('age>25', region='users')
 
 # Find products under $50
-products = client.json_search('$.price<50', region='products')
+products = client.json_search('price<50', region='products')
 
-# Complex query
-orders = client.json_search('$.status=shipped AND $.total>100', region='orders')
+# IN clause - match multiple values (v1.7.7)
+results = client.json_search('status=[active|pending]')
+
+# Multiple attributes with IN clauses (v1.7.7)
+results = client.json_search('status=[active|pending],country=[USA|UK|CA]')
+
+# Using convenience method with dict (v1.7.7)
+conditions = {
+    "status": ["active", "pending"],
+    "country": ["USA", "UK", "CA"]
+}
+results = client.json_search_in(conditions)
+
+# Build query string programmatically
+query = KuberClient.build_in_clause_query(conditions)
+# Returns: "status=[active|pending],country=[USA|UK|CA]"
 ```
 
 **Java:**
 ```java
-List<JsonNode> results = client.jsonSearch("$.age>25", "users");
-List<JsonNode> products = client.jsonSearch("$.price<50", "products");
+// Simple search
+List<JsonNode> results = client.jsonSearch("age>25");
+
+// IN clause - multiple values for one field (v1.7.7)
+results = client.jsonSearch("status=[active|pending]");
+
+// Multiple attributes with IN clauses (v1.7.7)
+results = client.jsonSearch("status=[active|pending],country=[USA|UK]");
+
+// Using convenience method with Map (v1.7.7)
+Map<String, List<String>> conditions = new LinkedHashMap<>();
+conditions.put("status", Arrays.asList("active", "pending"));
+conditions.put("country", Arrays.asList("USA", "UK", "CA"));
+results = client.jsonSearchIn(conditions);
+
+// Build query string programmatically
+String query = KuberClient.buildInClauseQuery(conditions);
+// Returns: "status=[active|pending],country=[USA|UK|CA]"
 ```
 
 **C#:**
 ```csharp
-var users = await client.JsonSearchAsync<User>("$.age>25", "users");
-var products = await client.JsonSearchAsync<Product>("$.price<50", "products");
+// Simple search
+var results = await client.JsonSearchAsync<User>("age>25");
+
+// IN clause - multiple values (v1.7.7)
+results = await client.JsonSearchAsync<User>("status=[active|pending]");
+
+// Multiple attributes with IN clauses (v1.7.7)
+results = await client.JsonSearchAsync<Trade>("status=[active|pending],country=[USA|UK]");
+
+// Using convenience method with Dictionary (v1.7.7)
+var conditions = new Dictionary<string, List<string>>
+{
+    { "status", new List<string> { "active", "pending" } },
+    { "country", new List<string> { "USA", "UK", "CA" } }
+};
+results = await client.JsonSearchInAsync<Trade>(conditions);
+
+// Build query string programmatically
+string query = KuberClient.BuildInClauseQuery(conditions);
+// Returns: "status=[active|pending],country=[USA|UK|CA]"
+```
+
+**Redis CLI:**
+```bash
+# Simple search
+JSEARCH status=active
+
+# IN clause (v1.7.7)
+JSEARCH status=[active|pending]
+
+# Multiple IN clauses (v1.7.7)
+JSEARCH status=[active|pending],country=[USA|UK|CA]
 ```
 
 ### 8.5 Removing Attributes from JSON (JREMOVE) - New in v1.7.2

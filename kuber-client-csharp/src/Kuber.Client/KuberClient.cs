@@ -306,6 +306,134 @@ public class KuberClient : IDisposable
         return JsonSerializer.Deserialize<T>(json);
     }
 
+    /// <summary>
+    /// Search JSON documents using deep search.
+    /// </summary>
+    /// <remarks>
+    /// <para>Query syntax:</para>
+    /// <list type="bullet">
+    /// <item>Single value: field=value</item>
+    /// <item>IN clause: field=[value1|value2|value3]</item>
+    /// <item>Multiple conditions: field1=value1,field2=value2</item>
+    /// <item>Operators: =, !=, >, &lt;, >=, &lt;=, ~= (regex)</item>
+    /// </list>
+    /// <para>Examples:</para>
+    /// <code>
+    /// // Single value
+    /// var results = await client.JsonSearchAsync&lt;User&gt;("status=active");
+    /// 
+    /// // IN clause - multiple values for one field
+    /// var results = await client.JsonSearchAsync&lt;User&gt;("status=[active|pending]");
+    /// 
+    /// // Multiple attributes with IN clauses
+    /// var results = await client.JsonSearchAsync&lt;Trade&gt;("status=[active|pending],country=[USA|UK|CA]");
+    /// </code>
+    /// </remarks>
+    /// <since>1.7.7 - Added IN clause support with [value1|value2|...] syntax</since>
+    public async Task<List<KeyValuePair<string, T?>>> JsonSearchAsync<T>(string query)
+    {
+        var results = new List<KeyValuePair<string, T?>>();
+        var redisResults = await _db.ExecuteAsync("JSEARCH", query);
+        
+        if (redisResults.IsNull)
+            return results;
+        
+        var items = (RedisResult[])redisResults!;
+        foreach (var item in items)
+        {
+            var str = item.ToString();
+            if (string.IsNullOrEmpty(str) || !str.Contains(':'))
+                continue;
+            
+            // Find where JSON starts (after the colon before { or [)
+            int jsonStart = -1;
+            for (int i = 0; i < str.Length - 1; i++)
+            {
+                if (str[i] == ':' && (str[i + 1] == '{' || str[i + 1] == '['))
+                {
+                    jsonStart = i;
+                    break;
+                }
+            }
+            
+            if (jsonStart > 0)
+            {
+                var key = str.Substring(0, jsonStart);
+                var json = str.Substring(jsonStart + 1);
+                try
+                {
+                    var value = JsonSerializer.Deserialize<T>(json);
+                    results.Add(new KeyValuePair<string, T?>(key, value));
+                }
+                catch (JsonException)
+                {
+                    // Skip malformed JSON
+                }
+            }
+        }
+        
+        return results;
+    }
+
+    /// <summary>
+    /// Search JSON documents with IN clause support using a conditions dictionary.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Convenience method for building queries with multiple attribute conditions,
+    /// each potentially matching multiple values (IN clause).
+    /// </para>
+    /// <para>Example:</para>
+    /// <code>
+    /// var conditions = new Dictionary&lt;string, List&lt;string&gt;&gt;
+    /// {
+    ///     { "status", new List&lt;string&gt; { "active", "pending" } },
+    ///     { "country", new List&lt;string&gt; { "USA", "UK", "CA" } }
+    /// };
+    /// var results = await client.JsonSearchInAsync&lt;Trade&gt;(conditions);
+    /// </code>
+    /// </remarks>
+    /// <since>1.7.7</since>
+    public async Task<List<KeyValuePair<string, T?>>> JsonSearchInAsync<T>(Dictionary<string, List<string>> conditions)
+    {
+        var query = BuildInClauseQuery(conditions);
+        return await JsonSearchAsync<T>(query);
+    }
+
+    /// <summary>
+    /// Build a query string with IN clause syntax from conditions dictionary.
+    /// </summary>
+    /// <param name="conditions">Dictionary mapping field names to lists of acceptable values</param>
+    /// <returns>Query string in format: field1=[v1|v2],field2=[v3|v4]</returns>
+    /// <since>1.7.7</since>
+    public static string BuildInClauseQuery(Dictionary<string, List<string>> conditions)
+    {
+        if (conditions == null || conditions.Count == 0)
+            return "";
+        
+        var parts = new List<string>();
+        foreach (var kvp in conditions)
+        {
+            var field = kvp.Key;
+            var values = kvp.Value;
+            
+            if (string.IsNullOrEmpty(field) || values == null || values.Count == 0)
+                continue;
+            
+            if (values.Count == 1)
+            {
+                parts.Add($"{field}={values[0]}");
+            }
+            else
+            {
+                var valuesStr = string.Join("|", values);
+                parts.Add($"{field}=[{valuesStr}]");
+            }
+        }
+        
+        return string.Join(",", parts);
+    }
+
     // =========================================================================
     // Admin Operations
     // =========================================================================
