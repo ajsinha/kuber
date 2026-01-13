@@ -58,7 +58,9 @@
                 <pre class="bg-dark text-light p-3 rounded"><code>region:customers
 key_field:customer_id
 ttl:3600
-delimiter:,</code></pre>
+delimiter:,
+encoding:auto           # Optional: auto (default), UTF-8, UTF-16, etc.
+ascii_normalize:true    # Optional: normalize to ASCII (default: true)</code></pre>
                 
                 <h3 class="mt-4">Composite Keys</h3>
                 <p>Use <code>/</code> separator in <code>key_field</code> to create composite keys from multiple fields:</p>
@@ -83,6 +85,102 @@ key_delimiter:-</code></pre>
                         <li><code>{"country":"","state":"CA","city":""}</code> → Key: <code>/CA/</code> ✓</li>
                         <li><code>{"country":"","state":"","city":""}</code> → Key: <code>//</code> (skipped - all empty)</li>
                     </ul>
+                </div>
+                
+                <h3 class="mt-4"><i class="fas fa-code me-2"></i>File Encoding Support <span class="badge bg-success">v1.7.7</span></h3>
+                <p>Autoload supports automatic encoding detection and explicit encoding specification for CSV, TXT, and JSON files.</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">Auto-Detection (Default)</div>
+                            <div class="card-body">
+                                <p class="mb-2">Files are automatically analyzed for:</p>
+                                <ul class="mb-0">
+                                    <li><strong>BOM Detection</strong>: UTF-8, UTF-16 LE/BE, UTF-32 LE/BE</li>
+                                    <li><strong>Character Validation</strong>: Tests common encodings</li>
+                                    <li><strong>Fallback</strong>: Uses configured default (UTF-8)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">Explicit Encoding</div>
+                            <div class="card-body">
+                                <p class="mb-2">Specify encoding in metadata file:</p>
+<pre class="bg-dark text-light p-2 rounded mb-2"><code>region:customers
+key_field:id
+encoding:UTF-16</code></pre>
+                                <p class="mb-0 small text-muted">Use <code>encoding:auto</code> to force auto-detection.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <p class="mt-2"><strong>Supported Encodings:</strong></p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="badge bg-secondary">UTF-8</span>
+                    <span class="badge bg-secondary">UTF-16</span>
+                    <span class="badge bg-secondary">UTF-16LE</span>
+                    <span class="badge bg-secondary">UTF-16BE</span>
+                    <span class="badge bg-secondary">UTF-32</span>
+                    <span class="badge bg-secondary">US-ASCII</span>
+                    <span class="badge bg-secondary">ISO-8859-1</span>
+                    <span class="badge bg-secondary">windows-1252</span>
+                    <span class="badge bg-secondary">Shift_JIS</span>
+                    <span class="badge bg-secondary">EUC-JP</span>
+                    <span class="badge bg-secondary">GB2312</span>
+                    <span class="badge bg-secondary">GBK</span>
+                    <span class="badge bg-secondary">Big5</span>
+                    <span class="badge bg-secondary">EUC-KR</span>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb me-2"></i><strong>Best Practice:</strong>
+                    For maximum compatibility, save files as UTF-8 with BOM. This ensures reliable encoding detection across all platforms.
+                </div>
+                
+                <h3 class="mt-4"><i class="fas fa-font me-2"></i>ASCII Normalization <span class="badge bg-success">v1.7.7</span></h3>
+                <p>Autoload automatically normalizes non-ASCII text to US-ASCII, ensuring data consistency and compatibility.</p>
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">Character Transformations</div>
+                    <div class="card-body">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr><th>Category</th><th>Input</th><th>Output</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Accented</td><td>café, naïve, résumé</td><td>cafe, naive, resume</td></tr>
+                                <tr><td>German</td><td>Größe, Müller, Straße</td><td>Groesse, Muller, Strasse</td></tr>
+                                <tr><td>Nordic</td><td>Ærø, Bjørk, Malmö</td><td>Aero, Bjork, Malmo</td></tr>
+                                <tr><td>Currency</td><td>€100, £50, ¥1000</td><td>EUR100, GBP50, YEN1000</td></tr>
+                                <tr><td>Typography</td><td>"smart" — dash</td><td>"smart" - dash</td></tr>
+                                <tr><td>Ligatures</td><td>ﬁnd, ﬂow</td><td>find, flow</td></tr>
+                                <tr><td>Greek</td><td>α, β, π, Ω</td><td>alpha, beta, pi, Omega</td></tr>
+                                <tr><td>Math</td><td>½, ¼, ±, ≤</td><td>1/2, 1/4, +/-, &lt;=</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <h5>Configuration</h5>
+                <pre class="bg-light p-3 rounded"><code>kuber:
+  autoload:
+    ascii-normalize: true       # Enable ASCII normalization (default: true)
+    ascii-normalize-keys: true  # Also normalize cache keys (default: true)</code></pre>
+                
+                <h5 class="mt-3">Per-File Override</h5>
+                <p>Disable ASCII normalization for specific files in metadata:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>region:international
+key_field:id
+ascii_normalize:false</code></pre>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i><strong>Note:</strong>
+                    Characters that cannot be transliterated (e.g., CJK characters) are removed. 
+                    Use <code>ascii_normalize:false</code> in metadata if you need to preserve such characters.
                 </div>
                 
                 <h3 class="mt-4">Attribute Mapping</h3>

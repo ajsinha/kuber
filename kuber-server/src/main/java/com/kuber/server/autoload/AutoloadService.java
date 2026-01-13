@@ -57,6 +57,45 @@ import java.util.concurrent.atomic.AtomicLong;
  * key_field:id
  * delimiter:,
  * key_delimiter:/
+ * encoding:UTF-8
+ * </pre>
+ * 
+ * <p><b>FILE ENCODING SUPPORT (v1.7.7):</b>
+ * <p>Autoload supports automatic encoding detection and explicit encoding specification:
+ * <ul>
+ *   <li><b>Auto-detection</b>: If encoding is not specified (default), files are analyzed for:
+ *     <ul>
+ *       <li>BOM (Byte Order Mark): UTF-8, UTF-16 LE/BE, UTF-32 LE/BE</li>
+ *       <li>Character validation: Tests common encodings (UTF-8, ISO-8859-1, windows-1252, ASCII)</li>
+ *     </ul>
+ *   </li>
+ *   <li><b>Explicit encoding</b>: Specify in metadata file: <code>encoding:UTF-16</code></li>
+ *   <li><b>Force auto-detect</b>: <code>encoding:auto</code></li>
+ * </ul>
+ * 
+ * <p>Supported encodings include: UTF-8, UTF-16, UTF-16LE, UTF-16BE, UTF-32, UTF-32LE, UTF-32BE,
+ * US-ASCII, ISO-8859-1 (Latin-1), windows-1252, Shift_JIS, EUC-JP, GB2312, GBK, Big5, EUC-KR.
+ * 
+ * <p><b>ASCII NORMALIZATION (v1.7.7):</b>
+ * <p>Autoload can normalize all text values to US-ASCII before storing in cache:
+ * <ul>
+ *   <li><b>Accented characters</b>: é → e, ü → u, ñ → n, ç → c</li>
+ *   <li><b>Special characters</b>: ß → ss, æ → ae, œ → oe, ø → o</li>
+ *   <li><b>Ligatures</b>: ﬁ → fi, ﬂ → fl</li>
+ *   <li><b>Currency</b>: € → EUR, £ → GBP, ¥ → YEN</li>
+ *   <li><b>Typography</b>: "smart quotes" → "straight quotes", em-dash → hyphen</li>
+ *   <li><b>Greek letters</b>: α → alpha, β → beta, π → pi</li>
+ * </ul>
+ * 
+ * <p>Configuration:
+ * <pre>
+ * kuber.autoload.ascii-normalize=true      # Global default (enabled)
+ * kuber.autoload.ascii-normalize-keys=true # Also normalize cache keys
+ * </pre>
+ * 
+ * <p>Per-file override in metadata:
+ * <pre>
+ * ascii_normalize:false   # Disable for this file
  * </pre>
  * 
  * <p>Composite Key Support:
@@ -473,22 +512,39 @@ public class AutoloadService {
      * Parse attribute mapping file.
      * Expected format: JSON object mapping source attribute names to target names.
      * Example: {"firstName": "first_name", "lastName": "last_name"}
+     * 
+     * <p>Uses auto-detection for file encoding with fallback to configured default.
      */
     private Map<String, String> parseAttributeMapping(Path mappingPath) throws IOException {
-        Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
-        String content = Files.readString(mappingPath, charset);
+        Charset defaultCharset = Charset.forName(properties.getAutoload().getFileEncoding());
+        String content = EncodingDetector.readString(mappingPath, defaultCharset);
         return objectMapper.readValue(content, 
                 new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
     }
     
     /**
      * Parse metadata file.
+     * 
+     * <p>Supports the following fields:
+     * <ul>
+     *   <li>region: target region name (default: "default")</li>
+     *   <li>ttl: time-to-live in seconds (default: -1, no expiration)</li>
+     *   <li>key_field: field(s) to use as cache key, supports composite with "/"</li>
+     *   <li>delimiter: CSV field delimiter (default: ",")</li>
+     *   <li>key_delimiter: delimiter for composite key values (default: "/")</li>
+     *   <li>encoding: file encoding (default: auto-detect, fallback to configured encoding)</li>
+     * </ul>
+     * 
+     * @param metadataPath path to the metadata file
+     * @return parsed AutoloadMetadata
+     * @throws IOException if the file cannot be read
      */
     private AutoloadMetadata parseMetadata(Path metadataPath) throws IOException {
         AutoloadMetadata metadata = new AutoloadMetadata();
         
-        Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
-        List<String> lines = Files.readAllLines(metadataPath, charset);
+        // Use default encoding for metadata file, with auto-detection
+        Charset defaultCharset = Charset.forName(properties.getAutoload().getFileEncoding());
+        List<String> lines = EncodingDetector.readAllLines(metadataPath, defaultCharset);
         
         for (String line : lines) {
             line = line.trim();
@@ -525,6 +581,22 @@ public class AutoloadService {
                             metadata.setKeyDelimiter(value);
                         }
                         break;
+                    case "encoding":
+                        // Allow explicit encoding specification
+                        // "auto" means use auto-detection (default behavior)
+                        metadata.setEncoding(value);
+                        if (!"auto".equalsIgnoreCase(value)) {
+                            log.info("Using explicit encoding from metadata: {}", value);
+                        }
+                        break;
+                    case "ascii_normalize":
+                    case "asciinormalize":
+                    case "ascii-normalize":
+                        // Override ASCII normalization for this file
+                        // "true"/"yes"/"1" = normalize, "false"/"no"/"0" = don't normalize
+                        metadata.setAsciiNormalize(value);
+                        log.info("ASCII normalization override from metadata: {}", value);
+                        break;
                     default:
                         log.debug("Unknown metadata field: {}", key);
                 }
@@ -536,15 +608,33 @@ public class AutoloadService {
     
     /**
      * Process a CSV file with batch writes for better performance.
+     * 
+     * <p>Supports automatic encoding detection or explicit encoding from metadata.
      */
     private ProcessingResult processCsvFile(Path csvFile, AutoloadMetadata metadata) throws IOException {
         ProcessingResult result = new ProcessingResult();
         
-        Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
         int batchSize = properties.getAutoload().getBatchSize();
         String fileName = csvFile.getFileName().toString();
         
-        log.info("Processing CSV file '{}' with batch size: {}", fileName, batchSize);
+        // Determine encoding: use metadata encoding if specified, otherwise auto-detect
+        Charset defaultCharset = Charset.forName(properties.getAutoload().getFileEncoding());
+        Charset charset;
+        String encodingSource;
+        
+        if (metadata.isAutoDetectEncoding()) {
+            // Auto-detect encoding
+            EncodingDetector.EncodingResult encodingResult = EncodingDetector.detectEncoding(csvFile, defaultCharset);
+            charset = encodingResult.charset();
+            encodingSource = "auto-detected (" + encodingResult.detectionMethod() + ")";
+        } else {
+            // Use explicit encoding from metadata
+            charset = EncodingDetector.parseCharset(metadata.getEncoding(), defaultCharset);
+            encodingSource = "metadata";
+        }
+        
+        log.info("Processing CSV file '{}' with encoding: {} [{}], batch size: {}", 
+                fileName, charset, encodingSource, batchSize);
         
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setDelimiter(metadata.getDelimiter())
@@ -554,7 +644,8 @@ public class AutoloadService {
                 .setTrim(true)
                 .build();
         
-        try (Reader reader = Files.newBufferedReader(csvFile, charset);
+        // Use EncodingDetector to create reader (handles BOM stripping)
+        try (Reader reader = EncodingDetector.createReader(csvFile, charset, true);
              CSVParser parser = new CSVParser(reader, format)) {
             
             // Get headers
@@ -593,6 +684,13 @@ public class AutoloadService {
             
             // Get attribute mapping if present
             Map<String, String> attrMapping = metadata.getAttributeMapping();
+            
+            // Determine if ASCII normalization should be applied
+            boolean asciiNormalize = metadata.shouldNormalizeAscii(properties.getAutoload().isAsciiNormalize());
+            boolean asciiNormalizeKeys = asciiNormalize && properties.getAutoload().isAsciiNormalizeKeys();
+            if (asciiNormalize) {
+                log.info("[{}] ASCII normalization enabled (keys: {})", fileName, asciiNormalizeKeys);
+            }
             
             // Batch accumulator
             List<CacheEntry> batch = new ArrayList<>(batchSize);
@@ -654,6 +752,17 @@ public class AutoloadService {
                         log.debug("Skipping record {} - all key field(s) are empty", record.getRecordNumber());
                         result.incrementSkipped();
                         continue;
+                    }
+                    
+                    // Apply ASCII normalization if enabled (v1.7.7)
+                    if (asciiNormalize) {
+                        // Normalize all string values in the JSON
+                        AsciiNormalizer.normalizeJsonInPlace(jsonNode, objectMapper, false);
+                        
+                        // Normalize the key if key normalization is enabled
+                        if (asciiNormalizeKeys) {
+                            keyValue = AsciiNormalizer.normalizeKey(keyValue);
+                        }
                     }
                     
                     // Create CacheEntry for batch
@@ -724,15 +833,33 @@ public class AutoloadService {
     
     /**
      * Process a JSON file (one JSON object per line - JSONL format) with batch writes.
+     * 
+     * <p>Supports automatic encoding detection or explicit encoding from metadata.
      */
     private ProcessingResult processJsonFile(Path jsonFile, AutoloadMetadata metadata) throws IOException {
         ProcessingResult result = new ProcessingResult();
         
-        Charset charset = Charset.forName(properties.getAutoload().getFileEncoding());
         int batchSize = properties.getAutoload().getBatchSize();
         String fileName = jsonFile.getFileName().toString();
         
-        log.info("Processing JSON file '{}' with batch size: {}", fileName, batchSize);
+        // Determine encoding: use metadata encoding if specified, otherwise auto-detect
+        Charset defaultCharset = Charset.forName(properties.getAutoload().getFileEncoding());
+        Charset charset;
+        String encodingSource;
+        
+        if (metadata.isAutoDetectEncoding()) {
+            // Auto-detect encoding
+            EncodingDetector.EncodingResult encodingResult = EncodingDetector.detectEncoding(jsonFile, defaultCharset);
+            charset = encodingResult.charset();
+            encodingSource = "auto-detected (" + encodingResult.detectionMethod() + ")";
+        } else {
+            // Use explicit encoding from metadata
+            charset = EncodingDetector.parseCharset(metadata.getEncoding(), defaultCharset);
+            encodingSource = "metadata";
+        }
+        
+        log.info("Processing JSON file '{}' with encoding: {} [{}], batch size: {}", 
+                fileName, charset, encodingSource, batchSize);
         
         int maxRecords = properties.getAutoload().getMaxRecordsPerFile();
         int recordCount = 0;
@@ -755,6 +882,13 @@ public class AutoloadService {
         // Get attribute mapping if present
         Map<String, String> attrMapping = metadata.getAttributeMapping();
         
+        // Determine if ASCII normalization should be applied
+        boolean asciiNormalize = metadata.shouldNormalizeAscii(properties.getAutoload().isAsciiNormalize());
+        boolean asciiNormalizeKeys = asciiNormalize && properties.getAutoload().isAsciiNormalizeKeys();
+        if (asciiNormalize) {
+            log.info("[{}] ASCII normalization enabled (keys: {})", fileName, asciiNormalizeKeys);
+        }
+        
         // Batch accumulator
         List<CacheEntry> batch = new ArrayList<>(batchSize);
         String region = metadata.getRegion();
@@ -765,7 +899,8 @@ public class AutoloadService {
         
         long startTime = System.currentTimeMillis();
         
-        try (BufferedReader reader = Files.newBufferedReader(jsonFile, charset)) {
+        // Use EncodingDetector to create reader (handles BOM stripping)
+        try (BufferedReader reader = EncodingDetector.createReader(jsonFile, charset, true)) {
             String line;
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
@@ -818,6 +953,17 @@ public class AutoloadService {
                     JsonNode finalNode = jsonNode;
                     if (attrMapping != null && !attrMapping.isEmpty()) {
                         finalNode = cacheService.applyAttributeMapping(jsonNode, attrMapping);
+                    }
+                    
+                    // Apply ASCII normalization if enabled (v1.7.7)
+                    if (asciiNormalize) {
+                        // Normalize all string values in the JSON
+                        finalNode = AsciiNormalizer.normalizeJson(finalNode, objectMapper, false, true);
+                        
+                        // Normalize the key if key normalization is enabled
+                        if (asciiNormalizeKeys) {
+                            keyValue = AsciiNormalizer.normalizeKey(keyValue);
+                        }
                     }
                     
                     // Create CacheEntry for batch
@@ -1119,6 +1265,22 @@ public class AutoloadService {
          * Loaded from .metadata.attributemapping.json file if present.
          */
         private Map<String, String> attributeMapping;
+        /**
+         * Optional encoding override for the data file.
+         * If not specified, encoding is auto-detected.
+         * Supported values: UTF-8, UTF-16, ISO-8859-1, windows-1252, US-ASCII, etc.
+         * Can also be set to "auto" to force auto-detection (default behavior).
+         * @since 1.7.7
+         */
+        private String encoding;
+        
+        /**
+         * Optional override for ASCII normalization.
+         * If null, uses the global kuber.autoload.ascii-normalize setting.
+         * Set to "true" or "false" to override per-file.
+         * @since 1.7.7
+         */
+        private String asciiNormalize;
         
         /**
          * Parse key_field into list of field names.
@@ -1140,6 +1302,28 @@ public class AutoloadService {
          */
         public boolean isCompositeKey() {
             return getKeyFields().size() > 1;
+        }
+        
+        /**
+         * Check if encoding should be auto-detected.
+         * @return true if encoding is null, empty, or "auto"
+         */
+        public boolean isAutoDetectEncoding() {
+            return encoding == null || encoding.isBlank() || "auto".equalsIgnoreCase(encoding.trim());
+        }
+        
+        /**
+         * Check if ASCII normalization should be applied.
+         * @param globalDefault the global default from configuration
+         * @return true if ASCII normalization should be applied
+         */
+        public boolean shouldNormalizeAscii(boolean globalDefault) {
+            if (asciiNormalize == null || asciiNormalize.isBlank()) {
+                return globalDefault;
+            }
+            return "true".equalsIgnoreCase(asciiNormalize.trim()) || 
+                   "yes".equalsIgnoreCase(asciiNormalize.trim()) ||
+                   "1".equals(asciiNormalize.trim());
         }
     }
     

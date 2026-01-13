@@ -699,6 +699,41 @@ public class KuberProperties {
         @Min(0)
         @Max(100)
         private int warmPercentage = 10;
+        
+        /**
+         * Whether to normalize all text values to US-ASCII during autoload.
+         * 
+         * When enabled:
+         * - Accented characters are converted to base forms (é → e, ü → u, ñ → n)
+         * - Special characters are transliterated (ß → ss, æ → ae, € → EUR)
+         * - Ligatures are expanded (ﬁ → fi, ﬂ → fl)
+         * - Typographic quotes/dashes are converted to ASCII equivalents
+         * - Characters that cannot be transliterated are removed
+         * 
+         * This ensures all cached data contains only ASCII characters (0-127),
+         * which is useful for:
+         * - Legacy system compatibility
+         * - Search optimization (searching "cafe" finds "café")
+         * - URL-safe key generation
+         * - Cross-platform consistency
+         * 
+         * Default: true (normalize to ASCII)
+         * 
+         * Can be overridden per-file in metadata: ascii_normalize:false
+         * 
+         * @since 1.7.7
+         */
+        private boolean asciiNormalize = true;
+        
+        /**
+         * Whether to also normalize cache keys to ASCII.
+         * Only applies when asciiNormalize is true.
+         * 
+         * Default: true
+         * 
+         * @since 1.7.7
+         */
+        private boolean asciiNormalizeKeys = true;
     }
     
     // ==================== BACKUP AND RESTORE CONFIGURATION ====================
