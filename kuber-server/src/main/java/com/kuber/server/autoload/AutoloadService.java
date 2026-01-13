@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * encoding:UTF-8
  * </pre>
  * 
- * <p><b>FILE ENCODING SUPPORT (v1.7.7):</b>
+ * <p><b>FILE ENCODING SUPPORT (v1.7.8):</b>
  * <p>Autoload supports automatic encoding detection and explicit encoding specification:
  * <ul>
  *   <li><b>Auto-detection</b>: If encoding is not specified (default), files are analyzed for:
@@ -76,7 +76,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Supported encodings include: UTF-8, UTF-16, UTF-16LE, UTF-16BE, UTF-32, UTF-32LE, UTF-32BE,
  * US-ASCII, ISO-8859-1 (Latin-1), windows-1252, Shift_JIS, EUC-JP, GB2312, GBK, Big5, EUC-KR.
  * 
- * <p><b>ASCII NORMALIZATION (v1.7.7):</b>
+ * <p><b>ASCII NORMALIZATION (v1.7.8):</b>
  * <p>Autoload can normalize all text values to US-ASCII before storing in cache:
  * <ul>
  *   <li><b>Accented characters</b>: é → e, ü → u, ñ → n, ç → c</li>
@@ -160,7 +160,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * with compaction operations. Acquires region locks during file processing.
  * Write operations wait for autoload to complete before proceeding.
  * 
- * @version 1.7.7
+ * @version 1.7.8
  */
 @Service
 @Slf4j
@@ -754,7 +754,7 @@ public class AutoloadService {
                         continue;
                     }
                     
-                    // Apply ASCII normalization if enabled (v1.7.7)
+                    // Apply ASCII normalization if enabled (v1.7.8)
                     if (asciiNormalize) {
                         // Normalize all string values in the JSON
                         AsciiNormalizer.normalizeJsonInPlace(jsonNode, objectMapper, false);
@@ -955,7 +955,7 @@ public class AutoloadService {
                         finalNode = cacheService.applyAttributeMapping(jsonNode, attrMapping);
                     }
                     
-                    // Apply ASCII normalization if enabled (v1.7.7)
+                    // Apply ASCII normalization if enabled (v1.7.8)
                     if (asciiNormalize) {
                         // Normalize all string values in the JSON
                         finalNode = AsciiNormalizer.normalizeJson(finalNode, objectMapper, false, true);
@@ -1270,7 +1270,7 @@ public class AutoloadService {
          * If not specified, encoding is auto-detected.
          * Supported values: UTF-8, UTF-16, ISO-8859-1, windows-1252, US-ASCII, etc.
          * Can also be set to "auto" to force auto-detection (default behavior).
-         * @since 1.7.7
+         * @since 1.7.8
          */
         private String encoding;
         
@@ -1278,7 +1278,7 @@ public class AutoloadService {
          * Optional override for ASCII normalization.
          * If null, uses the global kuber.autoload.ascii-normalize setting.
          * Set to "true" or "false" to override per-file.
-         * @since 1.7.7
+         * @since 1.7.8
          */
         private String asciiNormalize;
         

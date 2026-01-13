@@ -329,7 +329,7 @@ public class KuberClient : IDisposable
     /// var results = await client.JsonSearchAsync&lt;Trade&gt;("status=[active|pending],country=[USA|UK|CA]");
     /// </code>
     /// </remarks>
-    /// <since>1.7.7 - Added IN clause support with [value1|value2|...] syntax</since>
+    /// <since>1.7.8 - Added IN clause support with [value1|value2|...] syntax</since>
     public async Task<List<KeyValuePair<string, T?>>> JsonSearchAsync<T>(string query)
     {
         var results = new List<KeyValuePair<string, T?>>();
@@ -393,7 +393,7 @@ public class KuberClient : IDisposable
     /// var results = await client.JsonSearchInAsync&lt;Trade&gt;(conditions);
     /// </code>
     /// </remarks>
-    /// <since>1.7.7</since>
+    /// <since>1.7.8</since>
     public async Task<List<KeyValuePair<string, T?>>> JsonSearchInAsync<T>(Dictionary<string, List<string>> conditions)
     {
         var query = BuildInClauseQuery(conditions);
@@ -405,7 +405,7 @@ public class KuberClient : IDisposable
     /// </summary>
     /// <param name="conditions">Dictionary mapping field names to lists of acceptable values</param>
     /// <returns>Query string in format: field1=[v1|v2],field2=[v3|v4]</returns>
-    /// <since>1.7.7</since>
+    /// <since>1.7.8</since>
     public static string BuildInClauseQuery(Dictionary<string, List<string>> conditions)
     {
         if (conditions == null || conditions.Count == 0)

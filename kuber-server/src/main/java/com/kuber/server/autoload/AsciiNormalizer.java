@@ -55,8 +55,8 @@ import java.util.regex.Pattern;
  * "Price: €100"      → "Price: EUR100"
  * </pre>
  * 
- * @version 1.7.7
- * @since 1.7.7
+ * @version 1.7.8
+ * @since 1.7.8
  */
 @Slf4j
 public class AsciiNormalizer {

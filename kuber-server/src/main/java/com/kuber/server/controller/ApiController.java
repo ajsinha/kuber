@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 1.7.7
+ * @version 1.7.8
  */
 @RestController
 @RequestMapping("/api")
@@ -430,10 +430,10 @@ public class ApiController {
         return ResponseEntity.ok(results);
     }
     
-    // ==================== Generic Search API (v1.7.7 Enhanced) ====================
+    // ==================== Generic Search API (v1.7.8 Enhanced) ====================
     
     /**
-     * Enhanced generic search endpoint (v1.7.7) supporting multiple search modes.
+     * Enhanced generic search endpoint (v1.7.8) supporting multiple search modes.
      * 
      * <h2>Authentication</h2>
      * API key must be provided in the request body:
@@ -503,7 +503,7 @@ public class ApiController {
                 results = performSingleKeyLookup(region, request.getKey(), fields);
                 
             } else if (request.isMultiKeyLookup()) {
-                // Mode 2: Multiple keys lookup (v1.7.7)
+                // Mode 2: Multiple keys lookup (v1.7.8)
                 results = performMultiKeyLookup(region, request.getKeys(), limit, fields);
                 
             } else if (request.isKeyPatternSearch()) {
@@ -511,11 +511,11 @@ public class ApiController {
                 results = performKeyPatternSearch(region, request.getKeyPattern(), limit, fields);
                 
             } else if (request.isMultiKeyPatternSearch()) {
-                // Mode 4: Multiple key patterns search (v1.7.7)
+                // Mode 4: Multiple key patterns search (v1.7.8)
                 results = performMultiKeyPatternSearch(region, request.getKeyPatterns(), limit, fields);
                 
             } else if (request.isJsonCriteriaSearch()) {
-                // Mode 5: JSON attribute search with new criteria format (v1.7.7)
+                // Mode 5: JSON attribute search with new criteria format (v1.7.8)
                 results = performJsonCriteriaSearch(region, request.getCriteria(), limit, fields);
                 
             } else if (request.isJsonSearch()) {
@@ -565,7 +565,7 @@ public class ApiController {
     }
     
     /**
-     * Mode 2: Multiple keys lookup (v1.7.7).
+     * Mode 2: Multiple keys lookup (v1.7.8).
      */
     private List<Map<String, Object>> performMultiKeyLookup(String region, List<String> keys, int limit, List<String> fields) {
         List<Map<String, Object>> results = new ArrayList<>();
@@ -591,7 +591,7 @@ public class ApiController {
     }
     
     /**
-     * Mode 4: Multiple key patterns search (v1.7.7).
+     * Mode 4: Multiple key patterns search (v1.7.8).
      * Returns keys matching ANY of the patterns (OR logic between patterns).
      */
     private List<Map<String, Object>> performMultiKeyPatternSearch(String region, List<String> patterns, int limit, List<String> fields) {
@@ -626,7 +626,7 @@ public class ApiController {
     }
     
     /**
-     * Mode 5: JSON attribute search with new criteria format (v1.7.7).
+     * Mode 5: JSON attribute search with new criteria format (v1.7.8).
      * Uses AND logic - all criteria must match.
      */
     private List<Map<String, Object>> performJsonCriteriaSearch(String region, Map<String, Object> criteria, int limit, List<String> fields) {
@@ -1016,7 +1016,7 @@ public class ApiController {
         }
     }
     
-    // ==================== Generic Update API (v1.7.7) ====================
+    // ==================== Generic Update API (v1.7.8) ====================
     
     /**
      * Generic Update API - Unified SET/UPDATE operation via REST API.

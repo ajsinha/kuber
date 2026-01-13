@@ -14,7 +14,7 @@ package com.kuber.server.dto;
 import lombok.Data;
 
 /**
- * Request DTO for the Generic Update API endpoint (v1.7.7).
+ * Request DTO for the Generic Update API endpoint (v1.7.8).
  * 
  * Provides a unified SET/UPDATE operation via REST API with smart handling
  * of JSON data merging.
@@ -65,7 +65,7 @@ import lombok.Data;
  * {"apiKey": "kub_xxx", "region": "counters", "key": "hits", "value": 42}
  * </pre>
  * 
- * @version 1.7.7
+ * @version 1.7.8
  */
 @Data
 public class GenericUpdateRequest {

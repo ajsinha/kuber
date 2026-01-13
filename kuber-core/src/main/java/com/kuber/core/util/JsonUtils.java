@@ -308,7 +308,7 @@ public final class JsonUtils {
      * Check if JSON matches all query conditions.
      * Supports IN clause for matching against multiple values.
      * 
-     * @since 1.7.7 - Added IN clause support
+     * @since 1.7.8 - Added IN clause support
      */
     public static boolean matchesAllQueries(JsonNode json, List<QueryCondition> conditions) {
         for (QueryCondition condition : conditions) {
@@ -334,7 +334,7 @@ public final class JsonUtils {
      * @param operator The operator (typically "=" or "==")
      * @param values List of values to match against
      * @return true if field value matches any of the values
-     * @since 1.7.7
+     * @since 1.7.8
      */
     public static boolean matchesInClause(JsonNode json, String field, String operator, List<String> values) {
         JsonNode fieldValue = getPath(json, field);
@@ -393,7 +393,7 @@ public final class JsonUtils {
      * Check if JSON matches any query condition.
      * Supports IN clause for matching against multiple values.
      * 
-     * @since 1.7.7 - Added IN clause support
+     * @since 1.7.8 - Added IN clause support
      */
     public static boolean matchesAnyQuery(JsonNode json, List<QueryCondition> conditions) {
         for (QueryCondition condition : conditions) {
@@ -426,7 +426,7 @@ public final class JsonUtils {
      *   - "age>=18,age<=65" - numeric range comparison
      *   - "email~=.*@company\\.com" - regex matching
      * 
-     * @since 1.7.7 - Added IN clause support with [value1|value2|...] syntax
+     * @since 1.7.8 - Added IN clause support with [value1|value2|...] syntax
      */
     public static List<QueryCondition> parseQuery(String query) {
         List<QueryCondition> conditions = new ArrayList<>();
@@ -453,7 +453,7 @@ public final class JsonUtils {
      * - Simple conditions: field=value, field>10, field~=pattern
      * - IN clause: field=[value1|value2|value3]
      * 
-     * @since 1.7.7 - Added IN clause support with [value1|value2|...] syntax
+     * @since 1.7.8 - Added IN clause support with [value1|value2|...] syntax
      */
     private static QueryCondition parseCondition(String condition) {
         String[] operators = {"~=", ">=", "<=", "!=", "<>", "==", "=", ">", "<"};
@@ -540,7 +540,7 @@ public final class JsonUtils {
      * - Single value: field=value, field>value, field~=pattern
      * - Multiple values (IN): field=[value1|value2|value3]
      * 
-     * @since 1.7.7 - Added support for IN clause with multiple values
+     * @since 1.7.8 - Added support for IN clause with multiple values
      */
     public static class QueryCondition {
         private final String field;

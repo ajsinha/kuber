@@ -683,7 +683,7 @@ public class KuberClient implements AutoCloseable {
      * @param query Query string with conditions
      * @return List of matching JSON documents
      * @throws IOException If search fails
-     * @since 1.7.7 - Added IN clause support with [value1|value2|...] syntax
+     * @since 1.7.8 - Added IN clause support with [value1|value2|...] syntax
      */
     public List<JsonNode> jsonSearch(String query) throws IOException {
         List<String> results = sendCommandForList("JSEARCH", query);
@@ -726,7 +726,7 @@ public class KuberClient implements AutoCloseable {
      * @param conditions Map of field name to list of acceptable values
      * @return List of matching JSON documents
      * @throws IOException If search fails
-     * @since 1.7.7
+     * @since 1.7.8
      */
     public List<JsonNode> jsonSearchIn(Map<String, List<String>> conditions) throws IOException {
         return jsonSearch(buildInClauseQuery(conditions));
@@ -737,7 +737,7 @@ public class KuberClient implements AutoCloseable {
      * 
      * @param conditions Map of field name to list of acceptable values
      * @return Query string in format: field1=[v1|v2],field2=[v3|v4]
-     * @since 1.7.7
+     * @since 1.7.8
      */
     public static String buildInClauseQuery(Map<String, List<String>> conditions) {
         if (conditions == null || conditions.isEmpty()) {

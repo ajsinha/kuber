@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.7.7</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.7.8</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -652,8 +652,29 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.7.7</span>
-                                    <span class="text-muted small">Current - Security, SSL/TLS & Enhanced Search APIs</span>
+                                    <span class="badge bg-primary me-2">v1.7.8</span>
+                                    <span class="text-muted small">Current - RocksDB Default, ASCII Normalization &amp; Encoding Detection</span>
+                                </h6>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>January 2026</p>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>RocksDB Default</strong>: Changed default persistence from LMDB to RocksDB for better production performance with built-in compaction</li>
+                                    <li><strong>ASCII Normalization</strong>: Autoload automatically normalizes non-ASCII text to US-ASCII (configurable)</li>
+                                    <li><strong>Character Transliteration</strong>: Converts accented chars (é→e), special chars (ß→ss), currency (€→EUR), ligatures (ﬁ→fi)</li>
+                                    <li><strong>Greek Letters</strong>: Scientific notation support (α→alpha, β→beta, π→pi, Ω→Omega)</li>
+                                    <li><strong>Typography Normalization</strong>: Smart quotes, em-dashes, fractions, and superscripts converted to ASCII</li>
+                                    <li><strong>Encoding Auto-Detection</strong>: Autoload detects file encoding via BOM and character validation</li>
+                                    <li><strong>BOM Support</strong>: Automatic detection of UTF-8, UTF-16 LE/BE, UTF-32 LE/BE byte order marks</li>
+                                    <li><strong>Multi-Encoding Support</strong>: UTF-8, UTF-16, ISO-8859-1, windows-1252, Shift_JIS, EUC-JP, GB2312, GBK, Big5, EUC-KR</li>
+                                    <li><strong>Per-File Override</strong>: Control encoding and ASCII normalization per file via metadata</li>
+                                    <li><strong>AsciiNormalizer Utility</strong>: New utility class for comprehensive Unicode-to-ASCII conversion</li>
+                                    <li><strong>EncodingDetector Utility</strong>: New utility class for robust file encoding detection</li>
+                                    <li><strong>Key Normalization</strong>: Option to normalize cache keys to ASCII for URL-safe key generation</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v1.7.7</span>
+                                    <span class="text-muted small">Security, SSL/TLS &amp; Enhanced Search APIs</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>December 2025</p>
                                 <ul class="small text-muted mb-0">
@@ -692,7 +713,7 @@
                             <div class="mb-4">
                                 <h6 class="mb-1">
                                     <span class="badge bg-secondary me-2">v1.7.5</span>
-                                    <span class="text-muted small">Warm Objects & Eviction Protection</span>
+                                    <span class="text-muted small">Warm Objects &amp; Eviction Protection</span>
                                 </h6>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Warm Objects</strong>: Protect frequently accessed keys from eviction</li>
@@ -752,7 +773,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.7.7
+                                <strong>Version:</strong> 1.7.8
                             </li>
                         </ul>
                     </div>
@@ -811,7 +832,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.7.7
+                                <strong>Version:</strong> 1.7.8
                             </li>
                         </ul>
                     </div>

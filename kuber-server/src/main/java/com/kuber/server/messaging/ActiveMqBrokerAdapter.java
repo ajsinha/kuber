@@ -31,7 +31,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for ActiveMQ queues/topics.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 1.7.7
+ * @version 1.7.8
  */
 @Slf4j
 public class ActiveMqBrokerAdapter implements MessageBrokerAdapter {

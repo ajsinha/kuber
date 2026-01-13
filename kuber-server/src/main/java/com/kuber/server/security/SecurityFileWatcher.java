@@ -31,7 +31,7 @@ import java.nio.file.Paths;
  * - When users.json OR roles.json changes, BOTH are reloaded together
  * - Create default files if missing (admin user + admin role)
  * 
- * @version 1.7.7
+ * @version 1.7.8
  */
 @Slf4j
 @Service

@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Request DTO for the enhanced generic search API endpoint (v1.7.7).
+ * Request DTO for the enhanced generic search API endpoint (v1.7.8).
  * 
  * Supports multiple search modes with AND logic across all criteria:
  * 
@@ -97,7 +97,7 @@ public class GenericSearchRequest {
     private String type;
     
     /**
-     * JSON search criteria map (v1.7.7 enhanced format).
+     * JSON search criteria map (v1.7.8 enhanced format).
      * Supports:
      * - Simple equality: {"fieldName": "value"}
      * - IN operator: {"fieldName": ["value1", "value2"]}

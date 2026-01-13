@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.7.7";
+    private String version = "1.7.8";
     
     /**
      * Unique node identifier
@@ -116,7 +116,7 @@ public class KuberProperties {
     
     /**
      * Prometheus metrics configuration
-     * @since 1.7.7
+     * @since 1.7.8
      */
     private Prometheus prometheus = new Prometheus();
     
@@ -409,7 +409,7 @@ public class KuberProperties {
         @Min(1000)
         private int valueCacheLimitCheckIntervalMs = 30000;
         
-        // ==================== Warm Object Configuration (v1.7.7) ====================
+        // ==================== Warm Object Configuration (v1.7.8) ====================
         
         /**
          * Enable warm object maintenance per region.
@@ -417,7 +417,7 @@ public class KuberProperties {
          * "warm" (in-memory) objects per region, loading from disk if necessary.
          * This ensures frequently accessed data remains in memory for fast access.
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         private boolean warmObjectsEnabled = true;
         
@@ -436,7 +436,7 @@ public class KuberProperties {
          * Note: The warm object count cannot exceed the total keys in the region.
          * If configured higher, it will be capped at the region's key count.
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         private java.util.Map<String, Integer> regionWarmObjectCounts = new java.util.HashMap<>();
         
@@ -445,7 +445,7 @@ public class KuberProperties {
          * The warm object service runs at this interval to ensure regions
          * have their configured minimum warm objects in memory.
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         @Min(1000)
         private int warmObjectCheckIntervalMs = 60000;
@@ -455,7 +455,7 @@ public class KuberProperties {
          * When the warm object service needs to load objects from disk
          * to meet the warm object target, it loads them in batches of this size.
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         @Min(100)
         private int warmObjectLoadBatchSize = 1000;
@@ -464,7 +464,7 @@ public class KuberProperties {
          * Get the warm object count for a specific region.
          * Returns the region-specific count if configured, otherwise 0 (no minimum).
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         public int getWarmObjectCountForRegion(String regionName) {
             return regionWarmObjectCounts.getOrDefault(regionName, 0);
@@ -473,7 +473,7 @@ public class KuberProperties {
         /**
          * Check if a region has a configured warm object count.
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         public boolean hasWarmObjectConfig(String regionName) {
             return regionWarmObjectCounts.containsKey(regionName) 
@@ -721,7 +721,7 @@ public class KuberProperties {
          * 
          * Can be overridden per-file in metadata: ascii_normalize:false
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         private boolean asciiNormalize = true;
         
@@ -731,7 +731,7 @@ public class KuberProperties {
          * 
          * Default: true
          * 
-         * @since 1.7.7
+         * @since 1.7.8
          */
         private boolean asciiNormalizeKeys = true;
     }
@@ -1468,7 +1468,7 @@ public class KuberProperties {
     
     /**
      * Prometheus metrics configuration.
-     * @since 1.7.7
+     * @since 1.7.8
      */
     @Data
     public static class Prometheus {

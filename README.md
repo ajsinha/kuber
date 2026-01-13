@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.7
+Version 1.7.8
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -143,7 +143,7 @@ kuber.cache.value-cache-max-percent=20
 kuber.cache.value-cache-max-entries=10000
 ```
 
-### Warm Objects (v1.7.7)
+### Warm Objects (v1.7.8)
 
 Kuber can maintain a minimum number of "warm" (in-memory) objects per region, ensuring frequently accessed data stays in memory for optimal read performance:
 
@@ -173,7 +173,7 @@ kuber.cache.region-warm-object-counts.session=10000
 - Works with eviction services (respects memory limits)
 - Falls back to default behavior if not configured
 
-### Prometheus Monitoring (v1.7.7)
+### Prometheus Monitoring (v1.7.8)
 
 Kuber integrates with Prometheus for comprehensive metrics monitoring:
 
@@ -208,7 +208,7 @@ scrape_configs:
 
 See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Grafana dashboards and alerting rules.
 
-### Generic Search API (v1.7.7)
+### Generic Search API (v1.7.8)
 
 Enhanced search API with multiple search modes and flexible JSON attribute querying:
 
@@ -264,7 +264,7 @@ Enhanced search API with multiple search modes and flexible JSON attribute query
 
 See [docs/GENERIC_SEARCH_API.md](docs/GENERIC_SEARCH_API.md) for complete documentation.
 
-### Generic Update API (v1.7.7)
+### Generic Update API (v1.7.8)
 
 Unified SET/UPDATE operation with intelligent JSON merging:
 
@@ -332,7 +332,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-1.7.7.jar
+        -jar kuber-server/target/kuber-server-1.7.8.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -617,7 +617,7 @@ Create `secure/request_response.json`:
 }
 ```
 
-### Test Clients (v1.7.7)
+### Test Clients (v1.7.8)
 
 Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
 
@@ -656,7 +656,7 @@ python kafka_diagnostics.py --live --watch-only          # Live watch mode
 
 > **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
 
-### Request/Response Logging (v1.7.7)
+### Request/Response Logging (v1.7.8)
 
 All request/response pairs can be logged to files for debugging and auditing:
 
@@ -1028,7 +1028,7 @@ RBAC is enforced on:
 
 Users only see regions they have access to in the UI.
 
-### SSL/TLS Configuration (v1.7.7)
+### SSL/TLS Configuration (v1.7.8)
 
 Kuber supports SSL/TLS encryption for secure communications:
 

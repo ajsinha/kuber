@@ -1,6 +1,6 @@
 # Kuber Test Data Generators
 
-**Version 1.7.7**
+**Version 1.7.8**
 
 This module provides test data generators for financial instruments commonly used in trading, risk management, and regulatory reporting systems.
 

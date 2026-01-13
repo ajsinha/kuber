@@ -188,7 +188,7 @@ class KuberJsonClient:
         
         Query syntax:
         - field=value           : exact match
-        - field=[v1|v2|v3]      : IN clause - match any value (v1.7.7)
+        - field=[v1|v2|v3]      : IN clause - match any value (v1.7.8)
         - field!=value          : not equal
         - field>[=]value        : greater than [or equal]
         - field<[=]value        : less than [or equal]
@@ -199,7 +199,7 @@ class KuberJsonClient:
         
         Examples:
         - "status=active"                     : exact match
-        - "status=[active|pending]"           : IN clause (v1.7.7)
+        - "status=[active|pending]"           : IN clause (v1.7.8)
         - "status=[active|pending],country=[USA|UK]" : multiple IN clauses
         - "age>25,department=Engineering"     : multiple conditions
         """
@@ -446,8 +446,8 @@ def demo_c_search_multiple_attributes(client: KuberJsonClient):
         print(f"    - {r['key']}: {r['value'].get('name', 'N/A')} in {addr.get('city', 'N/A')}, {addr.get('state', 'N/A')}")
 
 def demo_c_in_clause_search(client: KuberJsonClient):
-    """Demo c) JSON search with IN clause - v1.7.7 Feature."""
-    print_header("C) JSON SEARCH - IN CLAUSE (v1.7.7)")
+    """Demo c) JSON search with IN clause - v1.7.8 Feature."""
+    print_header("C) JSON SEARCH - IN CLAUSE (v1.7.8)")
     
     print("\n  The IN clause allows matching a field against multiple values.")
     print("  Syntax: field=[value1|value2|value3]")
@@ -578,11 +578,11 @@ def main():
 ║   a) Set key with JSON value                                         ║
 ║   b) Retrieve key with JSON value                                    ║
 ║   c) JSON search with single/multiple attributes                     ║
-║      - IN clause for matching multiple values (v1.7.7)               ║
+║      - IN clause for matching multiple values (v1.7.8)               ║
 ║   d) Regex search on JSON attribute values                           ║
 ║   e) Search keys using regex                                         ║
 ║                                                                      ║
-║   v1.7.7 - JSEARCH IN Clause: field=[value1|value2|value3]           ║
+║   v1.7.8 - JSEARCH IN Clause: field=[value1|value2|value3]           ║
 ╚══════════════════════════════════════════════════════════════════════╝
     """)
     
@@ -602,7 +602,7 @@ def main():
             demo_b_get_json(client)
             demo_c_search_single_attribute(client)
             demo_c_search_multiple_attributes(client)
-            demo_c_in_clause_search(client)  # v1.7.7 - IN clause demo
+            demo_c_in_clause_search(client)  # v1.7.8 - IN clause demo
             demo_d_regex_search_json(client)
             demo_e_key_regex_search(client)
             

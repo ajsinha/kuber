@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v1.7.7 - SSL/TLS Configuration Help
+  ~ Kuber v1.7.8 - SSL/TLS Configuration Help
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('SSL/TLS Configuration')}"></head>
@@ -501,7 +501,7 @@ export SERVER_SSL_TRUST_STORE_TYPE=PKCS12
 # ---
 # services:
 #   kuber:
-#     image: kuber:1.7.7
+#     image: kuber:1.7.8
 #     ports:
 #       - "8443:8443"
 #     environment:
@@ -906,7 +906,7 @@ java -jar kuber-server.jar --spring.profiles.active=prod</code></pre>
 version: '3.8'
 services:
   kuber:
-    image: kuber:1.7.7
+    image: kuber:1.7.8
     ports:
       - "8443:8443"
     environment:

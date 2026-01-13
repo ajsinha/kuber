@@ -2,11 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
-## [1.7.7] - 2025-12-22 - ENHANCED GENERIC SEARCH API
+## [1.7.8] - 2025-12-22 - ENHANCED GENERIC SEARCH API
 
 ### 🔍 Major Feature: Enhanced Generic Search API
 
-**v1.7.7 introduces a powerful, flexible generic search API with multiple search modes and comprehensive JSON attribute querying capabilities.**
+**v1.7.8 introduces a powerful, flexible generic search API with multiple search modes and comprehensive JSON attribute querying capabilities.**
 
 The enhanced `/api/genericsearch` endpoint now supports multi-key lookups, multi-pattern regex searches, and advanced JSON attribute filtering with AND logic across all criteria.
 
@@ -90,7 +90,7 @@ All responses are JSON arrays:
 
 ### 📖 New Documentation: SSL/TLS Configuration Guide
 
-**v1.7.7 includes comprehensive SSL/TLS documentation covering secure communications.**
+**v1.7.8 includes comprehensive SSL/TLS documentation covering secure communications.**
 
 The new SSL/TLS Configuration Guide covers:
 - Server HTTPS configuration for REST API & Web UI
@@ -106,7 +106,7 @@ Access the guide at: `/help/ssl-tls` or in `docs/SSL_TLS_CONFIGURATION.md`
 
 ### 🔎 Enhanced Feature: JSEARCH IN Clause Support
 
-**v1.7.7 adds IN clause support to JSEARCH for matching multiple values per attribute.**
+**v1.7.8 adds IN clause support to JSEARCH for matching multiple values per attribute.**
 
 The JSEARCH command now supports matching a field against multiple values using the syntax `field=[value1|value2|value3]`:
 
@@ -158,7 +158,7 @@ var results = await client.JsonSearchInAsync<Trade>(conditions);
 
 ### 🔄 New Feature: Generic Update API
 
-**v1.7.7 introduces a unified SET/UPDATE endpoint with intelligent JSON merging.**
+**v1.7.8 introduces a unified SET/UPDATE endpoint with intelligent JSON merging.**
 
 The `/api/genericupdate` endpoint provides smart handling of both new entries and updates:
 
@@ -215,7 +215,7 @@ When `type="json"` and key exists:
 
 ### 🔥 Major New Feature: Per-Region Warm Object Configuration
 
-**v1.7.7 introduces configurable warm object counts per region, ensuring frequently accessed data remains in memory for optimal read performance.**
+**v1.7.8 introduces configurable warm object counts per region, ensuring frequently accessed data remains in memory for optimal read performance.**
 
 The new WarmObjectService proactively maintains a minimum number of "warm" (in-memory) objects per region, loading from disk if necessary. This works in coordination with eviction services to prevent thrashing.
 
