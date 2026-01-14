@@ -84,7 +84,20 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
                 return false;
             }
             
-            log.info("[{}] Connecting to Kafka at: {}", brokerName, bootstrapServers);
+            log.info("[{}] Checking Kafka broker availability at: {}", brokerName, bootstrapServers);
+            
+            // FIRST: Check if broker is actually reachable before creating consumer/producer
+            // This prevents continuous reconnection attempts and log spam
+            if (!isBrokerAvailable(bootstrapServers)) {
+                log.error("[{}] ❌ Kafka broker is NOT AVAILABLE at: {}", brokerName, bootstrapServers);
+                log.error("[{}] ❌ Connection NOT established. To fix:", brokerName);
+                log.error("[{}]    1. Start Kafka broker at {}", brokerName, bootstrapServers);
+                log.error("[{}]    2. Or disable this broker in request_response.json", brokerName);
+                log.error("[{}]    3. Or update bootstrap_servers to correct address", brokerName);
+                return false;
+            }
+            
+            log.info("[{}] ✓ Broker is available, connecting to Kafka at: {}", brokerName, bootstrapServers);
             
             // Consumer properties
             Properties consumerProps = new Properties();
@@ -138,6 +151,37 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
         } catch (Exception e) {
             log.error("[{}] ❌ Failed to connect to Kafka: {}", brokerName, e.getMessage(), e);
             errors.incrementAndGet();
+            return false;
+        }
+    }
+    
+    /**
+     * Check if Kafka broker is available by attempting to connect via AdminClient.
+     * Uses a short timeout to avoid blocking.
+     * 
+     * @param bootstrapServers the Kafka bootstrap servers
+     * @return true if broker is reachable, false otherwise
+     */
+    private boolean isBrokerAvailable(String bootstrapServers) {
+        Properties props = new Properties();
+        props.put(org.apache.kafka.clients.admin.AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(org.apache.kafka.clients.admin.AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+        props.put(org.apache.kafka.clients.admin.AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+        
+        try (org.apache.kafka.clients.admin.AdminClient adminClient = 
+                org.apache.kafka.clients.admin.AdminClient.create(props)) {
+            // Try to get cluster info with a 5 second timeout
+            adminClient.describeCluster().clusterId().get(5, java.util.concurrent.TimeUnit.SECONDS);
+            return true;
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.warn("[{}] Broker availability check timed out after 5 seconds", brokerName);
+            return false;
+        } catch (java.util.concurrent.ExecutionException e) {
+            log.warn("[{}] Broker availability check failed: {}", brokerName, 
+                    e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.warn("[{}] Broker availability check error: {}", brokerName, e.getMessage());
             return false;
         }
     }

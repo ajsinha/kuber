@@ -2,7 +2,7 @@
   "enabled" : true,
   "brokers" : {
     "activemq_example" : {
-      "enabled" : true,
+      "enabled" : false,
       "type" : "activemq",
       "connection" : {
         "password" : "admin",
@@ -26,7 +26,7 @@
       "request_topics" : [ "ccs_cache_request" ]
     },
     "kafka_example" : {
-      "enabled" : true,
+      "enabled" : false,
       "type" : "kafka",
       "connection" : {
         "group_id" : "kuber-request-processor",
