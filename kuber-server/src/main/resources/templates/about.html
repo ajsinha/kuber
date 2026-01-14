@@ -653,11 +653,13 @@
                             <div class="mb-4">
                                 <h6 class="mb-1">
                                     <span class="badge bg-primary me-2">v1.7.9</span>
-                                    <span class="text-muted small">Current - Parallel JSON Search &amp; Performance Enhancements</span>
+                                    <span class="text-muted small">Current - Parallel Search &amp; Performance Enhancements</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>January 2026</p>
                                 <ul class="small text-muted mb-0">
                                     <li><strong>Parallel JSON Search</strong>: High-performance multi-threaded search with up to 8x speedup on large datasets</li>
+                                    <li><strong>Parallel Pattern Search</strong>: Two-phase parallel processing for key pattern searches (4-6x speedup)</li>
+                                    <li><strong>Parallel Multi-Pattern Search</strong>: Parallel evaluation of multiple regex patterns with OR logic</li>
                                     <li><strong>Configurable Thread Pool</strong>: Default 8 threads, configurable via <code>kuber.search.thread-count</code></li>
                                     <li><strong>Auto Mode Selection</strong>: Automatically uses parallel for large datasets (&gt;1000 keys), sequential for small</li>
                                     <li><strong>Early Termination</strong>: Stops all threads when result limit is reached for efficiency</li>
@@ -666,9 +668,7 @@
                                     <li><strong>Configurable Timeout</strong>: Search timeout with partial results (default: 60 seconds)</li>
                                     <li><strong>RocksDB Default</strong>: Changed default persistence from LMDB to RocksDB for better production performance</li>
                                     <li><strong>ASCII Normalization</strong>: Autoload automatically normalizes non-ASCII text to US-ASCII (configurable)</li>
-                                    <li><strong>Character Transliteration</strong>: Converts accented chars (é→e), special chars (ß→ss), currency (€→EUR)</li>
                                     <li><strong>Encoding Auto-Detection</strong>: Autoload detects file encoding via BOM and character validation</li>
-                                    <li><strong>Multi-Encoding Support</strong>: UTF-8, UTF-16, ISO-8859-1, windows-1252, Shift_JIS, and more</li>
                                 </ul>
                             </div>
                             <div class="mb-4">

@@ -31,18 +31,16 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * High-performance parallel JSON search service.
+ * High-performance parallel search service for JSON and key pattern searches.
  * 
- * <p>This service provides significant performance improvements for JSON searches
- * on large datasets by utilizing multiple threads to scan documents in parallel.
+ * <p>This service provides significant performance improvements for searches
+ * on large datasets by utilizing multiple threads to process in parallel.
  * 
- * <h3>Features:</h3>
+ * <h3>Parallel Search Types:</h3>
  * <ul>
- *   <li>Automatic parallel/sequential mode selection based on dataset size</li>
- *   <li>Configurable thread count (default: 8)</li>
- *   <li>Early termination when result limit is reached</li>
- *   <li>Compiled regex pattern caching for performance</li>
- *   <li>Graceful timeout handling with partial results</li>
+ *   <li><strong>JSON Search</strong>: Parallel document fetch + criteria matching</li>
+ *   <li><strong>Pattern Search</strong>: Parallel key matching + value fetching</li>
+ *   <li><strong>Multi-Pattern Search</strong>: Parallel processing of multiple regex patterns</li>
  * </ul>
  * 
  * <h3>Performance:</h3>
@@ -74,6 +72,8 @@ public class ParallelJsonSearchService {
     private final AtomicLong parallelSearches = new AtomicLong(0);
     private final AtomicLong sequentialSearches = new AtomicLong(0);
     private final AtomicLong totalSearchTimeMs = new AtomicLong(0);
+    private final AtomicLong patternSearches = new AtomicLong(0);
+    private final AtomicLong jsonSearches = new AtomicLong(0);
     
     @PostConstruct
     public void initialize() {
@@ -88,14 +88,14 @@ public class ParallelJsonSearchService {
                 @Override
                 public Thread newThread(Runnable r) {
                     Thread t = new Thread(r);
-                    t.setName("kuber-json-search-" + counter.incrementAndGet());
+                    t.setName("kuber-search-" + counter.incrementAndGet());
                     t.setDaemon(true);
                     return t;
                 }
             });
             
             log.info("╔══════════════════════════════════════════════════════════════╗");
-            log.info("║         PARALLEL JSON SEARCH SERVICE INITIALIZED             ║");
+            log.info("║         PARALLEL SEARCH SERVICE INITIALIZED                  ║");
             log.info("╠══════════════════════════════════════════════════════════════╣");
             log.info("║  Status:    ENABLED                                          ║");
             log.info("║  Threads:   {}                                               ║", 
@@ -104,11 +104,14 @@ public class ParallelJsonSearchService {
                 String.format("%-8d", properties.getSearch().getParallelThreshold()));
             log.info("║  Timeout:   {} seconds                                       ║", 
                 String.format("%-8d", properties.getSearch().getTimeoutSeconds()));
+            log.info("║  Supports:  JSON Search, Pattern Search, Multi-Pattern       ║");
             log.info("╚══════════════════════════════════════════════════════════════╝");
         } else {
-            log.info("Parallel JSON search: DISABLED (sequential mode only)");
+            log.info("Parallel search: DISABLED (sequential mode only)");
         }
     }
+    
+    // ==================== JSON Criteria Search ====================
     
     /**
      * Search JSON documents with automatic parallel/sequential mode selection.
@@ -126,6 +129,7 @@ public class ParallelJsonSearchService {
         
         long startTime = System.currentTimeMillis();
         totalSearches.incrementAndGet();
+        jsonSearches.incrementAndGet();
         
         // Get all keys in the region
         Set<String> allKeys = cacheService.keys(region, "*");
@@ -135,7 +139,7 @@ public class ParallelJsonSearchService {
             return Collections.emptyList();
         }
         
-        log.debug("Searching {} keys in region '{}' with {} criteria", 
+        log.debug("JSON search: {} keys in region '{}' with {} criteria", 
             allKeys.size(), region, criteria != null ? criteria.size() : 0);
         
         List<Map<String, Object>> results;
@@ -143,43 +147,107 @@ public class ParallelJsonSearchService {
         // Decide parallel vs sequential
         if (shouldUseParallelSearch(allKeys.size())) {
             parallelSearches.incrementAndGet();
-            results = parallelSearch(region, allKeys, criteria, fields, limit);
+            results = parallelJsonSearch(region, allKeys, criteria, fields, limit);
         } else {
             sequentialSearches.incrementAndGet();
-            results = sequentialSearch(region, allKeys, criteria, fields, limit);
+            results = sequentialJsonSearch(region, allKeys, criteria, fields, limit);
         }
         
         long elapsed = System.currentTimeMillis() - startTime;
         totalSearchTimeMs.addAndGet(elapsed);
         
-        log.debug("Search completed: {} results in {}ms ({})", 
+        log.debug("JSON search completed: {} results in {}ms ({})", 
             results.size(), elapsed, 
             shouldUseParallelSearch(allKeys.size()) ? "parallel" : "sequential");
         
         return results;
     }
     
+    // ==================== Key Pattern Search ====================
+    
     /**
-     * Determine if parallel search should be used based on configuration and data size.
+     * Search by single key pattern with parallel value fetching.
+     * 
+     * @param region     Cache region to search
+     * @param pattern    Regex pattern to match keys
+     * @param fields     Fields to project in results (null for all fields)
+     * @param limit      Maximum number of results to return
+     * @return List of matching entries with their keys and values
      */
-    private boolean shouldUseParallelSearch(int keyCount) {
-        if (!properties.getSearch().isParallelEnabled()) {
-            return false;
-        }
-        if (searchExecutor == null || searchExecutor.isShutdown()) {
-            return false;
-        }
-        return keyCount >= properties.getSearch().getParallelThreshold();
+    public List<Map<String, Object>> searchByPattern(String region,
+                                                      String pattern,
+                                                      List<String> fields,
+                                                      int limit) {
+        return searchByPatterns(region, Collections.singletonList(pattern), fields, limit);
     }
     
     /**
-     * Sequential search for small datasets or when parallel is disabled.
+     * Search by multiple key patterns (OR logic) with parallel processing.
+     * 
+     * <p>This method provides significant performance improvements when:
+     * <ul>
+     *   <li>Multiple patterns need to be checked (patterns processed in parallel)</li>
+     *   <li>Many keys match (value fetching parallelized)</li>
+     *   <li>Large regions (&gt;1000 keys)</li>
+     * </ul>
+     * 
+     * @param region     Cache region to search
+     * @param patterns   List of regex patterns (OR logic - match any)
+     * @param fields     Fields to project in results (null for all fields)
+     * @param limit      Maximum number of results to return
+     * @return List of matching entries with their keys and values
      */
-    private List<Map<String, Object>> sequentialSearch(String region,
-                                                        Set<String> keys,
-                                                        Map<String, Object> criteria,
-                                                        List<String> fields,
-                                                        int limit) {
+    public List<Map<String, Object>> searchByPatterns(String region,
+                                                       List<String> patterns,
+                                                       List<String> fields,
+                                                       int limit) {
+        
+        long startTime = System.currentTimeMillis();
+        totalSearches.incrementAndGet();
+        patternSearches.incrementAndGet();
+        
+        // Get all keys in the region
+        Set<String> allKeys = cacheService.keys(region, "*");
+        
+        if (allKeys == null || allKeys.isEmpty()) {
+            log.debug("No keys found in region '{}' for pattern search", region);
+            return Collections.emptyList();
+        }
+        
+        log.debug("Pattern search: {} keys in region '{}' with {} patterns", 
+            allKeys.size(), region, patterns.size());
+        
+        List<Map<String, Object>> results;
+        
+        // Decide parallel vs sequential
+        if (shouldUseParallelSearch(allKeys.size())) {
+            parallelSearches.incrementAndGet();
+            results = parallelPatternSearch(region, allKeys, patterns, fields, limit);
+        } else {
+            sequentialSearches.incrementAndGet();
+            results = sequentialPatternSearch(region, allKeys, patterns, fields, limit);
+        }
+        
+        long elapsed = System.currentTimeMillis() - startTime;
+        totalSearchTimeMs.addAndGet(elapsed);
+        
+        log.debug("Pattern search completed: {} results in {}ms ({})", 
+            results.size(), elapsed, 
+            shouldUseParallelSearch(allKeys.size()) ? "parallel" : "sequential");
+        
+        return results;
+    }
+    
+    // ==================== Sequential Implementations ====================
+    
+    /**
+     * Sequential JSON search for small datasets.
+     */
+    private List<Map<String, Object>> sequentialJsonSearch(String region,
+                                                            Set<String> keys,
+                                                            Map<String, Object> criteria,
+                                                            List<String> fields,
+                                                            int limit) {
         List<Map<String, Object>> results = new ArrayList<>();
         
         for (String key : keys) {
@@ -202,27 +270,58 @@ public class ParallelJsonSearchService {
     }
     
     /**
-     * Parallel search using multiple threads for large datasets.
+     * Sequential pattern search for small datasets.
      */
-    private List<Map<String, Object>> parallelSearch(String region,
-                                                      Set<String> keys,
-                                                      Map<String, Object> criteria,
-                                                      List<String> fields,
-                                                      int limit) {
+    private List<Map<String, Object>> sequentialPatternSearch(String region,
+                                                               Set<String> keys,
+                                                               List<String> patterns,
+                                                               List<String> fields,
+                                                               int limit) {
+        List<Map<String, Object>> results = new ArrayList<>();
         
-        // Convert to list for partitioning
+        // Compile patterns once
+        List<Pattern> compiledPatterns = compilePatterns(patterns);
+        
+        for (String key : keys) {
+            if (results.size() >= limit) {
+                break;  // Early termination
+            }
+            
+            // Check if key matches any pattern (OR logic)
+            if (matchesAnyPattern(key, compiledPatterns)) {
+                try {
+                    String value = cacheService.get(region, key);
+                    if (value != null) {
+                        results.add(buildResultItemFromString(key, value, fields));
+                    }
+                } catch (Exception e) {
+                    log.trace("Error fetching value for key {}: {}", key, e.getMessage());
+                }
+            }
+        }
+        
+        return results;
+    }
+    
+    // ==================== Parallel Implementations ====================
+    
+    /**
+     * Parallel JSON search using multiple threads.
+     */
+    private List<Map<String, Object>> parallelJsonSearch(String region,
+                                                          Set<String> keys,
+                                                          Map<String, Object> criteria,
+                                                          List<String> fields,
+                                                          int limit) {
+        
         List<String> keyList = new ArrayList<>(keys);
-        
-        // Calculate partition size based on thread count
         int threadCount = properties.getSearch().getThreadCount();
         int partitionSize = (keyList.size() + threadCount - 1) / threadCount;
         
-        // Thread-safe result collection
         ConcurrentLinkedQueue<Map<String, Object>> results = new ConcurrentLinkedQueue<>();
         AtomicInteger foundCount = new AtomicInteger(0);
         AtomicBoolean limitReached = new AtomicBoolean(false);
         
-        // Create and submit search tasks for each partition
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         
         for (int i = 0; i < keyList.size(); i += partitionSize) {
@@ -231,31 +330,15 @@ public class ParallelJsonSearchService {
             List<String> partition = keyList.subList(start, end);
             
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                searchPartition(region, partition, criteria, fields, limit,
+                searchJsonPartition(region, partition, criteria, fields, limit,
                     results, foundCount, limitReached);
             }, searchExecutor);
             
             futures.add(future);
         }
         
-        // Wait for all tasks with timeout
-        try {
-            int timeoutSeconds = properties.getSearch().getTimeoutSeconds();
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .get(timeoutSeconds, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            log.warn("Parallel search timed out after {}s, returning {} partial results", 
-                properties.getSearch().getTimeoutSeconds(), results.size());
-            // Cancel remaining tasks
-            futures.forEach(f -> f.cancel(true));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Parallel search interrupted, returning {} partial results", results.size());
-        } catch (ExecutionException e) {
-            log.error("Parallel search execution error: {}", e.getMessage());
-        }
+        waitForCompletion(futures, results.size());
         
-        // Convert to list and trim to limit (may slightly exceed due to concurrent adds)
         List<Map<String, Object>> resultList = new ArrayList<>(results);
         if (resultList.size() > limit) {
             return resultList.subList(0, limit);
@@ -264,22 +347,112 @@ public class ParallelJsonSearchService {
     }
     
     /**
-     * Search a partition of keys (runs in a separate thread).
+     * Parallel pattern search with two-phase processing:
+     * Phase 1: Parallel key matching across partitions
+     * Phase 2: Parallel value fetching for matches
      */
-    private void searchPartition(String region,
-                                  List<String> keys,
-                                  Map<String, Object> criteria,
-                                  List<String> fields,
-                                  int limit,
-                                  ConcurrentLinkedQueue<Map<String, Object>> results,
-                                  AtomicInteger foundCount,
-                                  AtomicBoolean limitReached) {
+    private List<Map<String, Object>> parallelPatternSearch(String region,
+                                                             Set<String> keys,
+                                                             List<String> patterns,
+                                                             List<String> fields,
+                                                             int limit) {
+        
+        List<String> keyList = new ArrayList<>(keys);
+        int threadCount = properties.getSearch().getThreadCount();
+        int partitionSize = (keyList.size() + threadCount - 1) / threadCount;
+        
+        // Compile patterns once (thread-safe)
+        List<Pattern> compiledPatterns = compilePatterns(patterns);
+        
+        // Phase 1: Parallel key matching
+        ConcurrentLinkedQueue<String> matchedKeys = new ConcurrentLinkedQueue<>();
+        AtomicBoolean enoughMatches = new AtomicBoolean(false);
+        
+        List<CompletableFuture<Void>> matchFutures = new ArrayList<>();
+        
+        for (int i = 0; i < keyList.size(); i += partitionSize) {
+            int start = i;
+            int end = Math.min(i + partitionSize, keyList.size());
+            List<String> partition = keyList.subList(start, end);
+            
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                for (String key : partition) {
+                    if (enoughMatches.get()) return;  // Early exit
+                    
+                    if (matchesAnyPattern(key, compiledPatterns)) {
+                        matchedKeys.add(key);
+                        // Stop collecting if we have way more than needed
+                        if (matchedKeys.size() > limit * 2) {
+                            enoughMatches.set(true);
+                            return;
+                        }
+                    }
+                }
+            }, searchExecutor);
+            
+            matchFutures.add(future);
+        }
+        
+        waitForCompletion(matchFutures, 0);
+        
+        // Phase 2: Parallel value fetching for matched keys
+        List<String> keysToFetch = new ArrayList<>(matchedKeys);
+        if (keysToFetch.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        // Limit keys to fetch to avoid over-fetching
+        if (keysToFetch.size() > limit) {
+            keysToFetch = keysToFetch.subList(0, limit);
+        }
+        
+        log.debug("Pattern search phase 2: fetching values for {} matched keys", keysToFetch.size());
+        
+        ConcurrentLinkedQueue<Map<String, Object>> results = new ConcurrentLinkedQueue<>();
+        AtomicInteger foundCount = new AtomicInteger(0);
+        AtomicBoolean limitReached = new AtomicBoolean(false);
+        
+        int fetchPartitionSize = (keysToFetch.size() + threadCount - 1) / threadCount;
+        List<CompletableFuture<Void>> fetchFutures = new ArrayList<>();
+        
+        for (int i = 0; i < keysToFetch.size(); i += fetchPartitionSize) {
+            int start = i;
+            int end = Math.min(i + fetchPartitionSize, keysToFetch.size());
+            List<String> partition = keysToFetch.subList(start, end);
+            
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                fetchValuesPartition(region, partition, fields, limit,
+                    results, foundCount, limitReached);
+            }, searchExecutor);
+            
+            fetchFutures.add(future);
+        }
+        
+        waitForCompletion(fetchFutures, results.size());
+        
+        List<Map<String, Object>> resultList = new ArrayList<>(results);
+        if (resultList.size() > limit) {
+            return resultList.subList(0, limit);
+        }
+        return resultList;
+    }
+    
+    // ==================== Partition Workers ====================
+    
+    /**
+     * Search a partition of keys for JSON criteria (runs in separate thread).
+     */
+    private void searchJsonPartition(String region,
+                                      List<String> keys,
+                                      Map<String, Object> criteria,
+                                      List<String> fields,
+                                      int limit,
+                                      ConcurrentLinkedQueue<Map<String, Object>> results,
+                                      AtomicInteger foundCount,
+                                      AtomicBoolean limitReached) {
         
         for (String key : keys) {
-            // Check if limit reached by another thread
-            if (limitReached.get()) {
-                return;  // Early termination
-            }
+            if (limitReached.get()) return;
             
             try {
                 JsonNode document = cacheService.jsonGet(region, key, "$");
@@ -287,16 +460,110 @@ public class ParallelJsonSearchService {
                 if (document != null && matchesAllCriteria(document, criteria)) {
                     results.add(buildResultItem(key, document, fields));
                     
-                    // Check limit
                     if (foundCount.incrementAndGet() >= limit) {
                         limitReached.set(true);
                         return;
                     }
                 }
             } catch (Exception e) {
-                // Log but continue - don't fail entire search for one bad document
                 log.trace("Error processing key {} in partition: {}", key, e.getMessage());
             }
+        }
+    }
+    
+    /**
+     * Fetch values for a partition of keys (runs in separate thread).
+     */
+    private void fetchValuesPartition(String region,
+                                       List<String> keys,
+                                       List<String> fields,
+                                       int limit,
+                                       ConcurrentLinkedQueue<Map<String, Object>> results,
+                                       AtomicInteger foundCount,
+                                       AtomicBoolean limitReached) {
+        
+        for (String key : keys) {
+            if (limitReached.get()) return;
+            
+            try {
+                String value = cacheService.get(region, key);
+                
+                if (value != null) {
+                    results.add(buildResultItemFromString(key, value, fields));
+                    
+                    if (foundCount.incrementAndGet() >= limit) {
+                        limitReached.set(true);
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                log.trace("Error fetching value for key {}: {}", key, e.getMessage());
+            }
+        }
+    }
+    
+    // ==================== Pattern Matching ====================
+    
+    /**
+     * Compile regex patterns with caching.
+     */
+    private List<Pattern> compilePatterns(List<String> patterns) {
+        List<Pattern> compiled = new ArrayList<>();
+        for (String patternStr : patterns) {
+            try {
+                Pattern pattern = regexCache.computeIfAbsent(patternStr, Pattern::compile);
+                compiled.add(pattern);
+            } catch (PatternSyntaxException e) {
+                log.warn("Invalid regex pattern '{}': {}", patternStr, e.getMessage());
+            }
+        }
+        return compiled;
+    }
+    
+    /**
+     * Check if key matches any of the patterns (OR logic).
+     */
+    private boolean matchesAnyPattern(String key, List<Pattern> patterns) {
+        for (Pattern pattern : patterns) {
+            if (pattern.matcher(key).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // ==================== Helper Methods ====================
+    
+    /**
+     * Determine if parallel search should be used.
+     */
+    private boolean shouldUseParallelSearch(int keyCount) {
+        if (!properties.getSearch().isParallelEnabled()) {
+            return false;
+        }
+        if (searchExecutor == null || searchExecutor.isShutdown()) {
+            return false;
+        }
+        return keyCount >= properties.getSearch().getParallelThreshold();
+    }
+    
+    /**
+     * Wait for all futures to complete with timeout.
+     */
+    private void waitForCompletion(List<CompletableFuture<Void>> futures, int currentResults) {
+        try {
+            int timeoutSeconds = properties.getSearch().getTimeoutSeconds();
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            log.warn("Search timed out after {}s, returning {} partial results", 
+                properties.getSearch().getTimeoutSeconds(), currentResults);
+            futures.forEach(f -> f.cancel(true));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Search interrupted, returning partial results");
+        } catch (ExecutionException e) {
+            log.error("Search execution error: {}", e.getMessage());
         }
     }
     
@@ -305,7 +572,7 @@ public class ParallelJsonSearchService {
      */
     private boolean matchesAllCriteria(JsonNode json, Map<String, Object> criteria) {
         if (criteria == null || criteria.isEmpty()) {
-            return true;  // No criteria = match all
+            return true;
         }
         
         for (Map.Entry<String, Object> entry : criteria.entrySet()) {
@@ -315,21 +582,20 @@ public class ParallelJsonSearchService {
             JsonNode fieldValue = getJsonField(json, fieldPath);
             
             if (!matchesCriterion(fieldValue, criteriaValue)) {
-                return false;  // AND logic - all must match
+                return false;
             }
         }
         return true;
     }
     
     /**
-     * Get a field value from JSON, supporting dot notation for nested fields.
+     * Get a field value from JSON, supporting dot notation.
      */
     private JsonNode getJsonField(JsonNode json, String fieldPath) {
         if (json == null || fieldPath == null) {
             return null;
         }
         
-        // Handle dot notation for nested fields (e.g., "address.city")
         String[] parts = fieldPath.split("\\.");
         JsonNode current = json;
         
@@ -344,8 +610,7 @@ public class ParallelJsonSearchService {
     }
     
     /**
-     * Check if a field value matches a single criterion.
-     * Supports: equality, list (IN), regex, and comparison operators.
+     * Check if a field value matches a criterion.
      */
     @SuppressWarnings("unchecked")
     private boolean matchesCriterion(JsonNode fieldValue, Object criteriaValue) {
@@ -353,26 +618,19 @@ public class ParallelJsonSearchService {
             return false;
         }
         
-        // Case 1: List of values (IN operator)
         if (criteriaValue instanceof List) {
             List<?> valueList = (List<?>) criteriaValue;
-            return valueList.stream()
-                .anyMatch(v -> valueMatches(fieldValue, v));
+            return valueList.stream().anyMatch(v -> valueMatches(fieldValue, v));
         }
         
-        // Case 2: Map with operators (regex, comparison)
         if (criteriaValue instanceof Map) {
             Map<String, Object> operators = (Map<String, Object>) criteriaValue;
             return matchesOperators(fieldValue, operators);
         }
         
-        // Case 3: Simple equality
         return valueMatches(fieldValue, criteriaValue);
     }
     
-    /**
-     * Check if field value matches expected value.
-     */
     private boolean valueMatches(JsonNode fieldValue, Object expected) {
         if (expected == null) {
             return fieldValue.isNull();
@@ -381,23 +639,17 @@ public class ParallelJsonSearchService {
         String actualValue = fieldValue.asText();
         String expectedValue = String.valueOf(expected);
         
-        // Handle numeric comparison
         if (fieldValue.isNumber() && expected instanceof Number) {
             return fieldValue.asDouble() == ((Number) expected).doubleValue();
         }
         
-        // Handle boolean comparison
         if (fieldValue.isBoolean() && expected instanceof Boolean) {
             return fieldValue.asBoolean() == (Boolean) expected;
         }
         
-        // String comparison
         return actualValue.equals(expectedValue);
     }
     
-    /**
-     * Handle comparison operators: gt, gte, lt, lte, eq, ne, regex.
-     */
     private boolean matchesOperators(JsonNode fieldValue, Map<String, Object> operators) {
         for (Map.Entry<String, Object> op : operators.entrySet()) {
             String operator = op.getKey();
@@ -413,44 +665,29 @@ public class ParallelJsonSearchService {
                 case "regex" -> matchesRegex(fieldValue.asText(), String.valueOf(operand));
                 default -> {
                     log.trace("Unknown operator: {}", operator);
-                    yield true;  // Ignore unknown operators
+                    yield true;
                 }
             };
             
-            if (!matches) {
-                return false;  // All operators must match
-            }
+            if (!matches) return false;
         }
         return true;
     }
     
-    /**
-     * Compare numeric values.
-     */
     private int compareNumeric(JsonNode fieldValue, Object operand) {
         try {
             double fieldNum = fieldValue.asDouble();
-            double operandNum;
-            
-            if (operand instanceof Number) {
-                operandNum = ((Number) operand).doubleValue();
-            } else {
-                operandNum = Double.parseDouble(String.valueOf(operand));
-            }
-            
+            double operandNum = operand instanceof Number 
+                ? ((Number) operand).doubleValue() 
+                : Double.parseDouble(String.valueOf(operand));
             return Double.compare(fieldNum, operandNum);
         } catch (NumberFormatException e) {
-            log.trace("Cannot compare non-numeric values: {} vs {}", fieldValue, operand);
             return 0;
         }
     }
     
-    /**
-     * Match string against regex pattern with caching.
-     */
     private boolean matchesRegex(String value, String patternStr) {
         try {
-            // Use cached compiled pattern for performance
             Pattern pattern = regexCache.computeIfAbsent(patternStr, Pattern::compile);
             return pattern.matcher(value).matches();
         } catch (PatternSyntaxException e) {
@@ -459,9 +696,8 @@ public class ParallelJsonSearchService {
         }
     }
     
-    /**
-     * Build result item with optional field projection.
-     */
+    // ==================== Result Building ====================
+    
     private Map<String, Object> buildResultItem(String key, JsonNode document, List<String> fields) {
         Map<String, Object> item = new HashMap<>();
         item.put("key", key);
@@ -475,16 +711,32 @@ public class ParallelJsonSearchService {
         return item;
     }
     
-    /**
-     * Project specific fields from a JSON document.
-     */
+    private Map<String, Object> buildResultItemFromString(String key, String value, List<String> fields) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("key", key);
+        
+        try {
+            // Try to parse as JSON for field projection
+            JsonNode jsonValue = com.kuber.core.util.JsonUtils.parse(value);
+            if (fields != null && !fields.isEmpty()) {
+                item.put("value", projectFields(jsonValue, fields));
+            } else {
+                item.put("value", jsonValue);
+            }
+        } catch (Exception e) {
+            // Not JSON, return as-is
+            item.put("value", value);
+        }
+        
+        return item;
+    }
+    
     private ObjectNode projectFields(JsonNode document, List<String> fields) {
         ObjectNode projected = JsonNodeFactory.instance.objectNode();
         
         for (String field : fields) {
             JsonNode value = getJsonField(document, field);
             if (value != null && !value.isMissingNode()) {
-                // Handle dot notation - create nested structure
                 if (field.contains(".")) {
                     setNestedField(projected, field, value);
                 } else {
@@ -496,9 +748,6 @@ public class ParallelJsonSearchService {
         return projected;
     }
     
-    /**
-     * Set a nested field value using dot notation.
-     */
     private void setNestedField(ObjectNode root, String path, JsonNode value) {
         String[] parts = path.split("\\.");
         ObjectNode current = root;
@@ -514,6 +763,8 @@ public class ParallelJsonSearchService {
         current.set(parts[parts.length - 1], value);
     }
     
+    // ==================== Statistics ====================
+    
     /**
      * Get search statistics.
      */
@@ -522,6 +773,8 @@ public class ParallelJsonSearchService {
         stats.put("totalSearches", totalSearches.get());
         stats.put("parallelSearches", parallelSearches.get());
         stats.put("sequentialSearches", sequentialSearches.get());
+        stats.put("jsonSearches", jsonSearches.get());
+        stats.put("patternSearches", patternSearches.get());
         stats.put("totalSearchTimeMs", totalSearchTimeMs.get());
         
         long total = totalSearches.get();
@@ -564,8 +817,8 @@ public class ParallelJsonSearchService {
             }
         }
         
-        log.info("Parallel JSON search service shut down. Final stats: {} total searches, " +
-            "{} parallel, {} sequential", 
-            totalSearches.get(), parallelSearches.get(), sequentialSearches.get());
+        log.info("Search service shut down. Stats: {} total ({} JSON, {} pattern), {} parallel, {} sequential", 
+            totalSearches.get(), jsonSearches.get(), patternSearches.get(),
+            parallelSearches.get(), sequentialSearches.get());
     }
 }

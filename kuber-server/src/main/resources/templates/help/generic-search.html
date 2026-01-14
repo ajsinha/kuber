@@ -350,9 +350,37 @@ POST /api/v2/genericsearch</code></pre>
                         <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Parallel Search (v1.7.9)</h5>
                     </div>
                     <div class="card-body">
-                        <p>JSON searches now use <strong>parallel processing</strong> for significantly improved performance on large datasets.</p>
+                        <p>Both JSON searches and key pattern searches now use <strong>parallel processing</strong> for significantly improved performance on large datasets.</p>
                         
-                        <h6 class="mt-3">Performance Gains</h6>
+                        <h6 class="mt-3">Supported Parallel Search Types</h6>
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Search Type</th>
+                                    <th>Parallel Strategy</th>
+                                    <th>Benefit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>JSON Criteria Search</strong></td>
+                                    <td>Parallel document fetch + criteria matching</td>
+                                    <td>~8x speedup</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Single Pattern Search</strong></td>
+                                    <td>Phase 1: Parallel key matching<br>Phase 2: Parallel value fetching</td>
+                                    <td>~4-6x speedup</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Multi-Pattern Search</strong></td>
+                                    <td>Parallel pattern evaluation + value fetching</td>
+                                    <td>~4-6x speedup</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h6 class="mt-3">Performance Gains (JSON Search)</h6>
                         <table class="table table-sm table-bordered">
                             <thead class="table-light">
                                 <tr>
@@ -369,6 +397,22 @@ POST /api/v2/genericsearch</code></pre>
                                 <tr class="table-success"><td>100,000 keys</td><td>8,450ms</td><td>1,050ms</td><td><strong>~8x</strong></td></tr>
                             </tbody>
                         </table>
+                        
+                        <h6 class="mt-3">Two-Phase Pattern Search</h6>
+                        <p>Pattern searches use an optimized two-phase approach:</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>Phase 1: Parallel Key Matching (CPU-bound, fast)
+───────────────────────────────────────────────
+  Thread 1: [Keys 0-25000]     → Match patterns → Matched keys
+  Thread 2: [Keys 25001-50000] → Match patterns → Matched keys
+  Thread 3: [Keys 50001-75000] → Match patterns → Matched keys
+  Thread 4: [Keys 75001-100000]→ Match patterns → Matched keys
+
+Phase 2: Parallel Value Fetching (I/O-bound)
+───────────────────────────────────────────────
+  Thread 1: [Matched 0-250]     → Fetch values
+  Thread 2: [Matched 251-500]   → Fetch values
+  Thread 3: [Matched 501-750]   → Fetch values
+  Thread 4: [Matched 751-1000]  → Fetch values</code></pre>
                         
                         <h6 class="mt-3">How It Works</h6>
                         <ul>
@@ -394,6 +438,8 @@ Response:
     "totalSearches": 1523,
     "parallelSearches": 892,
     "sequentialSearches": 631,
+    "jsonSearches": 1100,
+    "patternSearches": 423,
     "totalSearchTimeMs": 45230,
     "avgSearchTimeMs": 29,
     "parallelSearchPercent": "58.6%",

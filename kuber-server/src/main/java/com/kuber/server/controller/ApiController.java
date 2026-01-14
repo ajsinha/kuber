@@ -592,48 +592,27 @@ public class ApiController {
     
     /**
      * Mode 3: Single key pattern (regex) search.
+     * Uses parallel search for improved performance on large datasets.
+     * 
+     * @since 1.7.9 - Now uses parallel pattern search
      */
     private List<Map<String, Object>> performKeyPatternSearch(String region, String pattern, int limit, List<String> fields) {
-        List<Map<String, Object>> results = cacheService.searchKeysByRegex(region, pattern, limit);
-        if (fields != null && !fields.isEmpty()) {
-            return applyFieldProjection(results, fields);
-        }
-        return results;
+        // Delegate to ParallelJsonSearchService for optimized pattern search
+        return parallelJsonSearchService.searchByPattern(region, pattern, fields, limit);
     }
     
     /**
      * Mode 4: Multiple key patterns search (v1.7.9).
      * Returns keys matching ANY of the patterns (OR logic between patterns).
+     * Uses parallel two-phase search for improved performance:
+     * - Phase 1: Parallel key matching across partitions
+     * - Phase 2: Parallel value fetching for matches
+     * 
+     * @since 1.7.9 - Now uses parallel pattern search
      */
     private List<Map<String, Object>> performMultiKeyPatternSearch(String region, List<String> patterns, int limit, List<String> fields) {
-        Set<String> matchedKeys = new LinkedHashSet<>();
-        List<Pattern> compiledPatterns = patterns.stream()
-            .map(Pattern::compile)
-            .collect(Collectors.toList());
-        
-        // Get all keys in region
-        Set<String> allKeys = cacheService.keys(region, "*");
-        
-        for (String key : allKeys) {
-            if (matchedKeys.size() >= limit) break;
-            // Check if key matches any pattern
-            for (Pattern p : compiledPatterns) {
-                if (p.matcher(key).matches()) {
-                    matchedKeys.add(key);
-                    break;
-                }
-            }
-        }
-        
-        // Build results
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (String key : matchedKeys) {
-            String value = cacheService.get(region, key);
-            if (value != null) {
-                results.add(buildResultItem(key, value, fields));
-            }
-        }
-        return results;
+        // Delegate to ParallelJsonSearchService for optimized multi-pattern search
+        return parallelJsonSearchService.searchByPatterns(region, patterns, fields, limit);
     }
     
     /**
