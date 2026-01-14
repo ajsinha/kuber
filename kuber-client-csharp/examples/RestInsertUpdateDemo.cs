@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Insert & Update JSON Documents Demo (v1.7.8)
+ * Kuber REST API - Insert & Update JSON Documents Demo (v1.7.9)
  *
  * This standalone C# application demonstrates how to:
  *
@@ -549,7 +549,7 @@ Request Body for JUPDATE:
             string region = args.Length > 3 ? args[3] : "update_demo_csharp";
 
             Console.WriteLine(new string('=', 80));
-            Console.WriteLine("  KUBER REST API - INSERT & UPDATE DEMO (v1.7.8) - C#");
+            Console.WriteLine("  KUBER REST API - INSERT & UPDATE DEMO (v1.7.9) - C#");
             Console.WriteLine(new string('=', 80));
             Console.WriteLine($"  Server:  {host}:{port}");
             Console.WriteLine($"  Region:  {region}");

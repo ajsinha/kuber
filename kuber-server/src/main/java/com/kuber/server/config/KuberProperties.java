@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.7.8";
+    private String version = "1.7.9";
     
     /**
      * Unique node identifier
@@ -116,9 +116,15 @@ public class KuberProperties {
     
     /**
      * Prometheus metrics configuration
-     * @since 1.7.8
+     * @since 1.7.9
      */
     private Prometheus prometheus = new Prometheus();
+    
+    /**
+     * JSON search configuration including parallel search settings.
+     * @since 1.7.9
+     */
+    private Search search = new Search();
     
     @Data
     public static class Base {
@@ -409,7 +415,7 @@ public class KuberProperties {
         @Min(1000)
         private int valueCacheLimitCheckIntervalMs = 30000;
         
-        // ==================== Warm Object Configuration (v1.7.8) ====================
+        // ==================== Warm Object Configuration (v1.7.9) ====================
         
         /**
          * Enable warm object maintenance per region.
@@ -417,7 +423,7 @@ public class KuberProperties {
          * "warm" (in-memory) objects per region, loading from disk if necessary.
          * This ensures frequently accessed data remains in memory for fast access.
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         private boolean warmObjectsEnabled = true;
         
@@ -436,7 +442,7 @@ public class KuberProperties {
          * Note: The warm object count cannot exceed the total keys in the region.
          * If configured higher, it will be capped at the region's key count.
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         private java.util.Map<String, Integer> regionWarmObjectCounts = new java.util.HashMap<>();
         
@@ -445,7 +451,7 @@ public class KuberProperties {
          * The warm object service runs at this interval to ensure regions
          * have their configured minimum warm objects in memory.
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         @Min(1000)
         private int warmObjectCheckIntervalMs = 60000;
@@ -455,7 +461,7 @@ public class KuberProperties {
          * When the warm object service needs to load objects from disk
          * to meet the warm object target, it loads them in batches of this size.
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         @Min(100)
         private int warmObjectLoadBatchSize = 1000;
@@ -464,7 +470,7 @@ public class KuberProperties {
          * Get the warm object count for a specific region.
          * Returns the region-specific count if configured, otherwise 0 (no minimum).
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         public int getWarmObjectCountForRegion(String regionName) {
             return regionWarmObjectCounts.getOrDefault(regionName, 0);
@@ -473,7 +479,7 @@ public class KuberProperties {
         /**
          * Check if a region has a configured warm object count.
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         public boolean hasWarmObjectConfig(String regionName) {
             return regionWarmObjectCounts.containsKey(regionName) 
@@ -721,7 +727,7 @@ public class KuberProperties {
          * 
          * Can be overridden per-file in metadata: ascii_normalize:false
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         private boolean asciiNormalize = true;
         
@@ -731,7 +737,7 @@ public class KuberProperties {
          * 
          * Default: true
          * 
-         * @since 1.7.8
+         * @since 1.7.9
          */
         private boolean asciiNormalizeKeys = true;
     }
@@ -1468,7 +1474,7 @@ public class KuberProperties {
     
     /**
      * Prometheus metrics configuration.
-     * @since 1.7.8
+     * @since 1.7.9
      */
     @Data
     public static class Prometheus {
@@ -1517,5 +1523,58 @@ public class KuberProperties {
          * Only used when includeLatencyHistograms is true.
          */
         private double[] latencyBuckets = {100, 500, 1000, 5000, 10000, 50000, 100000};
+    }
+    
+    /**
+     * JSON search configuration including parallel search settings.
+     * @since 1.7.9
+     */
+    @Data
+    public static class Search {
+        /**
+         * Enable parallel JSON search.
+         * When enabled, large searches are executed using multiple threads.
+         * Default: true
+         */
+        private boolean parallelEnabled = true;
+        
+        /**
+         * Number of threads for parallel search.
+         * Default: 8
+         * Set to 0 to use number of available processors.
+         */
+        @Min(0)
+        @Max(64)
+        private int threadCount = 8;
+        
+        /**
+         * Minimum number of keys to trigger parallel search.
+         * For datasets smaller than this threshold, sequential search is used.
+         * Default: 1000
+         */
+        @Min(100)
+        private int parallelThreshold = 1000;
+        
+        /**
+         * Search timeout in seconds.
+         * If a search takes longer than this, partial results are returned.
+         * Default: 60 seconds
+         */
+        @Min(1)
+        private int timeoutSeconds = 60;
+        
+        /**
+         * Cache compiled regex patterns for performance.
+         * Default: true
+         */
+        private boolean cacheRegexPatterns = true;
+        
+        /**
+         * Maximum number of cached regex patterns.
+         * Oldest patterns are evicted when this limit is reached.
+         * Default: 1000
+         */
+        @Min(10)
+        private int maxCachedPatterns = 1000;
     }
 }

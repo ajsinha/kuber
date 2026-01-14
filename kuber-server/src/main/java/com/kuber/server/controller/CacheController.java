@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  * Controller for cache query and modification operations.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 1.7.8
+ * @version 1.7.9
  */
 @Controller
 @RequestMapping("/cache")

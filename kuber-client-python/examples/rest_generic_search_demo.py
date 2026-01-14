@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kuber REST API - Generic Search Demo (v1.7.8)
+Kuber REST API - Generic Search Demo (v1.7.9)
 
 This standalone script demonstrates ALL search capabilities of the Kuber
 Generic Search API including:
@@ -654,7 +654,7 @@ Examples:
     args = parser.parse_args()
     
     print("=" * 80)
-    print("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.8)")
+    print("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.9)")
     print("=" * 80)
     print(f"  Server:  {args.host}:{args.port}")
     print(f"  Region:  {args.region}")

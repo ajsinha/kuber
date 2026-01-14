@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Insert & Update JSON Documents Demo (v1.7.8)
+ * Kuber REST API - Insert & Update JSON Documents Demo (v1.7.9)
  *
  * This standalone Java application demonstrates how to:
  *
@@ -602,7 +602,7 @@ Request Body for JUPDATE:
         String region = args.length > 3 ? args[3] : "update_demo_java";
 
         System.out.println("=".repeat(80));
-        System.out.println("  KUBER REST API - INSERT & UPDATE DEMO (v1.7.8) - Java");
+        System.out.println("  KUBER REST API - INSERT & UPDATE DEMO (v1.7.9) - Java");
         System.out.println("=".repeat(80));
         System.out.println("  Server:  " + host + ":" + port);
         System.out.println("  Region:  " + region);

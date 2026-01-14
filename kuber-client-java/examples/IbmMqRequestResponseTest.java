@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Kuber IBM MQ Request/Response Test Client (v1.7.8)
+ * Kuber IBM MQ Request/Response Test Client (v1.7.9)
  * 
  * Tests the Kuber Request/Response messaging feature via IBM MQ.
  *
@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Test client for Kuber's IBM MQ-based Request/Response messaging.
  * 
- * @version 1.7.8
+ * @version 1.7.9
  */
 public class IbmMqRequestResponseTest {
     

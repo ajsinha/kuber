@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.7.8</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
+                    <strong>Version 1.7.9</strong> - This document describes the architecture of <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache, 
                     an enterprise-grade caching system with Redis protocol compatibility and advanced features.
                 </div>
 
@@ -54,7 +54,7 @@
                                     <li><a href="#replication">Replication Architecture</a></li>
                                     <li><a href="#event-publishing">Event Publishing</a> <span class="badge bg-warning text-dark">v1.3.2</span></li>
                                     <li><a href="#request-response">Request/Response Messaging</a> <span class="badge bg-success">v1.7.1</span></li>
-                                    <li><a href="#prometheus">Prometheus Monitoring</a> <span class="badge bg-info">v1.7.8</span></li>
+                                    <li><a href="#prometheus">Prometheus Monitoring</a> <span class="badge bg-info">v1.7.9</span></li>
                                     <li><a href="#security">Security Architecture</a></li>
                                     <li><a href="#data-flow">Data Flow</a></li>
                                     <li><a href="#deployment">Deployment Patterns</a></li>
@@ -285,7 +285,7 @@ Cache service initialization completed in 1234 ms
 ╚════════════════════════════════════════════════════════════════════╝
 
 ╔════════════════════════════════════════════════════════════════════╗
-║   SYSTEM READY - Version 1.7.8                                     ║
+║   SYSTEM READY - Version 1.7.9                                     ║
 ║   ✓ Persistence maintenance: complete                              ║
 ║   ✓ Cache service: initialized                                     ║
 ║   ✓ Redis server: accepting connections                            ║
@@ -642,11 +642,11 @@ External Applications
                             <tr><td><strong>API Key Auth</strong></td><td>All requests must include valid API key for authentication</td></tr>
                             <tr><td><strong>Full Operations</strong></td><td>All cache operations supported: GET, SET, DELETE, MGET, MSET, JSON ops, etc.</td></tr>
                             <tr><td><strong>Admin UI</strong></td><td>Web interface for broker management and queue monitoring</td></tr>
-                            <tr><td><strong>Test Clients <span class="badge bg-success">v1.7.8</span></strong></td><td>Python, Java, C# test clients for all 4 broker types</td></tr>
+                            <tr><td><strong>Test Clients <span class="badge bg-success">v1.7.9</span></strong></td><td>Python, Java, C# test clients for all 4 broker types</td></tr>
                         </tbody>
                     </table>
                     
-                    <h4 class="mt-4">Test Clients <span class="badge bg-success">v1.7.8</span></h4>
+                    <h4 class="mt-4">Test Clients <span class="badge bg-success">v1.7.9</span></h4>
                     <p>Ready-to-use test clients demonstrate request/response messaging for all brokers:</p>
                     <div class="table-responsive">
                         <table class="table table-bordered table-sm">
@@ -724,9 +724,9 @@ External Applications
                     </div>
                 </section>
 
-                <!-- Prometheus Monitoring (v1.7.8) -->
+                <!-- Prometheus Monitoring (v1.7.9) -->
                 <section id="prometheus" class="mb-5">
-                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-chart-line me-2 text-warning"></i>Prometheus Monitoring <span class="badge bg-info">v1.7.8</span></h2>
+                    <h2 class="border-bottom pb-2 mb-4"><i class="fas fa-chart-line me-2 text-warning"></i>Prometheus Monitoring <span class="badge bg-info">v1.7.9</span></h2>
                     <p>Kuber integrates with Prometheus for comprehensive metrics monitoring and alerting via Spring Actuator and Micrometer.</p>
                     
                     <h4 class="mt-4">Architecture Overview</h4>
@@ -871,7 +871,7 @@ AUTH password</code></pre>
                         <li><strong>Audit</strong>: Track last-used timestamps</li>
                     </ul>
                     
-                    <h4 class="mt-4"><i class="fas fa-user-shield me-2"></i>Role-Based Access Control (v1.7.8)</h4>
+                    <h4 class="mt-4"><i class="fas fa-user-shield me-2"></i>Role-Based Access Control (v1.7.9)</h4>
                     <p>Kuber implements enterprise-grade RBAC with region-specific permissions:</p>
                     
                     <div class="card mb-3">
@@ -1115,7 +1115,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.7.8</p>
+                    <p class="text-muted small mb-0">Version 1.7.9</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

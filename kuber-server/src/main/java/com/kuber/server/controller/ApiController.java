@@ -20,6 +20,7 @@ import com.kuber.server.config.KuberProperties;
 import com.kuber.server.dto.GenericSearchRequest;
 import com.kuber.server.dto.GenericUpdateRequest;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.search.ParallelJsonSearchService;
 import com.kuber.server.security.ApiKeyService;
 import com.kuber.server.security.AuthorizationService;
 import lombok.Data;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 1.7.8
+ * @version 1.7.9
  */
 @RestController
 @RequestMapping("/api")
@@ -49,6 +50,7 @@ public class ApiController {
     private final KuberProperties properties;
     private final AuthorizationService authorizationService;
     private final ApiKeyService apiKeyService;
+    private final ParallelJsonSearchService parallelJsonSearchService;
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
@@ -71,6 +73,15 @@ public class ApiController {
         health.put("nodeId", properties.getNodeId());
         health.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         return ResponseEntity.ok(health);
+    }
+    
+    /**
+     * Get search statistics including parallel search metrics.
+     * @since 1.7.9
+     */
+    @GetMapping("/search/stats")
+    public ResponseEntity<Map<String, Object>> getSearchStats() {
+        return ResponseEntity.ok(parallelJsonSearchService.getStatistics());
     }
     
     // ==================== Region Operations ====================
@@ -430,10 +441,10 @@ public class ApiController {
         return ResponseEntity.ok(results);
     }
     
-    // ==================== Generic Search API (v1.7.8 Enhanced) ====================
+    // ==================== Generic Search API (v1.7.9 Enhanced) ====================
     
     /**
-     * Enhanced generic search endpoint (v1.7.8) supporting multiple search modes.
+     * Enhanced generic search endpoint (v1.7.9) supporting multiple search modes.
      * 
      * <h2>Authentication</h2>
      * API key must be provided in the request body:
@@ -503,7 +514,7 @@ public class ApiController {
                 results = performSingleKeyLookup(region, request.getKey(), fields);
                 
             } else if (request.isMultiKeyLookup()) {
-                // Mode 2: Multiple keys lookup (v1.7.8)
+                // Mode 2: Multiple keys lookup (v1.7.9)
                 results = performMultiKeyLookup(region, request.getKeys(), limit, fields);
                 
             } else if (request.isKeyPatternSearch()) {
@@ -511,11 +522,11 @@ public class ApiController {
                 results = performKeyPatternSearch(region, request.getKeyPattern(), limit, fields);
                 
             } else if (request.isMultiKeyPatternSearch()) {
-                // Mode 4: Multiple key patterns search (v1.7.8)
+                // Mode 4: Multiple key patterns search (v1.7.9)
                 results = performMultiKeyPatternSearch(region, request.getKeyPatterns(), limit, fields);
                 
             } else if (request.isJsonCriteriaSearch()) {
-                // Mode 5: JSON attribute search with new criteria format (v1.7.8)
+                // Mode 5: JSON attribute search with new criteria format (v1.7.9)
                 results = performJsonCriteriaSearch(region, request.getCriteria(), limit, fields);
                 
             } else if (request.isJsonSearch()) {
@@ -565,7 +576,7 @@ public class ApiController {
     }
     
     /**
-     * Mode 2: Multiple keys lookup (v1.7.8).
+     * Mode 2: Multiple keys lookup (v1.7.9).
      */
     private List<Map<String, Object>> performMultiKeyLookup(String region, List<String> keys, int limit, List<String> fields) {
         List<Map<String, Object>> results = new ArrayList<>();
@@ -591,7 +602,7 @@ public class ApiController {
     }
     
     /**
-     * Mode 4: Multiple key patterns search (v1.7.8).
+     * Mode 4: Multiple key patterns search (v1.7.9).
      * Returns keys matching ANY of the patterns (OR logic between patterns).
      */
     private List<Map<String, Object>> performMultiKeyPatternSearch(String region, List<String> patterns, int limit, List<String> fields) {
@@ -626,33 +637,16 @@ public class ApiController {
     }
     
     /**
-     * Mode 5: JSON attribute search with new criteria format (v1.7.8).
+     * Mode 5: JSON attribute search with criteria format.
+     * Uses ParallelJsonSearchService for high-performance search with automatic
+     * parallel/sequential mode selection based on dataset size.
      * Uses AND logic - all criteria must match.
+     * 
+     * @since 1.7.9 - Now uses parallel search for improved performance
      */
     private List<Map<String, Object>> performJsonCriteriaSearch(String region, Map<String, Object> criteria, int limit, List<String> fields) {
-        Set<String> keys = cacheService.keys(region, "*");
-        List<Map<String, Object>> results = new ArrayList<>();
-        
-        for (String key : keys) {
-            if (results.size() >= limit) break;
-            
-            JsonNode json = cacheService.jsonGet(region, key, "$");
-            if (json == null) continue;
-            
-            // Check if all criteria match (AND logic)
-            if (matchesAllCriteria(json, criteria)) {
-                Map<String, Object> item = new HashMap<>();
-                item.put("key", key);
-                if (fields != null && !fields.isEmpty()) {
-                    item.put("value", projectFields(json, fields));
-                } else {
-                    item.put("value", json);
-                }
-                results.add(item);
-            }
-        }
-        
-        return results;
+        // Delegate to ParallelJsonSearchService for optimized search
+        return parallelJsonSearchService.search(region, criteria, fields, limit);
     }
     
     /**
@@ -1016,7 +1010,7 @@ public class ApiController {
         }
     }
     
-    // ==================== Generic Update API (v1.7.8) ====================
+    // ==================== Generic Update API (v1.7.9) ====================
     
     /**
      * Generic Update API - Unified SET/UPDATE operation via REST API.

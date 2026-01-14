@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.7.8**
+**Version 1.7.9**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com

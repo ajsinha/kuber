@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Request/Response Logger Service (v1.7.8)
+ * Request/Response Logger Service (v1.7.9)
  * 
  * Asynchronously logs request/response pairs for each broker to rolling files.
  * Maintains up to 10 versions of log files per broker/topic.
@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
  *   <li>JSON format for easy parsing and viewing</li>
  * </ul>
  * 
- * @version 1.7.8
+ * @version 1.7.9
  */
 @Slf4j
 @Service

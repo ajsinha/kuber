@@ -68,7 +68,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Result: Value cache max takes priority (cannot exceed ceiling)</li>
  * </ul>
  * 
- * @since 1.7.8
+ * @since 1.7.9
  */
 @Slf4j
 @Service

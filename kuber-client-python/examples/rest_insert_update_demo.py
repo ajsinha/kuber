@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kuber REST API - Insert & Update JSON Documents Demo (v1.7.8)
+Kuber REST API - Insert & Update JSON Documents Demo (v1.7.9)
 
 This standalone script demonstrates how to:
 
@@ -661,7 +661,7 @@ Examples:
     args = parser.parse_args()
     
     print("=" * 80)
-    print("  KUBER REST API - INSERT & UPDATE DEMO (v1.7.8)")
+    print("  KUBER REST API - INSERT & UPDATE DEMO (v1.7.9)")
     print("=" * 80)
     print(f"  Server:  {args.host}:{args.port}")
     print(f"  Region:  {args.region}")

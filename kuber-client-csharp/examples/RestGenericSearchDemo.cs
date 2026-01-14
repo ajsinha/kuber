@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Generic Search Demo (v1.7.8)
+ * Kuber REST API - Generic Search Demo (v1.7.9)
  *
  * This standalone C# application demonstrates ALL search capabilities of the Kuber
  * Generic Search API including:
@@ -606,7 +606,7 @@ API Endpoint: POST /api/v1/genericsearch
             string region = args.Length > 3 ? args[3] : "search_demo_csharp";
 
             Console.WriteLine(new string('=', 80));
-            Console.WriteLine("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.8) - C#");
+            Console.WriteLine("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.9) - C#");
             Console.WriteLine(new string('=', 80));
             Console.WriteLine($"  Server:  {host}:{port}");
             Console.WriteLine($"  Region:  {region}");

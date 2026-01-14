@@ -43,8 +43,8 @@ import java.util.List;
  *   <li>UTF-32 LE: FF FE 00 00</li>
  * </ul>
  * 
- * @version 1.7.8
- * @since 1.7.8
+ * @version 1.7.9
+ * @since 1.7.9
  */
 @Slf4j
 public class EncodingDetector {

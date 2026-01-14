@@ -1,6 +1,6 @@
 # Kuber Generic Search API
 
-**Version 1.7.8**
+**Version 1.7.9**
 
 The Generic Search API provides a powerful, unified endpoint for searching cache data using multiple strategies: key lookups, regex patterns, and JSON attribute filtering.
 
@@ -57,7 +57,7 @@ Retrieve a single entry by exact key.
 
 ---
 
-### 2. Multi-Key Lookup (v1.7.8)
+### 2. Multi-Key Lookup (v1.7.9)
 
 Retrieve multiple entries by exact keys in a single request.
 
@@ -105,7 +105,7 @@ Search for keys matching a regex pattern.
 
 ---
 
-### 4. Multi-Pattern Search (v1.7.8)
+### 4. Multi-Pattern Search (v1.7.9)
 
 Search using multiple regex patterns. Returns keys matching ANY pattern (OR logic between patterns).
 
@@ -133,7 +133,7 @@ Search using multiple regex patterns. Returns keys matching ANY pattern (OR logi
 
 ---
 
-### 5. JSON Attribute Search (v1.7.8 Enhanced)
+### 5. JSON Attribute Search (v1.7.9 Enhanced)
 
 Search JSON documents by attribute values with AND logic across all criteria.
 
@@ -283,7 +283,7 @@ Return only specific fields from matching documents:
 | `keyPattern` | String | No | Regex pattern for key search |
 | `keyPatterns` | String[] | No | Multiple regex patterns |
 | `type` | String | No | Set to "json" for attribute search |
-| `criteria` | Object | No | JSON search criteria (v1.7.8) |
+| `criteria` | Object | No | JSON search criteria (v1.7.9) |
 | `values` | Object[] | No | Legacy JSON search format |
 | `fields` | String[] | No | Fields to return (projection) |
 | `limit` | Integer | No | Max results (default: 1000) |
@@ -453,7 +453,7 @@ String results = response.body().string();
 
 | Version | Changes |
 |---------|---------|
-| 1.7.8 | Added multi-key, multi-pattern, and enhanced JSON criteria search |
+| 1.7.9 | Added multi-key, multi-pattern, and enhanced JSON criteria search |
 | 1.7.6 | Added field projection support |
 | 1.0.0 | Initial generic search with single key/pattern and basic JSON search |
 

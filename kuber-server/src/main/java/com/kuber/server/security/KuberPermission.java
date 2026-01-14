@@ -14,7 +14,7 @@ package com.kuber.server.security;
 /**
  * Permission types for Kuber RBAC.
  * 
- * @version 1.7.8
+ * @version 1.7.9
  * @since 1.7.3
  */
 public enum KuberPermission {

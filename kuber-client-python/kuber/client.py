@@ -416,7 +416,7 @@ class KuberClient:
             # Multiple attributes with IN clauses
             results = client.json_search("status=[active|pending],country=[USA|UK|CA]")
         
-        Since: 1.7.8 - Added IN clause support with [value1|value2|...] syntax
+        Since: 1.7.9 - Added IN clause support with [value1|value2|...] syntax
         """
         args = ['JSEARCH', query]
         if region:
@@ -463,7 +463,7 @@ class KuberClient:
             }
             results = client.json_search_in(conditions)
         
-        Since: 1.7.8
+        Since: 1.7.9
         """
         query = self.build_in_clause_query(conditions)
         return self.json_search(query, region)
@@ -484,7 +484,7 @@ class KuberClient:
             query = KuberClient.build_in_clause_query(conditions)
             # Returns: "status=[active|pending],country=[USA|UK]"
         
-        Since: 1.7.8
+        Since: 1.7.9
         """
         if not conditions:
             return ""

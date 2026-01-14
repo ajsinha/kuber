@@ -502,7 +502,7 @@ public class ShutdownOrchestrator {
             notConfigured++;
         }
         
-        // Stop Warm Object Service (v1.7.8)
+        // Stop Warm Object Service (v1.7.9)
         if (warmObjectService != null) {
             try {
                 warmObjectService.shutdown();

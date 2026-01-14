@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Generic Search Demo (v1.7.8)
+ * Kuber REST API - Generic Search Demo (v1.7.9)
  *
  * This standalone Java application demonstrates ALL search capabilities of the Kuber
  * Generic Search API including:
@@ -688,7 +688,7 @@ API Endpoint: POST /api/v1/genericsearch
         String region = args.length > 3 ? args[3] : "search_demo_java";
 
         System.out.println("=".repeat(80));
-        System.out.println("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.8) - Java");
+        System.out.println("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.9) - Java");
         System.out.println("=".repeat(80));
         System.out.println("  Server:  " + host + ":" + port);
         System.out.println("  Region:  " + region);

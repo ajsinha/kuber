@@ -3403,7 +3403,7 @@ public class CacheService {
      * @param region Region name
      * @param maxCount Maximum number of cold keys to return
      * @return List of cold key names
-     * @since 1.7.8
+     * @since 1.7.9
      */
     public List<String> getColdKeys(String region, int maxCount) {
         KeyIndexInterface keyIndex = keyIndices.get(region);
@@ -3435,7 +3435,7 @@ public class CacheService {
      * 
      * @param region Region name
      * @param entry The cache entry to warm
-     * @since 1.7.8
+     * @since 1.7.9
      */
     public void warmObject(String region, CacheEntry entry) {
         if (entry == null || entry.isExpired()) {

@@ -157,7 +157,7 @@ public class KuberJsonDemo {
      * 
      * Query syntax:
      * - field=value           : exact match
-     * - field=[v1|v2|v3]      : IN clause - match any value (v1.7.8)
+     * - field=[v1|v2|v3]      : IN clause - match any value (v1.7.9)
      * - field!=value          : not equal
      * - field>[=]value        : greater than [or equal]
      * - field<[=]value        : less than [or equal]
@@ -168,7 +168,7 @@ public class KuberJsonDemo {
      * 
      * Examples:
      * - "status=active"                     : exact match
-     * - "status=[active|pending]"           : IN clause (v1.7.8)
+     * - "status=[active|pending]"           : IN clause (v1.7.9)
      * - "status=[active|pending],country=[USA|UK]" : multiple IN clauses
      * - "age>25,department=Engineering"     : multiple conditions
      */
@@ -384,7 +384,7 @@ public class KuberJsonDemo {
     }
     
     public void demoC_InClauseSearch() throws IOException {
-        printHeader("C) JSON SEARCH - IN CLAUSE (v1.7.8)");
+        printHeader("C) JSON SEARCH - IN CLAUSE (v1.7.9)");
         
         System.out.println("\n  The IN clause allows matching a field against multiple values.");
         System.out.println("  Syntax: field=[value1|value2|value3]");
@@ -518,11 +518,11 @@ public class KuberJsonDemo {
 ║   a) Set key with JSON value                                         ║
 ║   b) Retrieve key with JSON value                                    ║
 ║   c) JSON search with single/multiple attributes                     ║
-║      - IN clause for matching multiple values (v1.7.8)               ║
+║      - IN clause for matching multiple values (v1.7.9)               ║
 ║   d) Regex search on JSON attribute values                           ║
 ║   e) Search keys using regex                                         ║
 ║                                                                      ║
-║   v1.7.8 - JSEARCH IN Clause: field=[value1|value2|value3]           ║
+║   v1.7.9 - JSEARCH IN Clause: field=[value1|value2|value3]           ║
 ╚══════════════════════════════════════════════════════════════════════╝
         """);
         
@@ -558,7 +558,7 @@ public class KuberJsonDemo {
             demo.demoB_GetJson();
             demo.demoC_SearchSingleAttribute();
             demo.demoC_SearchMultipleAttributes();
-            demo.demoC_InClauseSearch();  // v1.7.8 - IN clause demo
+            demo.demoC_InClauseSearch();  // v1.7.9 - IN clause demo
             demo.demoD_RegexSearchJson();
             demo.demoE_KeyRegexSearch();
             
