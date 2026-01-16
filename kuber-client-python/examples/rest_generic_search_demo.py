@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kuber REST API - Generic Search Demo (v1.7.9)
+Kuber REST API - Generic Search Demo (v1.8.0)
 
 This standalone script demonstrates ALL search capabilities of the Kuber
 Generic Search API including:
@@ -16,6 +16,9 @@ Generic Search API including:
    - Comparison operators (gt, gte, lt, lte, eq, ne)
    - Combined AND logic across multiple attributes
 6. Field projection (select specific fields)
+7. Regex Key Search (v1.8.0):
+   - keys_regex() - Keys only (faster)
+   - search_keys() - Keys with values
 
 Usage:
     python rest_generic_search_demo.py [--host HOST] [--port PORT] [--api-key KEY]
@@ -73,6 +76,54 @@ class KuberSearchClient:
             return {
                 "status": response.status_code,
                 "data": response.json() if response.content else None
+            }
+        except requests.exceptions.RequestException as e:
+            return {"status": 0, "error": str(e)}
+    
+    def keys_regex(self, region: str, pattern: str, limit: int = 1000) -> Dict[str, Any]:
+        """
+        Find keys matching a regex pattern (keys only, no values).
+        More efficient than search_keys when you only need key names.
+        
+        Args:
+            region: Cache region
+            pattern: Java regex pattern (e.g., "^user:\\d+$")
+            limit: Maximum number of keys to return
+            
+        Returns:
+            Dict with status and list of matching keys
+        """
+        url = f"{self.base_url.replace('/v1', '')}/cache/{region}/keys/regex"
+        params = {"pattern": pattern, "limit": limit}
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            return {
+                "status": response.status_code,
+                "data": response.json() if response.content else []
+            }
+        except requests.exceptions.RequestException as e:
+            return {"status": 0, "error": str(e)}
+    
+    def search_keys(self, region: str, pattern: str, limit: int = 1000) -> Dict[str, Any]:
+        """
+        Search keys by regex pattern and return key-value pairs.
+        Returns full details including key, value, type, and TTL.
+        
+        Args:
+            region: Cache region
+            pattern: Java regex pattern (e.g., "^order:.*")
+            limit: Maximum number of results
+            
+        Returns:
+            Dict with status and list of dicts (key, value, type, ttl)
+        """
+        url = f"{self.base_url.replace('/v1', '')}/cache/{region}/ksearch"
+        params = {"pattern": pattern, "limit": limit}
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            return {
+                "status": response.status_code,
+                "data": response.json() if response.content else []
             }
         except requests.exceptions.RequestException as e:
             return {"status": 0, "error": str(e)}
@@ -632,6 +683,74 @@ def demo_limit_results(client: KuberSearchClient, region: str):
     print_result(result, max_items=10)
 
 
+def demo_regex_key_search(client: KuberSearchClient, region: str):
+    """Demonstrate regex key search APIs (v1.8.0)."""
+    print_header("10. REGEX KEY SEARCH (v1.8.0 - REST API)")
+    
+    print("""
+    New in v1.8.0: Two dedicated REST endpoints for regex-based key search:
+    
+    1. keys_regex() - Returns KEYS ONLY (faster, no value retrieval)
+       Endpoint: GET /api/cache/{region}/keys/regex?pattern={regex}&limit={limit}
+    
+    2. search_keys() - Returns KEYS + VALUES (full details)
+       Endpoint: GET /api/cache/{region}/ksearch?pattern={regex}&limit={limit}
+    """)
+    
+    # 10a. Keys only - find all customer keys
+    print_subheader("10a. keys_regex() - Find Customer Keys (keys only)")
+    print("    Pattern: ^customer_C00[1-5]$")
+    print("    Returns: List of matching key names only")
+    result = client.keys_regex(region, r"^customer_C00[1-5]$")
+    print(f"    URL: GET /api/cache/{region}/keys/regex?pattern=^customer_C00[1-5]$")
+    print_result(result, max_items=10)
+    
+    # 10b. Keys only - find all order keys
+    print_subheader("10b. keys_regex() - Find Order Keys")
+    print("    Pattern: ^order_.*")
+    result = client.keys_regex(region, r"^order_.*")
+    print(f"    URL: GET /api/cache/{region}/keys/regex?pattern=^order_.*")
+    print_result(result, max_items=10)
+    
+    # 10c. Keys with values - customer search
+    print_subheader("10c. search_keys() - Customer Keys with Values")
+    print("    Pattern: ^customer_C00[1-3]$")
+    print("    Returns: key, value, type, ttl for each match")
+    result = client.search_keys(region, r"^customer_C00[1-3]$")
+    print(f"    URL: GET /api/cache/{region}/ksearch?pattern=^customer_C00[1-3]$")
+    print_result(result, max_items=5)
+    
+    # 10d. Keys with values - order search with limit
+    print_subheader("10d. search_keys() - Orders with Limit")
+    print("    Pattern: ^order_ORD00.*")
+    print("    Limit: 3")
+    result = client.search_keys(region, r"^order_ORD00.*", limit=3)
+    print(f"    URL: GET /api/cache/{region}/ksearch?pattern=^order_ORD00.*&limit=3")
+    print_result(result, max_items=5)
+    
+    # 10e. Complex regex pattern
+    print_subheader("10e. Complex Regex - Keys ending with digits 1-5")
+    print("    Pattern: .*(1|2|3|4|5)$")
+    result = client.keys_regex(region, r".*(1|2|3|4|5)$", limit=10)
+    print_result(result, max_items=10)
+    
+    # 10f. Performance comparison note
+    print_subheader("10f. Performance Comparison")
+    print("""
+    ┌─────────────────┬────────────────────────────────────────────────────┐
+    │ Method          │ Use Case                                           │
+    ├─────────────────┼────────────────────────────────────────────────────┤
+    │ keys_regex()    │ When you only need key names (faster, less data)   │
+    │                 │ Example: Count keys, list for deletion, pagination │
+    ├─────────────────┼────────────────────────────────────────────────────┤
+    │ search_keys()   │ When you need key + value + metadata               │
+    │                 │ Example: Display results, export data, debugging   │
+    └─────────────────┴────────────────────────────────────────────────────┘
+    
+    Both methods use in-memory KeyIndex for O(1) key lookups!
+    """)
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -654,7 +773,7 @@ Examples:
     args = parser.parse_args()
     
     print("=" * 80)
-    print("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.9)")
+    print("  KUBER REST API - GENERIC SEARCH DEMO (v1.8.0)")
     print("=" * 80)
     print(f"  Server:  {args.host}:{args.port}")
     print(f"  Region:  {args.region}")
@@ -687,6 +806,7 @@ Examples:
         demo_complex_combined_searches(client, region)
         demo_field_projection(client, region)
         demo_limit_results(client, region)
+        demo_regex_key_search(client, region)  # New in v1.8.0
         
         # Summary
         print_header("DEMO COMPLETE")
@@ -697,7 +817,7 @@ This demo showcased all Generic Search API capabilities:
      - Single key: {"key": "abc"}
      - Multi-key: {"keys": ["a", "b", "c"]}
 
-  2. PATTERN SEARCHES (Regex)
+  2. PATTERN SEARCHES (Regex via Generic Search)
      - Single pattern: {"keypattern": "user_.*"}
      - Multi-pattern: {"keypatterns": ["user_.*", "admin_.*"]}
 
@@ -717,7 +837,17 @@ This demo showcased all Generic Search API capabilities:
   6. LIMITING RESULTS
      - Max results: {"limit": 100}
 
-API Endpoint: POST /api/v1/genericsearch
+  7. REGEX KEY SEARCH (v1.8.0 - REST API only)
+     - Keys only:   GET /api/cache/{region}/keys/regex?pattern={regex}
+     - Keys+Values: GET /api/cache/{region}/ksearch?pattern={regex}
+     - Python:      client.keys_regex(pattern) / client.search_keys(pattern)
+     - Java:        client.keysRegex(pattern) / client.ksearch(pattern)
+     - C#:          client.KeysRegexAsync(pattern) / client.SearchKeysAsync(pattern)
+
+API Endpoints:
+  - Generic Search: POST /api/v1/genericsearch
+  - Keys by Regex:  GET /api/cache/{region}/keys/regex
+  - Key Search:     GET /api/cache/{region}/ksearch
         """)
         
     except KeyboardInterrupt:

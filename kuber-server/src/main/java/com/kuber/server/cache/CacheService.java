@@ -1343,6 +1343,57 @@ public class CacheService {
     }
     
     /**
+     * Get keys matching a regex pattern (keys only, no values).
+     * This is more efficient than searchKeysByRegex() when you only need key names.
+     * Uses KeyIndex for fast key lookup (always in memory - no disk I/O).
+     * 
+     * @param region the cache region
+     * @param regexPattern a Java regex pattern to match keys (e.g., "^user:\\d+$")
+     * @return list of matching keys
+     */
+    public List<String> keysByRegex(String region, String regexPattern) {
+        return keysByRegex(region, regexPattern, 1000);
+    }
+    
+    /**
+     * Get keys matching a regex pattern with limit (keys only, no values).
+     * This is more efficient than searchKeysByRegex() when you only need key names.
+     * Uses KeyIndex for fast key lookup (always in memory - no disk I/O).
+     * 
+     * @param region the cache region
+     * @param regexPattern a Java regex pattern to match keys (e.g., "^user:\\d+$")
+     * @param limit maximum number of keys to return
+     * @return list of matching keys
+     */
+    public List<String> keysByRegex(String region, String regexPattern, int limit) {
+        ensureRegionExists(region);
+        
+        Pattern pattern;
+        try {
+            pattern = Pattern.compile(regexPattern);
+        } catch (Exception e) {
+            throw new KuberException(KuberException.ErrorCode.INVALID_ARGUMENT, 
+                    "Invalid regex pattern: " + e.getMessage());
+        }
+        
+        List<String> matchingKeys = new ArrayList<>();
+        
+        // Use KeyIndex for fast key iteration (always in memory - no disk I/O!)
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        
+        for (String key : keyIndex.getAllKeys()) {
+            if (pattern.matcher(key).matches()) {
+                matchingKeys.add(key);
+                if (matchingKeys.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        
+        return matchingKeys;
+    }
+    
+    /**
      * Search keys by regex pattern and return matching key-value pairs.
      * This is different from keys() which uses glob pattern and returns only keys.
      * 

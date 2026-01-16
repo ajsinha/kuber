@@ -367,6 +367,68 @@ class KuberRestClient:
         result = self._get(f'/api/cache/{region}/keys', {'pattern': pattern})
         return result if isinstance(result, list) else []
     
+    def keys_regex(self, pattern: str, region: str = None, limit: int = 1000) -> List[str]:
+        """
+        Find keys matching a regular expression pattern.
+        
+        This is more powerful than keys() which uses glob patterns.
+        Returns only keys (not values) for efficiency.
+        
+        Args:
+            pattern: Java regex pattern (e.g., '^user:\\d+$', '.*@gmail\\.com$')
+            region: Region name (default: current region)
+            limit: Maximum number of keys to return (default: 1000)
+            
+        Returns:
+            List of matching keys
+            
+        Example:
+            # Find all keys starting with 'user:' followed by digits
+            keys = client.keys_regex(r'^user:\\d+$')
+            
+            # Find all email-like keys
+            keys = client.keys_regex(r'.*@.*\\.com$', limit=500)
+        """
+        region = region or self._current_region
+        result = self._get(f'/api/cache/{region}/keys/regex', {
+            'pattern': pattern,
+            'limit': str(limit)
+        })
+        return result if isinstance(result, list) else []
+    
+    def search_keys(
+        self,
+        pattern: str,
+        region: str = None,
+        limit: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """
+        Search keys by regex pattern and return key-value pairs.
+        
+        Unlike keys_regex() which returns only keys, this method returns
+        full details including key, value, type, and TTL.
+        
+        Args:
+            pattern: Java regex pattern (e.g., '^order:\\d+$')
+            region: Region name (default: current region)
+            limit: Maximum number of results (default: 1000)
+            
+        Returns:
+            List of dicts with keys: 'key', 'value', 'type', 'ttl'
+            
+        Example:
+            # Search for order keys and get their values
+            results = client.search_keys(r'^order:2024.*')
+            for r in results:
+                print(f"Key: {r['key']}, Value: {r['value']}")
+        """
+        region = region or self._current_region
+        result = self._get(f'/api/cache/{region}/ksearch', {
+            'pattern': pattern,
+            'limit': str(limit)
+        })
+        return result if isinstance(result, list) else []
+    
     def ttl(self, key: str, region: str = None) -> int:
         """
         Get TTL of a key.

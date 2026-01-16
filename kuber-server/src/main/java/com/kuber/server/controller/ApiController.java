@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 1.7.9
+ * @version 1.8.1
  */
 @RestController
 @RequestMapping("/api")
@@ -291,6 +291,28 @@ public class ApiController {
                     .body(Map.of("error", "READ permission denied for region: " + region));
         }
         return ResponseEntity.ok(cacheService.keys(region, pattern));
+    }
+    
+    /**
+     * Get keys matching a regex pattern (keys only, no values).
+     * More efficient than /ksearch when you only need key names.
+     * 
+     * @param region the cache region
+     * @param pattern Java regex pattern (e.g., "^user:\\d+$")
+     * @param limit maximum number of keys to return (default: 1000)
+     * @return list of matching keys
+     */
+    @GetMapping("/cache/{region}/keys/regex")
+    public ResponseEntity<?> getKeysByRegex(
+            @PathVariable String region,
+            @RequestParam String pattern,
+            @RequestParam(defaultValue = "1000") int limit) {
+        // Require READ permission
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        return ResponseEntity.ok(cacheService.keysByRegex(region, pattern, limit));
     }
     
     /**

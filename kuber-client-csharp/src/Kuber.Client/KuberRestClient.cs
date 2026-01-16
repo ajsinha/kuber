@@ -177,6 +177,55 @@ public class KuberRestClient : IDisposable
     }
 
     /// <summary>
+    /// Find keys matching a regular expression pattern.
+    /// This is more powerful than KeysAsync() which uses glob patterns.
+    /// Returns only keys (not values) for efficiency.
+    /// </summary>
+    /// <param name="regexPattern">Java regex pattern (e.g., "^user:\\d+$")</param>
+    /// <param name="limit">Maximum number of keys to return (default: 1000)</param>
+    /// <returns>List of matching keys</returns>
+    /// <example>
+    /// // Find all keys starting with 'user:' followed by digits
+    /// var keys = await client.KeysRegexAsync(@"^user:\d+$");
+    /// 
+    /// // Find all email-like keys with limit
+    /// var keys = await client.KeysRegexAsync(@".*@.*\.com$", 500);
+    /// </example>
+    public async Task<IEnumerable<string>> KeysRegexAsync(string regexPattern, int limit = 1000)
+    {
+        var response = await _httpClient.GetAsync(
+            $"/api/cache/{_region}/keys/regex?pattern={Uri.EscapeDataString(regexPattern)}&limit={limit}");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<List<string>>(JsonOptions);
+        return result ?? Enumerable.Empty<string>();
+    }
+
+    /// <summary>
+    /// Search keys by regex pattern and return key-value pairs.
+    /// Unlike KeysRegexAsync() which returns only keys, this method returns
+    /// full details including key, value, type, and TTL.
+    /// </summary>
+    /// <param name="regexPattern">Java regex pattern (e.g., "^order:\\d+$")</param>
+    /// <param name="limit">Maximum number of results (default: 1000)</param>
+    /// <returns>List of KeySearchResult with key, value, type, ttl</returns>
+    /// <example>
+    /// // Search for order keys and get their values
+    /// var results = await client.SearchKeysAsync(@"^order:2024.*");
+    /// foreach (var r in results)
+    /// {
+    ///     Console.WriteLine($"Key: {r.Key}, Value: {r.Value}");
+    /// }
+    /// </example>
+    public async Task<IEnumerable<KeySearchResult>> SearchKeysAsync(string regexPattern, int limit = 1000)
+    {
+        var response = await _httpClient.GetAsync(
+            $"/api/cache/{_region}/ksearch?pattern={Uri.EscapeDataString(regexPattern)}&limit={limit}");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<List<KeySearchResult>>(JsonOptions);
+        return result ?? Enumerable.Empty<KeySearchResult>();
+    }
+
+    /// <summary>
     /// Get the remaining TTL of a key in seconds.
     /// </summary>
     public async Task<long?> TtlAsync(string key)
@@ -414,6 +463,25 @@ public class JsonSearchResult
     
     [JsonPropertyName("value")]
     public object? Value { get; set; }
+}
+
+/// <summary>
+/// Key search result including key, value, type, and TTL.
+/// Returned by SearchKeysAsync method.
+/// </summary>
+public class KeySearchResult
+{
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = "";
+    
+    [JsonPropertyName("value")]
+    public object? Value { get; set; }
+    
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+    
+    [JsonPropertyName("ttl")]
+    public long Ttl { get; set; } = -1;
 }
 
 /// <summary>

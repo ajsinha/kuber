@@ -1,0 +1,192 @@
+# =============================================================================
+# KUBER SECONDARY INDEX CONFIGURATION
+# =============================================================================
+# Version: 1.8.0
+# 
+# This file defines secondary indexes for JSON document search optimization.
+# Secondary indexes provide O(1) or O(log n) lookups instead of full table scans.
+#
+# INDEX TYPES:
+#   - HASH:  For equality queries (status = "active")
+#            O(1) lookup, best for low-cardinality fields
+#   - BTREE: For range queries (age > 30, date BETWEEN x AND y)
+#            O(log n) lookup, supports ordering
+#   - COMPOSITE: For multi-field queries (status = "active" AND city = "NYC")
+#            Single lookup for common query patterns
+#
+# STORAGE MODES:
+#   - memory:  Indexes stored only in memory (fastest, lost on restart)
+#   - rocksdb: Indexes persisted to RocksDB column families
+#   - hybrid:  In-memory for queries + RocksDB for persistence (RECOMMENDED)
+#
+# =============================================================================
+
+# Global indexing settings
+indexing:
+  # Enable/disable the indexing subsystem
+  enabled: true
+  
+  # Storage mode: memory, rocksdb, or hybrid
+  storage: hybrid
+  
+  # Rebuild indexes from data on startup (required for memory/hybrid modes)
+  rebuild-on-startup: true
+  
+  # Number of threads for parallel index rebuild
+  rebuild-threads: 4
+  
+  # Maximum memory per region for indexes (in MB)
+  max-memory-per-region-mb: 256
+  
+  # Maximum number of indexes per region
+  max-indexes-per-region: 20
+  
+  # Sync interval for hybrid mode (seconds)
+  persistence-sync-interval-seconds: 30
+  
+  # Auto-index configuration (experimental)
+  auto-index:
+    enabled: false
+    min-query-count: 100
+    min-selectivity: 0.1
+
+# =============================================================================
+# REGION INDEX DEFINITIONS
+# =============================================================================
+# Define indexes for each region that needs optimized searching.
+# Indexes are automatically maintained on INSERT/UPDATE/DELETE operations.
+#
+# Example region configurations are shown below. Uncomment and modify as needed.
+# =============================================================================
+
+regions:
+  # ---------------------------------------------------------------------------
+  # Example: Customer data region
+  # ---------------------------------------------------------------------------
+  # customers:
+  #   indexes:
+  #     # Hash index for status lookups: WHERE status = 'active'
+  #     - field: status
+  #       type: hash
+  #       description: "Customer status for filtering active/inactive"
+  #     
+  #     # Hash index for city lookups: WHERE city = 'NYC'
+  #     - field: city
+  #       type: hash
+  #       description: "City for geographic filtering"
+  #     
+  #     # BTree index for age ranges: WHERE age > 30 AND age < 50
+  #     - field: age
+  #       type: btree
+  #       description: "Age for demographic range queries"
+  #     
+  #     # BTree index for date ranges: WHERE created_at > '2025-01-01'
+  #     - field: created_at
+  #       type: btree
+  #       description: "Creation date for time-based queries"
+  #     
+  #     # Composite index for common query pattern
+  #     - field: status,city
+  #       type: hash
+  #       description: "Combined status+city for common filter pattern"
+
+  # ---------------------------------------------------------------------------
+  # Example: Order data region
+  # ---------------------------------------------------------------------------
+  # orders:
+  #   indexes:
+  #     - field: status
+  #       type: hash
+  #       description: "Order status (pending, shipped, delivered)"
+  #     
+  #     - field: customer_id
+  #       type: hash
+  #       description: "Customer ID for order lookups"
+  #     
+  #     - field: amount
+  #       type: btree
+  #       description: "Order amount for value-based filtering"
+  #     
+  #     - field: order_date
+  #       type: btree
+  #       description: "Order date for time-range queries"
+
+  # ---------------------------------------------------------------------------
+  # Example: Product catalog region
+  # ---------------------------------------------------------------------------
+  # products:
+  #   indexes:
+  #     - field: category
+  #       type: hash
+  #       description: "Product category"
+  #     
+  #     - field: brand
+  #       type: hash
+  #       description: "Product brand"
+  #     
+  #     - field: price
+  #       type: btree
+  #       description: "Price for range filtering"
+  #     
+  #     - field: in_stock
+  #       type: hash
+  #       description: "Stock availability flag"
+  #     
+  #     - field: rating
+  #       type: btree
+  #       description: "Customer rating for sorting/filtering"
+
+  # ---------------------------------------------------------------------------
+  # Example: Trade/Transaction region (financial)
+  # ---------------------------------------------------------------------------
+  # trades:
+  #   indexes:
+  #     - field: symbol
+  #       type: hash
+  #       description: "Trading symbol (AAPL, GOOGL, etc.)"
+  #     
+  #     - field: trade_type
+  #       type: hash
+  #       description: "BUY/SELL indicator"
+  #     
+  #     - field: trade_date
+  #       type: btree
+  #       description: "Trade execution date"
+  #     
+  #     - field: quantity
+  #       type: btree
+  #       description: "Trade quantity for volume filtering"
+  #     
+  #     - field: price
+  #       type: btree
+  #       description: "Execution price"
+
+# =============================================================================
+# NOTES:
+# =============================================================================
+# 
+# 1. FIELD PATHS:
+#    - Simple fields: "status", "city", "age"
+#    - Nested fields: "address.city", "metadata.created_by"
+#    - Array fields are NOT supported for indexing
+#
+# 2. INDEX SELECTION GUIDELINES:
+#    - Use HASH for: status, type, category, boolean flags, IDs
+#    - Use BTREE for: dates, numbers, timestamps, prices, quantities
+#    - Use COMPOSITE for: frequently combined query conditions
+#
+# 3. CARDINALITY CONSIDERATIONS:
+#    - HASH indexes work best with low-to-medium cardinality (<1000 unique values)
+#    - High cardinality fields (e.g., email, UUID) may not benefit much from HASH
+#    - BTREE is ideal for continuous ranges regardless of cardinality
+#
+# 4. MEMORY USAGE:
+#    - Each HASH index: ~50 bytes per document + 100 bytes per unique value
+#    - Each BTREE index: ~80 bytes per document
+#    - Monitor memory usage via /admin/indexes dashboard
+#
+# 5. WRITE PERFORMANCE:
+#    - Each index adds ~10-50 microseconds to write operations
+#    - Limit to 5-10 indexes per region for write-heavy workloads
+#
+# =============================================================================

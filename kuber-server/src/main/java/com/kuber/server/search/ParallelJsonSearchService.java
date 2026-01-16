@@ -16,10 +16,11 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
+import com.kuber.server.index.IndexManager;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -36,30 +37,36 @@ import java.util.regex.PatternSyntaxException;
  * <p>This service provides significant performance improvements for searches
  * on large datasets by utilizing multiple threads to process in parallel.
  * 
+ * <h3>Search Optimization Strategy (v1.8.1):</h3>
+ * <ol>
+ *   <li><strong>Index Lookup</strong>: If secondary indexes exist, use them for O(1)/O(log n) lookups</li>
+ *   <li><strong>Index Intersection</strong>: For multiple criteria, intersect index results</li>
+ *   <li><strong>Parallel Scan</strong>: Fall back to parallel full scan if no indexes available</li>
+ * </ol>
+ * 
  * <h3>Parallel Search Types:</h3>
  * <ul>
- *   <li><strong>JSON Search</strong>: Parallel document fetch + criteria matching</li>
+ *   <li><strong>JSON Search</strong>: Index lookup + parallel document fetch</li>
  *   <li><strong>Pattern Search</strong>: Parallel key matching + value fetching</li>
  *   <li><strong>Multi-Pattern Search</strong>: Parallel processing of multiple regex patterns</li>
  * </ul>
  * 
  * <h3>Performance:</h3>
  * <ul>
- *   <li>100K documents: ~8x speedup with 8 threads</li>
- *   <li>Automatic fallback to sequential for small datasets (&lt;1000 keys)</li>
- *   <li>Thread-safe result collection with minimal contention</li>
+ *   <li>With index: O(1) or O(log n) + document fetch</li>
+ *   <li>Without index: O(n) parallel scan - ~8x speedup with 8 threads</li>
  * </ul>
  * 
- * @version 1.7.9
+ * @version 1.8.1
  * @since 1.7.9
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class ParallelJsonSearchService {
 
     private final CacheService cacheService;
     private final KuberProperties properties;
+    private final IndexManager indexManager;
     
     // Thread pool for parallel search operations
     private ExecutorService searchExecutor;
@@ -74,6 +81,16 @@ public class ParallelJsonSearchService {
     private final AtomicLong totalSearchTimeMs = new AtomicLong(0);
     private final AtomicLong patternSearches = new AtomicLong(0);
     private final AtomicLong jsonSearches = new AtomicLong(0);
+    private final AtomicLong indexedSearches = new AtomicLong(0);
+    private final AtomicLong fullScanSearches = new AtomicLong(0);
+    
+    public ParallelJsonSearchService(CacheService cacheService, 
+                                     KuberProperties properties,
+                                     @Lazy IndexManager indexManager) {
+        this.cacheService = cacheService;
+        this.properties = properties;
+        this.indexManager = indexManager;
+    }
     
     @PostConstruct
     public void initialize() {
@@ -114,7 +131,15 @@ public class ParallelJsonSearchService {
     // ==================== JSON Criteria Search ====================
     
     /**
-     * Search JSON documents with automatic parallel/sequential mode selection.
+     * Search JSON documents with automatic index usage and parallel/sequential mode selection.
+     * 
+     * <p>Search Strategy (v1.8.1):
+     * <ol>
+     *   <li>Check if indexes exist for search criteria fields</li>
+     *   <li>If indexes available, use index lookup to narrow down candidates</li>
+     *   <li>For remaining criteria without indexes, filter candidates</li>
+     *   <li>Use parallel processing for large result sets</li>
+     * </ol>
      * 
      * @param region    Cache region to search
      * @param criteria  Search criteria (field-value mappings with optional operators)
@@ -131,26 +156,45 @@ public class ParallelJsonSearchService {
         totalSearches.incrementAndGet();
         jsonSearches.incrementAndGet();
         
-        // Get all keys in the region
-        Set<String> allKeys = cacheService.keys(region, "*");
-        
-        if (allKeys == null || allKeys.isEmpty()) {
-            log.debug("No keys found in region '{}' for search", region);
-            return Collections.emptyList();
-        }
-        
-        log.debug("JSON search: {} keys in region '{}' with {} criteria", 
-            allKeys.size(), region, criteria != null ? criteria.size() : 0);
+        // Try index-based search first
+        Set<String> candidateKeys = tryIndexLookup(region, criteria);
         
         List<Map<String, Object>> results;
         
-        // Decide parallel vs sequential
-        if (shouldUseParallelSearch(allKeys.size())) {
-            parallelSearches.incrementAndGet();
-            results = parallelJsonSearch(region, allKeys, criteria, fields, limit);
+        if (candidateKeys != null) {
+            // Index was used - search only candidate keys
+            indexedSearches.incrementAndGet();
+            log.debug("Index search: {} candidate keys for region '{}' with {} criteria", 
+                candidateKeys.size(), region, criteria != null ? criteria.size() : 0);
+            
+            if (candidateKeys.isEmpty()) {
+                results = Collections.emptyList();
+            } else {
+                // Search within candidate keys (may still need to verify other criteria)
+                results = searchWithinCandidates(region, candidateKeys, criteria, fields, limit);
+            }
         } else {
-            sequentialSearches.incrementAndGet();
-            results = sequentialJsonSearch(region, allKeys, criteria, fields, limit);
+            // No index available - fall back to full scan
+            fullScanSearches.incrementAndGet();
+            
+            Set<String> allKeys = cacheService.keys(region, "*");
+            
+            if (allKeys == null || allKeys.isEmpty()) {
+                log.debug("No keys found in region '{}' for search", region);
+                return Collections.emptyList();
+            }
+            
+            log.debug("Full scan search: {} keys in region '{}' with {} criteria", 
+                allKeys.size(), region, criteria != null ? criteria.size() : 0);
+            
+            // Decide parallel vs sequential
+            if (shouldUseParallelSearch(allKeys.size())) {
+                parallelSearches.incrementAndGet();
+                results = parallelJsonSearch(region, allKeys, criteria, fields, limit);
+            } else {
+                sequentialSearches.incrementAndGet();
+                results = sequentialJsonSearch(region, allKeys, criteria, fields, limit);
+            }
         }
         
         long elapsed = System.currentTimeMillis() - startTime;
@@ -158,7 +202,168 @@ public class ParallelJsonSearchService {
         
         log.debug("JSON search completed: {} results in {}ms ({})", 
             results.size(), elapsed, 
-            shouldUseParallelSearch(allKeys.size()) ? "parallel" : "sequential");
+            candidateKeys != null ? "indexed" : "full-scan");
+        
+        return results;
+    }
+    
+    /**
+     * Try to use secondary indexes to narrow down search candidates.
+     * 
+     * @param region Region to search
+     * @param criteria Search criteria
+     * @return Set of candidate keys if index was used, null if no applicable index
+     */
+    @SuppressWarnings("unchecked")
+    private Set<String> tryIndexLookup(String region, Map<String, Object> criteria) {
+        if (criteria == null || criteria.isEmpty() || indexManager == null) {
+            return null;
+        }
+        
+        Set<String> candidateKeys = null;
+        Set<String> indexedFields = new HashSet<>();
+        
+        for (Map.Entry<String, Object> entry : criteria.entrySet()) {
+            String field = entry.getKey();
+            Object value = entry.getValue();
+            
+            // Skip if no index for this field
+            if (!indexManager.hasIndex(region, field)) {
+                continue;
+            }
+            
+            Set<String> fieldMatches = null;
+            
+            // Handle different criteria types
+            if (value instanceof List) {
+                // IN clause: field IN [value1, value2, ...]
+                Set<Object> values = new HashSet<>((List<?>) value);
+                fieldMatches = indexManager.findIn(region, field, values);
+            } else if (value instanceof Map) {
+                // Operator-based: {gt: 10, lt: 100}
+                Map<String, Object> operators = (Map<String, Object>) value;
+                fieldMatches = applyOperatorsWithIndex(region, field, operators);
+            } else {
+                // Simple equality
+                fieldMatches = indexManager.findEquals(region, field, value);
+            }
+            
+            if (fieldMatches != null) {
+                indexedFields.add(field);
+                
+                if (candidateKeys == null) {
+                    // First indexed field
+                    candidateKeys = new HashSet<>(fieldMatches);
+                } else {
+                    // Intersect with previous results (AND logic)
+                    candidateKeys.retainAll(fieldMatches);
+                }
+                
+                // Early termination if no candidates left
+                if (candidateKeys.isEmpty()) {
+                    log.debug("Index intersection resulted in empty set for region {}", region);
+                    return candidateKeys;
+                }
+            }
+        }
+        
+        if (candidateKeys != null && !indexedFields.isEmpty()) {
+            log.debug("Index lookup used {} indexes, {} candidates for region {}", 
+                indexedFields.size(), candidateKeys.size(), region);
+        }
+        
+        return candidateKeys;
+    }
+    
+    /**
+     * Apply operators using index (for BTREE indexes supporting range queries,
+     * and TRIGRAM indexes supporting regex queries).
+     */
+    private Set<String> applyOperatorsWithIndex(String region, String field, Map<String, Object> operators) {
+        Set<String> result = null;
+        
+        for (Map.Entry<String, Object> op : operators.entrySet()) {
+            String operator = op.getKey().toLowerCase();
+            Object operand = op.getValue();
+            
+            Set<String> matches = switch (operator) {
+                case "gt" -> indexManager.findGreaterThan(region, field, operand, false);
+                case "gte" -> indexManager.findGreaterThan(region, field, operand, true);
+                case "lt" -> indexManager.findLessThan(region, field, operand, false);
+                case "lte" -> indexManager.findLessThan(region, field, operand, true);
+                case "eq" -> indexManager.findEquals(region, field, operand);
+                case "ne" -> null; // NOT queries need full scan
+                case "regex" -> {
+                    // Try to use TRIGRAM index for regex
+                    if (operand != null && indexManager.supportsRegex(region, field)) {
+                        try {
+                            Pattern pattern = regexCache.computeIfAbsent(
+                                operand.toString(), Pattern::compile);
+                            yield indexManager.findRegex(region, field, pattern);
+                        } catch (Exception e) {
+                            log.debug("Invalid regex pattern: {}", operand);
+                            yield null;
+                        }
+                    }
+                    yield null;
+                }
+                case "prefix", "startswith" -> {
+                    // Try to use PREFIX or TRIGRAM index for prefix search
+                    if (operand != null && indexManager.supportsPrefix(region, field)) {
+                        yield indexManager.findPrefix(region, field, operand.toString());
+                    }
+                    yield null;
+                }
+                case "contains" -> {
+                    // Try to use TRIGRAM index for contains search
+                    if (operand != null) {
+                        yield indexManager.findContains(region, field, operand.toString());
+                    }
+                    yield null;
+                }
+                default -> null;
+            };
+            
+            if (matches == null) {
+                // This operator can't use index
+                continue;
+            }
+            
+            if (result == null) {
+                result = new HashSet<>(matches);
+            } else {
+                result.retainAll(matches);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Search within a pre-filtered set of candidate keys.
+     */
+    private List<Map<String, Object>> searchWithinCandidates(String region,
+                                                              Set<String> candidateKeys,
+                                                              Map<String, Object> criteria,
+                                                              List<String> fields,
+                                                              int limit) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        
+        for (String key : candidateKeys) {
+            if (results.size() >= limit) {
+                break;
+            }
+            
+            try {
+                JsonNode document = cacheService.jsonGet(region, key, "$");
+                
+                if (document != null && matchesAllCriteria(document, criteria)) {
+                    results.add(buildResultItem(key, document, fields));
+                }
+            } catch (Exception e) {
+                log.trace("Error processing key {}: {}", key, e.getMessage());
+            }
+        }
         
         return results;
     }
@@ -663,6 +868,12 @@ public class ParallelJsonSearchService {
                 case "eq" -> valueMatches(fieldValue, operand);
                 case "ne" -> !valueMatches(fieldValue, operand);
                 case "regex" -> matchesRegex(fieldValue.asText(), String.valueOf(operand));
+                case "prefix", "startswith" -> 
+                    fieldValue.asText().toLowerCase().startsWith(String.valueOf(operand).toLowerCase());
+                case "contains" -> 
+                    fieldValue.asText().toLowerCase().contains(String.valueOf(operand).toLowerCase());
+                case "suffix", "endswith" ->
+                    fieldValue.asText().toLowerCase().endsWith(String.valueOf(operand).toLowerCase());
                 default -> {
                     log.trace("Unknown operator: {}", operator);
                     yield true;
@@ -775,6 +986,8 @@ public class ParallelJsonSearchService {
         stats.put("sequentialSearches", sequentialSearches.get());
         stats.put("jsonSearches", jsonSearches.get());
         stats.put("patternSearches", patternSearches.get());
+        stats.put("indexedSearches", indexedSearches.get());
+        stats.put("fullScanSearches", fullScanSearches.get());
         stats.put("totalSearchTimeMs", totalSearchTimeMs.get());
         
         long total = totalSearches.get();
@@ -782,6 +995,8 @@ public class ParallelJsonSearchService {
             stats.put("avgSearchTimeMs", totalSearchTimeMs.get() / total);
             stats.put("parallelSearchPercent", 
                 String.format("%.1f%%", (parallelSearches.get() * 100.0) / total));
+            stats.put("indexedSearchPercent",
+                String.format("%.1f%%", (indexedSearches.get() * 100.0) / total));
         }
         
         stats.put("parallelEnabled", properties.getSearch().isParallelEnabled());

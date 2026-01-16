@@ -87,7 +87,7 @@ key_delimiter:-</code></pre>
                     </ul>
                 </div>
                 
-                <h3 class="mt-4"><i class="fas fa-code me-2"></i>File Encoding Support <span class="badge bg-success">v1.7.9</span></h3>
+                <h3 class="mt-4"><i class="fas fa-code me-2"></i>File Encoding Support <span class="badge bg-success">v1.8.1</span></h3>
                 <p>Autoload supports automatic encoding detection and explicit encoding specification for CSV, TXT, and JSON files.</p>
                 
                 <div class="row">
@@ -141,7 +141,7 @@ encoding:UTF-16</code></pre>
                     For maximum compatibility, save files as UTF-8 with BOM. This ensures reliable encoding detection across all platforms.
                 </div>
                 
-                <h3 class="mt-4"><i class="fas fa-font me-2"></i>ASCII Normalization <span class="badge bg-success">v1.7.9</span></h3>
+                <h3 class="mt-4"><i class="fas fa-font me-2"></i>ASCII Normalization <span class="badge bg-success">v1.8.1</span></h3>
                 <p>Autoload automatically normalizes non-ASCII text to US-ASCII, ensuring data consistency and compatibility.</p>
                 
                 <div class="card mb-3">
@@ -184,19 +184,222 @@ ascii_normalize:false</code></pre>
                 </div>
                 
                 <h3 class="mt-4">Attribute Mapping</h3>
-                <p>Create <code>data.csv.metadata.attributemapping.json</code>:</p>
+                <p>Create <code>data.csv.metadata.attributemapping.json</code> to rename fields during import:</p>
                 <pre class="bg-dark text-light p-3 rounded"><code>{
     "firstName": "first_name",
-    "lastName": "last_name"
+    "lastName": "last_name",
+    "emailAddress": "email"
 }</code></pre>
+                
+                <h3 class="mt-4"><i class="fas fa-file-csv me-2"></i>Complete CSV Example</h3>
+                <div class="card mb-3">
+                    <div class="card-header bg-dark text-white">customers.csv</div>
+                    <div class="card-body p-0">
+                        <pre class="mb-0 p-3"><code>customer_id,name,email,city,balance
+C001,John Smith,john@example.com,New York,1500.00
+C002,Jane Doe,jane@example.com,Los Angeles,2500.50
+C003,Bob Wilson,bob@example.com,Chicago,750.25</code></pre>
+                    </div>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-dark text-white">customers.csv.metadata</div>
+                    <div class="card-body p-0">
+                        <pre class="mb-0 p-3"><code>region:customers
+key_field:customer_id
+ttl:86400
+delimiter:,
+encoding:auto
+ascii_normalize:true</code></pre>
+                    </div>
+                </div>
+                
+                <p><strong>Result in Kuber:</strong></p>
+                <pre class="bg-light p-3 rounded"><code>Key: C001
+Value: {"customer_id":"C001","name":"John Smith","email":"john@example.com","city":"New York","balance":"1500.00"}</code></pre>
+                
+                <h3 class="mt-4"><i class="fas fa-file-code me-2"></i>Complete JSON Example</h3>
+                <div class="card mb-3">
+                    <div class="card-header bg-dark text-white">products.json (JSONL format - one object per line)</div>
+                    <div class="card-body p-0">
+                        <pre class="mb-0 p-3"><code>{"sku":"SKU001","name":"Widget A","price":19.99,"category":"electronics"}
+{"sku":"SKU002","name":"Gadget B","price":29.99,"category":"electronics"}
+{"sku":"SKU003","name":"Tool C","price":9.99,"category":"hardware"}</code></pre>
+                    </div>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-dark text-white">products.json.metadata</div>
+                    <div class="card-body p-0">
+                        <pre class="mb-0 p-3"><code>region:products
+key_field:sku
+ttl:-1</code></pre>
+                    </div>
+                </div>
+                
+                <h3 class="mt-4"><i class="fas fa-terminal me-2"></i>File-Based Trigger Commands <span class="badge bg-success">v1.8.1</span></h3>
+                <p>Trigger autoload operations by creating special files (similar to <code>kuber.shutdown</code>):</p>
+                
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Command</th><th>File to Create</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Rebuild Region Indexes</td>
+                            <td><code>touch kuber.index.&lt;region&gt;.rebuild</code></td>
+                            <td>Rebuild all secondary indexes for a region after bulk load</td>
+                        </tr>
+                        <tr>
+                            <td>Create Index</td>
+                            <td><code>touch kuber.index.&lt;region&gt;.&lt;field&gt;.create.hash</code></td>
+                            <td>Create a new index (hash, btree, trigram, prefix)</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb me-2"></i><strong>Workflow Tip:</strong>
+                    After bulk loading data via autoload, create index trigger files to build secondary indexes:
+                    <pre class="bg-dark text-light p-2 rounded mt-2 mb-0"><code># Load data, then create indexes
+cp customers.csv data/autoload/inbox/
+cp customers.csv.metadata data/autoload/inbox/
+# Wait for autoload to complete...
+touch kuber.index.customers.email.create.hash
+touch kuber.index.customers.city.create.hash</code></pre>
+                </div>
+                
+                <h3 class="mt-4"><i class="fas fa-chart-line me-2"></i>Monitoring &amp; Logs</h3>
+                <p>Autoload progress is logged with detailed statistics:</p>
+                <pre class="bg-light p-3 rounded"><code>INFO  AutoloadService - Processing file: customers.csv (UTF-8)
+INFO  AutoloadService - Loaded 10,000 records in 1.2s (8,333 records/sec)
+INFO  AutoloadService - File moved to outbox: customers.csv</code></pre>
+                
+                <h4 class="mt-3">REST API Endpoints</h4>
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr><th>Endpoint</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>GET /api/autoload/status</code></td><td>Current autoload status and statistics</td></tr>
+                        <tr><td><code>GET /api/autoload/history</code></td><td>History of processed files</td></tr>
+                        <tr><td><code>POST /api/autoload/trigger</code></td><td>Manually trigger inbox scan</td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4"><i class="fas fa-exclamation-circle me-2"></i>Troubleshooting</h3>
+                
+                <div class="accordion" id="troubleshootingAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble1">
+                                File not being processed
+                            </button>
+                        </h2>
+                        <div id="trouble1" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li>Ensure file is in <code>inbox/</code> directory (not root autoload folder)</li>
+                                    <li>Check that <code>.metadata</code> file exists with same base name</li>
+                                    <li>Verify <code>kuber.autoload.enabled=true</code> in configuration</li>
+                                    <li>Check file extension is supported (.csv, .txt, .json)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble2">
+                                Encoding issues / garbled characters
+                            </button>
+                        </h2>
+                        <div id="trouble2" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li>Explicitly set encoding in metadata: <code>encoding:UTF-16</code></li>
+                                    <li>Save source files as UTF-8 with BOM for reliable detection</li>
+                                    <li>Disable ASCII normalization if needed: <code>ascii_normalize:false</code></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble3">
+                                Records not appearing in cache
+                            </button>
+                        </h2>
+                        <div id="trouble3" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li>Verify <code>key_field</code> column exists in data</li>
+                                    <li>Check for empty key values (records with empty keys are skipped)</li>
+                                    <li>Ensure region name is valid (alphanumeric, no spaces)</li>
+                                    <li>Check logs for parsing errors</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble4">
+                                Slow loading performance
+                            </button>
+                        </h2>
+                        <div id="trouble4" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li>Increase batch size: <code>kuber.autoload.batch-size=8192</code></li>
+                                    <li>Ensure MongoDB persistence is async: <code>kuber.cache.persistent-mode=false</code></li>
+                                    <li>For very large files, consider splitting into smaller chunks</li>
+                                    <li>Check available memory and adjust JVM heap size</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 class="mt-4"><i class="fas fa-list-check me-2"></i>Best Practices</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card border-success mb-3">
+                            <div class="card-header bg-success text-white"><i class="fas fa-check me-2"></i>Do</div>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">Use UTF-8 encoding with BOM</li>
+                                <li class="list-group-item">Test with small files first</li>
+                                <li class="list-group-item">Use meaningful key fields</li>
+                                <li class="list-group-item">Set appropriate TTL values</li>
+                                <li class="list-group-item">Create secondary indexes after bulk load</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-danger mb-3">
+                            <div class="card-header bg-danger text-white"><i class="fas fa-times me-2"></i>Don't</div>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">Load files without metadata</li>
+                                <li class="list-group-item">Use duplicate key values</li>
+                                <li class="list-group-item">Forget to check processed files in outbox</li>
+                                <li class="list-group-item">Load very large files without testing</li>
+                                <li class="list-group-item">Mix encodings in the same file</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                    <a href="/help/backup" class="btn btn-outline-secondary ms-2"><i class="fas fa-download me-2"></i>Backup &amp; Export</a>
+                    <a href="/help/secondary-indexing" class="btn btn-outline-info ms-2"><i class="fas fa-list-alt me-2"></i>Secondary Indexing</a>
                 </div>
             </div>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.9</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.1</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

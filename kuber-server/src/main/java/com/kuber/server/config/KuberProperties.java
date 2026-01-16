@@ -115,6 +115,12 @@ public class KuberProperties {
     private Shutdown shutdown = new Shutdown();
     
     /**
+     * Secondary indexing configuration including file watcher settings.
+     * @since 1.8.1
+     */
+    private Indexing indexing = new Indexing();
+    
+    /**
      * Prometheus metrics configuration
      * @since 1.7.9
      */
@@ -226,12 +232,12 @@ public class KuberProperties {
          * This limit applies to ALL persistence stores (LMDB, RocksDB, MongoDB, etc.)
          * and prevents issues with database-specific key length limits.
          * 
-         * Default: 256 bytes (sufficient for most use cases)
-         * Maximum recommended: 1024 bytes (for compatibility with all backends)
+         * Default: 1024 bytes (sufficient for most use cases including longer keys)
+         * Maximum recommended: 4096 bytes (for compatibility with all backends)
          */
         @Min(1)
         @Max(65536)
-        private int maxKeyLengthBytes = 256;
+        private int maxKeyLengthBytes = 1024;
         
         /**
          * Global maximum number of entries across ALL regions combined.
@@ -1470,6 +1476,93 @@ public class KuberProperties {
          */
         @Min(1)
         private int phaseDelaySeconds = 5;
+    }
+    
+    /**
+     * Secondary indexing configuration.
+     * 
+     * <p>Controls file-based index operations for automation and scripting.
+     * 
+     * <h2>File-Based Triggers:</h2>
+     * <ul>
+     *   <li>{@code kuber.index.<region>.rebuild} - Rebuild all indexes for region</li>
+     *   <li>{@code kuber.index.<region>.drop} - Drop all indexes for region</li>
+     *   <li>{@code kuber.index.<region>.<field>.rebuild} - Rebuild specific index</li>
+     *   <li>{@code kuber.index.<region>.<field>.drop} - Drop specific index</li>
+     *   <li>{@code kuber.index.all.rebuild} - Rebuild ALL indexes</li>
+     *   <li>{@code kuber.index.<region>.<field>.create.<type>} - Create new index</li>
+     * </ul>
+     * 
+     * @since 1.8.1
+     */
+    @Data
+    public static class Indexing {
+        /**
+         * Enable file-based index operation triggers.
+         * When enabled, Kuber watches for trigger files like kuber.index.*.rebuild
+         * and executes the corresponding index operations.
+         * 
+         * Default: true
+         */
+        private boolean fileWatcherEnabled = true;
+        
+        /**
+         * How often to check for index trigger files (in milliseconds).
+         * Default: 5000ms (5 seconds)
+         */
+        @Min(1000)
+        private long fileWatcherIntervalMs = 5000;
+        
+        /**
+         * Directory to watch for index trigger files.
+         * Default: . (current working directory)
+         */
+        private String fileWatcherDirectory = ".";
+        
+        /**
+         * Default storage mode for secondary indexes.
+         * HEAP: Fast but uses JVM heap memory (may cause GC pressure)
+         * OFFHEAP: Slower but uses direct memory (no GC pressure, better for large indexes)
+         * Default: HEAP
+         */
+        private String defaultStorage = "HEAP";
+        
+        /**
+         * Storage mode for HASH indexes.
+         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         */
+        private String hashStorage = "DEFAULT";
+        
+        /**
+         * Storage mode for BTREE indexes.
+         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         */
+        private String btreeStorage = "DEFAULT";
+        
+        /**
+         * Storage mode for TRIGRAM indexes.
+         * Recommended: OFFHEAP (trigram indexes consume significant memory)
+         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         */
+        private String trigramStorage = "OFFHEAP";
+        
+        /**
+         * Storage mode for PREFIX indexes.
+         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         */
+        private String prefixStorage = "DEFAULT";
+        
+        /**
+         * Initial off-heap buffer size per index in bytes.
+         * Default: 16MB
+         */
+        private long offheapInitialSize = 16L * 1024L * 1024L;
+        
+        /**
+         * Maximum off-heap buffer size per index in bytes.
+         * Default: 1GB
+         */
+        private long offheapMaxSize = 1024L * 1024L * 1024L;
     }
     
     /**

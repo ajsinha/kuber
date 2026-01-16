@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending: Hybrid Secondary Index Architecture
+  -->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{layout :: head('Index Statistics')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<!-- Hidden inputs for JavaScript access -->
+<input type="hidden" id="indexRegion" th:value="${region}">
+<input type="hidden" id="indexField" th:value="${field}">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    
+    <div class="container-fluid py-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/admin/indexes}">Indexes</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/admin/indexes/region/{r}(r=${region})}" th:text="${region}">region</a></li>
+                <li class="breadcrumb-item active" th:text="${field}">field</li>
+            </ol>
+        </nav>
+        
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h2 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    Index Statistics
+                </h2>
+                <p class="text-muted mt-2 mb-0">
+                    <span class="badge bg-secondary" th:text="${region}">region</span>
+                    <code class="ms-2" th:text="${field}">field</code>
+                </p>
+            </div>
+            <div class="col-auto">
+                <a th:href="@{/admin/indexes/region/{r}(r=${region})}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Region Indexes
+                </a>
+                <button class="btn btn-warning" onclick="rebuildCurrentIndex()">
+                    <i class="fas fa-sync-alt me-1"></i> Rebuild
+                </button>
+            </div>
+        </div>
+        
+        <!-- Not Found -->
+        <div th:unless="${found}" class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Index not found: <span th:text="${region}">region</span>.<span th:text="${field}">field</span>
+        </div>
+        
+        <!-- Statistics Content -->
+        <div th:if="${found}">
+            <div class="row g-4">
+                <!-- Basic Info Card -->
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Index Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th class="w-50 bg-light">Region</th>
+                                        <td><span class="badge bg-secondary" th:text="${region}">region</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Field</th>
+                                        <td><code th:text="${field}">field</code></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Type</th>
+                                        <td>
+                                            <span th:if="${stats['type'] == 'HASH'}" class="badge bg-primary fs-6">HASH</span>
+                                            <span th:if="${stats['type'] == 'BTREE'}" class="badge bg-success fs-6">BTREE</span>
+                                            <span th:if="${stats['type'] == 'TRIGRAM'}" class="badge bg-warning text-dark fs-6">TRIGRAM</span>
+                                            <span th:if="${stats['type'] == 'PREFIX'}" class="badge bg-info fs-6">PREFIX</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Storage</th>
+                                        <td>
+                                            <span th:if="${stats['isOffHeap'] == true}" class="badge bg-secondary fs-6">
+                                                <i class="fas fa-hdd me-1"></i>OFF-HEAP
+                                            </span>
+                                            <span th:unless="${stats['isOffHeap'] == true}" class="badge bg-light text-dark fs-6 border">
+                                                <i class="fas fa-memory me-1"></i>HEAP
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Description</th>
+                                        <td th:text="${stats['description'] != null ? stats['description'] : '-'}">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Last Rebuilt</th>
+                                        <td th:text="${stats['lastRebuilt'] != null ? stats['lastRebuilt'] : 'Never'}">Never</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Statistics Card -->
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-database me-2"></i>Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th class="w-50 bg-light">Total Entries</th>
+                                        <td class="fw-bold text-primary" th:text="${stats['entries'] != null ? #numbers.formatInteger(stats['entries'], 1, 'COMMA') : 0}">0</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Unique Values</th>
+                                        <td th:text="${stats['uniqueValues'] != null ? #numbers.formatInteger(stats['uniqueValues'], 1, 'COMMA') : 0}">0</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Memory Usage</th>
+                                        <td th:text="${stats['memoryBytes'] != null ? #numbers.formatDecimal(stats['memoryBytes'] / 1048576.0, 1, 2) + ' MB' : 'N/A'}">N/A</td>
+                                    </tr>
+                                    <tr th:if="${stats['isOffHeap'] == true}">
+                                        <th class="bg-light">Off-Heap Usage</th>
+                                        <td th:text="${stats['offHeapBytesUsed'] != null ? #numbers.formatDecimal(stats['offHeapBytesUsed'] / 1048576.0, 1, 2) + ' MB' : 'N/A'}">N/A</td>
+                                    </tr>
+                                    <tr th:if="${stats['offHeapBytesAllocated'] != null}">
+                                        <th class="bg-light">Off-Heap Allocated</th>
+                                        <td th:text="${#numbers.formatDecimal(stats['offHeapBytesAllocated'] / 1048576.0, 1, 2) + ' MB'}">N/A</td>
+                                    </tr>
+                                    <tr th:if="${stats['segmentCount'] != null}">
+                                        <th class="bg-light">Segments</th>
+                                        <td th:text="${stats['segmentCount']}">0</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Lookups</th>
+                                        <td th:text="${stats['lookups'] != null ? #numbers.formatInteger(stats['lookups'], 1, 'COMMA') : 0}">0</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">Supports Range Queries</th>
+                                        <td>
+                                            <span th:if="${stats['supportsRangeQueries'] == true}" class="badge bg-success">Yes</span>
+                                            <span th:unless="${stats['supportsRangeQueries'] == true}" class="badge bg-secondary">No</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Value Distribution Card -->
+                <div class="col-12" th:if="${stats['distribution'] != null and !#lists.isEmpty(stats['distribution'])}">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Value Distribution (Top 10)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Value</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                            <th>Distribution</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="item, iterStat : ${stats['distribution']}">
+                                            <td th:text="${iterStat.count}">1</td>
+                                            <td><code th:text="${item['value']}">value</code></td>
+                                            <td th:text="${#numbers.formatInteger(item['count'], 1, 'COMMA')}">0</td>
+                                            <td th:text="${item['percentage']}">0%</td>
+                                            <td style="min-width: 200px;">
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar bg-primary" role="progressbar" 
+                                                         th:style="'width: ' + ${item['percentage']}"
+                                                         th:text="${item['percentage']}">0%</div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions Card -->
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-tools me-2"></i>Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="d-grid">
+                                        <button class="btn btn-warning" onclick="rebuildCurrentIndex()">
+                                            <i class="fas fa-sync-alt me-2"></i> Rebuild Index
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-grid">
+                                        <button class="btn btn-danger" onclick="confirmDropCurrentIndex()">
+                                            <i class="fas fa-trash me-2"></i> Drop Index
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-grid">
+                                        <a th:href="@{/cache(region=${region})}" class="btn btn-outline-primary">
+                                            <i class="fas fa-search me-2"></i> Browse Data
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-grid">
+                                        <a th:href="@{/help/secondary-indexing}" class="btn btn-outline-info">
+                                            <i class="fas fa-book me-2"></i> Documentation
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Drop Index Confirmation Modal -->
+<div class="modal fade" id="dropIndexModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Drop Index</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to drop the index <strong id="dropIndexName"></strong>?</p>
+                <p class="text-danger mb-0">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDropBtn">
+                    <i class="fas fa-trash me-1"></i> Drop Index
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
+     style="background: rgba(0,0,0,0.5); z-index: 9999;">
+    <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
+        <div class="spinner-border mb-2" role="status"></div>
+        <div>Processing...</div>
+    </div>
+</div>
+
+<th:block th:replace="~{layout :: scripts}"></th:block>
+<script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+<script>
+    // Get region and field from hidden inputs
+    function getCurrentRegion() {
+        return document.getElementById('indexRegion').value;
+    }
+    
+    function getCurrentField() {
+        return document.getElementById('indexField').value;
+    }
+    
+    function showLoading() {
+        document.getElementById('loadingOverlay').classList.remove('d-none');
+    }
+    
+    function hideLoading() {
+        document.getElementById('loadingOverlay').classList.add('d-none');
+    }
+    
+    function showToast(message, type) {
+        type = type || 'success';
+        var alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + ' me-2"></i>' +
+            message +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        document.body.appendChild(alertDiv);
+        setTimeout(function() { alertDiv.remove(); }, 5000);
+    }
+    
+    function rebuildIndex(region, field) {
+        if (!confirm('Rebuild index ' + region + '.' + field + '?')) return;
+        
+        showLoading();
+        fetch('/api/admin/indexes/' + encodeURIComponent(region) + '/' + encodeURIComponent(field) + '/rebuild', {
+            method: 'POST'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Index rebuilt in ' + data.rebuildTimeMs + 'ms');
+                setTimeout(function() { location.reload(); }, 1000);
+            } else {
+                showToast(data.error || 'Failed to rebuild', 'danger');
+            }
+        })
+        .catch(function(error) {
+            showToast('Error: ' + error.message, 'danger');
+        })
+        .finally(function() {
+            hideLoading();
+        });
+    }
+    
+    function rebuildCurrentIndex() {
+        rebuildIndex(getCurrentRegion(), getCurrentField());
+    }
+    
+    function confirmDropIndex(region, field) {
+        document.getElementById('dropIndexName').textContent = region + '.' + field;
+        new bootstrap.Modal(document.getElementById('dropIndexModal')).show();
+    }
+    
+    function confirmDropCurrentIndex() {
+        confirmDropIndex(getCurrentRegion(), getCurrentField());
+    }
+    
+    document.getElementById('confirmDropBtn').addEventListener('click', function() {
+        bootstrap.Modal.getInstance(document.getElementById('dropIndexModal')).hide();
+        
+        var currentRegion = getCurrentRegion();
+        var currentField = getCurrentField();
+        
+        showLoading();
+        fetch('/api/admin/indexes/' + encodeURIComponent(currentRegion) + '/' + encodeURIComponent(currentField), {
+            method: 'DELETE'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Index dropped successfully');
+                setTimeout(function() { 
+                    window.location.href = '/admin/indexes/region/' + encodeURIComponent(currentRegion);
+                }, 1000);
+            } else {
+                showToast(data.error || 'Failed to drop index', 'danger');
+            }
+        })
+        .catch(function(error) {
+            showToast('Error: ' + error.message, 'danger');
+        })
+        .finally(function() {
+            hideLoading();
+        });
+    });
+</script>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 1.7.9
+Version 1.8.1
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,13 +13,15 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
+- **Secondary Indexing (v1.8.1)**: O(1) hash and O(log n) B-tree indexes for 100-1000x faster JSON searches
+- **Hybrid Index Storage (v1.8.1)**: In-memory indexes for speed + RocksDB persistence for durability
 - **Role-Based Access Control (v1.7.3)**: Enterprise RBAC with region-specific permissions (READ/WRITE/DELETE)
 - **Off-Heap Key Index (v1.3.2 - segmented, >2GB)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
 - **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
 - **Redis Protocol Compatibility**: Connect using any Redis client
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
-- **Multi-Backend Persistence**: LMDB (default), RocksDB, MongoDB, SQLite, PostgreSQL
+- **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
 - **Event Publishing (v1.2.8)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files
 - **Request/Response Messaging (v1.7.1)**: Access cache via message brokers with async processing, backpressure, and broker controls
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
@@ -143,7 +145,7 @@ kuber.cache.value-cache-max-percent=20
 kuber.cache.value-cache-max-entries=10000
 ```
 
-### Warm Objects (v1.7.9)
+### Warm Objects (v1.8.1)
 
 Kuber can maintain a minimum number of "warm" (in-memory) objects per region, ensuring frequently accessed data stays in memory for optimal read performance:
 
@@ -173,7 +175,7 @@ kuber.cache.region-warm-object-counts.session=10000
 - Works with eviction services (respects memory limits)
 - Falls back to default behavior if not configured
 
-### Prometheus Monitoring (v1.7.9)
+### Prometheus Monitoring (v1.8.1)
 
 Kuber integrates with Prometheus for comprehensive metrics monitoring:
 
@@ -208,7 +210,7 @@ scrape_configs:
 
 See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Grafana dashboards and alerting rules.
 
-### Generic Search API (v1.7.9)
+### Generic Search API (v1.8.1)
 
 Enhanced search API with multiple search modes and flexible JSON attribute querying:
 
@@ -264,7 +266,7 @@ Enhanced search API with multiple search modes and flexible JSON attribute query
 
 See [docs/GENERIC_SEARCH_API.md](docs/GENERIC_SEARCH_API.md) for complete documentation.
 
-### Generic Update API (v1.7.9)
+### Generic Update API (v1.8.1)
 
 Unified SET/UPDATE operation with intelligent JSON merging:
 
@@ -332,7 +334,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-1.7.9.jar
+        -jar kuber-server/target/kuber-server-1.8.1.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -617,7 +619,7 @@ Create `secure/request_response.json`:
 }
 ```
 
-### Test Clients (v1.7.9)
+### Test Clients (v1.8.1)
 
 Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
 
@@ -656,7 +658,7 @@ python kafka_diagnostics.py --live --watch-only          # Live watch mode
 
 > **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
 
-### Request/Response Logging (v1.7.9)
+### Request/Response Logging (v1.8.1)
 
 All request/response pairs can be logged to files for debugging and auditing:
 
@@ -1028,7 +1030,7 @@ RBAC is enforced on:
 
 Users only see regions they have access to in the UI.
 
-### SSL/TLS Configuration (v1.7.9)
+### SSL/TLS Configuration (v1.8.1)
 
 Kuber supports SSL/TLS encryption for secure communications:
 

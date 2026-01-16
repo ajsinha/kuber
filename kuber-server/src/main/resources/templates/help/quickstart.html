@@ -19,7 +19,7 @@
                 <pre class="bg-dark text-light p-3 rounded"><code># Required JVM options for LMDB persistence on Java 9+
 java --add-opens=java.base/java.nio=ALL-UNNAMED \
      --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server-1.7.9.jar
+     -jar kuber-server-1.8.1.jar
 
 # Or use the startup script (includes all required JVM options)
 ./scripts/kuber-start.sh</code></pre>
@@ -35,7 +35,7 @@ OK
                 
                 <div class="alert alert-light border mt-3">
                     <i class="fas fa-plug me-2 text-primary"></i>
-                    <strong>Session Management (v1.7.9):</strong> Use <code>CLIENT SETTIMEOUT &lt;seconds&gt;</code> to keep connections alive longer.
+                    <strong>Session Management (v1.8.1):</strong> Use <code>CLIENT SETTIMEOUT &lt;seconds&gt;</code> to keep connections alive longer.
                     See <a href="/help/redis-protocol#connection-management">Connection Management</a>.
                 </div>
                 
@@ -85,7 +85,7 @@ python rabbitmq_request_response_test.py</code></pre>
                     <div class="col-md-6 mb-4">
                         <div class="card h-100 border-success">
                             <div class="card-header bg-success text-white">
-                                <i class="fas fa-memory me-2"></i>Memory Management <span class="badge bg-light text-dark">v1.7.9</span>
+                                <i class="fas fa-memory me-2"></i>Memory Management <span class="badge bg-light text-dark">v1.8.1</span>
                             </div>
                             <div class="card-body">
                                 <ul class="mb-0">
@@ -165,7 +165,7 @@ python rabbitmq_request_response_test.py</code></pre>
                     <div class="col-md-6 mb-4">
                         <div class="card h-100" style="border-color: #8b5cf6;">
                             <div class="card-header text-white" style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);">
-                                <i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging <span class="badge bg-light text-dark">v1.7.9</span>
+                                <i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging <span class="badge bg-light text-dark">v1.8.1</span>
                             </div>
                             <div class="card-body">
                                 <ul class="mb-0">
@@ -182,7 +182,7 @@ python rabbitmq_request_response_test.py</code></pre>
                     <div class="col-md-6 mb-4">
                         <div class="card h-100" style="border-color: #dc3545;">
                             <div class="card-header text-white" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
-                                <i class="fas fa-shield-alt me-2"></i>Role-Based Access Control <span class="badge bg-light text-dark">v1.7.9</span>
+                                <i class="fas fa-shield-alt me-2"></i>Role-Based Access Control <span class="badge bg-light text-dark">v1.8.1</span>
                             </div>
                             <div class="card-body">
                                 <ul class="mb-0">
@@ -213,7 +213,7 @@ python rabbitmq_request_response_test.py</code></pre>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.9</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.1</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

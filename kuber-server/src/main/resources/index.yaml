@@ -1,0 +1,109 @@
+# ==============================================================================
+# Kuber Secondary Index Configuration
+# Copyright (c) 2025-2030, All Rights Reserved
+# Ashutosh Sinha | Email: ajsinha@gmail.com
+# ==============================================================================
+#
+# This file defines secondary indexes for JSON document regions.
+# Indexes dramatically improve search performance by avoiding full table scans.
+#
+# Index Types:
+#   - hash:  For equality queries (status = "active", city = "NYC")
+#   - btree: For range queries (age > 30, price BETWEEN 100 AND 500)
+#
+# Composite indexes can be created by specifying multiple fields separated by comma.
+#
+# ==============================================================================
+
+indexing:
+  # Global indexing settings
+  enabled: true
+  
+  # Storage strategy: memory, rocksdb, or hybrid (recommended)
+  # - memory: Fastest queries, indexes lost on restart unless persisted
+  # - rocksdb: Persistent, slightly slower
+  # - hybrid: In-memory with RocksDB persistence (best of both)
+  storage: hybrid
+  
+  # Rebuild indexes from data on startup
+  rebuild-on-startup: true
+  
+  # Number of threads for parallel index rebuild
+  rebuild-threads: 4
+  
+  # Maximum memory for indexes per region (in MB)
+  max-memory-per-region-mb: 256
+  
+  # Maximum number of indexes per region
+  max-indexes-per-region: 20
+  
+  # Persistence settings (for hybrid/rocksdb storage)
+  persistence:
+    enabled: true
+    sync-interval-seconds: 30
+
+# ==============================================================================
+# Region Index Definitions
+# ==============================================================================
+# Define which fields to index for each region.
+# Indexes are automatically maintained when documents are added/updated/deleted.
+#
+# Example configurations are provided below. Uncomment and modify as needed.
+# ==============================================================================
+
+regions:
+  # ------------------------------------------------------------------------------
+  # Example: Customer region indexes
+  # ------------------------------------------------------------------------------
+  # customers:
+  #   indexes:
+  #     - field: status
+  #       type: hash
+  #       description: "Index for status equality queries"
+  #     
+  #     - field: city
+  #       type: hash
+  #       description: "Index for city equality queries"
+  #     
+  #     - field: age
+  #       type: btree
+  #       description: "Index for age range queries"
+  #     
+  #     - field: created_at
+  #       type: btree
+  #       description: "Index for date range queries"
+  #     
+  #     - field: status,city
+  #       type: hash
+  #       description: "Composite index for status AND city queries"
+
+  # ------------------------------------------------------------------------------
+  # Example: Orders region indexes
+  # ------------------------------------------------------------------------------
+  # orders:
+  #   indexes:
+  #     - field: status
+  #       type: hash
+  #     
+  #     - field: customer_id
+  #       type: hash
+  #     
+  #     - field: amount
+  #       type: btree
+  #     
+  #     - field: order_date
+  #       type: btree
+
+  # ------------------------------------------------------------------------------
+  # Example: Products region indexes
+  # ------------------------------------------------------------------------------
+  # products:
+  #   indexes:
+  #     - field: category
+  #       type: hash
+  #     
+  #     - field: price
+  #       type: btree
+  #     
+  #     - field: in_stock
+  #       type: hash

@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Generic Search Demo (v1.7.9)
+ * Kuber REST API - Generic Search Demo (v1.8.0)
  *
  * This standalone C# application demonstrates ALL search capabilities of the Kuber
  * Generic Search API including:
@@ -15,6 +15,9 @@
  *    - Comparison operators (gt, gte, lt, lte, eq, ne)
  *    - Combined AND logic across multiple attributes
  * 6. Field projection (select specific fields)
+ * 7. Regex Key Search (v1.8.0):
+ *    - KeysRegexAsync() - Keys only (faster)
+ *    - SearchKeysAsync() - Keys with values
  *
  * Usage:
  *     dotnet run [host] [port] [apiKey]
@@ -34,6 +37,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Kuber.Examples
 {
@@ -61,6 +65,12 @@ namespace Kuber.Examples
             return await response.Content.ReadAsStringAsync();
         }
 
+        private async Task<string> GetAsync(string url)
+        {
+            var response = await _httpClient.GetAsync(url);
+            return await response.Content.ReadAsStringAsync();
+        }
+
         // ==================== Generic Search ====================
 
         public async Task<string> GenericSearchAsync(Dictionary<string, object> request)
@@ -74,6 +84,36 @@ namespace Kuber.Examples
         {
             var json = JsonSerializer.Serialize(value);
             await PostAsync($"/cache/{region}/{key}", json);
+        }
+
+        /// <summary>
+        /// Find keys matching a regex pattern (keys only, no values).
+        /// More efficient than SearchKeysAsync when you only need key names.
+        /// </summary>
+        /// <param name="region">Cache region</param>
+        /// <param name="pattern">Java regex pattern (e.g., "^user:\\d+$")</param>
+        /// <param name="limit">Maximum number of keys to return</param>
+        /// <returns>JSON response with list of matching keys</returns>
+        public async Task<string> KeysRegexAsync(string region, string pattern, int limit = 1000)
+        {
+            var encodedPattern = Uri.EscapeDataString(pattern);
+            var url = _baseUrl.Replace("/v1", "") + $"/cache/{region}/keys/regex?pattern={encodedPattern}&limit={limit}";
+            return await GetAsync(url);
+        }
+
+        /// <summary>
+        /// Search keys by regex pattern and return key-value pairs.
+        /// Returns full details including key, value, type, and TTL.
+        /// </summary>
+        /// <param name="region">Cache region</param>
+        /// <param name="pattern">Java regex pattern (e.g., "^order:.*")</param>
+        /// <param name="limit">Maximum number of results</param>
+        /// <returns>JSON response with list of key-value objects</returns>
+        public async Task<string> SearchKeysAsync(string region, string pattern, int limit = 1000)
+        {
+            var encodedPattern = Uri.EscapeDataString(pattern);
+            var url = _baseUrl.Replace("/v1", "") + $"/cache/{region}/ksearch?pattern={encodedPattern}&limit={limit}";
+            return await GetAsync(url);
         }
 
         // ==================== Print Helpers ====================
@@ -543,6 +583,74 @@ namespace Kuber.Examples
             PrintResult(await GenericSearchAsync(req));
         }
 
+        private async Task DemoRegexKeySearchAsync(string region)
+        {
+            PrintHeader("10. REGEX KEY SEARCH (v1.8.0 - REST API)");
+
+            Console.WriteLine(@"
+    New in v1.8.0: Two dedicated REST endpoints for regex-based key search:
+    
+    1. KeysRegexAsync() - Returns KEYS ONLY (faster, no value retrieval)
+       Endpoint: GET /api/cache/{region}/keys/regex?pattern={regex}&limit={limit}
+    
+    2. SearchKeysAsync() - Returns KEYS + VALUES (full details)
+       Endpoint: GET /api/cache/{region}/ksearch?pattern={regex}&limit={limit}
+            ");
+
+            // 10a. Keys only - find all customer keys
+            PrintSubheader("10a. KeysRegexAsync() - Find Customer Keys (keys only)");
+            Console.WriteLine("    Pattern: ^customer_C00[1-5]$");
+            Console.WriteLine("    Returns: List of matching key names only");
+            var result = await KeysRegexAsync(region, @"^customer_C00[1-5]$");
+            Console.WriteLine($"    URL: GET /api/cache/{region}/keys/regex?pattern=^customer_C00[1-5]$");
+            PrintResult(result);
+
+            // 10b. Keys only - find all order keys
+            PrintSubheader("10b. KeysRegexAsync() - Find Order Keys");
+            Console.WriteLine("    Pattern: ^order_.*");
+            result = await KeysRegexAsync(region, @"^order_.*");
+            Console.WriteLine($"    URL: GET /api/cache/{region}/keys/regex?pattern=^order_.*");
+            PrintResult(result);
+
+            // 10c. Keys with values - customer search
+            PrintSubheader("10c. SearchKeysAsync() - Customer Keys with Values");
+            Console.WriteLine("    Pattern: ^customer_C00[1-3]$");
+            Console.WriteLine("    Returns: key, value, type, ttl for each match");
+            result = await SearchKeysAsync(region, @"^customer_C00[1-3]$");
+            Console.WriteLine($"    URL: GET /api/cache/{region}/ksearch?pattern=^customer_C00[1-3]$");
+            PrintResult(result);
+
+            // 10d. Keys with values - order search with limit
+            PrintSubheader("10d. SearchKeysAsync() - Orders with Limit");
+            Console.WriteLine("    Pattern: ^order_ORD00.*");
+            Console.WriteLine("    Limit: 3");
+            result = await SearchKeysAsync(region, @"^order_ORD00.*", 3);
+            Console.WriteLine($"    URL: GET /api/cache/{region}/ksearch?pattern=^order_ORD00.*&limit=3");
+            PrintResult(result);
+
+            // 10e. Complex regex pattern
+            PrintSubheader("10e. Complex Regex - Keys ending with digits 1-5");
+            Console.WriteLine("    Pattern: .*(1|2|3|4|5)$");
+            result = await KeysRegexAsync(region, @".*(1|2|3|4|5)$", 10);
+            PrintResult(result);
+
+            // 10f. Performance comparison note
+            PrintSubheader("10f. Performance Comparison");
+            Console.WriteLine(@"
+    ┌─────────────────────┬────────────────────────────────────────────────────┐
+    │ Method              │ Use Case                                           │
+    ├─────────────────────┼────────────────────────────────────────────────────┤
+    │ KeysRegexAsync()    │ When you only need key names (faster, less data)   │
+    │                     │ Example: Count keys, list for deletion, pagination │
+    ├─────────────────────┼────────────────────────────────────────────────────┤
+    │ SearchKeysAsync()   │ When you need key + value + metadata               │
+    │                     │ Example: Display results, export data, debugging   │
+    └─────────────────────┴────────────────────────────────────────────────────┘
+    
+    Both methods use in-memory KeyIndex for O(1) key lookups!
+            ");
+        }
+
         // ==================== Main ====================
 
         public async Task RunDemoAsync(string region)
@@ -559,6 +667,7 @@ namespace Kuber.Examples
                 await DemoComplexSearchesAsync(region);
                 await DemoFieldProjectionAsync(region);
                 await DemoLimitResultsAsync(region);
+                await DemoRegexKeySearchAsync(region);  // New in v1.8.0
 
                 PrintHeader("DEMO COMPLETE");
                 Console.WriteLine(@"
@@ -568,7 +677,7 @@ This demo showcased all Generic Search API capabilities:
      - Single key: {""key"": ""abc""}
      - Multi-key: {""keys"": [""a"", ""b"", ""c""]}
 
-  2. PATTERN SEARCHES (Regex)
+  2. PATTERN SEARCHES (Regex via Generic Search)
      - Single pattern: {""keypattern"": ""user_.*""}
      - Multi-pattern: {""keypatterns"": [""user_.*"", ""admin_.*""]}
 
@@ -588,7 +697,15 @@ This demo showcased all Generic Search API capabilities:
   6. LIMITING RESULTS
      - Max results: {""limit"": 100}
 
-API Endpoint: POST /api/v1/genericsearch
+  7. REGEX KEY SEARCH (v1.8.0 - REST API only)
+     - Keys only:   GET /api/cache/{region}/keys/regex?pattern={regex}
+     - Keys+Values: GET /api/cache/{region}/ksearch?pattern={regex}
+     - C#:          client.KeysRegexAsync(pattern) / client.SearchKeysAsync(pattern)
+
+API Endpoints:
+  - Generic Search: POST /api/v1/genericsearch
+  - Keys by Regex:  GET /api/cache/{region}/keys/regex
+  - Key Search:     GET /api/cache/{region}/ksearch
 ");
             }
             catch (Exception ex)
@@ -606,7 +723,7 @@ API Endpoint: POST /api/v1/genericsearch
             string region = args.Length > 3 ? args[3] : "search_demo_csharp";
 
             Console.WriteLine(new string('=', 80));
-            Console.WriteLine("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.9) - C#");
+            Console.WriteLine("  KUBER REST API - GENERIC SEARCH DEMO (v1.8.0) - C#");
             Console.WriteLine(new string('=', 80));
             Console.WriteLine($"  Server:  {host}:{port}");
             Console.WriteLine($"  Region:  {region}");

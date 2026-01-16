@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 1.7.9**
+**Version 1.8.1**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -1005,6 +1005,205 @@ kuber:
       path: ./data/lmdb
       map-size: 10737418240   # 10GB max database size
 ```
+
+---
+
+## 8.5 Secondary Indexing Architecture (v1.8.1)
+
+Kuber v1.8.1 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
+
+### 8.5.1 Hybrid Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       SECONDARY INDEXING SYSTEM                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                      IN-MEMORY INDEX LAYER                             │ │
+│  │                                                                        │ │
+│  │  ┌──────────────────────┐    ┌──────────────────────────────────────┐ │ │
+│  │  │     HASH INDEX       │    │         BTREE INDEX                  │ │ │
+│  │  │                      │    │                                      │ │ │
+│  │  │  Map<Value, Set<Key>>│    │  TreeMap<Value, Set<Key>>           │ │ │
+│  │  │                      │    │                                      │ │ │
+│  │  │  O(1) Lookup         │    │  O(log n) Lookup + Range            │ │ │
+│  │  │                      │    │                                      │ │ │
+│  │  │  Best for:           │    │  Best for:                          │ │ │
+│  │  │  - status = "active" │    │  - age > 30                         │ │ │
+│  │  │  - city = "NYC"      │    │  - date BETWEEN x AND y             │ │ │
+│  │  │  - category IN [...]│    │  - price < 100                       │ │ │
+│  │  └──────────────────────┘    └──────────────────────────────────────┘ │ │
+│  │                                                                        │ │
+│  │                    ↓ Periodic Sync (hybrid mode)                       │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                   ROCKSDB PERSISTENCE LAYER                            │ │
+│  │                                                                        │ │
+│  │  Column Family: idx_{region}_{field}                                  │ │
+│  │                                                                        │ │
+│  │  Key: field_value | Doc Key                                           │ │
+│  │  Value: document key list (compressed)                                │ │
+│  │                                                                        │ │
+│  │  • Survives restarts                                                  │ │
+│  │  • Loaded into memory on startup                                      │ │
+│  │  • Incremental sync every 30 seconds                                  │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.5.2 Index Types
+
+| Type | Data Structure | Complexity | Use Cases |
+|------|----------------|------------|-----------|
+| **HASH** | `ConcurrentHashMap<Object, Set<String>>` | O(1) lookup | Equality queries, low cardinality |
+| **BTREE** | `ConcurrentSkipListMap<Comparable, Set<String>>` | O(log n) + O(k) | Range queries, sorting |
+| **COMPOSITE** | `ConcurrentHashMap<String, Set<String>>` | O(1) lookup | Multi-field equality |
+
+### 8.5.3 Query Optimization Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          QUERY: status="active" AND city="NYC"               │
+└───────────────────────────────────────────────────┬─────────────────────────┘
+                                                    │
+                                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           QUERY PLANNER                                      │
+│                                                                              │
+│  1. Analyze query conditions                                                 │
+│  2. Check available indexes: status (HASH ✓), city (HASH ✓)                 │
+│  3. Select strategy: Index Intersection                                     │
+└───────────────────────────────────────────────────┬─────────────────────────┘
+                                                    │
+                          ┌─────────────────────────┴─────────────────────────┐
+                          ▼                                                   ▼
+            ┌─────────────────────────┐                     ┌─────────────────────────┐
+            │   status Index Lookup   │                     │    city Index Lookup    │
+            │                         │                     │                         │
+            │   "active" → {k1, k3,   │                     │   "NYC" → {k1, k4,      │
+            │               k7, ...}  │                     │            k50, ...}    │
+            │   32,000 keys           │                     │   5,000 keys            │
+            └────────────┬────────────┘                     └────────────┬────────────┘
+                         │                                               │
+                         └────────────────────┬──────────────────────────┘
+                                              ▼
+                         ┌─────────────────────────────────────────────────┐
+                         │              SET INTERSECTION                   │
+                         │                                                 │
+                         │  {k1, k3, k7, ...} ∩ {k1, k4, k50, ...}       │
+                         │                                                 │
+                         │  Result: {k1, k50, k203, ...}  (450 keys)      │
+                         └───────────────────────┬─────────────────────────┘
+                                                 │
+                                                 ▼
+                         ┌─────────────────────────────────────────────────┐
+                         │         FETCH DOCUMENTS (450 only)              │
+                         │                                                 │
+                         │  Before indexing: 100,000 fetches → 8,450ms    │
+                         │  With indexing:       450 fetches →    12ms    │
+                         │                                                 │
+                         │  Speedup: 704x                                  │
+                         └─────────────────────────────────────────────────┘
+```
+
+### 8.5.4 Index Maintenance
+
+Indexes are automatically maintained on write operations:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           INDEX MAINTENANCE                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  INSERT (JSET):                                                              │
+│  ─────────────────────────────────────────────────────────────               │
+│  1. Store document in cache/persistence                                      │
+│  2. For each indexed field:                                                  │
+│     a. Extract field value from document                                     │
+│     b. Add document key to index: index.add(fieldValue, docKey)             │
+│  3. Mark persistence dirty (hybrid mode)                                     │
+│                                                                               │
+│  UPDATE (JUPDATE):                                                           │
+│  ─────────────────────────────────────────────────────────────               │
+│  1. Get old document                                                         │
+│  2. For each indexed field:                                                  │
+│     a. Remove from old value's set: index.remove(oldValue, docKey)          │
+│     b. Add to new value's set: index.add(newValue, docKey)                  │
+│  3. Update document                                                          │
+│                                                                               │
+│  DELETE:                                                                      │
+│  ─────────────────────────────────────────────────────────────               │
+│  1. For each indexed field:                                                  │
+│     a. Remove document key from index: index.remove(fieldValue, docKey)     │
+│  2. Delete document                                                          │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.5.5 Configuration
+
+Index definitions are stored in `config/index.yaml`:
+
+```yaml
+indexing:
+  enabled: true
+  storage: hybrid              # memory | rocksdb | hybrid
+  rebuild-on-startup: true     # Rebuild indexes from data
+  rebuild-threads: 4           # Parallel rebuild threads
+  max-memory-per-region-mb: 256
+  max-indexes-per-region: 20
+  
+  persistence:
+    enabled: true
+    sync-interval-seconds: 30
+
+regions:
+  customers:
+    indexes:
+      - field: status
+        type: hash
+        description: "Customer status filter"
+      - field: city
+        type: hash
+      - field: age
+        type: btree
+      - field: created_at
+        type: btree
+      - field: status,city      # Composite index
+        type: hash
+
+  orders:
+    indexes:
+      - field: status
+        type: hash
+      - field: customer_id
+        type: hash
+      - field: amount
+        type: btree
+```
+
+### 8.5.6 Memory Usage
+
+| Index Type | Memory per Entry | 100K Documents |
+|------------|------------------|----------------|
+| HASH (low cardinality) | ~50 bytes | ~5 MB |
+| HASH (high cardinality) | ~80 bytes | ~8 MB |
+| BTREE | ~100 bytes | ~10 MB |
+| COMPOSITE (2 fields) | ~120 bytes | ~12 MB |
+
+### 8.5.7 Component Classes
+
+| Class | Responsibility |
+|-------|----------------|
+| `IndexManager` | Central coordinator for all indexes |
+| `IndexConfiguration` | YAML loader with hot-reload support |
+| `HashIndex` | O(1) equality index implementation |
+| `BTreeIndex` | O(log n) range index implementation |
+| `IndexDefinition` | Index metadata (field, type, region) |
+| `IndexController` | REST API and Admin UI endpoints |
 
 ---
 

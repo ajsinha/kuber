@@ -37,13 +37,14 @@
                                     <tr><td><code>DEL</code></td><td><code>DEL key [key ...]</code></td><td>Delete one or more keys</td></tr>
                                     <tr><td><code>EXISTS</code></td><td><code>EXISTS key [key ...]</code></td><td>Check if key(s) exist</td></tr>
                                     <tr><td><code>KEYS</code></td><td><code>KEYS pattern</code></td><td>Find keys matching glob pattern</td></tr>
+                                    <tr class="table-info"><td><code>KEYS/REGEX</code></td><td><code>GET /api/cache/{region}/keys/regex</code></td><td>Find keys matching regex (REST only, v1.8.1)</td></tr>
                                     <tr><td><code>SCAN</code></td><td><code>SCAN cursor [MATCH pattern] [COUNT count]</code></td><td>Incrementally iterate keys</td></tr>
                                     <tr><td><code>TYPE</code></td><td><code>TYPE key</code></td><td>Get type of value at key</td></tr>
                                     <tr><td><code>RENAME</code></td><td><code>RENAME key newkey</code></td><td>Rename a key</td></tr>
                                     <tr><td><code>RENAMENX</code></td><td><code>RENAMENX key newkey</code></td><td>Rename only if newkey doesn't exist</td></tr>
                                     <tr><td><code>DBSIZE</code></td><td><code>DBSIZE</code></td><td>Get number of keys in current region</td></tr>
                                     <tr><td><code>FLUSHDB</code></td><td><code>FLUSHDB</code></td><td>Delete all keys in current region</td></tr>
-                                    <tr><td><code>KSEARCH</code></td><td><code>KSEARCH pattern [LIMIT n]</code></td><td>Regex key search with values (Kuber Extension)</td></tr>
+                                    <tr><td><code>KSEARCH</code></td><td><code>GET /api/cache/{region}/ksearch</code></td><td>Regex key search with values (REST only)</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -223,6 +224,107 @@ Console.WriteLine($"User keys: {string.Join(", ", keys)}");
 // All keys in region
 var allKeys = client.Keys("*");
 Console.WriteLine($"Total keys: {allKeys.Count()}");</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KEYS REGEX - REST API Only -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><code>KEYS REGEX</code> - Find Keys by Regular Expression <span class="badge bg-light text-dark ms-2">v1.8.1</span></h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Find keys matching a Java regular expression pattern. More powerful than glob patterns - supports full regex syntax. <strong>REST API only</strong> (not available via Redis protocol).</p>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            <strong>Tip:</strong> Use <code>keys_regex()</code>/<code>keysRegex()</code> when you only need key names (faster). 
+                            Use <code>search_keys()</code>/<code>SearchKeysAsync()</code> when you need both keys and values.
+                        </div>
+                        
+                        <h6 class="mt-4">REST API Endpoints</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr>
+                                <td><span class="badge bg-success">GET</span></td>
+                                <td><code>/api/cache/{region}/keys/regex?pattern={regex}&amp;limit={limit}</code></td>
+                                <td>Returns keys only (faster)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-success">GET</span></td>
+                                <td><code>/api/cache/{region}/ksearch?pattern={regex}&amp;limit={limit}</code></td>
+                                <td>Returns key, value, type, TTL</td>
+                            </tr>
+                        </table>
+                        
+                        <ul class="nav nav-tabs mt-4" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#keysregex-rest">REST</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#keysregex-python">Python</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#keysregex-java">Java</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#keysregex-csharp">C#</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="keysregex-rest">
+<pre class="bg-dark text-light p-3 rounded"><code># Find keys matching regex (keys only)
+GET /api/cache/default/keys/regex?pattern=^user:\d%2B$&amp;limit=1000
+
+# Find keys with values (full search)
+GET /api/cache/default/ksearch?pattern=^order:2024.*&amp;limit=500
+
+# Common regex patterns:
+# ^user:\d+$       - user: followed by digits
+# .*@gmail\.com$   - ends with @gmail.com
+# ^(order|invoice):.*  - starts with order: or invoice:</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="keysregex-python">
+<pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberRestClient
+
+client = KuberRestClient('localhost', 8080, api_key='kub_xxx')
+
+# Find keys matching regex pattern (keys only - faster)
+keys = client.keys_regex(r'^user:\d+$')
+print(f"Found {len(keys)} user keys")
+
+# With limit
+keys = client.keys_regex(r'.*@gmail\.com$', limit=500)
+
+# Get keys WITH values (slower but includes data)
+results = client.search_keys(r'^order:2024.*')
+for r in results:
+    print(f"Key: {r['key']}, Value: {r['value']}, TTL: {r['ttl']}")</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="keysregex-java">
+<pre class="bg-dark text-light p-3 rounded"><code>KuberRestClient client = new KuberRestClient("localhost", 8080, "kub_xxx");
+
+// Find keys matching regex pattern (keys only - faster)
+List&lt;String&gt; keys = client.keysRegex("^user:\\d+$");
+System.out.println("Found " + keys.size() + " user keys");
+
+// With limit
+keys = client.keysRegex(".*@gmail\\.com$", 500);
+
+// Get keys WITH values (slower but includes data)
+List&lt;Map&lt;String, Object&gt;&gt; results = client.ksearch("^order:2024.*");
+for (Map&lt;String, Object&gt; r : results) {
+    System.out.println("Key: " + r.get("key") + ", Value: " + r.get("value"));
+}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="keysregex-csharp">
+<pre class="bg-dark text-light p-3 rounded"><code>using var client = new KuberRestClient("localhost", 8080, "kub_xxx");
+
+// Find keys matching regex pattern (keys only - faster)
+var keys = await client.KeysRegexAsync(@"^user:\d+$");
+Console.WriteLine($"Found {keys.Count()} user keys");
+
+// With limit
+keys = await client.KeysRegexAsync(@".*@gmail\.com$", 500);
+
+// Get keys WITH values (slower but includes data)
+var results = await client.SearchKeysAsync(@"^order:2024.*");
+foreach (var r in results)
+{
+    Console.WriteLine($"Key: {r.Key}, Value: {r.Value}, TTL: {r.Ttl}");
+}</code></pre>
                             </div>
                         </div>
                     </div>
@@ -412,7 +514,7 @@ foreach (var kv in results) {
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.7.9</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.1</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

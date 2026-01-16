@@ -524,6 +524,55 @@ public class KuberRestClient implements AutoCloseable {
     }
     
     /**
+     * Find keys matching a regular expression pattern.
+     * This is more powerful than keys() which uses glob patterns.
+     * Returns only keys (not values) for efficiency.
+     *
+     * @param regexPattern Java regex pattern (e.g., "^user:\\d+$")
+     * @return List of matching keys
+     */
+    public List<String> keysRegex(String regexPattern) throws IOException {
+        return keysRegex(regexPattern, currentRegion, 1000);
+    }
+    
+    /**
+     * Find keys matching a regular expression pattern with limit.
+     *
+     * @param regexPattern Java regex pattern (e.g., "^user:\\d+$")
+     * @param limit Maximum number of keys to return
+     * @return List of matching keys
+     */
+    public List<String> keysRegex(String regexPattern, int limit) throws IOException {
+        return keysRegex(regexPattern, currentRegion, limit);
+    }
+    
+    /**
+     * Find keys matching a regular expression pattern in specific region.
+     * Returns only keys (not values) for efficiency.
+     * 
+     * Example:
+     *   // Find all keys starting with 'user:' followed by digits
+     *   List&lt;String&gt; keys = client.keysRegex("^user:\\d+$", "customers", 500);
+     *
+     * @param regexPattern Java regex pattern (e.g., "^user:\\d+$", ".*@gmail\\.com$")
+     * @param region Region to search in
+     * @param limit Maximum number of keys to return
+     * @return List of matching keys
+     */
+    public List<String> keysRegex(String regexPattern, String region, int limit) throws IOException {
+        JsonNode result = request("GET", "/api/cache/" + region + "/keys/regex?pattern=" + 
+                java.net.URLEncoder.encode(regexPattern, "UTF-8") + "&limit=" + limit);
+        
+        List<String> keyList = new ArrayList<>();
+        if (result != null && result.isArray()) {
+            for (JsonNode node : result) {
+                keyList.add(node.asText());
+            }
+        }
+        return keyList;
+    }
+    
+    /**
      * Get database size
      */
     public long dbSize() throws IOException {

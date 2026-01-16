@@ -187,7 +187,7 @@ client = KuberClient(
 )
 ```
 
-## Test Data Generators (v1.7.9)
+## Test Data Generators (v1.8.1)
 
 The `testdata` module provides synthetic data generators for testing and development:
 

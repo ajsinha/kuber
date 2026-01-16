@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.7.9</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.8.1</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -652,23 +652,27 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.7.9</span>
-                                    <span class="text-muted small">Current - Parallel Search &amp; Performance Enhancements</span>
+                                    <span class="badge bg-primary me-2">v1.8.1</span>
+                                    <span class="text-muted small">Current - Secondary Indexing &amp; Hybrid Search Architecture</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>January 2026</p>
                                 <ul class="small text-muted mb-0">
-                                    <li><strong>Parallel JSON Search</strong>: High-performance multi-threaded search with up to 8x speedup on large datasets</li>
-                                    <li><strong>Parallel Pattern Search</strong>: Two-phase parallel processing for key pattern searches (4-6x speedup)</li>
-                                    <li><strong>Parallel Multi-Pattern Search</strong>: Parallel evaluation of multiple regex patterns with OR logic</li>
-                                    <li><strong>Configurable Thread Pool</strong>: Default 8 threads, configurable via <code>kuber.search.thread-count</code></li>
-                                    <li><strong>Auto Mode Selection</strong>: Automatically uses parallel for large datasets (&gt;1000 keys), sequential for small</li>
-                                    <li><strong>Early Termination</strong>: Stops all threads when result limit is reached for efficiency</li>
-                                    <li><strong>Regex Pattern Caching</strong>: Compiled regex patterns cached for repeated searches</li>
-                                    <li><strong>Search Statistics API</strong>: New <code>/api/search/stats</code> endpoint for monitoring search performance</li>
-                                    <li><strong>Configurable Timeout</strong>: Search timeout with partial results (default: 60 seconds)</li>
-                                    <li><strong>RocksDB Default</strong>: Changed default persistence from LMDB to RocksDB for better production performance</li>
-                                    <li><strong>ASCII Normalization</strong>: Autoload automatically normalizes non-ASCII text to US-ASCII (configurable)</li>
-                                    <li><strong>Encoding Auto-Detection</strong>: Autoload detects file encoding via BOM and character validation</li>
+                                    <li><strong>Secondary Indexing</strong>: Hash and BTree indexes for O(1) and O(log n) lookups instead of full table scans</li>
+                                    <li><strong>Hybrid Storage</strong>: In-memory indexes for queries + RocksDB persistence for durability</li>
+                                    <li><strong>Index Configuration</strong>: Define indexes per region in <code>config/index.yaml</code></li>
+                                    <li><strong>Index Management UI</strong>: Admin page at <code>/admin/indexes</code> for creating, viewing, rebuilding indexes</li>
+                                    <li><strong>Index REST API</strong>: Full CRUD operations at <code>/api/v1/regions/{region}/indexes</code></li>
+                                    <li><strong>Query Optimizer</strong>: Automatically selects best index for queries (intersection for AND logic)</li>
+                                    <li><strong>Hash Index</strong>: O(1) lookups for equality queries (status, city, category)</li>
+                                    <li><strong>BTree Index</strong>: O(log n) range queries (age &gt; 30, date BETWEEN, price &lt; 100)</li>
+                                    <li><strong>Composite Indexes</strong>: Multi-field indexes for common query patterns</li>
+                                    <li><strong>Auto Index Maintenance</strong>: Indexes updated automatically on INSERT/UPDATE/DELETE</li>
+                                    <li><strong>Index Rebuild</strong>: On-demand or startup rebuild with parallel processing</li>
+                                    <li><strong>Performance</strong>: 100-1000x speedup for indexed queries vs full scan</li>
+                                    <li><strong>Parallel JSON Search</strong>: Multi-threaded search with up to 8x speedup on large datasets</li>
+                                    <li><strong>Parallel Pattern Search</strong>: Two-phase parallel processing for key pattern searches</li>
+                                    <li><strong>Search Statistics</strong>: Monitor index hit rates, query performance at <code>/api/v1/indexes/stats</code></li>
+                                    <li><strong>Hot Reload</strong>: Index configuration changes detected and applied without restart</li>
                                 </ul>
                             </div>
                             <div class="mb-4">
@@ -773,7 +777,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.7.9
+                                <strong>Version:</strong> 1.8.1
                             </li>
                         </ul>
                     </div>
@@ -832,7 +836,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.7.9
+                                <strong>Version:</strong> 1.8.1
                             </li>
                         </ul>
                     </div>

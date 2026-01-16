@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Generic Search Demo (v1.7.9)
+ * Kuber REST API - Generic Search Demo (v1.8.1)
  *
  * This standalone Java application demonstrates ALL search capabilities of the Kuber
  * Generic Search API including:
@@ -15,6 +15,9 @@
  *    - Comparison operators (gt, gte, lt, lte, eq, ne)
  *    - Combined AND logic across multiple attributes
  * 6. Field projection (select specific fields)
+ * 7. Regex Key Search (v1.8.1):
+ *    - keysRegex() - Keys only (faster)
+ *    - searchKeys() - Keys with values
  *
  * Usage:
  *     javac RestGenericSearchDemo.java
@@ -111,6 +114,36 @@ public class RestGenericSearchDemo {
 
     public void putJson(String region, String key, String jsonValue) throws IOException {
         doPost("/cache/" + region + "/" + key, jsonValue);
+    }
+
+    /**
+     * Find keys matching a regex pattern (keys only, no values).
+     * More efficient than searchKeys when you only need key names.
+     * 
+     * @param region Cache region
+     * @param pattern Java regex pattern (e.g., "^user:\\d+$")
+     * @param limit Maximum number of keys to return
+     * @return JSON response with list of matching keys
+     */
+    public String keysRegex(String region, String pattern, int limit) throws IOException {
+        String encodedPattern = URLEncoder.encode(pattern, StandardCharsets.UTF_8.toString());
+        String endpoint = "/cache/" + region + "/keys/regex?pattern=" + encodedPattern + "&limit=" + limit;
+        return doGet(endpoint.replace("/v1", ""));
+    }
+
+    /**
+     * Search keys by regex pattern and return key-value pairs.
+     * Returns full details including key, value, type, and TTL.
+     * 
+     * @param region Cache region
+     * @param pattern Java regex pattern (e.g., "^order:.*")
+     * @param limit Maximum number of results
+     * @return JSON response with list of key-value objects
+     */
+    public String searchKeys(String region, String pattern, int limit) throws IOException {
+        String encodedPattern = URLEncoder.encode(pattern, StandardCharsets.UTF_8.toString());
+        String endpoint = "/cache/" + region + "/ksearch?pattern=" + encodedPattern + "&limit=" + limit;
+        return doGet(endpoint.replace("/v1", ""));
     }
 
     // ==================== JSON Builder Helpers ====================
@@ -628,6 +661,75 @@ public class RestGenericSearchDemo {
         printResult(genericSearch(req));
     }
 
+    private void demoRegexKeySearch(String region) throws IOException {
+        printHeader("10. REGEX KEY SEARCH (v1.8.1 - REST API)");
+
+        System.out.println("""
+    
+    New in v1.8.1: Two dedicated REST endpoints for regex-based key search:
+    
+    1. keysRegex() - Returns KEYS ONLY (faster, no value retrieval)
+       Endpoint: GET /api/cache/{region}/keys/regex?pattern={regex}&limit={limit}
+    
+    2. searchKeys() - Returns KEYS + VALUES (full details)
+       Endpoint: GET /api/cache/{region}/ksearch?pattern={regex}&limit={limit}
+        """);
+
+        // 10a. Keys only - find all customer keys
+        printSubheader("10a. keysRegex() - Find Customer Keys (keys only)");
+        System.out.println("    Pattern: ^customer_C00[1-5]$");
+        System.out.println("    Returns: List of matching key names only");
+        String result = keysRegex(region, "^customer_C00[1-5]$", 1000);
+        System.out.println("    URL: GET /api/cache/" + region + "/keys/regex?pattern=^customer_C00[1-5]$");
+        printResult(result);
+
+        // 10b. Keys only - find all order keys
+        printSubheader("10b. keysRegex() - Find Order Keys");
+        System.out.println("    Pattern: ^order_.*");
+        result = keysRegex(region, "^order_.*", 1000);
+        System.out.println("    URL: GET /api/cache/" + region + "/keys/regex?pattern=^order_.*");
+        printResult(result);
+
+        // 10c. Keys with values - customer search
+        printSubheader("10c. searchKeys() - Customer Keys with Values");
+        System.out.println("    Pattern: ^customer_C00[1-3]$");
+        System.out.println("    Returns: key, value, type, ttl for each match");
+        result = searchKeys(region, "^customer_C00[1-3]$", 1000);
+        System.out.println("    URL: GET /api/cache/" + region + "/ksearch?pattern=^customer_C00[1-3]$");
+        printResult(result);
+
+        // 10d. Keys with values - order search with limit
+        printSubheader("10d. searchKeys() - Orders with Limit");
+        System.out.println("    Pattern: ^order_ORD00.*");
+        System.out.println("    Limit: 3");
+        result = searchKeys(region, "^order_ORD00.*", 3);
+        System.out.println("    URL: GET /api/cache/" + region + "/ksearch?pattern=^order_ORD00.*&limit=3");
+        printResult(result);
+
+        // 10e. Complex regex pattern
+        printSubheader("10e. Complex Regex - Keys ending with digits 1-5");
+        System.out.println("    Pattern: .*(1|2|3|4|5)$");
+        result = keysRegex(region, ".*(1|2|3|4|5)$", 10);
+        printResult(result);
+
+        // 10f. Performance comparison note
+        printSubheader("10f. Performance Comparison");
+        System.out.println("""
+    
+    ┌─────────────────┬────────────────────────────────────────────────────┐
+    │ Method          │ Use Case                                           │
+    ├─────────────────┼────────────────────────────────────────────────────┤
+    │ keysRegex()     │ When you only need key names (faster, less data)   │
+    │                 │ Example: Count keys, list for deletion, pagination │
+    ├─────────────────┼────────────────────────────────────────────────────┤
+    │ searchKeys()    │ When you need key + value + metadata               │
+    │                 │ Example: Display results, export data, debugging   │
+    └─────────────────┴────────────────────────────────────────────────────┘
+    
+    Both methods use in-memory KeyIndex for O(1) key lookups!
+        """);
+    }
+
     // ==================== Main ====================
 
     public void runDemo(String region) {
@@ -642,6 +744,7 @@ public class RestGenericSearchDemo {
             demoComplexSearches(region);
             demoFieldProjection(region);
             demoLimitResults(region);
+            demoRegexKeySearch(region);  // New in v1.8.1
 
             printHeader("DEMO COMPLETE");
             System.out.println("""
@@ -652,7 +755,7 @@ This demo showcased all Generic Search API capabilities:
      - Single key: {"key": "abc"}
      - Multi-key: {"keys": ["a", "b", "c"]}
 
-  2. PATTERN SEARCHES (Regex)
+  2. PATTERN SEARCHES (Regex via Generic Search)
      - Single pattern: {"keypattern": "user_.*"}
      - Multi-pattern: {"keypatterns": ["user_.*", "admin_.*"]}
 
@@ -672,7 +775,15 @@ This demo showcased all Generic Search API capabilities:
   6. LIMITING RESULTS
      - Max results: {"limit": 100}
 
-API Endpoint: POST /api/v1/genericsearch
+  7. REGEX KEY SEARCH (v1.8.1 - REST API only)
+     - Keys only:   GET /api/cache/{region}/keys/regex?pattern={regex}
+     - Keys+Values: GET /api/cache/{region}/ksearch?pattern={regex}
+     - Java:        client.keysRegex(pattern) / client.ksearch(pattern)
+
+API Endpoints:
+  - Generic Search: POST /api/v1/genericsearch
+  - Keys by Regex:  GET /api/cache/{region}/keys/regex
+  - Key Search:     GET /api/cache/{region}/ksearch
             """);
 
         } catch (Exception e) {
@@ -688,7 +799,7 @@ API Endpoint: POST /api/v1/genericsearch
         String region = args.length > 3 ? args[3] : "search_demo_java";
 
         System.out.println("=".repeat(80));
-        System.out.println("  KUBER REST API - GENERIC SEARCH DEMO (v1.7.9) - Java");
+        System.out.println("  KUBER REST API - GENERIC SEARCH DEMO (v1.8.1) - Java");
         System.out.println("=".repeat(80));
         System.out.println("  Server:  " + host + ":" + port);
         System.out.println("  Region:  " + region);
