@@ -1,4 +1,0 @@
-region:mock_trades
-ttl:86400
-key_field:source_system/trade_id
-delimiter:|

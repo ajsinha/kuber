@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
  * RESP (Redis Serialization Protocol) codec factory for Apache MINA.
  * Handles both RESP array format and inline commands.
  * 
- * @version 1.8.1
+ * @version 1.8.2
  */
 public class RedisProtocolCodecFactory implements ProtocolCodecFactory {
     

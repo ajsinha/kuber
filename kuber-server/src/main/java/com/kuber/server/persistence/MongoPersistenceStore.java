@@ -361,17 +361,82 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
         return collection.countDocuments();
     }
     
+    /**
+     * Fast estimate of entry count using MongoDB's estimatedDocumentCount().
+     * This uses collection metadata and is O(1) - suitable for dashboard display.
+     * Unlike countDocuments(), this does not scan the collection.
+     */
+    @Override
+    public long estimateEntryCount(String region) {
+        try {
+            String collectionName = getCollectionName(region);
+            MongoCollection<Document> collection = database.getCollection(collectionName);
+            return collection.estimatedDocumentCount();
+        } catch (Exception e) {
+            log.debug("Could not get estimated count for region '{}': {}", region, e.getMessage());
+            return countEntries(region);
+        }
+    }
+    
     @Override
     public List<String> getKeys(String region, String pattern, int limit) {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);
         
         List<String> keys = new ArrayList<>();
-        collection.find()
-                .projection(Projections.include("key"))
-                .forEach(doc -> keys.add(doc.getString("key")));
         
-        return filterKeys(keys, pattern, limit);
+        // Use server-side regex filtering if pattern is specified
+        if (pattern != null && !pattern.isEmpty() && !"*".equals(pattern)) {
+            String regex = globToMongoRegex(pattern);
+            collection.find(Filters.regex("key", regex))
+                    .projection(Projections.include("key"))
+                    .limit(limit > 0 ? limit : 0)
+                    .forEach(doc -> keys.add(doc.getString("key")));
+        } else {
+            // No pattern - just apply limit
+            var cursor = collection.find()
+                    .projection(Projections.include("key"));
+            if (limit > 0) {
+                cursor = cursor.limit(limit);
+            }
+            cursor.forEach(doc -> keys.add(doc.getString("key")));
+        }
+        
+        return keys;
+    }
+    
+    /**
+     * Iterate through all entries in a region without loading all into memory.
+     * Uses MongoDB cursor for memory-efficient streaming - critical for startup
+     * data loading and backup operations on large regions.
+     * 
+     * @param region Region name
+     * @param consumer Consumer to process each entry
+     * @return Number of entries processed
+     * @since 1.8.2
+     */
+    @Override
+    public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        long count = 0;
+        try (var cursor = collection.find().cursor()) {
+            while (cursor.hasNext()) {
+                try {
+                    Document doc = cursor.next();
+                    CacheEntry entry = documentToEntry(doc, region);
+                    if (!entry.isExpired()) {
+                        consumer.accept(entry);
+                        count++;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse entry during MongoDB iteration: {}", e.getMessage());
+                }
+            }
+        }
+        
+        return count;
     }
     
     @Override
@@ -422,18 +487,71 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
         String collectionName = getCollectionName(region);
         MongoCollection<Document> collection = database.getCollection(collectionName);
         
-        // Filter where expiresAt is null OR expiresAt >= now
-        Bson filter = Filters.or(
+        // Build compound filter: non-expired AND optional key pattern
+        List<Bson> filters = new ArrayList<>();
+        
+        // Non-expired filter
+        filters.add(Filters.or(
                 Filters.eq("expiresAt", null),
                 Filters.gte("expiresAt", Instant.now())
-        );
+        ));
+        
+        // Key pattern filter (server-side)
+        if (pattern != null && !pattern.isEmpty() && !"*".equals(pattern)) {
+            filters.add(Filters.regex("key", globToMongoRegex(pattern)));
+        }
         
         List<String> keys = new ArrayList<>();
-        collection.find(filter)
-                .projection(Projections.include("key"))
-                .forEach(doc -> keys.add(doc.getString("key")));
+        var cursor = collection.find(Filters.and(filters))
+                .projection(Projections.include("key"));
+        if (limit > 0) {
+            cursor = cursor.limit(limit);
+        }
+        cursor.forEach(doc -> keys.add(doc.getString("key")));
         
-        return filterKeys(keys, pattern, limit);
+        return keys;
+    }
+    
+    /**
+     * Convert a glob pattern to a MongoDB-compatible regex string.
+     * Handles *, ? wildcards and escapes special regex characters.
+     */
+    private String globToMongoRegex(String glob) {
+        if (glob == null || glob.isEmpty() || glob.equals("*")) {
+            return ".*";
+        }
+        
+        StringBuilder regex = new StringBuilder("^");
+        for (char c : glob.toCharArray()) {
+            switch (c) {
+                case '*':
+                    regex.append(".*");
+                    break;
+                case '?':
+                    regex.append(".");
+                    break;
+                case '.':
+                case '(':
+                case ')':
+                case '+':
+                case '|':
+                case '^':
+                case '$':
+                case '@':
+                case '%':
+                case '\\':
+                case '{':
+                case '}':
+                case '[':
+                case ']':
+                    regex.append("\\").append(c);
+                    break;
+                default:
+                    regex.append(c);
+            }
+        }
+        regex.append("$");
+        return regex.toString();
     }
     
     private Document entryToDocument(CacheEntry entry) {

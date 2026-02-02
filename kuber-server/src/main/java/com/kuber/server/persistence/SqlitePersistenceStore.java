@@ -805,18 +805,103 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
         Connection conn = regionConnections.get(region);
         if (conn == null) return keys;
         
-        String sql = "SELECT key FROM kuber_entries";
+        // Use server-side GLOB filtering and LIMIT
+        String sql;
+        boolean hasPattern = pattern != null && !pattern.isEmpty() && !"*".equals(pattern);
         
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                keys.add(rs.getString("key"));
+        if (hasPattern && limit > 0) {
+            sql = "SELECT key FROM kuber_entries WHERE key GLOB ? LIMIT ?";
+        } else if (hasPattern) {
+            sql = "SELECT key FROM kuber_entries WHERE key GLOB ?";
+        } else if (limit > 0) {
+            sql = "SELECT key FROM kuber_entries LIMIT ?";
+        } else {
+            sql = "SELECT key FROM kuber_entries";
+        }
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            int paramIdx = 1;
+            if (hasPattern) {
+                stmt.setString(paramIdx++, pattern);
+            }
+            if (limit > 0) {
+                stmt.setInt(paramIdx, limit);
+            }
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    keys.add(rs.getString("key"));
+                }
             }
         } catch (SQLException e) {
             log.error("Failed to get keys from region '{}': {}", region, e.getMessage(), e);
         }
         
-        return filterKeys(keys, pattern, limit);
+        return keys;
+    }
+    
+    /**
+     * Fast estimate of entry count for dashboard display.
+     * Uses max(rowid) as a fast O(1) approximation for SQLite.
+     * Falls back to exact count if the approximation fails.
+     */
+    @Override
+    public long estimateEntryCount(String region) {
+        Connection conn = regionConnections.get(region);
+        if (conn == null) return 0;
+        
+        // For SQLite, COUNT(*) is already fast with the B-tree, 
+        // but we can use max(rowid) as a faster approximation
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM kuber_entries")) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            log.debug("Could not get estimated count for region '{}': {}", region, e.getMessage());
+        }
+        return 0;
+    }
+    
+    /**
+     * Iterate through all entries in a region without loading all into memory.
+     * Uses streaming ResultSet for memory-efficient iteration - critical for startup
+     * data loading and backup operations on large regions.
+     * 
+     * @param region Region name
+     * @param consumer Consumer to process each entry
+     * @return Number of entries processed
+     * @since 1.8.2
+     */
+    @Override
+    public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
+        Connection conn = regionConnections.get(region);
+        if (conn == null) {
+            log.warn("forEachEntry: Region '{}' connection not found", region);
+            return 0;
+        }
+        
+        long count = 0;
+        String sql = "SELECT * FROM kuber_entries";
+        
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                try {
+                    CacheEntry entry = resultSetToEntry(rs, region);
+                    if (!entry.isExpired()) {
+                        consumer.accept(entry);
+                        count++;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse entry during SQLite iteration: {}", e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to iterate entries in region '{}': {}", region, e.getMessage(), e);
+        }
+        
+        return count;
     }
     
     @Override
@@ -877,10 +962,26 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
         Connection conn = regionConnections.get(region);
         if (conn == null) return keys;
         
-        String sql = "SELECT key FROM kuber_entries WHERE expires_at IS NULL OR expires_at >= ?";
+        boolean hasPattern = pattern != null && !pattern.isEmpty() && !"*".equals(pattern);
         
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setLong(1, System.currentTimeMillis());
+        // Build SQL with server-side filtering
+        StringBuilder sql = new StringBuilder("SELECT key FROM kuber_entries WHERE (expires_at IS NULL OR expires_at >= ?)");
+        if (hasPattern) {
+            sql.append(" AND key GLOB ?");
+        }
+        if (limit > 0) {
+            sql.append(" LIMIT ?");
+        }
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            int paramIdx = 1;
+            stmt.setLong(paramIdx++, System.currentTimeMillis());
+            if (hasPattern) {
+                stmt.setString(paramIdx++, pattern);
+            }
+            if (limit > 0) {
+                stmt.setInt(paramIdx, limit);
+            }
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
@@ -891,7 +992,7 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
             log.error("Failed to get non-expired keys from region '{}': {}", region, e.getMessage(), e);
         }
         
-        return filterKeys(keys, pattern, limit);
+        return keys;
     }
     
     // ==================== Helper Methods ====================

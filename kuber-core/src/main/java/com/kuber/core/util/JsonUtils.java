@@ -274,7 +274,8 @@ public final class JsonUtils {
             case "regex":
                 try {
                     Pattern pattern = Pattern.compile(value);
-                    return pattern.matcher(actualValue).matches();
+                    // Use find() for partial match, not matches() which requires full string match
+                    return pattern.matcher(actualValue).find();
                 } catch (Exception e) {
                     return false;
                 }
@@ -464,13 +465,16 @@ public final class JsonUtils {
                 String field = condition.substring(0, idx).trim();
                 String value = condition.substring(idx + op.length()).trim();
                 
+                // Strip surrounding quotes from value if present
+                value = stripQuotes(value);
+                
                 // Check for IN clause syntax: [value1|value2|value3]
                 if (value.startsWith("[") && value.endsWith("]")) {
                     String innerValues = value.substring(1, value.length() - 1);
                     String[] parts = innerValues.split("\\|");
                     List<String> valueList = new ArrayList<>();
                     for (String part : parts) {
-                        String trimmed = part.trim();
+                        String trimmed = stripQuotes(part.trim());
                         if (!trimmed.isEmpty()) {
                             valueList.add(trimmed);
                         }
@@ -485,6 +489,20 @@ public final class JsonUtils {
         }
         
         return null;
+    }
+    
+    /**
+     * Strip surrounding single or double quotes from a value.
+     */
+    private static String stripQuotes(String value) {
+        if (value == null || value.length() < 2) {
+            return value;
+        }
+        if ((value.startsWith("\"") && value.endsWith("\"")) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
     
     /**

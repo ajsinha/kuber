@@ -72,8 +72,8 @@ import java.util.regex.Pattern;
  *     file-watcher-directory: .      # Directory to watch (default: current dir)
  * </pre>
  * 
- * @version 1.8.1
- * @since 1.8.1
+ * @version 1.8.2
+ * @since 1.8.2
  */
 @Service
 @Slf4j

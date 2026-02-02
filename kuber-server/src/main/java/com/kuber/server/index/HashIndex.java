@@ -22,8 +22,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Thread-safe implementation using ConcurrentHashMap.
  * 
- * @version 1.8.1
- * @since 1.8.1
+ * @version 1.8.2
+ * @since 1.8.2
  */
 @Slf4j
 public class HashIndex implements SecondaryIndex {

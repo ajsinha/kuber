@@ -1,6 +1,6 @@
 # How to Start Kuber Server
 
-**Version 1.8.1**
+**Version 1.8.2**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -98,7 +98,7 @@ mvn clean install
 
 After successful build, the server JAR is located at:
 ```
-kuber-server/target/kuber-server-1.8.1.jar
+kuber-server/target/kuber-server-1.8.2.jar
 ```
 
 ### Build Specific Module
@@ -127,17 +127,17 @@ dotnet build
 ```bash
 # Basic start (includes required JVM options)
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server/target/kuber-server-1.8.1.jar
+     -jar kuber-server/target/kuber-server-1.8.2.jar
 
 # With specific memory settings
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
      -Xms512m -Xmx2g \
-     -jar kuber-server/target/kuber-server-1.8.1.jar
+     -jar kuber-server/target/kuber-server-1.8.2.jar
 
 # With garbage collector tuning (for large heaps)
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
      -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
-     -jar kuber-server/target/kuber-server-1.8.1.jar
+     -jar kuber-server/target/kuber-server-1.8.2.jar
 ```
 
 ### Method 2: Using Maven (Recommended for Development)
@@ -444,7 +444,7 @@ docker run -d \
   -e SPRING_SECURITY_USER_PASSWORD=secret \
   -p 8080:8080 \
   -p 6380:6380 \
-  kuber-server:1.8.1
+  kuber-server:1.8.2
 ```
 
 ---
@@ -597,7 +597,7 @@ Create `start-kuber.sh`:
 KUBER_HOME=/opt/kuber
 # Required: --add-opens for LMDB persistence on Java 9+
 JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -Xms4g -Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-KUBER_JAR="${KUBER_HOME}/kuber-server-1.8.1.jar"
+KUBER_JAR="${KUBER_HOME}/kuber-server-1.8.2.jar"
 CONFIG_DIR="${KUBER_HOME}/config"
 LOG_DIR="${KUBER_HOME}/logs"
 PID_FILE="${KUBER_HOME}/kuber.pid"
@@ -756,7 +756,7 @@ java -jar kuber-server.jar \
 
 ```bash
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server-1.8.1.jar
+     -jar kuber-server-1.8.2.jar
 ```
 
 ### Typical Production Start

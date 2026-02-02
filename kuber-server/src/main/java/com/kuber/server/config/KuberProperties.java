@@ -116,7 +116,7 @@ public class KuberProperties {
     
     /**
      * Secondary indexing configuration including file watcher settings.
-     * @since 1.8.1
+     * @since 1.8.2
      */
     private Indexing indexing = new Indexing();
     
@@ -1493,7 +1493,7 @@ public class KuberProperties {
      *   <li>{@code kuber.index.<region>.<field>.create.<type>} - Create new index</li>
      * </ul>
      * 
-     * @since 1.8.1
+     * @since 1.8.2
      */
     @Data
     public static class Indexing {

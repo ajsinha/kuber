@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright (c) 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Kuber v1.8.2 - Persistence Configuration Help
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Persistence Configuration')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+<div class="container-fluid py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Persistence Configuration</li>
+        </ol>
+    </nav>
+    
+    <h1 class="mb-4"><i class="fas fa-database text-primary me-2"></i>Persistence Configuration Guide</h1>
+    
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Persistence Backends:</strong> Kuber supports 6 persistence backends &mdash; <strong>RocksDB</strong>, <strong>LMDB</strong>, <strong>SQLite</strong>, <strong>PostgreSQL</strong>, <strong>MongoDB</strong>, and <strong>Memory</strong> (no persistence). Each backend is fully interchangeable via a single configuration property. This guide covers how to choose, configure, and tune each backend for your workload.
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Contents</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="text-primary">Overview</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#choosing">Choosing a Backend</a></li>
+                        <li><a href="#comparison">Comparison Matrix</a></li>
+                        <li><a href="#decision-tree">Decision Flowchart</a></li>
+                        <li><a href="#common-properties">Common Properties</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-success">Embedded Backends</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#rocksdb">RocksDB</a></li>
+                        <li><a href="#lmdb">LMDB</a></li>
+                        <li><a href="#sqlite">SQLite</a></li>
+                        <li><a href="#memory">Memory (No Persistence)</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-warning">External Backends</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#postgresql">PostgreSQL</a></li>
+                        <li><a href="#mongodb">MongoDB</a></li>
+                        <li><a href="#async-writes">Async Batched Writes</a></li>
+                        <li><a href="#migration">Migrating Between Backends</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- CHOOSING A BACKEND                                                -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="choosing">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fas fa-compass me-2"></i>Choosing a Persistence Backend</h4>
+        </div>
+        <div class="card-body">
+            <p>The persistence backend is responsible for durably storing cache data so it survives server restarts. Every backend implements the same <code>PersistenceStore</code> interface with full feature parity (as of v1.8.2), so your choice comes down to <strong>operational requirements</strong>, <strong>performance characteristics</strong>, and <strong>deployment constraints</strong>.</p>
+            
+            <p>To select a backend, set this single property in <code>application.properties</code>:</p>
+            
+            <pre class="bg-dark text-light p-3 rounded"><code># Supported types: rocksdb, lmdb, mongodb, sqlite, postgresql, memory
+kuber.persistence.type=rocksdb</code></pre>
+            
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Important:</strong> Changing the persistence type does not migrate data. You must export/import data manually or use the backup/restore feature when switching backends. See <a href="#migration">Migrating Between Backends</a>.
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- COMPARISON MATRIX                                                 -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="comparison">
+        <div class="card-header bg-dark text-white">
+            <h4 class="mb-0"><i class="fas fa-table me-2"></i>Backend Comparison Matrix</h4>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 16%">Feature</th>
+                            <th class="text-center" style="width: 14%">RocksDB</th>
+                            <th class="text-center" style="width: 14%">LMDB</th>
+                            <th class="text-center" style="width: 14%">SQLite</th>
+                            <th class="text-center" style="width: 14%">PostgreSQL</th>
+                            <th class="text-center" style="width: 14%">MongoDB</th>
+                            <th class="text-center" style="width: 14%">Memory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Type</strong></td>
+                            <td class="text-center"><span class="badge bg-success">Embedded</span></td>
+                            <td class="text-center"><span class="badge bg-success">Embedded</span></td>
+                            <td class="text-center"><span class="badge bg-success">Embedded</span></td>
+                            <td class="text-center"><span class="badge bg-info">External</span></td>
+                            <td class="text-center"><span class="badge bg-info">External</span></td>
+                            <td class="text-center"><span class="badge bg-secondary">None</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Write Speed</strong></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Read Speed</strong></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Large Datasets</strong></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-danger fw-bold">★</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Crash Recovery</strong></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-danger fw-bold">★</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Operational Overhead</strong></td>
+                            <td class="text-center"><span class="text-success">Low</span></td>
+                            <td class="text-center"><span class="text-success">Lowest</span></td>
+                            <td class="text-center"><span class="text-success">Low</span></td>
+                            <td class="text-center"><span class="text-warning">Medium</span></td>
+                            <td class="text-center"><span class="text-warning">Medium</span></td>
+                            <td class="text-center"><span class="text-success">None</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>External Dependency</strong></td>
+                            <td class="text-center"><span class="badge bg-success">None</span></td>
+                            <td class="text-center"><span class="badge bg-success">None</span></td>
+                            <td class="text-center"><span class="badge bg-success">None</span></td>
+                            <td class="text-center"><span class="badge bg-warning text-dark">PostgreSQL</span></td>
+                            <td class="text-center"><span class="badge bg-warning text-dark">MongoDB</span></td>
+                            <td class="text-center"><span class="badge bg-success">None</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>JSON Querying</strong></td>
+                            <td class="text-center">Client-side</td>
+                            <td class="text-center">Client-side</td>
+                            <td class="text-center">Client-side</td>
+                            <td class="text-center"><span class="text-success fw-bold">JSONB + GIN</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">Native BSON</span></td>
+                            <td class="text-center">Client-side</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Shared Access</strong></td>
+                            <td class="text-center"><span class="text-danger">Single Process</span></td>
+                            <td class="text-center"><span class="text-danger">Single Process</span></td>
+                            <td class="text-center"><span class="text-danger">Single Process</span></td>
+                            <td class="text-center"><span class="text-success">Multi-Process</span></td>
+                            <td class="text-center"><span class="text-success">Multi-Process</span></td>
+                            <td class="text-center"><span class="text-danger">Single Process</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Disk Space</strong></td>
+                            <td class="text-center">Moderate <small class="text-muted">(compaction)</small></td>
+                            <td class="text-center">Moderate <small class="text-muted">(sparse file)</small></td>
+                            <td class="text-center">Compact <small class="text-muted">(VACUUM)</small></td>
+                            <td class="text-center">Managed <small class="text-muted">(autovacuum)</small></td>
+                            <td class="text-center">Managed <small class="text-muted">(WiredTiger)</small></td>
+                            <td class="text-center">N/A</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Best For</strong></td>
+                            <td class="text-center"><small>Write-heavy workloads, large datasets</small></td>
+                            <td class="text-center"><small>Read-heavy workloads, low latency</small></td>
+                            <td class="text-center"><small>Development, small deployments</small></td>
+                            <td class="text-center"><small>Enterprise with existing PG infra</small></td>
+                            <td class="text-center"><small>Document queries, existing Mongo infra</small></td>
+                            <td class="text-center"><small>Testing, ephemeral caches</small></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- DECISION FLOWCHART                                                -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="decision-tree">
+        <div class="card-header bg-dark text-white">
+            <h4 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Which Backend Should I Use?</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-lg-6">
+                    <h5 class="text-primary"><i class="fas fa-check-circle me-1"></i> Use <strong>RocksDB</strong> if&hellip;</h5>
+                    <ul>
+                        <li>You have a <strong>write-heavy workload</strong> (high throughput ingestion)</li>
+                        <li>Your dataset is <strong>very large</strong> (hundreds of millions of entries)</li>
+                        <li>You want the <strong>best write throughput</strong> of any embedded backend</li>
+                        <li>You need <strong>background compaction</strong> for space reclamation</li>
+                        <li>You want the <strong>default, production-proven</strong> choice</li>
+                    </ul>
+                    
+                    <h5 class="text-primary mt-4"><i class="fas fa-check-circle me-1"></i> Use <strong>LMDB</strong> if&hellip;</h5>
+                    <ul>
+                        <li>You have a <strong>read-heavy workload</strong> (reads far outnumber writes)</li>
+                        <li>You want the <strong>absolute lowest read latency</strong> (zero-copy memory mapping)</li>
+                        <li>You need <strong>predictable, consistent latency</strong> with no background work</li>
+                        <li>You want <strong>zero recovery time</strong> after crash (no WAL replay)</li>
+                        <li>You prefer the <strong>simplest possible deployment</strong></li>
+                    </ul>
+                </div>
+                <div class="col-lg-6">
+                    <h5 class="text-success"><i class="fas fa-check-circle me-1"></i> Use <strong>PostgreSQL</strong> if&hellip;</h5>
+                    <ul>
+                        <li>Your organization already runs <strong>managed PostgreSQL</strong> (RDS, Cloud SQL)</li>
+                        <li>You need <strong>multiple Kuber instances</strong> sharing one persistence layer</li>
+                        <li>You want <strong>JSONB + GIN</strong> for server-side JSON queries</li>
+                        <li>Your DBA team is comfortable with <strong>PostgreSQL tuning and backups</strong></li>
+                    </ul>
+                    
+                    <h5 class="text-success mt-4"><i class="fas fa-check-circle me-1"></i> Use <strong>MongoDB</strong> if&hellip;</h5>
+                    <ul>
+                        <li>Your organization already runs <strong>MongoDB Atlas</strong> or self-hosted clusters</li>
+                        <li>You want <strong>native BSON document queries</strong> on cached JSON data</li>
+                        <li>You need <strong>horizontal scalability</strong> via sharding for the persistence tier</li>
+                    </ul>
+                    
+                    <h5 class="text-warning mt-4"><i class="fas fa-check-circle me-1"></i> Use <strong>SQLite</strong> if&hellip;</h5>
+                    <ul>
+                        <li>You need a <strong>simple, file-based</strong> persistence with SQL query capability</li>
+                        <li>You are running a <strong>development</strong> or <strong>edge/IoT deployment</strong></li>
+                        <li>Your dataset is <strong>moderate</strong> (up to a few million entries)</li>
+                    </ul>
+                    
+                    <h5 class="text-danger mt-4"><i class="fas fa-check-circle me-1"></i> Use <strong>Memory</strong> if&hellip;</h5>
+                    <ul>
+                        <li>You are <strong>testing or prototyping</strong></li>
+                        <li>You explicitly want <strong>no disk I/O</strong></li>
+                        <li>Data loss on restart is <strong>perfectly acceptable</strong></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- COMMON PROPERTIES                                                 -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="common-properties">
+        <div class="card-header bg-secondary text-white">
+            <h4 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Common Properties (All Backends)</h4>
+        </div>
+        <div class="card-body">
+            <p>These properties apply regardless of which persistence backend is selected:</p>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:40%">Property</th>
+                            <th style="width:12%">Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.persistence.type</code></td>
+                            <td><code>rocksdb</code></td>
+                            <td>
+                                <strong>The persistence backend to use.</strong>
+                                Accepted values: <code>rocksdb</code>, <code>lmdb</code>, <code>sqlite</code>, <code>postgresql</code>, <code>mongodb</code>, <code>memory</code>.
+                                Changing this value requires a restart. Data is <strong>not migrated automatically</strong> between backends &mdash; use backup/restore to move data.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.sync-individual-writes</code></td>
+                            <td><code>false</code></td>
+                            <td>
+                                <strong>Controls write durability for individual PUT/SET operations.</strong>
+                                <br><br>
+                                <strong><code>false</code> (async, default):</strong> Writes go to in-memory cache immediately and are flushed to disk in the background via the batched async writer. This gives 10&ndash;100&times; better write throughput. The tradeoff is that a crash between the in-memory write and the next disk flush can lose a small number of entries.
+                                <br><br>
+                                <strong><code>true</code> (sync):</strong> Each write blocks until the data is confirmed on disk. Maximum durability at the cost of latency (~1&ndash;5ms per write due to <code>fsync</code>). Use this if you cannot tolerate any data loss.
+                                <br><br>
+                                <em>Note:</em> Batch operations (autoload, bulk import) always use async mode regardless of this setting for throughput.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.cache.persistence-batch-size</code></td>
+                            <td><code>100</code></td>
+                            <td>
+                                <strong>Number of entries to accumulate before flushing to disk.</strong>
+                                The async persistence engine collects this many entries before issuing a batch write. Larger batches improve throughput but increase the window of data at risk.
+                                Recommended values: 50&ndash;500 for most workloads. Set higher (1000+) for very high write rates.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.cache.persistence-interval-ms</code></td>
+                            <td><code>1000</code></td>
+                            <td>
+                                <strong>Maximum time (ms) to wait before flushing a partial batch to disk.</strong>
+                                Even if the batch size has not been reached, the async writer will flush after this interval. This bounds the maximum data loss window.
+                                <br><br>
+                                Lower values (100&ndash;500ms) reduce risk but increase disk I/O. Higher values (2000&ndash;5000ms) improve throughput at the cost of a larger loss window. The default of 1000ms is a good balance for most deployments.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- ROCKSDB                                                           -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="rocksdb">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5986 100%);">
+            <h4 class="mb-0"><i class="fas fa-mountain me-2"></i>RocksDB</h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h5>Overview</h5>
+                    <p>
+                        RocksDB is a high-performance, LSM-tree (Log-Structured Merge-tree) based key-value store developed by Meta (Facebook). It is the <strong>default persistence backend</strong> in Kuber. RocksDB is optimized for fast, low-latency storage on SSDs and handles write-heavy workloads exceptionally well due to its append-only write path.
+                    </p>
+                    <p>
+                        Writes are first appended to an in-memory buffer (memtable), which is periodically flushed to immutable sorted files (SSTables) on disk. Background compaction merges SSTables to reclaim space and maintain read performance. This architecture means <strong>writes never block on disk I/O</strong> (they go to the memtable) and <strong>reads benefit from bloom filters and block caches</strong>.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-plus-circle me-1"></i> Strengths</h6>
+                            <ul class="small mb-2">
+                                <li>Highest write throughput of any embedded backend</li>
+                                <li>Excellent for SSD-based storage</li>
+                                <li>Efficient background compaction</li>
+                                <li>Handles hundreds of millions of entries</li>
+                                <li>Built-in compression (LZ4/Snappy/Zstd)</li>
+                            </ul>
+                            <h6 class="card-title text-warning"><i class="fas fa-exclamation-circle me-1"></i> Considerations</h6>
+                            <ul class="small mb-0">
+                                <li>Write amplification during compaction</li>
+                                <li>Compaction uses background CPU and I/O</li>
+                                <li>Disk usage can temporarily spike 2&times; during compaction</li>
+                                <li>Native library dependency (platform-specific)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5><i class="fas fa-code me-2"></i>Minimal Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=rocksdb
+kuber.persistence.rocksdb.path=./data/rocksdb</code></pre>
+            
+            <h5 class="mt-4"><i class="fas fa-cog me-2"></i>All Properties</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr><th style="width:40%">Property</th><th style="width:12%">Default</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.persistence.rocksdb.path</code></td>
+                            <td><code>./data/rocksdb</code></td>
+                            <td>
+                                <strong>Directory where RocksDB stores its data files.</strong>
+                                This directory contains SSTables, WAL files, MANIFEST, and the CURRENT pointer.
+                                Use a <strong>fast SSD</strong> for best performance. The directory is created automatically if it does not exist.
+                                In production, use an absolute path (e.g., <code>/opt/kuber/data/rocksdb</code>) to avoid confusion with relative paths under different startup directories. The path is resolved relative to <code>kuber.base.datadir</code> if set.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.rocksdb.compaction-enabled</code></td>
+                            <td><code>true</code></td>
+                            <td>
+                                <strong>Enable scheduled background compaction.</strong>
+                                RocksDB performs its own internal compaction, but Kuber can also trigger a manual full compaction on a schedule to aggressively reclaim space after bulk deletes or TTL expiration.
+                                Disable this only if you are managing compaction externally or in test environments.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.rocksdb.compaction-cron</code></td>
+                            <td><code>0 0 2 * * ?</code></td>
+                            <td>
+                                <strong>Cron expression for scheduled compaction.</strong>
+                                Default runs at <strong>2:00 AM daily</strong>. Compaction reclaims disk space from deleted/expired entries and optimizes read performance.
+                                <br><br>
+                                Format: <code>second minute hour day-of-month month day-of-week</code>
+                                <br>
+                                Examples:
+                                <code>0 0 3 * * SUN</code> (3 AM every Sunday),
+                                <code>0 0 1,13 * * ?</code> (1 AM and 1 PM daily).
+                                <br><br>
+                                <em>Tip:</em> Schedule compaction during off-peak hours. A full compaction on a large dataset can consume significant I/O for several minutes.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5 class="mt-4"><i class="fas fa-tachometer-alt me-2"></i>Performance Characteristics</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <h3 class="text-success">~1&ndash;5 &micro;s</h3>
+                            <p class="mb-0 text-muted">Point read latency (cached)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <h3 class="text-primary">~2&ndash;10 &micro;s</h3>
+                            <p class="mb-0 text-muted">Write latency (to memtable)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-warning">
+                        <div class="card-body text-center">
+                            <h3 class="text-warning">100M+</h3>
+                            <p class="mb-0 text-muted">Entries supported</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- LMDB                                                              -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="lmdb">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #065f46 0%, #059669 100%);">
+            <h4 class="mb-0"><i class="fas fa-bolt me-2"></i>LMDB</h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h5>Overview</h5>
+                    <p>
+                        LMDB (Lightning Memory-Mapped Database) is a B+ tree based embedded database that uses the OS virtual memory system to map the entire database into the process address space. Reads are <strong>zero-copy</strong> &mdash; they return a pointer directly into the memory-mapped file without any serialization or buffer copying. This makes LMDB the <strong>fastest backend for read-heavy workloads</strong>.
+                    </p>
+                    <p>
+                        LMDB uses copy-on-write semantics with MVCC (Multi-Version Concurrency Control), meaning readers never block writers and writers never block readers. There is no WAL (Write-Ahead Log) to replay after a crash &mdash; the database is always in a consistent state because committed transactions are written directly to the B+ tree with atomic page updates.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-plus-circle me-1"></i> Strengths</h6>
+                            <ul class="small mb-2">
+                                <li>Fastest read latency (zero-copy via mmap)</li>
+                                <li>No crash recovery needed (instant restart)</li>
+                                <li>No background maintenance threads</li>
+                                <li>Predictable, consistent latency profile</li>
+                                <li>ACID compliant with full MVCC</li>
+                            </ul>
+                            <h6 class="card-title text-warning"><i class="fas fa-exclamation-circle me-1"></i> Considerations</h6>
+                            <ul class="small mb-0">
+                                <li>Requires upfront map size reservation</li>
+                                <li>Write speed slower than RocksDB for bulk loads</li>
+                                <li>Single writer at a time (readers are concurrent)</li>
+                                <li>File size grows monotonically (free pages reused internally)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5><i class="fas fa-code me-2"></i>Minimal Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=lmdb
+kuber.persistence.lmdb.path=./data/lmdb</code></pre>
+            
+            <h5 class="mt-4"><i class="fas fa-cog me-2"></i>All Properties</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr><th style="width:40%">Property</th><th style="width:12%">Default</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.persistence.lmdb.path</code></td>
+                            <td><code>./data/lmdb</code></td>
+                            <td>
+                                <strong>Directory where LMDB stores its data files.</strong>
+                                LMDB creates two files: <code>data.mdb</code> (the database) and <code>lock.mdb</code> (the lock file).
+                                Use an SSD for optimal performance. The directory is created automatically. Resolved relative to <code>kuber.base.datadir</code> if set.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.lmdb.map-size</code></td>
+                            <td><code>1099511627776</code><br><small class="text-muted">(1 TB)</small></td>
+                            <td>
+                                <strong>Maximum database size in bytes (virtual address space reservation).</strong>
+                                <br><br>
+                                <strong>This is the most important LMDB parameter.</strong> LMDB memory-maps the entire database into the process's virtual address space. This value sets the upper bound.
+                                <br><br>
+                                <div class="alert alert-success mb-2">
+                                    <i class="fas fa-lightbulb me-1"></i>
+                                    <strong>Don't panic about the 1 TB default!</strong> This reserves <em>virtual</em> address space only. Actual disk and RAM usage grow only as data is written. On 64-bit systems (which have 128 TB+ of virtual space), a 1 TB reservation is trivially small and has zero performance impact.
+                                </div>
+                                Physical RAM usage is managed entirely by the OS page cache &mdash; only pages that are actively being read are kept in RAM. If memory pressure increases, the OS evicts LMDB pages just like any file cache.
+                                <br><br>
+                                If you see <code>MDB_MAP_FULL</code> or "Environment mapsize reached" errors, increase this value and restart. Common values:
+                                100 GB = <code>107374182400</code>,
+                                500 GB = <code>536870912000</code>,
+                                1 TB = <code>1099511627776</code>,
+                                4 TB = <code>4398046511104</code>.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.lmdb.sync-writes</code></td>
+                            <td><code>true</code></td>
+                            <td>
+                                <strong>Whether to fsync after each transaction commit.</strong>
+                                <br><br>
+                                <strong><code>true</code> (default):</strong> Full durability. Each commit is synced to disk via <code>fdatasync()</code>. Data survives power loss. Write latency is ~1&ndash;5ms per commit.
+                                <br><br>
+                                <strong><code>false</code> (MDB_NOSYNC):</strong> Commits return immediately without waiting for disk. 10&ndash;50&times; faster writes. Data is at risk if the OS crashes or power is lost (not if only the Kuber process crashes, as the OS will eventually flush).
+                                <br><br>
+                                <em>Recommendation:</em> Leave <code>true</code> for production. Set <code>false</code> only for bulk loading or development.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5 class="mt-4"><i class="fas fa-tachometer-alt me-2"></i>Performance Characteristics</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <h3 class="text-success">~0.5&ndash;2 &micro;s</h3>
+                            <p class="mb-0 text-muted">Point read latency (zero-copy)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <h3 class="text-primary">~5&ndash;50 &micro;s</h3>
+                            <p class="mb-0 text-muted">Write latency (with sync)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-warning">
+                        <div class="card-body text-center">
+                            <h3 class="text-warning">0 ms</h3>
+                            <p class="mb-0 text-muted">Crash recovery time</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- SQLITE                                                            -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="sqlite">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);">
+            <h4 class="mb-0"><i class="fas fa-file-alt me-2"></i>SQLite</h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h5>Overview</h5>
+                    <p>
+                        SQLite is the world's most widely deployed database engine &mdash; a self-contained, serverless, zero-configuration SQL database. Kuber uses SQLite in a <strong>one-database-per-region</strong> architecture, giving each region its own <code>.db</code> file for improved write concurrency and isolation. A separate <code>_metadata.db</code> stores region definitions.
+                    </p>
+                    <p>
+                        All SQLite databases run in <strong>WAL mode</strong> (Write-Ahead Logging), which allows concurrent readers and writers. SQLite is an excellent choice for development, edge deployments, or moderate-scale production use where simplicity is paramount. It requires no external services and stores everything in ordinary files.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-plus-circle me-1"></i> Strengths</h6>
+                            <ul class="small mb-2">
+                                <li>Zero configuration, zero dependencies</li>
+                                <li>Full SQL query capability</li>
+                                <li>Per-region database isolation</li>
+                                <li>Very compact on-disk footprint</li>
+                                <li>Easy to inspect data with any SQLite tool</li>
+                            </ul>
+                            <h6 class="card-title text-warning"><i class="fas fa-exclamation-circle me-1"></i> Considerations</h6>
+                            <ul class="small mb-0">
+                                <li>Single-writer per database file</li>
+                                <li>Slower than RocksDB/LMDB for high write rates</li>
+                                <li>Needs periodic VACUUM for space reclamation</li>
+                                <li>Not suitable for very large datasets (10M+ entries)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5><i class="fas fa-code me-2"></i>Minimal Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=sqlite
+kuber.persistence.sqlite.path=./data/kuber.db</code></pre>
+            
+            <h5 class="mt-4"><i class="fas fa-cog me-2"></i>All Properties</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr><th style="width:40%">Property</th><th style="width:12%">Default</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.persistence.sqlite.path</code></td>
+                            <td><code>./data/kuber.db</code></td>
+                            <td>
+                                <strong>Base path for SQLite database files.</strong>
+                                Kuber extracts the directory from this path and creates a <code>sqlite/</code> subdirectory within it. Inside that directory:
+                                <br>
+                                <code>_metadata.db</code> &mdash; Region definitions<br>
+                                <code>{regionName}.db</code> &mdash; One database per region
+                                <br><br>
+                                For example, with the default path, files are stored in <code>./data/sqlite/_metadata.db</code>, <code>./data/sqlite/trades.db</code>, etc.
+                                <br><br>
+                                <em>Tip:</em> Each region&rsquo;s database also has <code>-wal</code> and <code>-shm</code> companion files (WAL journal and shared memory). These are normal and are cleaned up on graceful shutdown via <code>PRAGMA wal_checkpoint(TRUNCATE)</code>.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5 class="mt-3"><i class="fas fa-info-circle me-2 text-info"></i>Runtime Pragmas (Auto-Configured)</h5>
+            <p class="text-muted">The following SQLite pragmas are set automatically on each database connection. They are not configurable via properties but are documented here for reference:</p>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr><th>Pragma</th><th>Value</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>journal_mode</code></td><td><code>WAL</code></td><td>Enables concurrent readers + writer</td></tr>
+                        <tr><td><code>synchronous</code></td><td><code>NORMAL</code></td><td>Balanced durability: syncs at critical moments but not every commit</td></tr>
+                        <tr><td><code>cache_size</code></td><td><code>10000</code></td><td>10,000 pages (~40 MB) in-memory page cache per region database</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- POSTGRESQL                                                        -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="postgresql">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #336791 0%, #1f4e79 100%);">
+            <h4 class="mb-0"><i class="fas fa-elephant me-2"></i>PostgreSQL</h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h5>Overview</h5>
+                    <p>
+                        PostgreSQL is an enterprise-grade, open-source relational database. Kuber stores all regions in a <strong>single <code>kuber_entries</code> table</strong> with a composite primary key <code>(region, key)</code>. JSON values are stored as <strong>JSONB</strong> with a GIN index, enabling powerful server-side JSON queries (containment, path, existence operators).
+                    </p>
+                    <p>
+                        The PostgreSQL backend uses <strong>HikariCP</strong> for connection pooling, providing efficient connection reuse and automatic connection health monitoring. This is the ideal choice for teams that already operate PostgreSQL (including managed services like AWS RDS, Google Cloud SQL, or Azure Database for PostgreSQL) and want the cache persistence integrated into their existing database infrastructure.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-plus-circle me-1"></i> Strengths</h6>
+                            <ul class="small mb-2">
+                                <li>JSONB with GIN index for JSON queries</li>
+                                <li>Multi-process shared access</li>
+                                <li>Managed service options (RDS, Cloud SQL)</li>
+                                <li>Mature backup, replication, monitoring</li>
+                                <li>Enterprise compliance and audit capability</li>
+                            </ul>
+                            <h6 class="card-title text-warning"><i class="fas fa-exclamation-circle me-1"></i> Considerations</h6>
+                            <ul class="small mb-0">
+                                <li>Higher latency than embedded backends (network hop)</li>
+                                <li>Requires external PostgreSQL instance</li>
+                                <li>Connection pool tuning needed for high concurrency</li>
+                                <li>Additional operational overhead (DBA, patching)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5><i class="fas fa-code me-2"></i>Minimal Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=postgresql
+kuber.persistence.postgresql.url=jdbc:postgresql://localhost:5432/kuber
+kuber.persistence.postgresql.username=kuber
+kuber.persistence.postgresql.password=kuber</code></pre>
+            
+            <h5 class="mt-4"><i class="fas fa-cog me-2"></i>All Properties</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr><th style="width:40%">Property</th><th style="width:12%">Default</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.url</code></td>
+                            <td colspan="2">
+                                <code>jdbc:postgresql://localhost:5432/kuber</code>
+                                <br><br>
+                                <strong>JDBC connection URL.</strong>
+                                The database must already exist; Kuber creates the tables and indexes automatically on first startup.
+                                For managed databases, use the provided connection string (e.g., <code>jdbc:postgresql://mydb.us-east-1.rds.amazonaws.com:5432/kuber?sslmode=require</code>).
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.username</code></td>
+                            <td><code>kuber</code></td>
+                            <td><strong>Database username.</strong> Must have CREATE TABLE, INSERT, SELECT, UPDATE, DELETE, CREATE INDEX privileges on the target database.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.password</code></td>
+                            <td><code>kuber</code></td>
+                            <td><strong>Database password.</strong> In production, use environment variable substitution: <code>${KUBER_PG_PASSWORD}</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.pool-size</code></td>
+                            <td><code>10</code></td>
+                            <td>
+                                <strong>Maximum number of connections in the HikariCP pool.</strong>
+                                This is the upper bound of concurrent database connections. For most workloads, 10&ndash;20 is sufficient.
+                                Rule of thumb: <code>pool-size = (2 &times; CPU cores) + number of disks</code>.
+                                <br><br>
+                                <em>Warning:</em> Setting this too high wastes PostgreSQL backend memory and can cause connection exhaustion if multiple Kuber instances share the same database.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.min-idle</code></td>
+                            <td><code>2</code></td>
+                            <td><strong>Minimum number of idle connections maintained in the pool.</strong> HikariCP keeps at least this many connections open, avoiding the latency of creating new connections during traffic spikes.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.connection-timeout-ms</code></td>
+                            <td><code>30000</code></td>
+                            <td><strong>Maximum time (ms) to wait for a connection from the pool.</strong> If all connections are busy and no connection becomes available within this period, a <code>SQLException</code> is thrown. Increase for high-latency networks or heavily loaded PostgreSQL servers.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.idle-timeout-ms</code></td>
+                            <td><code>600000</code><br><small class="text-muted">(10 min)</small></td>
+                            <td><strong>Maximum time (ms) a connection can sit idle before being retired.</strong> This applies only when the pool has more than <code>min-idle</code> connections. Keeps the pool lean during quiet periods.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.postgresql.max-lifetime-ms</code></td>
+                            <td><code>1800000</code><br><small class="text-muted">(30 min)</small></td>
+                            <td><strong>Maximum lifetime (ms) of a connection in the pool.</strong> Connections are retired after this period to prevent stale connections from accumulating. Should be set to <em>several minutes less</em> than any database-level timeout to avoid abrupt disconnections.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- MONGODB                                                           -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="mongodb">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #116149 0%, #00684a 100%);">
+            <h4 class="mb-0"><i class="fas fa-leaf me-2"></i>MongoDB</h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h5>Overview</h5>
+                    <p>
+                        MongoDB is a document-oriented NoSQL database. Kuber uses a <strong>one-collection-per-region</strong> architecture (named <code>kuber_{region_name}</code>) plus a shared <code>kuber_regions</code> metadata collection. JSON values are stored as <strong>native BSON embedded documents</strong>, making them directly queryable with MongoDB's rich query language without any deserialization overhead.
+                    </p>
+                    <p>
+                        The MongoDB backend is ideal for organizations already running MongoDB (including MongoDB Atlas) and for workloads that benefit from MongoDB's horizontal scalability through sharding. Collections and indexes are created automatically on first use.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-plus-circle me-1"></i> Strengths</h6>
+                            <ul class="small mb-2">
+                                <li>Native BSON document queries on cached JSON</li>
+                                <li>Horizontal scalability via sharding</li>
+                                <li>MongoDB Atlas for managed deployments</li>
+                                <li>Per-region collection isolation</li>
+                                <li>Flexible document model</li>
+                            </ul>
+                            <h6 class="card-title text-warning"><i class="fas fa-exclamation-circle me-1"></i> Considerations</h6>
+                            <ul class="small mb-0">
+                                <li>Higher latency than embedded backends</li>
+                                <li>Requires external MongoDB instance or cluster</li>
+                                <li>WiredTiger storage engine tuning for large datasets</li>
+                                <li>Connection pool sizing for concurrent access</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5><i class="fas fa-code me-2"></i>Minimal Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=mongodb
+kuber.mongo.uri=mongodb://localhost:27017
+kuber.mongo.database=kuber</code></pre>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> MongoDB connection properties use the <code>kuber.mongo.*</code> prefix (not <code>kuber.persistence.mongodb.*</code>) because the MongoDB client is also used for features beyond persistence.
+            </div>
+            
+            <h5 class="mt-4"><i class="fas fa-cog me-2"></i>All Properties</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr><th style="width:40%">Property</th><th style="width:12%">Default</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.mongo.uri</code></td>
+                            <td colspan="2">
+                                <code>mongodb://localhost:27017</code>
+                                <br><br>
+                                <strong>MongoDB connection URI.</strong>
+                                Supports all standard MongoDB URI options including authentication, replica sets, and TLS:
+                                <br>
+                                <code>mongodb://user:pass@host1:27017,host2:27017/kuber?replicaSet=rs0&amp;tls=true</code>
+                                <br><br>
+                                For MongoDB Atlas: <code>mongodb+srv://user:pass@cluster.mongodb.net/kuber</code>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.mongo.database</code></td>
+                            <td><code>kuber</code></td>
+                            <td><strong>MongoDB database name.</strong> All Kuber collections are created within this database. The database is created automatically on first write if it does not exist.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.mongo.connection-pool-size</code></td>
+                            <td><code>50</code></td>
+                            <td><strong>Maximum number of connections in the MongoDB driver connection pool.</strong> The MongoDB Java driver manages this pool automatically. For Atlas or remote clusters, 25&ndash;50 is usually sufficient. For local/colocated instances, the default of 50 works well.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.mongo.connection-timeout-ms</code></td>
+                            <td><code>10000</code><br><small class="text-muted">(10 sec)</small></td>
+                            <td><strong>Maximum time (ms) to wait for a connection to be established.</strong> Increase for high-latency networks (e.g., cross-region Atlas clusters).</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.mongo.socket-timeout-ms</code></td>
+                            <td><code>30000</code><br><small class="text-muted">(30 sec)</small></td>
+                            <td><strong>Maximum time (ms) to wait for a response on an established connection.</strong> This is the read timeout for individual operations. Increase if you have very large documents or slow queries.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- MEMORY                                                            -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="memory">
+        <div class="card-header text-white bg-danger">
+            <h4 class="mb-0"><i class="fas fa-memory me-2"></i>Memory (No Persistence)</h4>
+        </div>
+        <div class="card-body">
+            <h5>Overview</h5>
+            <p>
+                The memory backend provides <strong>no disk persistence at all</strong>. All data lives exclusively in the JVM heap and is lost when the server shuts down or crashes. This is useful for testing, prototyping, or use cases where the cache is purely ephemeral (e.g., session caches that are rebuilt from an upstream source on startup).
+            </p>
+            
+            <div class="alert alert-danger">
+                <i class="fas fa-skull-crossbones me-2"></i>
+                <strong>Warning:</strong> All data is permanently lost on server restart, crash, or JVM termination. Do not use in production unless data loss is explicitly acceptable.
+            </div>
+            
+            <h5><i class="fas fa-code me-2"></i>Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=memory</code></pre>
+            <p>No additional properties are required or applicable.</p>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- ASYNC BATCHED WRITES                                              -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="async-writes">
+        <div class="card-header bg-secondary text-white">
+            <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Async Batched Write Engine</h4>
+        </div>
+        <div class="card-body">
+            <p>
+                All persistence backends (except Memory) share a common <strong>asynchronous batched write engine</strong> in the <code>AbstractPersistenceStore</code> base class. Instead of writing each entry to disk individually, the engine accumulates entries and flushes them in batches. This dramatically improves throughput, especially for backends with high per-operation overhead (SQLite, PostgreSQL, MongoDB).
+            </p>
+            
+            <h5>How It Works</h5>
+            <ol>
+                <li>A PUT/SET operation writes the entry to the in-memory cache immediately (sub-microsecond).</li>
+                <li>The entry is enqueued for async persistence.</li>
+                <li>A background thread flushes entries to disk when either:
+                    <ul>
+                        <li>The batch reaches <code>persistence-batch-size</code> entries, or</li>
+                        <li>The <code>persistence-interval-ms</code> timer expires (whichever comes first).</li>
+                    </ul>
+                </li>
+                <li>The batch is written to the persistence store in a single transaction (where supported).</li>
+            </ol>
+            
+            <h5 class="mt-3">Tuning the Batch Engine</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white"><strong>High-Throughput (writes/sec &gt; 10K)</strong></div>
+                        <div class="card-body">
+<pre class="mb-0"><code>kuber.cache.persistence-batch-size=500
+kuber.cache.persistence-interval-ms=2000</code></pre>
+                            <small class="text-muted">Larger batches, less frequent flushes. Accepts a wider data-at-risk window for maximum throughput.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white"><strong>Low-Latency Durability</strong></div>
+                        <div class="card-body">
+<pre class="mb-0"><code>kuber.cache.persistence-batch-size=25
+kuber.cache.persistence-interval-ms=200
+kuber.persistence.sync-individual-writes=true</code></pre>
+                            <small class="text-muted">Small batches, frequent flushes. Minimizes data-at-risk window at the cost of I/O throughput.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- MIGRATION                                                         -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="migration">
+        <div class="card-header bg-dark text-white">
+            <h4 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Migrating Between Backends</h4>
+        </div>
+        <div class="card-body">
+            <p>Kuber does not automatically migrate data when you change <code>kuber.persistence.type</code>. To move data between backends:</p>
+            
+            <h5>Option 1: Backup &amp; Restore (Recommended)</h5>
+            <ol>
+                <li>With the old backend running, trigger a backup via the Admin UI or REST API: <code>POST /api/admin/backup</code></li>
+                <li>Stop the server.</li>
+                <li>Change <code>kuber.persistence.type</code> in <code>application.properties</code>.</li>
+                <li>Start the server (it will start with an empty store).</li>
+                <li>Restore from backup via the Admin UI or REST API: <code>POST /api/admin/restore</code></li>
+            </ol>
+            
+            <h5>Option 2: Autoload Re-Import</h5>
+            <ol>
+                <li>Export your data as CSV/JSON files into the autoload inbox directory.</li>
+                <li>Change <code>kuber.persistence.type</code>.</li>
+                <li>Start the server &mdash; autoload will re-import the files.</li>
+            </ol>
+            
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Always verify data integrity after migration by comparing entry counts and spot-checking values.
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="py-4 mt-4 border-top">
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
+                <p class="text-muted small mb-0">Version 1.8.2</p>
+            </div>
+            <div class="col-md-6 text-end">
+                <p class="text-muted small mb-0">
+                    Copyright &copy; 2025-2030, All Rights Reserved<br>
+                    Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
+                    <span class="badge bg-warning text-dark">Patent Pending</span>
+                </p>
+            </div>
+        </div>
+    </footer>
+</div>
+</main>
+
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

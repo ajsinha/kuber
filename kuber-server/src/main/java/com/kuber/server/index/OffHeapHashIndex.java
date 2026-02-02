@@ -42,8 +42,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  *   <li>Segmented buffers support >2GB total storage</li>
  * </ul>
  * 
- * @version 1.8.1
- * @since 1.8.1
+ * @version 1.8.2
+ * @since 1.8.2
  */
 @Slf4j
 public class OffHeapHashIndex implements SecondaryIndex {

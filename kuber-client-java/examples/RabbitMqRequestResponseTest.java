@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Test client for Kuber's RabbitMQ-based Request/Response messaging.
  * 
- * @version 1.8.1
+ * @version 1.8.2
  */
 public class RabbitMqRequestResponseTest {
     

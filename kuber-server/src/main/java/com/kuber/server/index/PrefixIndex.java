@@ -35,8 +35,8 @@ import java.util.regex.Pattern;
  *   <li>Memory: Efficient for values with common prefixes</li>
  * </ul>
  * 
- * @version 1.8.1
- * @since 1.8.1
+ * @version 1.8.2
+ * @since 1.8.2
  */
 @Slf4j
 public class PrefixIndex implements SecondaryIndex {

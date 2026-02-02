@@ -139,7 +139,7 @@ kuber.backup.batch-size=10000               # Entries per batch</code></pre>
                     <strong>Fast Entry Counts (v1.2.2):</strong> Dashboard and UI pages use O(1) fast estimates from RocksDB native properties. This ensures instant page loads even with millions of entries. The counts are approximate but highly accurate for typical use cases.
                 </div>
                 
-                <h3 class="mt-4">Parallel Search (v1.8.1)</h3>
+                <h3 class="mt-4">Parallel Search (v1.8.2)</h3>
                 <pre class="bg-dark text-light p-3 rounded"><code># Parallel JSON Search Configuration
 kuber.search.parallel-enabled=true     # Enable parallel search (default: true)
 kuber.search.thread-count=8            # Number of threads (default: 8, 0=CPU count)
@@ -150,7 +150,7 @@ kuber.search.max-cached-patterns=1000  # Max cached patterns (default: 1000)</co
                 
                 <div class="alert alert-success mt-3">
                     <i class="fas fa-bolt me-2"></i>
-                    <strong>Parallel JSON Search (v1.8.1):</strong> JSON searches automatically use multiple threads for large datasets (&gt;1000 keys), providing up to 8x speedup. For smaller datasets, sequential search is used to avoid thread overhead. Monitor performance via <code>GET /api/search/stats</code>.
+                    <strong>Parallel JSON Search (v1.8.2):</strong> JSON searches automatically use multiple threads for large datasets (&gt;1000 keys), providing up to 8x speedup. For smaller datasets, sequential search is used to avoid thread overhead. Monitor performance via <code>GET /api/search/stats</code>.
                 </div>
                 
                 <h3 class="mt-4">Security</h3>
@@ -163,7 +163,7 @@ kuber.security.admin-password=admin123</code></pre>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.1</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.2</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

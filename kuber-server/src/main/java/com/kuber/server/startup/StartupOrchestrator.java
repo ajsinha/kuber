@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -78,6 +79,7 @@ public class StartupOrchestrator {
     private final AutoloadService autoloadService;
     private final RedisProtocolServer redisProtocolServer;
     private final BackupRestoreService backupRestoreService;
+    private final Environment environment;
     
     @Autowired(required = false)
     private RegionEventPublishingService publishingService;
@@ -93,13 +95,15 @@ public class StartupOrchestrator {
                                CacheService cacheService,
                                AutoloadService autoloadService,
                                RedisProtocolServer redisProtocolServer,
-                               BackupRestoreService backupRestoreService) {
+                               BackupRestoreService backupRestoreService,
+                               Environment environment) {
         this.properties = properties;
         this.persistenceMaintenanceService = persistenceMaintenanceService;
         this.cacheService = cacheService;
         this.autoloadService = autoloadService;
         this.redisProtocolServer = redisProtocolServer;
         this.backupRestoreService = backupRestoreService;
+        this.environment = environment;
     }
     
     /**
@@ -272,6 +276,24 @@ public class StartupOrchestrator {
             log.info("║   ✓ Backup/restore: running                                        ║");
             log.info("║   ✓ Request/Response: {}                              ║",
                     requestResponseService != null && requestResponseService.isEnabled() ? "running       " : "not configured");
+            log.info("║                                                                    ║");
+            log.info("╚════════════════════════════════════════════════════════════════════╝");
+            
+            // Log listening ports for easy reference
+            String httpPort = environment.getProperty("server.port", "8080");
+            int redisPort = properties.getNetwork().getPort();
+            String persistenceType = properties.getPersistence().getType();
+            
+            log.info("");
+            log.info("╔════════════════════════════════════════════════════════════════════╗");
+            log.info("║  LISTENING ENDPOINTS                                               ║");
+            log.info("╠════════════════════════════════════════════════════════════════════╣");
+            log.info("║                                                                    ║");
+            log.info(String.format("║   HTTP / Web UI      :  http://localhost:%-24s║", httpPort));
+            log.info(String.format("║   REST API           :  http://localhost:%-24s║", httpPort + "/api"));
+            log.info(String.format("║   Redis Protocol     :  redis://localhost:%-23s║", String.valueOf(redisPort)));
+            log.info("║                                                                    ║");
+            log.info(String.format("║   Persistence        :  %-39s║", persistenceType.toUpperCase()));
             log.info("║                                                                    ║");
             log.info("╚════════════════════════════════════════════════════════════════════╝");
             

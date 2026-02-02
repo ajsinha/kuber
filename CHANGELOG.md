@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.8.2] - 2026-02-02 - PERSISTENCE BACKEND PARITY & QUERY FIXES
+
+### 🔧 Persistence Backend Parity
+
+**All 5 persistence backends (RocksDB, LMDB, MongoDB, SQLite, PostgreSQL) now have full feature parity on all core interface methods.**
+
+### Fixes Applied to MongoDB, SQLite, PostgreSQL
+
+| Method | Before | After |
+|--------|--------|-------|
+| `forEachEntry` | Default: loads ALL entries into List (OOM risk) | Streaming cursor - constant memory |
+| `estimateEntryCount` | Default: full table scan | O(1) metadata-based estimate |
+| `getKeys` | Loads ALL keys, filters in Java | Server-side filtering with LIMIT |
+| `getNonExpiredKeys` | Loads ALL keys, filters in Java | Server-side compound filter with LIMIT |
+
+### Backend-Specific Optimizations
+
+- **MongoDB**: `estimatedDocumentCount()` for O(1) estimates, `Filters.regex()` for server-side key pattern matching, cursor-based streaming for `forEachEntry`
+- **SQLite**: Native `GLOB` operator for server-side pattern matching, `LIMIT` pushed to SQL, streaming ResultSet for `forEachEntry`
+- **PostgreSQL**: `LIKE` operator for pattern matching, `setFetchSize(1000)` for server-side cursors in `forEachEntry`, proper auto-commit management for streaming
+
+### 🐛 JSEARCH Query Bug Fixes
+
+- **Quote stripping**: Queries like `$.field="value with spaces"` now correctly strip surrounding quotes before matching
+- **Regex partial matching**: The `~=` operator now uses `find()` instead of `matches()`, enabling partial regex matching (e.g., `~=Mizuho` matches "Mizuho Bank Ltd")
+- **IN clause quote support**: Quoted values in IN clauses are now properly stripped
+
+### 🖥️ Thymeleaf Template Fix
+
+- Fixed `T(String).format()` SpEL error on index stats page - replaced with `#numbers.formatDecimal()` utility
+
+---
+
 ## [1.8.1] - 2025-01-16 - OFF-HEAP INDEX STORAGE & UI ENHANCEMENTS
 
 ### 🚀 Off-Heap Index Storage

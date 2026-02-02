@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Metrics include cache operations, memory usage, region statistics,
  * and performance counters.
  * 
- * @version 1.8.1
+ * @version 1.8.2
  */
 @Slf4j
 @Service
