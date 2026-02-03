@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 1.8.3**
+**Version 1.9.0**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -28,7 +28,7 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `1.8.3` | Current application version (read-only) |
+| `kuber.version` | `1.9.0` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
 | `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json, request_response.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
@@ -91,7 +91,7 @@ Data storage backend settings.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.persistence.type` | `rocksdb` | Backend type: `rocksdb` (default v1.8.3+), `lmdb`, `mongodb`, `sqlite`, `postgresql`, `memory` |
+| `kuber.persistence.type` | `rocksdb` | Backend type: `rocksdb` (default v1.9.0+), `lmdb`, `mongodb`, `sqlite`, `postgresql`, `memory` |
 | `kuber.persistence.sync-individual-writes` | `false` | `true` = wait for disk sync on each write (slower but durable) |
 
 ### RocksDB Settings (Default)
@@ -713,7 +713,7 @@ Minimal production configuration:
 # Base directory
 kuber.base.datadir=/var/kuber/data
 
-# Persistence (rocksdb is default as of v1.8.3)
+# Persistence (rocksdb is default as of v1.9.0)
 kuber.persistence.type=rocksdb
 
 # Security (create users.json in secure folder)

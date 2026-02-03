@@ -34,8 +34,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Configurable bloom filters for faster lookups</li>
  * </ul>
  * 
- * @version 1.8.3
- * @since 1.8.3
+ * @version 1.9.0
+ * @since 1.9.0
  */
 @Slf4j
 public class RocksDbIndexStorage implements IndexStorageProvider {

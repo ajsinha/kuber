@@ -45,6 +45,7 @@ public class PersistenceConfig {
             case "postgresql", "postgres" -> createPostgresPersistenceStore();
             case "rocksdb", "rocks" -> createRocksDbPersistenceStore();
             case "lmdb" -> createLmdbPersistenceStore();
+            case "aerospike", "aero" -> createAerospikePersistenceStore();
             case "memory", "mem" -> createMemoryPersistenceStore();
             default -> {
                 log.warn("Unknown persistence type '{}', defaulting to RocksDB", type);
@@ -93,6 +94,13 @@ public class PersistenceConfig {
                 properties.getPersistence().getLmdb().getPath(),
                 properties.getPersistence().getLmdb().getMapSize() / (1024 * 1024));
         return new LmdbPersistenceStore(properties);
+    }
+    
+    private PersistenceStore createAerospikePersistenceStore() {
+        log.info("Creating Aerospike persistence store at: {} (namespace: {})", 
+                properties.getPersistence().getAerospike().getHosts(),
+                properties.getPersistence().getAerospike().getNamespace());
+        return new AerospikePersistenceStore(properties);
     }
     
     private PersistenceStore createMemoryPersistenceStore() {

@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * Controller for region management operations.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 1.8.3
+ * @version 1.9.0
  */
 @Slf4j
 @Controller

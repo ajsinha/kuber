@@ -20,11 +20,11 @@
                 </div>
                 <h1 class="display-4 fw-bold mb-3"><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h1>
                 <p class="lead text-muted">
-                    A high-performance, Redis-compatible distributed caching solution with pluggable persistence (RocksDB default), 
+                    A high-performance, Redis-compatible distributed caching solution with pluggable persistence (RocksDB, Aerospike, MongoDB, and more), 
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 1.8.3</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 1.9.0</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -80,7 +80,7 @@
                         </div>
                         <h5 class="card-title">Multi-Backend Persistence</h5>
                         <p class="card-text text-muted">
-                            Choose your persistence backend: RocksDB, LMDB, MongoDB, SQLite, or PostgreSQL. 
+                            Choose your persistence backend: RocksDB, LMDB, MongoDB, SQLite, PostgreSQL, or Aerospike. 
                             Each region gets its own dedicated database instance for maximum concurrency.
                         </p>
                     </div>
@@ -254,7 +254,7 @@
                                             </li>
                                             <li class="mb-3">
                                                 <i class="fas fa-check text-success me-2"></i>
-                                                <strong>Multi-Backend</strong> - 5 persistence options vs single engine
+                                                <strong>Multi-Backend</strong> - 6 persistence options vs single engine
                                             </li>
                                             <li class="mb-3">
                                                 <i class="fas fa-check text-success me-2"></i>
@@ -352,8 +352,8 @@
                                             <div class="col-md-6 col-lg-3">
                                                 <div class="text-center p-3 rounded" style="background: rgba(255,255,255,0.1);">
                                                     <i class="fas fa-database fa-2x text-white mb-2"></i>
-                                                    <h6 class="text-white mb-1">5 Persistence Backends</h6>
-                                                    <small class="text-white-50">RocksDB • LMDB • MongoDB • SQLite • PostgreSQL</small>
+                                                    <h6 class="text-white mb-1">6 Persistence Backends</h6>
+                                                    <small class="text-white-50">RocksDB • LMDB • MongoDB • PostgreSQL • SQLite • Aerospike</small>
                                                 </div>
                                             </div>
                                             <div class="col-md-6 col-lg-3">
@@ -512,7 +512,7 @@
                                     </li>
                                     <li class="mb-3">
                                         <i class="fas fa-check-circle text-success me-2"></i>
-                                        <strong>Persistence Layer</strong> - RocksDB, LMDB, MongoDB, PostgreSQL, SQLite, Memory
+                                        <strong>Persistence Layer</strong> - RocksDB, LMDB, MongoDB, PostgreSQL, SQLite, Aerospike, Memory
                                     </li>
                                     <li class="mb-3">
                                         <i class="fas fa-check-circle text-success me-2"></i>
@@ -550,7 +550,7 @@
                                         </tr>
                                         <tr>
                                             <td><strong>Persistence</strong></td>
-                                            <td>RocksDB (default), LMDB, MongoDB, PostgreSQL, SQLite</td>
+                                            <td>RocksDB (default), LMDB, MongoDB, PostgreSQL, SQLite, Aerospike</td>
                                         </tr>
                                         <tr>
                                             <td><strong>Coordination</strong></td>
@@ -661,11 +661,14 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v1.8.3</span>
-                                    <span class="text-muted small">Current - Secondary Indexing &amp; Hybrid Search Architecture</span>
+                                    <span class="badge bg-primary me-2">v1.9.0</span>
+                                    <span class="text-muted small">Current - Aerospike Integration &amp; Secondary Indexing</span>
                                 </h6>
-                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>January 2026</p>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
                                 <ul class="small text-muted mb-0">
+                                    <li><strong>Aerospike Backend</strong>: New high-performance persistence backend with sub-millisecond latency</li>
+                                    <li><strong>Native TTL</strong>: Aerospike's native per-record TTL for automatic expiration (no cleanup needed!)</li>
+                                    <li><strong>Horizontal Scale</strong>: Aerospike cluster support with auto-sharding across nodes</li>
                                     <li><strong>Secondary Indexing</strong>: Hash and BTree indexes for O(1) and O(log n) lookups instead of full table scans</li>
                                     <li><strong>Hybrid Storage</strong>: In-memory indexes for queries + RocksDB persistence for durability</li>
                                     <li><strong>Index Configuration</strong>: Define indexes per region in <code>config/index.yaml</code></li>
@@ -786,7 +789,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.8.3
+                                <strong>Version:</strong> 1.9.0
                             </li>
                         </ul>
                     </div>
@@ -845,7 +848,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 1.8.3
+                                <strong>Version:</strong> 1.9.0
                             </li>
                         </ul>
                     </div>

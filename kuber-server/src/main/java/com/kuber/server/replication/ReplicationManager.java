@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * to replicate data from the PRIMARY. When this node becomes PRIMARY,
  * resets the {@link ReplicationOpLog} and stops any active sync.
  * 
- * @since 1.8.3
+ * @since 1.9.0
  */
 @Slf4j
 @Component

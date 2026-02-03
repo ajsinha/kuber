@@ -64,7 +64,7 @@ import java.util.*;
  * }
  * </pre>
  * 
- * @version 1.8.3
+ * @version 1.9.0
  */
 public class KuberMessagingExample {
     
@@ -595,7 +595,7 @@ public class KuberMessagingExample {
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
             ║          KUBER REQUEST/RESPONSE MESSAGING - JAVA CLIENT              ║
-            ║                         Version 1.8.3                                ║
+            ║                         Version 1.9.0                                ║
             ╚══════════════════════════════════════════════════════════════════════╝
             """);
         

@@ -205,7 +205,7 @@ public interface PersistenceStore {
      */
     List<String> getNonExpiredKeys(String region, String pattern, int limit);
     
-    // ==================== Native JSON Query Support (v1.8.3) ====================
+    // ==================== Native JSON Query Support (v1.9.0) ====================
     
     /**
      * Search entries by JSON criteria using native database queries.
@@ -231,7 +231,7 @@ public interface PersistenceStore {
      *                 </ul>
      * @param limit    Maximum number of results to return
      * @return List of matching cache entries, or null if native queries not supported
-     * @since 1.8.3
+     * @since 1.9.0
      */
     default List<CacheEntry> searchByJsonCriteria(String region, Map<String, Object> criteria, int limit) {
         // Default: not supported - return null to signal fallback to full scan
@@ -242,7 +242,7 @@ public interface PersistenceStore {
      * Check if this persistence backend supports native JSON queries.
      * 
      * @return true if searchByJsonCriteria is implemented, false otherwise
-     * @since 1.8.3
+     * @since 1.9.0
      */
     default boolean supportsNativeJsonQuery() {
         return false;
@@ -257,6 +257,7 @@ public interface PersistenceStore {
         POSTGRESQL("postgresql"),
         ROCKSDB("rocksdb"),
         LMDB("lmdb"),
+        AEROSPIKE("aerospike"),
         MEMORY("memory");
         
         private final String value;

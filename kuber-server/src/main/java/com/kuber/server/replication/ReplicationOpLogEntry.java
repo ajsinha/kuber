@@ -25,7 +25,7 @@ import java.time.Instant;
  * <p>For SET operations, the full {@link CacheEntry} is captured at append time
  * so the entry is self-contained and immune to later mutations or evictions.
  * 
- * @since 1.8.3
+ * @since 1.9.0
  */
 @Data
 @Builder

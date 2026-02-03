@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  * <p>All endpoints are protected by a shared replication auth token.
  * Only PRIMARY nodes should serve these endpoints; SECONDARY nodes return 503.
  * 
- * @since 1.8.3
+ * @since 1.9.0
  */
 @Slf4j
 @RestController

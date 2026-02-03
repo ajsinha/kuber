@@ -37,7 +37,7 @@ import java.util.regex.PatternSyntaxException;
  * <p>This service provides significant performance improvements for searches
  * on large datasets by utilizing multiple threads to process in parallel.
  * 
- * <h3>Search Optimization Strategy (v1.8.3):</h3>
+ * <h3>Search Optimization Strategy (v1.9.0):</h3>
  * <ol>
  *   <li><strong>Index Lookup</strong>: If secondary indexes exist, use them for O(1)/O(log n) lookups</li>
  *   <li><strong>Index Intersection</strong>: For multiple criteria, intersect index results</li>
@@ -57,7 +57,7 @@ import java.util.regex.PatternSyntaxException;
  *   <li>Without index: O(n) parallel scan - ~8x speedup with 8 threads</li>
  * </ul>
  * 
- * @version 1.8.3
+ * @version 1.9.0
  * @since 1.7.9
  */
 @Service
@@ -138,7 +138,7 @@ public class ParallelJsonSearchService {
     /**
      * Search JSON documents with automatic index usage and parallel/sequential mode selection.
      * 
-     * <p>Search Strategy (v1.8.3):
+     * <p>Search Strategy (v1.9.0):
      * <ol>
      *   <li>Check if indexes exist for search criteria fields</li>
      *   <li>If indexes available, use index lookup to narrow down candidates</li>
@@ -179,7 +179,7 @@ public class ParallelJsonSearchService {
                 results = searchWithinCandidates(region, candidateKeys, criteria, fields, limit);
             }
         } else {
-            // No index available - try hybrid query strategy (v1.8.3)
+            // No index available - try hybrid query strategy (v1.9.0)
             results = tryHybridQuery(region, criteria, fields, limit);
             
             if (results == null) {
@@ -368,7 +368,7 @@ public class ParallelJsonSearchService {
      * @param fields   Fields to project (null for all)
      * @param limit    Maximum results
      * @return List of matching documents, or null if native query not available
-     * @since 1.8.3
+     * @since 1.9.0
      */
     private List<Map<String, Object>> tryHybridQuery(String region, 
                                                       Map<String, Object> criteria,

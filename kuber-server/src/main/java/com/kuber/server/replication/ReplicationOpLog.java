@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  * If a SECONDARY falls too far behind (its last sequence is no longer in the buffer),
  * it must perform a full resync.
  * 
- * @since 1.8.3
+ * @since 1.9.0
  */
 @Slf4j
 @Component

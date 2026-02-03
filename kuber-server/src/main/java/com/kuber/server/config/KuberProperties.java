@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.8.3";
+    private String version = "1.9.0";
     
     /**
      * Unique node identifier
@@ -116,7 +116,7 @@ public class KuberProperties {
     
     /**
      * Secondary indexing configuration including file watcher settings.
-     * @since 1.8.3
+     * @since 1.9.0
      */
     private Indexing indexing = new Indexing();
     
@@ -1309,7 +1309,7 @@ public class KuberProperties {
     @Data
     public static class Persistence {
         /**
-         * Persistence store type: lmdb, rocksdb, mongodb, sqlite, postgresql, memory
+         * Persistence store type: lmdb, rocksdb, mongodb, sqlite, postgresql, aerospike, memory
          * Default: lmdb (fastest reads via memory-mapping, no external dependencies)
          * 
          * LMDB is recommended for most use cases due to:
@@ -1362,6 +1362,12 @@ public class KuberProperties {
          * LMDB configuration
          */
         private Lmdb lmdb = new Lmdb();
+        
+        /**
+         * Aerospike configuration
+         * @since 1.9.0
+         */
+        private Aerospike aerospike = new Aerospike();
     }
     
     @Data
@@ -1486,6 +1492,112 @@ public class KuberProperties {
     }
     
     /**
+     * Aerospike persistence configuration.
+     * 
+     * <p>Aerospike is a high-performance, distributed NoSQL database that provides:
+     * <ul>
+     *   <li>Sub-millisecond read/write latency</li>
+     *   <li>Native TTL support per record (automatic expiration)</li>
+     *   <li>Horizontal scalability with automatic sharding</li>
+     *   <li>Strong consistency with flash-optimized storage</li>
+     * </ul>
+     * 
+     * <p>Prerequisites:
+     * <ol>
+     *   <li>Install and start Aerospike server (Community or Enterprise)</li>
+     *   <li>Create a namespace in aerospike.conf (e.g., "kuber")</li>
+     *   <li>Configure the namespace with appropriate storage (memory, SSD, or hybrid)</li>
+     * </ol>
+     * 
+     * @since 1.9.0
+     */
+    @Data
+    public static class Aerospike {
+        /**
+         * Aerospike cluster hosts.
+         * Format: host1:port1,host2:port2
+         * Default port is 3000 if not specified.
+         * 
+         * Example: "localhost:3000" or "aero1:3000,aero2:3000,aero3:3000"
+         */
+        private String hosts = "localhost:3000";
+        
+        /**
+         * Aerospike namespace to use.
+         * The namespace must be pre-configured in aerospike.conf on the server.
+         * Each namespace can have different storage configurations.
+         */
+        private String namespace = "kuber";
+        
+        /**
+         * Username for authentication (if security is enabled on Aerospike).
+         * Leave empty for Aerospike Community Edition without security.
+         */
+        private String username;
+        
+        /**
+         * Password for authentication (if security is enabled on Aerospike).
+         */
+        private String password;
+        
+        /**
+         * Connection timeout in milliseconds.
+         * Time to wait for a new connection to be established.
+         */
+        private int connectionTimeoutMs = 5000;
+        
+        /**
+         * Socket timeout in milliseconds.
+         * Maximum time to wait for a socket operation (read/write).
+         */
+        private int socketTimeoutMs = 30000;
+        
+        /**
+         * Maximum connections per node.
+         * Aerospike client maintains a connection pool per node.
+         */
+        private int maxConnsPerNode = 300;
+        
+        /**
+         * Connection pools per node.
+         * Multiple pools can reduce lock contention under high load.
+         */
+        private int connPoolsPerNode = 1;
+        
+        /**
+         * Whether to store the user key with the record.
+         * When true, the key can be retrieved via record metadata.
+         * Recommended: true (required for scan operations to return keys).
+         */
+        private boolean sendKey = true;
+        
+        /**
+         * Write commit level.
+         * COMMIT_ALL - Wait for write to be committed on all replicas
+         * COMMIT_MASTER - Wait for write to be committed on master only (faster)
+         */
+        private String commitLevel = "COMMIT_ALL";
+        
+        /**
+         * Read replica policy.
+         * SEQUENCE - Read from nodes in sequence (prefer master)
+         * MASTER - Read only from master
+         * MASTER_PROLES - Read from master or proles randomly
+         * RANDOM - Read from random node
+         */
+        private String replica = "SEQUENCE";
+        
+        /**
+         * Default TTL for records in seconds.
+         * -1 = Use namespace default TTL
+         * -2 = Never expire
+         * 0 = Use namespace default TTL
+         * >0 = Specific TTL in seconds
+         */
+        private int defaultTtl = -1;
+    }
+    
+    /**
      * Shutdown configuration for graceful application termination.
      * 
      * <p>Kuber supports multiple shutdown mechanisms:
@@ -1552,7 +1664,7 @@ public class KuberProperties {
      *   <li>{@code kuber.index.<region>.<field>.create.<type>} - Create new index</li>
      * </ul>
      * 
-     * @since 1.8.3
+     * @since 1.9.0
      */
     @Data
     public static class Indexing {
@@ -1624,7 +1736,7 @@ public class KuberProperties {
          */
         private long offheapMaxSize = 1024L * 1024L * 1024L;
         
-        // ==================== Disk-Based Index Configuration (v1.8.3) ====================
+        // ==================== Disk-Based Index Configuration (v1.9.0) ====================
         
         /**
          * Backend engine for disk-based indexes.
@@ -1634,7 +1746,7 @@ public class KuberProperties {
          * <p>This is independent of the main persistence backend. You can use
          * PostgreSQL for data persistence and RocksDB for index storage.
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private String diskBackend = "rocksdb";
         
@@ -1642,7 +1754,7 @@ public class KuberProperties {
          * Directory for disk-based index storage.
          * Default: ./kuberdata/indexes
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private String diskDirectory = "./kuberdata/indexes";
         
@@ -1651,7 +1763,7 @@ public class KuberProperties {
          * Improves durability but reduces write performance.
          * Default: false (indexes can be rebuilt from data)
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private boolean diskWalEnabled = false;
         
@@ -1661,7 +1773,7 @@ public class KuberProperties {
          * false: Buffered writes, faster but may lose recent index updates on crash
          * Default: false (indexes can be rebuilt)
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private boolean diskSyncWrites = false;
         
@@ -1670,7 +1782,7 @@ public class KuberProperties {
          * Higher values improve read performance but use more RAM.
          * Default: 64MB
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private int diskCacheSizeMb = 64;
         
@@ -1679,7 +1791,7 @@ public class KuberProperties {
          * Improves lookup performance for non-existent keys.
          * Default: true
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private boolean diskBloomFilterEnabled = true;
         
@@ -1689,11 +1801,11 @@ public class KuberProperties {
          * When false, indexes are always rebuilt from persistence on startup.
          * Default: true
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private boolean diskReuseOnStartup = true;
         
-        // ==================== Hybrid Query Strategy (v1.8.3) ====================
+        // ==================== Hybrid Query Strategy (v1.9.0) ====================
         
         /**
          * Enable hybrid query strategy.
@@ -1713,7 +1825,7 @@ public class KuberProperties {
          * 
          * Default: true
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private boolean hybridQueryEnabled = true;
         
@@ -1723,7 +1835,7 @@ public class KuberProperties {
          * AND a native query is available, use native database query.
          * Default: 10000
          * 
-         * @since 1.8.3
+         * @since 1.9.0
          */
         private int hybridQueryThreshold = 10000;
     }

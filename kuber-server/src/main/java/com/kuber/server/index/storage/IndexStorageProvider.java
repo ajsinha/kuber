@@ -23,8 +23,8 @@ import java.util.Set;
  * 
  * <p>Index data structure: {@code indexName:fieldValue → Set<cacheKeys>}
  * 
- * @version 1.8.3
- * @since 1.8.3
+ * @version 1.9.0
+ * @since 1.9.0
  */
 public interface IndexStorageProvider {
     

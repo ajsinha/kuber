@@ -38,8 +38,8 @@ import java.util.*;
  *   <li>Single-writer (serialized writes)</li>
  * </ul>
  * 
- * @version 1.8.3
- * @since 1.8.3
+ * @version 1.9.0
+ * @since 1.9.0
  */
 @Slf4j
 public class SqliteIndexStorage implements IndexStorageProvider {

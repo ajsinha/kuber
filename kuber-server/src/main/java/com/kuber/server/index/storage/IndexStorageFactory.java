@@ -24,8 +24,8 @@ import org.springframework.stereotype.Component;
  *   <li>RocksDB for data + Memory for indexes (fastest)</li>
  * </ul>
  * 
- * @version 1.8.3
- * @since 1.8.3
+ * @version 1.9.0
+ * @since 1.9.0
  */
 @Slf4j
 @Component

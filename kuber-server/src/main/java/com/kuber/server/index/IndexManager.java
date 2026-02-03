@@ -53,8 +53,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Without index (full scan): O(n)</li>
  * </ul>
  * 
- * @version 1.8.3
- * @since 1.8.3
+ * @version 1.9.0
+ * @since 1.9.0
  */
 @Service
 @Slf4j

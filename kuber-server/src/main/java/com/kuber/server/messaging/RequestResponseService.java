@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  *   <li>API key authentication for all requests</li>
  * </ul>
  * 
- * @version 1.8.3
+ * @version 1.9.0
  */
 @Slf4j
 @Service

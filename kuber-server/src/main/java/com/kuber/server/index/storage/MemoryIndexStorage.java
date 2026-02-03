@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
  *   <li>May cause GC pressure with large indexes</li>
  * </ul>
  * 
- * @version 1.8.3
- * @since 1.8.3
+ * @version 1.9.0
+ * @since 1.9.0
  */
 @Slf4j
 public class MemoryIndexStorage implements IndexStorageProvider {

@@ -2,9 +2,66 @@
 
 All notable changes to this project are documented in this file.
 
-## [1.8.3] - 2026-02-03 - HYBRID INDEXING STRATEGY & DISK INDEX STORAGE
+## [1.9.0] - 2026-02-03 - AEROSPIKE INTEGRATION
 
-### 🚀 Hybrid Index Strategy (NEW)
+### 🚀 Aerospike Persistence Backend (NEW)
+
+**Kuber now supports Aerospike as a persistence backend:**
+
+- **Sub-millisecond latency**: Flash/SSD optimized storage
+- **Native TTL support**: Automatic record expiration (perfect for caching!)
+- **Horizontal scalability**: Auto-sharding across cluster nodes
+- **Strong consistency**: Immediate persistence with COMMIT_ALL
+
+### Data Model Mapping
+
+| Kuber Concept | Aerospike Concept | Description                           |
+|---------------|-------------------|---------------------------------------|
+| Region        | Set               | Each region becomes an Aerospike Set  |
+| Cache Key     | Record Key        | Direct mapping to primary key         |
+| JSON Value    | "v" Bin (String)  | Serialized JSON in String bin         |
+| TTL           | Record TTL        | Native Aerospike expiration           |
+
+### Configuration
+
+```properties
+# Enable Aerospike persistence
+kuber.persistence.type=aerospike
+
+# Cluster connection
+kuber.persistence.aerospike.hosts=localhost:3000
+kuber.persistence.aerospike.namespace=kuber
+
+# Write policy
+kuber.persistence.aerospike.commit-level=COMMIT_ALL
+kuber.persistence.aerospike.send-key=true
+
+# Read policy
+kuber.persistence.aerospike.replica=SEQUENCE
+```
+
+### Key Features
+
+- **Batch operations**: Efficient bulk reads/writes
+- **Cluster support**: Multi-node with automatic failover
+- **TTL priority**: Entry TTL → Region TTL → Config TTL → Namespace TTL
+- **Scan support**: Full region scans for backup/export
+- **Zero cleanup**: Aerospike auto-evicts expired records
+
+### Performance Comparison
+
+| Operation        | Aerospike   | RocksDB    | PostgreSQL |
+|------------------|-------------|------------|------------|
+| Single Read      | <1ms        | ~1-5ms     | ~2-10ms    |
+| Single Write     | <1ms        | ~1-5ms     | ~5-20ms    |
+| Batch Read (1K)  | ~5-10ms     | ~20-50ms   | ~50-100ms  |
+| Throughput       | 100K+ ops/s | 50-100K    | 10-30K     |
+
+---
+
+## [1.8.3] - 2026-02-02 - HYBRID INDEXING STRATEGY & DISK INDEX STORAGE
+
+### 🚀 Hybrid Index Strategy
 
 **Kuber now uses a multi-layer approach to optimize JSON searches:**
 

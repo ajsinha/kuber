@@ -56,7 +56,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>PRIMARY role change: stop sync, await new election</li>
  * </ul>
  * 
- * @since 1.8.3
+ * @since 1.9.0
  */
 @Slf4j
 @Service

@@ -598,7 +598,7 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
      * This is O(1) and uses table statistics maintained by ANALYZE/autovacuum.
      * Falls back to exact count if statistics are unavailable.
      * 
-     * @since 1.8.3
+     * @since 1.9.0
      */
     @Override
     public long estimateEntryCount(String region) {
@@ -656,7 +656,7 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
      * @param region Region name
      * @param consumer Consumer to process each entry
      * @return Number of entries processed
-     * @since 1.8.3
+     * @since 1.9.0
      */
     @Override
     public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
@@ -828,7 +828,7 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
         return like.toString();
     }
     
-    // ==================== Native JSON Query Support (v1.8.3) ====================
+    // ==================== Native JSON Query Support (v1.9.0) ====================
     
     @Override
     public boolean supportsNativeJsonQuery() {

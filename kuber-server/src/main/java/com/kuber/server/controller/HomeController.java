@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * Controller for the main dashboard and home pages.
  * Shows only regions the user has access to.
  * 
- * @version 1.8.3
+ * @version 1.9.0
  */
 @Controller
 @RequiredArgsConstructor
@@ -118,6 +118,8 @@ public class HomeController {
             case POSTGRESQL -> properties.getPersistence().getPostgresql().getUrl();
             case ROCKSDB -> properties.getPersistence().getRocksdb().getPath();
             case LMDB -> properties.getPersistence().getLmdb().getPath();
+            case AEROSPIKE -> properties.getPersistence().getAerospike().getHosts() + "/" + 
+                             properties.getPersistence().getAerospike().getNamespace();
             case MEMORY -> "In-Memory (no persistence)";
         };
     }
