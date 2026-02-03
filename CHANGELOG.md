@@ -2,7 +2,63 @@
 
 All notable changes to this project are documented in this file.
 
-## [1.8.2] - 2026-02-02 - PERSISTENCE BACKEND PARITY & QUERY FIXES
+## [1.8.3] - 2026-02-03 - HYBRID INDEXING STRATEGY & DISK INDEX STORAGE
+
+### 🚀 Hybrid Index Strategy (NEW)
+
+**Kuber now uses a multi-layer approach to optimize JSON searches:**
+
+1. **Kuber Secondary Index** (fastest) - O(1) hash or O(log n) B-tree lookups
+2. **Native Database Query** (fast) - Falls back to PostgreSQL GIN, MongoDB, or SQLite JSON1
+3. **Full Scan** (fallback) - Parallel scan when no index available
+
+### Native JSON Query Support by Backend
+
+| Backend    | Native JSON Query | Technology Used                    |
+|------------|-------------------|------------------------------------|
+| PostgreSQL | ✅ Supported      | GIN index + JSONB `@>` operator   |
+| MongoDB    | ✅ Supported      | Native `$eq`, `$gt`, `$in` queries |
+| SQLite     | ✅ Supported      | JSON1 extension (`json_extract`)  |
+| RocksDB    | ❌ Not Supported  | Key-value only                     |
+| LMDB       | ❌ Not Supported  | Key-value only                     |
+| Memory     | ❌ Not Supported  | Must create Kuber indexes          |
+
+### 💾 Disk-Based Index Storage (NEW)
+
+**Secondary indexes can now be stored on disk instead of memory:**
+
+- **RocksDB backend**: Best write performance, LSM-tree storage
+- **LMDB backend**: Best read performance, memory-mapped files
+- **SQLite backend**: Most portable, SQL-queryable
+
+| Storage | RAM Usage | Persistence | Best For                    |
+|---------|-----------|-------------|-----------------------------|
+| HEAP    | High      | No          | Small indexes (<10M)        |
+| OFFHEAP | Medium    | No          | Large indexes, avoid GC     |
+| DISK    | Minimal   | Yes         | Very large indexes, fast startup |
+
+### Configuration
+
+```properties
+# Index storage: HEAP, OFFHEAP, or DISK
+kuber.indexing.default-storage=HEAP
+
+# Disk backend: rocksdb, lmdb, or sqlite
+kuber.indexing.disk-backend=rocksdb
+kuber.indexing.disk-directory=${kuber.base.datadir}/indexes
+kuber.indexing.disk-cache-size-mb=64
+kuber.indexing.disk-reuse-on-startup=true
+
+# Hybrid query: Enable native DB query fallback
+kuber.indexing.hybrid-query-enabled=true
+kuber.indexing.hybrid-query-threshold=10000
+```
+
+### 📚 Documentation
+
+- Added comprehensive **Secondary Indexes** help page with query flow diagrams
+- Added persistence backend comparison matrix
+- Added troubleshooting guide for index issues
 
 ### 🔧 Persistence Backend Parity
 

@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - Generic Search Demo (v1.8.2)
+ * Kuber REST API - Generic Search Demo (v1.8.3)
  *
  * This standalone Java application demonstrates ALL search capabilities of the Kuber
  * Generic Search API including:
@@ -15,7 +15,7 @@
  *    - Comparison operators (gt, gte, lt, lte, eq, ne)
  *    - Combined AND logic across multiple attributes
  * 6. Field projection (select specific fields)
- * 7. Regex Key Search (v1.8.2):
+ * 7. Regex Key Search (v1.8.3):
  *    - keysRegex() - Keys only (faster)
  *    - searchKeys() - Keys with values
  *
@@ -662,11 +662,11 @@ public class RestGenericSearchDemo {
     }
 
     private void demoRegexKeySearch(String region) throws IOException {
-        printHeader("10. REGEX KEY SEARCH (v1.8.2 - REST API)");
+        printHeader("10. REGEX KEY SEARCH (v1.8.3 - REST API)");
 
         System.out.println("""
     
-    New in v1.8.2: Two dedicated REST endpoints for regex-based key search:
+    New in v1.8.3: Two dedicated REST endpoints for regex-based key search:
     
     1. keysRegex() - Returns KEYS ONLY (faster, no value retrieval)
        Endpoint: GET /api/cache/{region}/keys/regex?pattern={regex}&limit={limit}
@@ -744,7 +744,7 @@ public class RestGenericSearchDemo {
             demoComplexSearches(region);
             demoFieldProjection(region);
             demoLimitResults(region);
-            demoRegexKeySearch(region);  // New in v1.8.2
+            demoRegexKeySearch(region);  // New in v1.8.3
 
             printHeader("DEMO COMPLETE");
             System.out.println("""
@@ -775,7 +775,7 @@ This demo showcased all Generic Search API capabilities:
   6. LIMITING RESULTS
      - Max results: {"limit": 100}
 
-  7. REGEX KEY SEARCH (v1.8.2 - REST API only)
+  7. REGEX KEY SEARCH (v1.8.3 - REST API only)
      - Keys only:   GET /api/cache/{region}/keys/regex?pattern={regex}
      - Keys+Values: GET /api/cache/{region}/ksearch?pattern={regex}
      - Java:        client.keysRegex(pattern) / client.ksearch(pattern)
@@ -799,7 +799,7 @@ API Endpoints:
         String region = args.length > 3 ? args[3] : "search_demo_java";
 
         System.out.println("=".repeat(80));
-        System.out.println("  KUBER REST API - GENERIC SEARCH DEMO (v1.8.2) - Java");
+        System.out.println("  KUBER REST API - GENERIC SEARCH DEMO (v1.8.3) - Java");
         System.out.println("=".repeat(80));
         System.out.println("  Server:  " + host + ":" + port);
         System.out.println("  Region:  " + region);

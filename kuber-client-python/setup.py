@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="kuber-client",
-    version="1.6.5",
+    version="1.8.3",
     author="Ashutosh Sinha",
     author_email="ajsinha@gmail.com",
     description="Python client for Kuber Distributed Cache",

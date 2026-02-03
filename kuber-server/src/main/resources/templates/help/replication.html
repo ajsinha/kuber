@@ -13,30 +13,489 @@
         </nav>
         <div class="row">
             <div class="col-lg-10 mx-auto">
-                <h1 class="display-5 mb-4"><i class="fas fa-sync text-success me-3"></i>Replication</h1>
+                <h1 class="display-5 mb-4"><i class="fas fa-sync text-success me-3"></i>Replication &amp; High Availability</h1>
+                <p class="lead text-muted">Primary/Secondary replication with ZooKeeper coordination, automatic failover, and OpLog-based data synchronization.</p>
 
-                <h3>Overview</h3>
-                <p>Kuber supports Primary/Secondary replication with ZooKeeper coordination.</p>
-                
-                <h3 class="mt-4">Configuration</h3>
-                <pre class="bg-dark text-light p-3 rounded"><code>kuber.replication.enabled=true
-kuber.replication.zookeeper.connect-string=localhost:2181
-kuber.replication.zookeeper.session-timeout-ms=30000</code></pre>
-                
-                <h3 class="mt-4">Behavior</h3>
+                <!-- TABLE OF CONTENTS -->
+                <div class="card bg-light mb-5">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3"><i class="fas fa-list me-2"></i>Contents</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ol class="mb-0">
+                                    <li><a href="#architecture">Architecture Overview</a></li>
+                                    <li><a href="#how-it-works">How It Works</a></li>
+                                    <li><a href="#oplog">OpLog Replication Engine</a></li>
+                                    <li><a href="#sync-protocol">Sync Protocol</a></li>
+                                    <li><a href="#failover">Failover &amp; Recovery</a></li>
+                                </ol>
+                            </div>
+                            <div class="col-md-6">
+                                <ol start="6" class="mb-0">
+                                    <li><a href="#configuration">Configuration Reference</a></li>
+                                    <li><a href="#deployment">Deployment Guide</a></li>
+                                    <li><a href="#monitoring">Monitoring &amp; Diagnostics</a></li>
+                                    <li><a href="#tuning">Performance Tuning</a></li>
+                                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. ARCHITECTURE OVERVIEW -->
+                <h2 id="architecture" class="mt-5 mb-3"><span class="badge bg-success me-2">1</span>Architecture Overview</h2>
+
+                <p>Kuber uses a <strong>Primary/Secondary</strong> replication model with <strong>Apache ZooKeeper</strong> for leader election and coordination. The PRIMARY node handles all write operations and journals them to an in-memory <strong>OpLog</strong> (operation log). SECONDARY nodes tail the OpLog via HTTP and apply mutations locally, maintaining a near-real-time read replica.</p>
+
+                <div class="card border-info mb-4">
+                    <div class="card-body">
+<pre class="mb-0 text-monospace small">&#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;      &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+&#x2502;        KUBER NODE A         &#x2502;      &#x2502;        KUBER NODE B         &#x2502;
+&#x2502;         (PRIMARY)           &#x2502;      &#x2502;        (SECONDARY)          &#x2502;
+&#x2502;                             &#x2502;      &#x2502;                             &#x2502;
+&#x2502;  CacheService (read+write) &#x2502;      &#x2502;  CacheService (read only)  &#x2502;
+&#x2502;           &#x2502;                &#x2502;      &#x2502;           &#x25B2;                &#x2502;
+&#x2502;  &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x25BC;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510; &#x2502;      &#x2502;  &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510; &#x2502;
+&#x2502;  &#x2502;   Replication OpLog    &#x2502; &#x2502; HTTP &#x2502;  &#x2502;  ReplicationSyncService &#x2502; &#x2502;
+&#x2502;  &#x2502;   (ring buffer)        &#x2502;&#x25C4;&#x251C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2524;&#x2500;&#x2500;&#x2524;  (polls PRIMARY oplog) &#x2502; &#x2502;
+&#x2502;  &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518; &#x2502;      &#x2502;  &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518; &#x2502;
+&#x2502;                             &#x2502;      &#x2502;                             &#x2502;
+&#x2502;  Persistence (own store)   &#x2502;      &#x2502;  Persistence (own store)   &#x2502;
+&#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;      &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;
+               &#x2502;                                    &#x2502;
+               &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;    &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;
+                    &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x25BC;&#x2500;&#x2500;&#x2500;&#x2500;&#x25BC;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+                    &#x2502;    ZooKeeper     &#x2502;
+                    &#x2502;  (leader elect)  &#x2502;
+                    &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;</pre>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-success">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-crown text-warning me-2"></i>PRIMARY</h5>
+                                <p class="card-text mb-0">Handles all read and write operations. Journals every mutation to the OpLog ring buffer. Serves replication API endpoints for SECONDARY nodes.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-clone text-secondary me-2"></i>SECONDARY</h5>
+                                <p class="card-text mb-0">Read-only replica. Rejects all write attempts with <code>READONLY</code> error. Polls PRIMARY's OpLog and applies mutations locally.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-info">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-sitemap text-info me-2"></i>ZooKeeper</h5>
+                                <p class="card-text mb-0">Coordinates leader election via Curator LeaderLatch. Stores node metadata (host, ports). Detects failures via session timeouts.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. HOW IT WORKS -->
+                <h2 id="how-it-works" class="mt-5 mb-3"><span class="badge bg-success me-2">2</span>How It Works</h2>
+
+                <h4>Leader Election</h4>
+                <p>When <code>kuber.zookeeper.enabled=true</code>, each node connects to ZooKeeper and creates an ephemeral sequential znode under <code>/kuber/leader</code>. The node with the <strong>lowest sequence number</strong> becomes PRIMARY. Apache Curator's <code>LeaderLatch</code> handles session expiry, network partitions, and herd effect avoidance.</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered">
+                        <thead class="table-dark">
+                            <tr><th>Node State</th><th>Reads</th><th>Writes</th><th>OpLog</th><th>Sync Service</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><span class="badge bg-success">STANDALONE</span></td><td>&#x2705;</td><td>&#x2705;</td><td>Inactive</td><td>Inactive</td></tr>
+                            <tr><td><span class="badge bg-warning text-dark">PRIMARY</span></td><td>&#x2705;</td><td>&#x2705;</td><td>Appending</td><td>Inactive</td></tr>
+                            <tr><td><span class="badge bg-secondary">SECONDARY</span></td><td>&#x2705;</td><td>&#x274C; READONLY</td><td>N/A</td><td>Polling PRIMARY</td></tr>
+                            <tr><td><span class="badge bg-info">SYNCING</span></td><td>&#x2705; (may be stale)</td><td>&#x274C; READONLY</td><td>N/A</td><td>Full sync in progress</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Write Path (PRIMARY)</h4>
+                <ol>
+                    <li><strong>checkWriteAccess()</strong> passes (this node is PRIMARY)</li>
+                    <li>Entry written to KeyIndex + Value Cache + Persistence Store (normal path)</li>
+                    <li><strong>OpLog.append()</strong> captures the mutation with a monotonic sequence number</li>
+                </ol>
+
+                <h4>Write Rejection (SECONDARY)</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>Protocol</th><th>Error Response</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Redis Protocol</td><td><code>-READONLY You can't write against a read only replica</code></td></tr>
+                            <tr><td>REST API</td><td>HTTP 403 / ReadOnlyException</td></tr>
+                            <tr><td>Web UI</td><td>Badge shows SECONDARY mode; write operations blocked</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 3. OPLOG -->
+                <h2 id="oplog" class="mt-5 mb-3"><span class="badge bg-success me-2">3</span>OpLog Replication Engine</h2>
+
+                <p>The OpLog is a <strong>lock-free circular ring buffer</strong> backed by <code>AtomicReferenceArray</code> and <code>AtomicLong</code>. Every write on the PRIMARY produces one OpLog entry.</p>
+
+                <div class="card bg-dark text-light mb-4">
+                    <div class="card-body">
+<pre class="mb-0 small">Ring Buffer (capacity = oplog-capacity, default 100,000)
+[1] [2] [3] [4] [5] [6] [7] [8] [9] ... [N]
+      ^ oldest available             ^ current sequence
+
+Write index = sequenceId % capacity
+Oldest = max(1, currentSequence - capacity + 1)
+
+If SECONDARY falls behind by more than capacity --&gt; full resync required</pre>
+                    </div>
+                </div>
+
+                <h4>OpLog Entry Types</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>OpType</th><th>Triggered By</th><th>Payload</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>SET</code></td><td>set, setEx, setNx, mset, hset, incr, append</td><td>Full CacheEntry snapshot</td></tr>
+                            <tr><td><code>DELETE</code></td><td>del, multi-delete</td><td>region + key</td></tr>
+                            <tr><td><code>REGION_CREATE</code></td><td>Region creation</td><td>Full CacheRegion definition</td></tr>
+                            <tr><td><code>REGION_DELETE</code></td><td>Region deletion</td><td>region name</td></tr>
+                            <tr><td><code>REGION_PURGE</code></td><td>Region purge</td><td>region name</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i><strong>Overflow Behavior:</strong> When the buffer is full, oldest entries are silently overwritten. If a SECONDARY's last-applied sequence has fallen off the buffer, the PRIMARY returns <code>SEQUENCE_TOO_OLD</code>, triggering automatic full resync.
+                </div>
+
+                <!-- 4. SYNC PROTOCOL -->
+                <h2 id="sync-protocol" class="mt-5 mb-3"><span class="badge bg-success me-2">4</span>Sync Protocol</h2>
+
+                <p>When a node becomes SECONDARY, the <code>ReplicationSyncService</code> starts a background thread:</p>
+
+                <div class="card bg-dark text-light mb-4">
+                    <div class="card-body">
+<pre class="mb-0 small">SECONDARY                                 PRIMARY
+   |                                         |
+   |---- GET /api/replication/info ----------&gt;|  Phase 0: Discovery
+   |&lt;--- { currentSequence: N } -------------|  (note sequence for catch-up)
+   |                                         |
+   |---- GET /api/replication/regions -------&gt;|  Phase 1: Region Sync
+   |&lt;--- [{ name, description, ... }] -------|  (create missing regions)
+   |                                         |
+   |---- GET /snapshot/{region}?offset=0 ---&gt;|  Phase 2: Full Snapshot
+   |&lt;--- { entries: [...], hasMore: true } --|  (paginate all entries)
+   |---- GET /snapshot/{region}?offset=5000 &gt;|
+   |&lt;--- { entries: [...], hasMore: false } -|
+   |     ... repeat for each region ...       |
+   |                                         |
+   |---- GET /oplog?afterSequence=N --------&gt;|  Phase 3: Catch-up
+   |&lt;--- { entries: [...], status: OK } -----|  (apply mutations since snapshot)
+   |                                         |
+   |---- GET /oplog?afterSequence=M --------&gt;|  Phase 4: Continuous Tail
+   |&lt;--- { entries: [] } -------------------|  (poll every sync-interval-ms)
+   |     ... forever until role change ...    |</pre>
+                    </div>
+                </div>
+
+                <h4>Phase Details</h4>
+                <dl>
+                    <dt><span class="badge bg-primary">Phase 0</span> Discovery</dt>
+                    <dd>Query PRIMARY's <code>/api/replication/info</code> for current oplog sequence (the "snapshot point").</dd>
+                    <dt><span class="badge bg-primary">Phase 1</span> Region Sync</dt>
+                    <dd>Fetch all region definitions. Create missing regions locally via <code>applyReplicatedRegionCreate()</code> (bypasses write-access check).</dd>
+                    <dt><span class="badge bg-primary">Phase 2</span> Full Snapshot</dt>
+                    <dd>Paginate through all entries per region in batches of <code>sync-batch-size</code>. Each entry applied to local KeyIndex, value cache, and persistence.</dd>
+                    <dt><span class="badge bg-primary">Phase 3</span> Catch-up</dt>
+                    <dd>Replay oplog entries from snapshot sequence to current, catching mutations that occurred during the snapshot phase.</dd>
+                    <dt><span class="badge bg-primary">Phase 4</span> Continuous Tail</dt>
+                    <dd>Poll <code>/api/replication/oplog</code> at <code>sync-interval-ms</code> intervals. Replication lag &#x2248; 1 poll interval when idle.</dd>
+                </dl>
+
+                <h4>Replication API Endpoints (PRIMARY)</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>Endpoint</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>GET /api/replication/info</code></td><td>PRIMARY metadata: nodeId, currentSequence, regionCount</td></tr>
+                            <tr><td><code>GET /api/replication/regions</code></td><td>All region definitions</td></tr>
+                            <tr><td><code>GET /api/replication/snapshot/{region}?offset=&amp;limit=</code></td><td>Paginated entry snapshot (max 10K per page)</td></tr>
+                            <tr><td><code>GET /api/replication/oplog?afterSequence=&amp;limit=</code></td><td>Oplog tail (returns SEQUENCE_TOO_OLD if buffer wrapped)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-warning">
+                    <i class="fas fa-shield-alt me-2"></i><strong>Security:</strong> All endpoints protected by <code>X-Replication-Token</code> header. Set <code>kuber.replication.auth-token</code> on all nodes.
+                </div>
+
+                <!-- 5. FAILOVER -->
+                <h2 id="failover" class="mt-5 mb-3"><span class="badge bg-success me-2">5</span>Failover &amp; Recovery</h2>
+
+                <h4>Automatic Failover Timeline</h4>
+                <div class="card bg-light mb-4">
+                    <div class="card-body">
+<pre class="mb-0 small">t = 0s     PRIMARY crashes
+t = 0-30s  ZooKeeper waits for session timeout (session-timeout-ms)
+t = 30s    Ephemeral znode deleted; Curator watcher fires on SECONDARY
+t = 30s    SECONDARY.isLeader() called:
+             1. syncService.stopSync()       -- stop tailing old PRIMARY
+             2. opLog.reset()                -- fresh oplog for new PRIMARY
+             3. isPrimary = true             -- accept writes
+             4. Publish NODE_PRIMARY event
+t = 30s+   New PRIMARY is fully operational</pre>
+                    </div>
+                </div>
+
+                <h4>ZooKeeper Disconnect Fallback</h4>
+                <p>If a node loses ZooKeeper connectivity, it switches to <strong>STANDALONE PRIMARY</strong> mode (safety: avoid both nodes rejecting writes).</p>
+
+                <h4>Old PRIMARY Rejoins</h4>
+                <p>Becomes SECONDARY automatically (ZK re-election), performs full sync from the new PRIMARY.</p>
+
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i><strong>Data Loss Window:</strong> Writes on PRIMARY not yet replicated are lost on crash. Window &#x2248; <code>sync-interval-ms</code> (default 500ms). For mission-critical durability, combine with shared PostgreSQL/MongoDB persistence.
+                </div>
+
+                <!-- 6. CONFIGURATION -->
+                <h2 id="configuration" class="mt-5 mb-3"><span class="badge bg-success me-2">6</span>Configuration Reference</h2>
+
+                <h4>ZooKeeper Properties</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.zookeeper.enabled</code></td><td><code>false</code></td><td>Enable ZooKeeper-based replication</td></tr>
+                            <tr><td><code>kuber.zookeeper.connect-string</code></td><td><code>localhost:2181</code></td><td>ZooKeeper connection string (comma-separated for cluster)</td></tr>
+                            <tr><td><code>kuber.zookeeper.session-timeout-ms</code></td><td><code>30000</code></td><td>Session timeout. Lower = faster failover, more false positives.</td></tr>
+                            <tr><td><code>kuber.zookeeper.connection-timeout-ms</code></td><td><code>15000</code></td><td>Initial connection timeout</td></tr>
+                            <tr><td><code>kuber.zookeeper.base-path</code></td><td><code>/kuber</code></td><td>ZK namespace. Change for multi-cluster on same ZK.</td></tr>
+                            <tr><td><code>kuber.zookeeper.retry-base-sleep-ms</code></td><td><code>1000</code></td><td>Curator retry initial sleep</td></tr>
+                            <tr><td><code>kuber.zookeeper.retry-max-attempts</code></td><td><code>3</code></td><td>Curator retry max attempts</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Replication Properties</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.replication.oplog-capacity</code></td><td><code>100000</code></td><td>Ring buffer size. If SECONDARY falls behind more than this, full resync triggers.</td></tr>
+                            <tr><td><code>kuber.replication.sync-batch-size</code></td><td><code>5000</code></td><td>Entries per HTTP page for snapshot and oplog fetch</td></tr>
+                            <tr><td><code>kuber.replication.sync-interval-ms</code></td><td><code>500</code></td><td>Oplog poll interval. Lower = less lag, more HTTP traffic.</td></tr>
+                            <tr><td><code>kuber.replication.heartbeat-interval-ms</code></td><td><code>5000</code></td><td>ZK node re-registration interval</td></tr>
+                            <tr><td><code>kuber.replication.connect-timeout-ms</code></td><td><code>5000</code></td><td>HTTP connect timeout for SECONDARY to PRIMARY</td></tr>
+                            <tr><td><code>kuber.replication.read-timeout-ms</code></td><td><code>30000</code></td><td>HTTP read timeout (must accommodate large snapshot pages)</td></tr>
+                            <tr><td><code>kuber.replication.auth-token</code></td><td><em>(none)</em></td><td>Shared secret for replication API. <strong>Required in production.</strong></td></tr>
+                            <tr><td><code>kuber.replication.advertised-address</code></td><td><code>localhost</code></td><td>Hostname/IP other nodes use to reach this node's HTTP port</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Node Identity</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>Property</th><th>Default</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>kuber.node-id</code></td><td><em>random 8-char UUID</em></td><td>Unique node identifier. Set explicitly for predictable logs and ZK paths.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 7. DEPLOYMENT -->
+                <h2 id="deployment" class="mt-5 mb-3"><span class="badge bg-success me-2">7</span>Deployment Guide</h2>
+
+                <h4>Prerequisites</h4>
                 <ul>
-                    <li><strong>PRIMARY</strong> - Handles read/write operations</li>
-                    <li><strong>SECONDARY</strong> - Read-only, receives replicated data</li>
-                    <li><strong>Automatic Failover</strong> - Secondary becomes primary if primary fails</li>
+                    <li>ZooKeeper ensemble (3+ nodes for production; 1 node for development)</li>
+                    <li>Network connectivity between all Kuber nodes and ZooKeeper</li>
+                    <li>HTTP connectivity between Kuber nodes (SECONDARY reaches PRIMARY's HTTP port)</li>
                 </ul>
+
+                <h4>Example: Two-Node Setup</h4>
+                <p><strong>Node A</strong> (<code>10.0.1.50</code>)</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber.node-id=node-alpha
+server.port=8080
+kuber.network.port=6380
+
+kuber.zookeeper.enabled=true
+kuber.zookeeper.connect-string=zk1:2181,zk2:2181,zk3:2181
+
+kuber.replication.advertised-address=10.0.1.50
+kuber.replication.auth-token=my-secret-token-2025
+kuber.replication.oplog-capacity=200000
+
+kuber.persistence.type=rocksdb</code></pre>
+
+                <p><strong>Node B</strong> (<code>10.0.1.51</code>) &#x2014; identical except node-id and advertised-address:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber.node-id=node-beta
+kuber.replication.advertised-address=10.0.1.51
+# ... everything else identical to Node A ...</code></pre>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb me-2"></i><strong>Tip:</strong> Override per-node settings via JVM args: <code>-Dkuber.node-id=node-beta -Dkuber.replication.advertised-address=10.0.1.51</code>
+                </div>
+
+                <h4>Shared Persistence Variant</h4>
+                <p>For maximum durability, point both nodes at the same PostgreSQL or MongoDB. The SECONDARY still replicates via OpLog for fast in-memory sync:</p>
+                <pre class="bg-dark text-light p-3 rounded"><code># On BOTH nodes:
+kuber.persistence.type=postgresql
+kuber.persistence.postgresql.url=jdbc:postgresql://pg-server:5432/kuber
+kuber.persistence.postgresql.username=kuber
+kuber.persistence.postgresql.password=secret</code></pre>
+
+                <!-- 8. MONITORING -->
+                <h2 id="monitoring" class="mt-5 mb-3"><span class="badge bg-success me-2">8</span>Monitoring &amp; Diagnostics</h2>
+
+                <h4>REST API: <code>GET /api/info</code></h4>
+                <pre class="bg-dark text-light p-3 rounded"><code>{
+  "replication": {
+    "nodeId": "node-alpha",
+    "mode": "PRIMARY",
+    "isPrimary": true,
+    "zkConnected": true,
+    "participants": 2,
+    "oplog": {
+      "currentSequence": 142857,
+      "size": 100000,
+      "capacity": 100000,
+      "oldestSequence": 42858
+    },
+    "sync": {
+      "running": false,
+      "synced": false,
+      "lastAppliedSequence": 0,
+      "entriesReplicated": 0
+    }
+  }
+}</code></pre>
+
+                <h4>Key Metrics</h4>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr><th>Metric</th><th>Healthy</th><th>Action if Unhealthy</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Replication Lag</strong> (PRIMARY sequence - SECONDARY lastApplied)</td><td>&lt; 1000</td><td>Reduce sync-interval-ms or increase bandwidth</td></tr>
+                            <tr><td><strong>OpLog Utilization</strong> (size / capacity)</td><td>&lt; 80%</td><td>Increase oplog-capacity</td></tr>
+                            <tr><td><strong>sync.synced</strong></td><td>true</td><td>If false, full sync in progress (normal after restart)</td></tr>
+                            <tr><td><strong>zkConnected</strong></td><td>true</td><td>Check ZooKeeper ensemble health</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 9. TUNING -->
+                <h2 id="tuning" class="mt-5 mb-3"><span class="badge bg-success me-2">9</span>Performance Tuning</h2>
+
+                <h4>High Write Throughput (&gt;50K writes/sec)</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber.replication.oplog-capacity=500000
+kuber.replication.sync-batch-size=10000
+kuber.replication.sync-interval-ms=100</code></pre>
+
+                <h4>Low Latency Replication (&lt;100ms lag)</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber.replication.sync-interval-ms=50
+kuber.replication.sync-batch-size=1000</code></pre>
+
+                <h4>Fast Failover (&lt;10s)</h4>
+                <pre class="bg-dark text-light p-3 rounded"><code>kuber.zookeeper.session-timeout-ms=10000
+kuber.replication.heartbeat-interval-ms=2000</code></pre>
+
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>ZooKeeper enforces a minimum session timeout of <code>2 x tickTime</code> (typically 4s). Values below this floor are ignored.
+                </div>
+
+                <!-- 10. TROUBLESHOOTING -->
+                <h2 id="troubleshooting" class="mt-5 mb-3"><span class="badge bg-success me-2">10</span>Troubleshooting</h2>
+
+                <div class="accordion mb-4" id="troubleshootingAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#t1">SECONDARY shows "full resync" repeatedly</button>
+                        </h2>
+                        <div id="t1" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <p><strong>Cause:</strong> OpLog wrapped before SECONDARY caught up.</p>
+                                <p><strong>Fix:</strong> Increase <code>oplog-capacity</code>. Reduce <code>sync-interval-ms</code>. Increase <code>sync-batch-size</code>.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#t2">SECONDARY: "Connection refused" to PRIMARY</button>
+                        </h2>
+                        <div id="t2" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <p><strong>Cause:</strong> Wrong <code>advertised-address</code> or firewall blocking HTTP port.</p>
+                                <p><strong>Fix:</strong> Set <code>advertised-address</code> to PRIMARY's real IP. Ensure <code>server.port</code> is reachable between nodes.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#t3">Both nodes show STANDALONE PRIMARY</button>
+                        </h2>
+                        <div id="t3" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <p><strong>Cause:</strong> Split-brain: both lost ZooKeeper. Safety fallback promotes both to PRIMARY.</p>
+                                <p><strong>Fix:</strong> Restore ZooKeeper connectivity. Curator will re-elect one as SECONDARY.</p>
+                                <p><strong>Prevention:</strong> Use 3+ node ZK ensemble across availability zones.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#t4">401 Unauthorized on replication endpoints</button>
+                        </h2>
+                        <div id="t4" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <p><strong>Cause:</strong> Mismatched <code>auth-token</code> between nodes.</p>
+                                <p><strong>Fix:</strong> Ensure identical <code>kuber.replication.auth-token</code> on all nodes.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#t5">SECONDARY has stale data</button>
+                        </h2>
+                        <div id="t5" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                            <div class="accordion-body">
+                                <p><strong>Cause:</strong> Normal replication lag (&#x2248; <code>sync-interval-ms</code>).</p>
+                                <p><strong>Verify:</strong> Compare PRIMARY <code>oplog.currentSequence</code> vs SECONDARY <code>sync.lastAppliedSequence</code> via <code>/api/info</code>.</p>
+                                <p><strong>Fix:</strong> Reduce <code>sync-interval-ms</code> (e.g., 50ms).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
+                    <a href="/help/persistence" class="btn btn-outline-success ms-2"><i class="fas fa-database me-2"></i>Persistence Guide</a>
                 </div>
             </div>
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.2</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.8.3</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

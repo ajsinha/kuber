@@ -17,4 +17,4 @@ Patent Pending
 from .trade_generator import TradeGenerator, generate_trades
 
 __all__ = ['TradeGenerator', 'generate_trades']
-__version__ = '1.7.9'
+__version__ = '1.8.3'

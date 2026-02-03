@@ -37,7 +37,7 @@ import java.util.regex.PatternSyntaxException;
  * <p>This service provides significant performance improvements for searches
  * on large datasets by utilizing multiple threads to process in parallel.
  * 
- * <h3>Search Optimization Strategy (v1.8.2):</h3>
+ * <h3>Search Optimization Strategy (v1.8.3):</h3>
  * <ol>
  *   <li><strong>Index Lookup</strong>: If secondary indexes exist, use them for O(1)/O(log n) lookups</li>
  *   <li><strong>Index Intersection</strong>: For multiple criteria, intersect index results</li>
@@ -57,7 +57,7 @@ import java.util.regex.PatternSyntaxException;
  *   <li>Without index: O(n) parallel scan - ~8x speedup with 8 threads</li>
  * </ul>
  * 
- * @version 1.8.2
+ * @version 1.8.3
  * @since 1.7.9
  */
 @Service
@@ -67,6 +67,7 @@ public class ParallelJsonSearchService {
     private final CacheService cacheService;
     private final KuberProperties properties;
     private final IndexManager indexManager;
+    private final com.kuber.server.persistence.PersistenceStore persistenceStore;
     
     // Thread pool for parallel search operations
     private ExecutorService searchExecutor;
@@ -83,13 +84,17 @@ public class ParallelJsonSearchService {
     private final AtomicLong jsonSearches = new AtomicLong(0);
     private final AtomicLong indexedSearches = new AtomicLong(0);
     private final AtomicLong fullScanSearches = new AtomicLong(0);
+    private final AtomicLong nativeQuerySearches = new AtomicLong(0);
     
     public ParallelJsonSearchService(CacheService cacheService, 
                                      KuberProperties properties,
-                                     @Lazy IndexManager indexManager) {
+                                     @Lazy IndexManager indexManager,
+                                     @org.springframework.beans.factory.annotation.Autowired(required = false) 
+                                     com.kuber.server.persistence.PersistenceStore persistenceStore) {
         this.cacheService = cacheService;
         this.properties = properties;
         this.indexManager = indexManager;
+        this.persistenceStore = persistenceStore;
     }
     
     @PostConstruct
@@ -133,7 +138,7 @@ public class ParallelJsonSearchService {
     /**
      * Search JSON documents with automatic index usage and parallel/sequential mode selection.
      * 
-     * <p>Search Strategy (v1.8.2):
+     * <p>Search Strategy (v1.8.3):
      * <ol>
      *   <li>Check if indexes exist for search criteria fields</li>
      *   <li>If indexes available, use index lookup to narrow down candidates</li>
@@ -174,26 +179,31 @@ public class ParallelJsonSearchService {
                 results = searchWithinCandidates(region, candidateKeys, criteria, fields, limit);
             }
         } else {
-            // No index available - fall back to full scan
-            fullScanSearches.incrementAndGet();
+            // No index available - try hybrid query strategy (v1.8.3)
+            results = tryHybridQuery(region, criteria, fields, limit);
             
-            Set<String> allKeys = cacheService.keys(region, "*");
-            
-            if (allKeys == null || allKeys.isEmpty()) {
-                log.debug("No keys found in region '{}' for search", region);
-                return Collections.emptyList();
-            }
-            
-            log.debug("Full scan search: {} keys in region '{}' with {} criteria", 
-                allKeys.size(), region, criteria != null ? criteria.size() : 0);
-            
-            // Decide parallel vs sequential
-            if (shouldUseParallelSearch(allKeys.size())) {
-                parallelSearches.incrementAndGet();
-                results = parallelJsonSearch(region, allKeys, criteria, fields, limit);
-            } else {
-                sequentialSearches.incrementAndGet();
-                results = sequentialJsonSearch(region, allKeys, criteria, fields, limit);
+            if (results == null) {
+                // Hybrid query not available or failed - fall back to full scan
+                fullScanSearches.incrementAndGet();
+                
+                Set<String> allKeys = cacheService.keys(region, "*");
+                
+                if (allKeys == null || allKeys.isEmpty()) {
+                    log.debug("No keys found in region '{}' for search", region);
+                    return Collections.emptyList();
+                }
+                
+                log.debug("Full scan search: {} keys in region '{}' with {} criteria", 
+                    allKeys.size(), region, criteria != null ? criteria.size() : 0);
+                
+                // Decide parallel vs sequential
+                if (shouldUseParallelSearch(allKeys.size())) {
+                    parallelSearches.incrementAndGet();
+                    results = parallelJsonSearch(region, allKeys, criteria, fields, limit);
+                } else {
+                    sequentialSearches.incrementAndGet();
+                    results = sequentialJsonSearch(region, allKeys, criteria, fields, limit);
+                }
             }
         }
         
@@ -337,6 +347,108 @@ public class ParallelJsonSearchService {
         }
         
         return result;
+    }
+    
+    /**
+     * Try hybrid query strategy using native database queries.
+     * 
+     * <p>When no Kuber secondary index exists for the search criteria,
+     * this method attempts to use native database queries instead of
+     * a full in-memory scan.
+     * 
+     * <p><b>Supported backends:</b>
+     * <ul>
+     *   <li>PostgreSQL - Uses GIN JSONB index with @&gt; operator</li>
+     *   <li>MongoDB - Uses native document queries</li>
+     *   <li>SQLite - Uses JSON1 extension (json_extract)</li>
+     * </ul>
+     * 
+     * @param region   Cache region to search
+     * @param criteria Search criteria
+     * @param fields   Fields to project (null for all)
+     * @param limit    Maximum results
+     * @return List of matching documents, or null if native query not available
+     * @since 1.8.3
+     */
+    private List<Map<String, Object>> tryHybridQuery(String region, 
+                                                      Map<String, Object> criteria,
+                                                      List<String> fields,
+                                                      int limit) {
+        // Check if hybrid query is enabled
+        if (!properties.getIndexing().isHybridQueryEnabled()) {
+            return null;
+        }
+        
+        // Check if persistence store supports native JSON queries
+        if (persistenceStore == null || !persistenceStore.supportsNativeJsonQuery()) {
+            return null;
+        }
+        
+        // Check threshold - only use native query for larger datasets
+        long entryCount = persistenceStore.estimateEntryCount(region);
+        if (entryCount < properties.getIndexing().getHybridQueryThreshold()) {
+            // Small dataset, full scan is fine
+            return null;
+        }
+        
+        try {
+            // Execute native database query
+            List<com.kuber.core.model.CacheEntry> entries = 
+                persistenceStore.searchByJsonCriteria(region, criteria, limit);
+            
+            if (entries == null) {
+                // Native query not supported or failed
+                return null;
+            }
+            
+            nativeQuerySearches.incrementAndGet();
+            log.debug("Hybrid query (native): {} results from {} for region '{}' with {} criteria",
+                    entries.size(), persistenceStore.getClass().getSimpleName(), 
+                    region, criteria != null ? criteria.size() : 0);
+            
+            // Convert entries to result maps with field projection
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (com.kuber.core.model.CacheEntry entry : entries) {
+                if (entry.getJsonValue() != null) {
+                    Map<String, Object> result = new java.util.LinkedHashMap<>();
+                    result.put("_key", entry.getKey());
+                    
+                    if (fields == null || fields.isEmpty()) {
+                        // Return all fields
+                        result.put("_value", entry.getJsonValue());
+                    } else {
+                        // Project specific fields
+                        for (String field : fields) {
+                            com.fasterxml.jackson.databind.JsonNode fieldValue = 
+                                entry.getJsonValue().get(field);
+                            if (fieldValue != null) {
+                                result.put(field, jsonNodeToObject(fieldValue));
+                            }
+                        }
+                    }
+                    
+                    results.add(result);
+                }
+            }
+            
+            return results;
+            
+        } catch (Exception e) {
+            log.warn("Hybrid query failed, falling back to scan: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Convert JsonNode to plain Java object for result projection.
+     */
+    private Object jsonNodeToObject(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        if (node.isTextual()) return node.asText();
+        if (node.isNumber()) return node.numberValue();
+        if (node.isBoolean()) return node.asBoolean();
+        if (node.isArray() || node.isObject()) return node;
+        return node.asText();
     }
     
     /**
@@ -988,6 +1100,7 @@ public class ParallelJsonSearchService {
         stats.put("patternSearches", patternSearches.get());
         stats.put("indexedSearches", indexedSearches.get());
         stats.put("fullScanSearches", fullScanSearches.get());
+        stats.put("nativeQuerySearches", nativeQuerySearches.get());
         stats.put("totalSearchTimeMs", totalSearchTimeMs.get());
         
         long total = totalSearches.get();

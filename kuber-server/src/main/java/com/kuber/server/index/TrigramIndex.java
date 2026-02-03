@@ -56,8 +56,8 @@ import java.util.regex.Pattern;
  *   <li>Apply the full regex only to candidates (much smaller set than full scan)</li>
  * </ol>
  * 
- * @version 1.8.2
- * @since 1.8.2
+ * @version 1.8.3
+ * @since 1.8.3
  */
 @Slf4j
 public class TrigramIndex implements SecondaryIndex {

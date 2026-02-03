@@ -871,7 +871,7 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
      * @param region Region name
      * @param consumer Consumer to process each entry
      * @return Number of entries processed
-     * @since 1.8.2
+     * @since 1.8.3
      */
     @Override
     public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
@@ -993,6 +993,143 @@ public class SqlitePersistenceStore extends AbstractPersistenceStore {
         }
         
         return keys;
+    }
+    
+    // ==================== Native JSON Query Support (v1.8.3) ====================
+    
+    @Override
+    public boolean supportsNativeJsonQuery() {
+        return true;
+    }
+    
+    @Override
+    public List<CacheEntry> searchByJsonCriteria(String region, java.util.Map<String, Object> criteria, int limit) {
+        if (criteria == null || criteria.isEmpty()) {
+            return loadEntries(region, limit);
+        }
+        
+        Connection conn = getOrCreateRegionConnection(region);
+        if (conn == null) {
+            return null;
+        }
+        
+        List<CacheEntry> results = new ArrayList<>();
+        
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT * FROM kuber_entries WHERE ");
+        sql.append("(expires_at IS NULL OR expires_at > ?) ");
+        
+        List<Object> params = new ArrayList<>();
+        params.add(System.currentTimeMillis());
+        
+        // Add criteria using json_extract
+        for (java.util.Map.Entry<String, Object> entry : criteria.entrySet()) {
+            String field = entry.getKey();
+            Object value = entry.getValue();
+            
+            if (value instanceof List) {
+                // IN clause: json_extract(json_value, '$.field') IN (?, ?, ?)
+                @SuppressWarnings("unchecked")
+                List<?> values = (List<?>) value;
+                if (!values.isEmpty()) {
+                    sql.append("AND json_extract(json_value, '$.").append(field).append("') IN (");
+                    for (int i = 0; i < values.size(); i++) {
+                        if (i > 0) sql.append(", ");
+                        sql.append("?");
+                        params.add(values.get(i).toString());
+                    }
+                    sql.append(") ");
+                }
+                
+            } else if (value instanceof String) {
+                String strValue = (String) value;
+                
+                // Check for comparison operators
+                if (strValue.startsWith(">=")) {
+                    sql.append("AND CAST(json_extract(json_value, '$.").append(field).append("') AS REAL) >= ? ");
+                    params.add(parseNumeric(strValue.substring(2)));
+                } else if (strValue.startsWith("<=")) {
+                    sql.append("AND CAST(json_extract(json_value, '$.").append(field).append("') AS REAL) <= ? ");
+                    params.add(parseNumeric(strValue.substring(2)));
+                } else if (strValue.startsWith("!=")) {
+                    sql.append("AND json_extract(json_value, '$.").append(field).append("') != ? ");
+                    params.add(strValue.substring(2));
+                } else if (strValue.startsWith(">")) {
+                    sql.append("AND CAST(json_extract(json_value, '$.").append(field).append("') AS REAL) > ? ");
+                    params.add(parseNumeric(strValue.substring(1)));
+                } else if (strValue.startsWith("<")) {
+                    sql.append("AND CAST(json_extract(json_value, '$.").append(field).append("') AS REAL) < ? ");
+                    params.add(parseNumeric(strValue.substring(1)));
+                } else if (strValue.startsWith("=")) {
+                    sql.append("AND json_extract(json_value, '$.").append(field).append("') = ? ");
+                    params.add(strValue.substring(1));
+                } else {
+                    // Equality
+                    sql.append("AND json_extract(json_value, '$.").append(field).append("') = ? ");
+                    params.add(strValue);
+                }
+            } else if (value instanceof Number) {
+                sql.append("AND CAST(json_extract(json_value, '$.").append(field).append("') AS REAL) = ? ");
+                params.add(((Number) value).doubleValue());
+            } else if (value instanceof Boolean) {
+                // SQLite stores JSON booleans as 1/0 or true/false
+                sql.append("AND (json_extract(json_value, '$.").append(field).append("') = ? ");
+                sql.append("OR json_extract(json_value, '$.").append(field).append("') = ?) ");
+                boolean boolValue = (Boolean) value;
+                params.add(boolValue ? 1 : 0);
+                params.add(boolValue ? "true" : "false");
+            }
+        }
+        
+        sql.append("LIMIT ?");
+        params.add(limit);
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                Object param = params.get(i);
+                if (param instanceof String) {
+                    stmt.setString(i + 1, (String) param);
+                } else if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param instanceof Long) {
+                    stmt.setLong(i + 1, (Long) param);
+                } else if (param instanceof Double) {
+                    stmt.setDouble(i + 1, (Double) param);
+                } else {
+                    stmt.setObject(i + 1, param);
+                }
+            }
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    results.add(resultSetToEntry(rs, region));
+                }
+            }
+            
+            log.debug("SQLite native JSON query: {} results for region '{}' with {} criteria", 
+                    results.size(), region, criteria.size());
+            
+        } catch (SQLException e) {
+            log.warn("SQLite native JSON query failed, falling back to scan: {}", e.getMessage());
+            return null; // Signal fallback
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Parse a string to numeric for comparison queries.
+     */
+    private Object parseNumeric(String value) {
+        try {
+            if (value.contains(".")) {
+                return Double.parseDouble(value);
+            } else {
+                return Long.parseLong(value);
+            }
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
     }
     
     // ==================== Helper Methods ====================

@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.7.9";
+    private String version = "1.8.3";
     
     /**
      * Unique node identifier
@@ -116,7 +116,7 @@ public class KuberProperties {
     
     /**
      * Secondary indexing configuration including file watcher settings.
-     * @since 1.8.2
+     * @since 1.8.3
      */
     private Indexing indexing = new Indexing();
     
@@ -576,19 +576,20 @@ public class KuberProperties {
     @Data
     public static class Replication {
         /**
-         * Batch size for sync operations
+         * Batch size for sync operations (snapshot pagination and oplog fetch).
+         * Larger batches reduce HTTP round-trips but increase memory per batch.
          */
         @Min(1)
-        private int syncBatchSize = 1000;
+        private int syncBatchSize = 5000;
         
         /**
-         * Sync timeout in milliseconds
+         * Sync timeout in milliseconds (overall full-sync timeout)
          */
         @Min(1000)
         private int syncTimeoutMs = 60000;
         
         /**
-         * Heartbeat interval in milliseconds
+         * Heartbeat interval in milliseconds (ZooKeeper node re-registration)
          */
         @Min(1000)
         private int heartbeatIntervalMs = 5000;
@@ -598,6 +599,64 @@ public class KuberProperties {
          */
         @Min(1000)
         private int primaryCheckIntervalMs = 10000;
+        
+        /**
+         * OpLog circular buffer capacity.
+         * Determines how many write operations are retained for delta replication.
+         * If a SECONDARY falls more than this many operations behind, it must
+         * perform a full resync.
+         * 
+         * Memory usage: ~500 bytes per entry (varies with value size).
+         * Default 100,000 entries ≈ 50–100 MB.
+         * 
+         * Increase for high write-rate deployments or slow SECONDARY networks.
+         */
+        @Min(1000)
+        private int oplogCapacity = 100000;
+        
+        /**
+         * Polling interval in milliseconds for the continuous oplog tail.
+         * The SECONDARY polls the PRIMARY's oplog at this interval when no
+         * new entries are available.
+         * 
+         * Lower values reduce replication lag but increase HTTP traffic.
+         * Default: 500ms (max replication lag ~500ms when idle).
+         */
+        @Min(100)
+        private int syncIntervalMs = 500;
+        
+        /**
+         * HTTP connect timeout in milliseconds for replication client.
+         */
+        @Min(1000)
+        private int connectTimeoutMs = 5000;
+        
+        /**
+         * HTTP read timeout in milliseconds for replication client.
+         * Must be large enough for full-sync snapshot pages.
+         */
+        @Min(5000)
+        private int readTimeoutMs = 30000;
+        
+        /**
+         * Shared authentication token for replication API.
+         * Both PRIMARY and SECONDARY must use the same token.
+         * If blank, replication endpoints are unauthenticated.
+         * 
+         * STRONGLY recommended to set this in production.
+         */
+        private String authToken;
+        
+        /**
+         * Advertised hostname or IP address that other nodes use to reach
+         * this node's HTTP server.
+         * 
+         * Default: "localhost" (single-machine development).
+         * In production, set to this node's actual IP or DNS name.
+         * 
+         * Example: "10.0.1.50" or "kuber-node-a.internal"
+         */
+        private String advertisedAddress = "localhost";
     }
     
     @Data
@@ -1493,7 +1552,7 @@ public class KuberProperties {
      *   <li>{@code kuber.index.<region>.<field>.create.<type>} - Create new index</li>
      * </ul>
      * 
-     * @since 1.8.2
+     * @since 1.8.3
      */
     @Data
     public static class Indexing {
@@ -1523,32 +1582,33 @@ public class KuberProperties {
          * Default storage mode for secondary indexes.
          * HEAP: Fast but uses JVM heap memory (may cause GC pressure)
          * OFFHEAP: Slower but uses direct memory (no GC pressure, better for large indexes)
+         * DISK: Slowest but minimal RAM usage, survives restarts
          * Default: HEAP
          */
         private String defaultStorage = "HEAP";
         
         /**
          * Storage mode for HASH indexes.
-         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         * HEAP | OFFHEAP | DISK | DEFAULT (use defaultStorage)
          */
         private String hashStorage = "DEFAULT";
         
         /**
          * Storage mode for BTREE indexes.
-         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         * HEAP | OFFHEAP | DISK | DEFAULT (use defaultStorage)
          */
         private String btreeStorage = "DEFAULT";
         
         /**
          * Storage mode for TRIGRAM indexes.
          * Recommended: OFFHEAP (trigram indexes consume significant memory)
-         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         * HEAP | OFFHEAP | DISK | DEFAULT (use defaultStorage)
          */
         private String trigramStorage = "OFFHEAP";
         
         /**
          * Storage mode for PREFIX indexes.
-         * HEAP | OFFHEAP | DEFAULT (use defaultStorage)
+         * HEAP | OFFHEAP | DISK | DEFAULT (use defaultStorage)
          */
         private String prefixStorage = "DEFAULT";
         
@@ -1563,6 +1623,109 @@ public class KuberProperties {
          * Default: 1GB
          */
         private long offheapMaxSize = 1024L * 1024L * 1024L;
+        
+        // ==================== Disk-Based Index Configuration (v1.8.3) ====================
+        
+        /**
+         * Backend engine for disk-based indexes.
+         * Options: rocksdb, lmdb, sqlite
+         * Default: rocksdb (best write performance)
+         * 
+         * <p>This is independent of the main persistence backend. You can use
+         * PostgreSQL for data persistence and RocksDB for index storage.
+         * 
+         * @since 1.8.3
+         */
+        private String diskBackend = "rocksdb";
+        
+        /**
+         * Directory for disk-based index storage.
+         * Default: ./kuberdata/indexes
+         * 
+         * @since 1.8.3
+         */
+        private String diskDirectory = "./kuberdata/indexes";
+        
+        /**
+         * Enable write-ahead logging for disk indexes.
+         * Improves durability but reduces write performance.
+         * Default: false (indexes can be rebuilt from data)
+         * 
+         * @since 1.8.3
+         */
+        private boolean diskWalEnabled = false;
+        
+        /**
+         * Sync writes to disk immediately.
+         * true: Maximum durability, slower writes
+         * false: Buffered writes, faster but may lose recent index updates on crash
+         * Default: false (indexes can be rebuilt)
+         * 
+         * @since 1.8.3
+         */
+        private boolean diskSyncWrites = false;
+        
+        /**
+         * Cache size for disk-based indexes in MB.
+         * Higher values improve read performance but use more RAM.
+         * Default: 64MB
+         * 
+         * @since 1.8.3
+         */
+        private int diskCacheSizeMb = 64;
+        
+        /**
+         * Enable bloom filters for disk-based indexes.
+         * Improves lookup performance for non-existent keys.
+         * Default: true
+         * 
+         * @since 1.8.3
+         */
+        private boolean diskBloomFilterEnabled = true;
+        
+        /**
+         * Skip index rebuild on startup if disk indexes exist.
+         * When true and using DISK storage, existing index data is reused.
+         * When false, indexes are always rebuilt from persistence on startup.
+         * Default: true
+         * 
+         * @since 1.8.3
+         */
+        private boolean diskReuseOnStartup = true;
+        
+        // ==================== Hybrid Query Strategy (v1.8.3) ====================
+        
+        /**
+         * Enable hybrid query strategy.
+         * When a Kuber secondary index doesn't exist for a query field,
+         * fall back to native database queries (PostgreSQL GIN, MongoDB, etc.)
+         * instead of full table scan.
+         * 
+         * <p>Supported backends for native query fallback:
+         * <ul>
+         *   <li>PostgreSQL - Uses GIN JSONB index and @&gt; operator</li>
+         *   <li>MongoDB - Uses native document queries</li>
+         *   <li>SQLite - Uses JSON1 extension (json_extract)</li>
+         * </ul>
+         * 
+         * <p>Backends without native JSON query support (RocksDB, LMDB, Memory)
+         * will fall back to full scan when no Kuber index exists.
+         * 
+         * Default: true
+         * 
+         * @since 1.8.3
+         */
+        private boolean hybridQueryEnabled = true;
+        
+        /**
+         * Threshold for falling back to native database query.
+         * If the estimated number of entries to scan exceeds this threshold
+         * AND a native query is available, use native database query.
+         * Default: 10000
+         * 
+         * @since 1.8.3
+         */
+        private int hybridQueryThreshold = 10000;
     }
     
     /**

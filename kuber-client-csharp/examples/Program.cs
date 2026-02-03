@@ -12,7 +12,7 @@ using Kuber.Client.Examples;
 Console.WriteLine(@"
 ╔══════════════════════════════════════════════════════════════════════╗
 ║               KUBER DISTRIBUTED CACHE - C# EXAMPLES                  ║
-║                          Version 1.7.0                               ║
+║                          Version 1.8.3                               ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
 Select an example to run:

@@ -20,7 +20,7 @@ public static class RestApiExample
     {
         Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
         Console.WriteLine("║              KUBER REST API EXAMPLE - C# CLIENT                     ║");
-        Console.WriteLine("║                        Version 1.7.0                                ║");
+        Console.WriteLine("║                        Version 1.8.3                                ║");
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
         Console.WriteLine();
 

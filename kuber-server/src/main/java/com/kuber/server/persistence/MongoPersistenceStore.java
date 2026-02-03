@@ -16,6 +16,7 @@ import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheRegion;
 import com.kuber.core.util.JsonUtils;
 import com.kuber.server.config.KuberProperties;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
@@ -413,7 +414,7 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
      * @param region Region name
      * @param consumer Consumer to process each entry
      * @return Number of entries processed
-     * @since 1.8.2
+     * @since 1.8.3
      */
     @Override
     public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
@@ -510,6 +511,109 @@ public class MongoPersistenceStore extends AbstractPersistenceStore {
         cursor.forEach(doc -> keys.add(doc.getString("key")));
         
         return keys;
+    }
+    
+    // ==================== Native JSON Query Support (v1.8.3) ====================
+    
+    @Override
+    public boolean supportsNativeJsonQuery() {
+        return true;
+    }
+    
+    @Override
+    public List<CacheEntry> searchByJsonCriteria(String region, java.util.Map<String, Object> criteria, int limit) {
+        if (criteria == null || criteria.isEmpty()) {
+            return loadEntries(region, limit);
+        }
+        
+        List<CacheEntry> results = new ArrayList<>();
+        String collectionName = getCollectionName(region);
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+        
+        // Build MongoDB query
+        List<Bson> filters = new ArrayList<>();
+        
+        // Filter non-expired entries
+        filters.add(Filters.or(
+            Filters.eq("expiresAt", null),
+            Filters.gt("expiresAt", java.time.Instant.now())
+        ));
+        
+        // Add criteria filters
+        for (java.util.Map.Entry<String, Object> entry : criteria.entrySet()) {
+            String field = entry.getKey();
+            Object value = entry.getValue();
+            String jsonField = "jsonValue." + field;
+            
+            if (value instanceof List) {
+                // IN clause: field in [a, b, c]
+                @SuppressWarnings("unchecked")
+                List<?> values = (List<?>) value;
+                filters.add(Filters.in(jsonField, values));
+                
+            } else if (value instanceof String) {
+                String strValue = (String) value;
+                
+                // Check for comparison operators
+                if (strValue.startsWith(">=")) {
+                    filters.add(Filters.gte(jsonField, parseValue(strValue.substring(2))));
+                } else if (strValue.startsWith("<=")) {
+                    filters.add(Filters.lte(jsonField, parseValue(strValue.substring(2))));
+                } else if (strValue.startsWith("!=")) {
+                    filters.add(Filters.ne(jsonField, parseValue(strValue.substring(2))));
+                } else if (strValue.startsWith(">")) {
+                    filters.add(Filters.gt(jsonField, parseValue(strValue.substring(1))));
+                } else if (strValue.startsWith("<")) {
+                    filters.add(Filters.lt(jsonField, parseValue(strValue.substring(1))));
+                } else if (strValue.startsWith("=")) {
+                    filters.add(Filters.eq(jsonField, parseValue(strValue.substring(1))));
+                } else {
+                    // Equality
+                    filters.add(Filters.eq(jsonField, parseValue(strValue)));
+                }
+            } else {
+                // Direct value match
+                filters.add(Filters.eq(jsonField, value));
+            }
+        }
+        
+        // Execute query
+        FindIterable<Document> cursor = collection.find(Filters.and(filters))
+                .limit(limit);
+        
+        for (Document doc : cursor) {
+            results.add(documentToEntry(doc, region));
+        }
+        
+        log.debug("MongoDB native JSON query: {} results for region '{}' with {} criteria", 
+                results.size(), region, criteria.size());
+        
+        return results;
+    }
+    
+    /**
+     * Parse a string value to appropriate type for MongoDB queries.
+     */
+    private Object parseValue(String value) {
+        if (value == null) return null;
+        
+        // Try numeric
+        try {
+            if (value.contains(".")) {
+                return Double.parseDouble(value);
+            } else {
+                return Long.parseLong(value);
+            }
+        } catch (NumberFormatException e) {
+            // Not numeric
+        }
+        
+        // Try boolean
+        if ("true".equalsIgnoreCase(value)) return true;
+        if ("false".equalsIgnoreCase(value)) return false;
+        
+        // Return as string
+        return value;
     }
     
     /**

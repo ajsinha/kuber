@@ -15,6 +15,7 @@ import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheRegion;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -203,6 +204,49 @@ public interface PersistenceStore {
      * Get non-expired keys in a region.
      */
     List<String> getNonExpiredKeys(String region, String pattern, int limit);
+    
+    // ==================== Native JSON Query Support (v1.8.3) ====================
+    
+    /**
+     * Search entries by JSON criteria using native database queries.
+     * 
+     * <p>This method enables the "hybrid query strategy" where persistence backends
+     * with native JSON query support (PostgreSQL, MongoDB, SQLite) can execute
+     * queries directly in the database when no Kuber secondary index exists.
+     * 
+     * <p><b>Implementation Status:</b>
+     * <ul>
+     *   <li>PostgreSQL - Uses GIN index with JSONB @&gt; operator</li>
+     *   <li>MongoDB - Uses native document queries</li>
+     *   <li>SQLite - Uses JSON1 extension (json_extract)</li>
+     *   <li>RocksDB, LMDB, Memory - Returns null (no native JSON support)</li>
+     * </ul>
+     * 
+     * @param region   Cache region to search
+     * @param criteria Map of field names to values/conditions. Supports:
+     *                 <ul>
+     *                   <li>Equality: {@code {"status": "active"}}</li>
+     *                   <li>Comparison: {@code {"price": ">100"}}, {@code {"age": "<=30"}}</li>
+     *                   <li>IN clause: {@code {"status": ["active", "pending"]}}</li>
+     *                 </ul>
+     * @param limit    Maximum number of results to return
+     * @return List of matching cache entries, or null if native queries not supported
+     * @since 1.8.3
+     */
+    default List<CacheEntry> searchByJsonCriteria(String region, Map<String, Object> criteria, int limit) {
+        // Default: not supported - return null to signal fallback to full scan
+        return null;
+    }
+    
+    /**
+     * Check if this persistence backend supports native JSON queries.
+     * 
+     * @return true if searchByJsonCriteria is implemented, false otherwise
+     * @since 1.8.3
+     */
+    default boolean supportsNativeJsonQuery() {
+        return false;
+    }
     
     /**
      * Persistence store types.

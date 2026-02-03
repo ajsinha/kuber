@@ -23,6 +23,7 @@ import java.sql.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * PostgreSQL implementation of PersistenceStore.
@@ -597,7 +598,7 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
      * This is O(1) and uses table statistics maintained by ANALYZE/autovacuum.
      * Falls back to exact count if statistics are unavailable.
      * 
-     * @since 1.8.2
+     * @since 1.8.3
      */
     @Override
     public long estimateEntryCount(String region) {
@@ -655,7 +656,7 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
      * @param region Region name
      * @param consumer Consumer to process each entry
      * @return Number of entries processed
-     * @since 1.8.2
+     * @since 1.8.3
      */
     @Override
     public long forEachEntry(String region, java.util.function.Consumer<CacheEntry> consumer) {
@@ -825,6 +826,150 @@ public class PostgresPersistenceStore extends AbstractPersistenceStore {
             }
         }
         return like.toString();
+    }
+    
+    // ==================== Native JSON Query Support (v1.8.3) ====================
+    
+    @Override
+    public boolean supportsNativeJsonQuery() {
+        return true;
+    }
+    
+    @Override
+    public List<CacheEntry> searchByJsonCriteria(String region, Map<String, Object> criteria, int limit) {
+        if (criteria == null || criteria.isEmpty()) {
+            return loadEntries(region, limit);
+        }
+        
+        List<CacheEntry> results = new ArrayList<>();
+        
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT * FROM kuber_entries WHERE region = ? ");
+        sql.append("AND (expires_at IS NULL OR expires_at > NOW()) ");
+        
+        List<Object> params = new ArrayList<>();
+        params.add(region);
+        
+        for (Map.Entry<String, Object> entry : criteria.entrySet()) {
+            String field = entry.getKey();
+            Object value = entry.getValue();
+            
+            if (value instanceof List) {
+                // IN clause: field IN ('a', 'b', 'c')
+                @SuppressWarnings("unchecked")
+                List<String> values = (List<String>) value;
+                if (!values.isEmpty()) {
+                    // Use JSONB @? operator with jsonpath for IN clause
+                    sql.append("AND json_value @? ?::jsonpath ");
+                    // Build jsonpath: $.field ? (@ == "a" || @ == "b" || @ == "c")
+                    StringBuilder jsonPath = new StringBuilder("$.");
+                    jsonPath.append(field).append(" ? (");
+                    for (int i = 0; i < values.size(); i++) {
+                        if (i > 0) jsonPath.append(" || ");
+                        jsonPath.append("@ == \"").append(values.get(i).replace("\"", "\\\"")).append("\"");
+                    }
+                    jsonPath.append(")");
+                    params.add(jsonPath.toString());
+                }
+            } else if (value instanceof String) {
+                String strValue = (String) value;
+                
+                // Check for comparison operators: >100, <50, >=10, <=20, !=value
+                if (strValue.matches("^[<>=!]+.*")) {
+                    String operator;
+                    String compareValue;
+                    
+                    if (strValue.startsWith(">=")) {
+                        operator = ">=";
+                        compareValue = strValue.substring(2);
+                    } else if (strValue.startsWith("<=")) {
+                        operator = "<=";
+                        compareValue = strValue.substring(2);
+                    } else if (strValue.startsWith("!=")) {
+                        operator = "!=";
+                        compareValue = strValue.substring(2);
+                    } else if (strValue.startsWith(">")) {
+                        operator = ">";
+                        compareValue = strValue.substring(1);
+                    } else if (strValue.startsWith("<")) {
+                        operator = "<";
+                        compareValue = strValue.substring(1);
+                    } else if (strValue.startsWith("=")) {
+                        operator = "=";
+                        compareValue = strValue.substring(1);
+                    } else {
+                        // Equality
+                        sql.append("AND json_value @> ?::jsonb ");
+                        params.add("{\"" + field + "\": \"" + strValue + "\"}");
+                        continue;
+                    }
+                    
+                    // Try numeric comparison
+                    try {
+                        Double.parseDouble(compareValue);
+                        sql.append("AND (json_value->>'").append(field).append("')::numeric ")
+                           .append(operator).append(" ?::numeric ");
+                        params.add(compareValue);
+                    } catch (NumberFormatException e) {
+                        // String comparison
+                        sql.append("AND json_value->>'").append(field).append("' ")
+                           .append(operator).append(" ? ");
+                        params.add(compareValue);
+                    }
+                } else {
+                    // Simple equality - use containment operator for GIN index
+                    sql.append("AND json_value @> ?::jsonb ");
+                    params.add("{\"" + field + "\": \"" + strValue + "\"}");
+                }
+            } else if (value instanceof Number) {
+                // Numeric equality
+                sql.append("AND (json_value->>'").append(field).append("')::numeric = ?::numeric ");
+                params.add(value);
+            } else if (value instanceof Boolean) {
+                // Boolean equality
+                sql.append("AND (json_value->>'").append(field).append("')::boolean = ? ");
+                params.add(value);
+            }
+        }
+        
+        sql.append("LIMIT ?");
+        params.add(limit);
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            
+            for (int i = 0; i < params.size(); i++) {
+                Object param = params.get(i);
+                if (param instanceof String) {
+                    stmt.setString(i + 1, (String) param);
+                } else if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param instanceof Long) {
+                    stmt.setLong(i + 1, (Long) param);
+                } else if (param instanceof Double) {
+                    stmt.setDouble(i + 1, (Double) param);
+                } else if (param instanceof Boolean) {
+                    stmt.setBoolean(i + 1, (Boolean) param);
+                } else {
+                    stmt.setObject(i + 1, param);
+                }
+            }
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    results.add(resultSetToEntry(rs));
+                }
+            }
+            
+            log.debug("PostgreSQL native JSON query: {} results for region '{}' with {} criteria", 
+                    results.size(), region, criteria.size());
+            
+        } catch (SQLException e) {
+            log.warn("Native JSON query failed, falling back to scan: {}", e.getMessage());
+            return null; // Signal fallback
+        }
+        
+        return results;
     }
     
     private CacheEntry resultSetToEntry(ResultSet rs) throws SQLException {

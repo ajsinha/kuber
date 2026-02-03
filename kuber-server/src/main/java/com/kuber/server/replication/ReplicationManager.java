@@ -13,6 +13,7 @@ package com.kuber.server.replication;
 
 import com.kuber.core.constants.KuberConstants;
 import com.kuber.core.model.CacheEvent;
+import com.kuber.core.util.JsonUtils;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.event.EventPublisher;
 import lombok.Getter;
@@ -22,7 +23,9 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.leader.LeaderLatch;
 import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +38,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Manages replication and leader election using ZooKeeper.
- * Handles primary/secondary failover automatically.
+ * 
+ * <p>Coordinates PRIMARY/SECONDARY roles via Curator LeaderLatch.
+ * When this node becomes SECONDARY, starts the {@link ReplicationSyncService}
+ * to replicate data from the PRIMARY. When this node becomes PRIMARY,
+ * resets the {@link ReplicationOpLog} and stops any active sync.
+ * 
+ * @since 1.8.3
  */
 @Slf4j
 @Component
@@ -44,6 +53,13 @@ public class ReplicationManager implements LeaderLatchListener {
     
     private final KuberProperties properties;
     private final EventPublisher eventPublisher;
+    private final Environment environment;
+    
+    @Autowired
+    private ReplicationSyncService syncService;
+    
+    @Autowired
+    private ReplicationOpLog opLog;
     
     private CuratorFramework zkClient;
     private LeaderLatch leaderLatch;
@@ -65,9 +81,11 @@ public class ReplicationManager implements LeaderLatchListener {
     // Shutdown flag to stop scheduled tasks
     private volatile boolean shuttingDown = false;
     
-    public ReplicationManager(KuberProperties properties, EventPublisher eventPublisher) {
+    public ReplicationManager(KuberProperties properties, EventPublisher eventPublisher,
+                              Environment environment) {
         this.properties = properties;
         this.eventPublisher = eventPublisher;
+        this.environment = environment;
     }
     
     @PostConstruct
@@ -133,9 +151,12 @@ public class ReplicationManager implements LeaderLatchListener {
         
         Map<String, Object> nodeInfo = new HashMap<>();
         nodeInfo.put("nodeId", properties.getNodeId());
-        nodeInfo.put("host", properties.getNetwork().getBindAddress());
-        nodeInfo.put("port", properties.getNetwork().getPort());
+        nodeInfo.put("host", properties.getReplication().getAdvertisedAddress());
+        nodeInfo.put("redisPort", properties.getNetwork().getPort());
+        nodeInfo.put("httpPort", Integer.parseInt(environment.getProperty("server.port", "8080")));
         nodeInfo.put("startTime", Instant.now().toString());
+        nodeInfo.put("isPrimary", isPrimary.get());
+        nodeInfo.put("mode", mode);
         
         String data = com.kuber.core.util.JsonUtils.toJson(nodeInfo);
         
@@ -152,6 +173,16 @@ public class ReplicationManager implements LeaderLatchListener {
         isPrimary.set(true);
         mode = KuberConstants.REPL_STATE_PRIMARY;
         primaryNodeId = properties.getNodeId();
+        
+        // Stop sync service if it was running (we were SECONDARY before)
+        if (syncService != null && syncService.isRunning()) {
+            syncService.stopSync();
+        }
+        
+        // Reset oplog for fresh journaling as new PRIMARY
+        if (opLog != null) {
+            opLog.reset();
+        }
         
         eventPublisher.publish(CacheEvent.builder()
                 .eventId(java.util.UUID.randomUUID().toString())
@@ -195,8 +226,10 @@ public class ReplicationManager implements LeaderLatchListener {
     }
     
     /**
-     * Start synchronization with primary
+     * Start synchronization with primary.
+     * Discovers the PRIMARY's HTTP endpoint from ZooKeeper and starts the sync service.
      */
+    @SuppressWarnings("unchecked")
     public void startSync() {
         if (isPrimary()) {
             return;
@@ -212,8 +245,32 @@ public class ReplicationManager implements LeaderLatchListener {
                 .timestamp(Instant.now())
                 .build());
         
-        // In a real implementation, this would sync data from the primary
-        // For now, we rely on MongoDB for data consistency
+        // Discover PRIMARY's HTTP endpoint from ZooKeeper node registration
+        String primaryHost = properties.getReplication().getAdvertisedAddress();
+        int primaryHttpPort = Integer.parseInt(environment.getProperty("server.port", "8080"));
+        
+        try {
+            if (primaryNodeId != null && zkClient != null) {
+                String nodePath = properties.getZookeeper().getBasePath() + "/nodes/" + primaryNodeId;
+                byte[] data = zkClient.getData().forPath(nodePath);
+                if (data != null) {
+                    Map<String, Object> nodeInfo = JsonUtils.fromJson(new String(data), 
+                            new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                    if (nodeInfo.get("host") != null) {
+                        primaryHost = (String) nodeInfo.get("host");
+                    }
+                    if (nodeInfo.get("httpPort") != null) {
+                        primaryHttpPort = ((Number) nodeInfo.get("httpPort")).intValue();
+                    }
+                    log.info("Discovered PRIMARY HTTP endpoint from ZooKeeper: {}:{}", primaryHost, primaryHttpPort);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to discover PRIMARY endpoint from ZooKeeper: {}. Using defaults.", e.getMessage());
+        }
+        
+        // Start the background sync service
+        syncService.startSync(primaryHost, primaryHttpPort);
         
         lastSyncTime = Instant.now();
         mode = KuberConstants.REPL_STATE_SECONDARY;
@@ -225,7 +282,7 @@ public class ReplicationManager implements LeaderLatchListener {
                 .timestamp(Instant.now())
                 .build());
         
-        log.info("Sync completed");
+        log.info("Sync service launched - replication running in background");
     }
     
     /**
@@ -246,6 +303,21 @@ public class ReplicationManager implements LeaderLatchListener {
             } catch (Exception e) {
                 info.put("participants", "unknown");
             }
+        }
+        
+        // OpLog stats (available on PRIMARY)
+        if (opLog != null) {
+            Map<String, Object> opLogInfo = new HashMap<>();
+            opLogInfo.put("currentSequence", opLog.getCurrentSequence());
+            opLogInfo.put("size", opLog.size());
+            opLogInfo.put("capacity", opLog.getCapacity());
+            opLogInfo.put("oldestSequence", opLog.getOldestAvailableSequence());
+            info.put("oplog", opLogInfo);
+        }
+        
+        // Sync service stats (available on SECONDARY)
+        if (syncService != null) {
+            info.put("sync", syncService.getSyncStatus());
         }
         
         return info;
@@ -287,6 +359,11 @@ public class ReplicationManager implements LeaderLatchListener {
         
         // Set shutdown flag to stop scheduled tasks
         shuttingDown = true;
+        
+        // Stop sync service if running
+        if (syncService != null && syncService.isRunning()) {
+            syncService.stopSync();
+        }
         
         try {
             if (leaderLatch != null) {

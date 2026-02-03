@@ -25,14 +25,14 @@
             <div class="col-lg-10 mx-auto">
                 <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v1.8.2)</h4>
+                        <h4 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v1.8.3)</h4>
                     </div>
                     <div class="card-body">
                         
                         <!-- Introduction -->
                         <div class="alert alert-info">
                             <i class="fas fa-lightbulb me-2"></i>
-                            <strong>New in v1.8.2:</strong> Secondary indexes provide O(1) hash lookups, O(log n) range queries,
+                            <strong>New in v1.8.3:</strong> Secondary indexes provide O(1) hash lookups, O(log n) range queries,
                             and now <strong>TRIGRAM indexes for fast regex/pattern searches</strong> on JSON attributes - 
                             delivering <strong>100-1000x performance improvements</strong> over full table scans.
                         </div>
@@ -163,7 +163,7 @@
                             <div class="col-md-6">
                                 <div class="card border-warning mb-3">
                                     <div class="card-header bg-warning text-dark">
-                                        <strong>TRIGRAM Index</strong> <span class="badge bg-dark ms-2">v1.8.2</span>
+                                        <strong>TRIGRAM Index</strong> <span class="badge bg-dark ms-2">v1.8.3</span>
                                     </div>
                                     <div class="card-body">
                                         <p><strong>Best for:</strong> Regex, substring, pattern searches</p>
@@ -186,7 +186,7 @@
                             <div class="col-md-6">
                                 <div class="card border-info mb-3">
                                     <div class="card-header bg-info text-white">
-                                        <strong>PREFIX Index</strong> <span class="badge bg-light text-dark ms-2">v1.8.2</span>
+                                        <strong>PREFIX Index</strong> <span class="badge bg-light text-dark ms-2">v1.8.3</span>
                                     </div>
                                     <div class="card-body">
                                         <p><strong>Best for:</strong> Prefix/starts-with queries</p>
@@ -1032,7 +1032,7 @@ JINDEX REBUILDALL customers</code></pre>
                         </table>
                         
                         <!-- Off-Heap Storage -->
-                        <h5 class="mt-4"><i class="fas fa-hdd me-2 text-warning"></i>Off-Heap Storage <span class="badge bg-success">NEW in 1.8.2</span></h5>
+                        <h5 class="mt-4"><i class="fas fa-hdd me-2 text-warning"></i>Off-Heap Storage <span class="badge bg-success">NEW in 1.8.3</span></h5>
                         <p>
                             For large indexes or memory-constrained environments, Kuber supports <strong>off-heap storage</strong> 
                             that stores index data in direct memory (outside the JVM heap). This provides:
@@ -1143,7 +1143,7 @@ kuber.indexing.offheap-max-size=1073741824     # 1GB max per index</code></pre>
                         </div>
                         
                         <!-- File-Based Index Operations -->
-                        <h5 class="mt-4"><i class="fas fa-file-alt me-2 text-success"></i>File-Based Index Operations <span class="badge bg-success">NEW in 1.8.2</span></h5>
+                        <h5 class="mt-4"><i class="fas fa-file-alt me-2 text-success"></i>File-Based Index Operations <span class="badge bg-success">NEW in 1.8.3</span></h5>
                         <p>
                             Similar to the <code>kuber.shutdown</code> mechanism, you can trigger index operations by creating 
                             special files in the Kuber working directory. This is ideal for <strong>automation, scripting, 
@@ -1307,10 +1307,195 @@ echo "Pipeline complete: Data loaded and indexes created"</code></pre>
                             region/field names.
                         </div>
                         
+                        <!-- Index Storage Options -->
+                        <h5 class="mt-5"><i class="fas fa-database me-2 text-info"></i>Index Storage Options <span class="badge bg-success">v1.8.3</span></h5>
+                        <p>Secondary indexes can be stored in different backends to balance between speed and memory usage:</p>
+                        
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <strong>Index Storage vs Data Persistence:</strong>
+                            <table class="table table-sm table-borderless mt-2 mb-0">
+                                <tr>
+                                    <td><code>kuber.persistence.type</code></td>
+                                    <td>Where cache <strong>DATA</strong> is stored</td>
+                                    <td><code>postgresql</code>, <code>mongodb</code>, <code>sqlite</code>, <code>rocksdb</code>, <code>lmdb</code>, <code>memory</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>kuber.indexing.disk-backend</code></td>
+                                    <td>Where <strong>INDEXES</strong> are stored</td>
+                                    <td><code>rocksdb</code>, <code>lmdb</code>, <code>sqlite</code> (embedded DBs only)</td>
+                                </tr>
+                            </table>
+                            <small class="text-muted">PostgreSQL/MongoDB are not available for index storage because indexes require fast local disk access. The Hybrid Query Strategy uses their native JSON query capabilities instead.</small>
+                        </div>
+                        
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Storage</th>
+                                    <th>Location</th>
+                                    <th>Read</th>
+                                    <th>Write</th>
+                                    <th>RAM</th>
+                                    <th>Persistent</th>
+                                    <th>Best For</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="table-success">
+                                    <td><strong>HEAP</strong></td>
+                                    <td>JVM Heap</td>
+                                    <td><span class="badge bg-success">Fastest</span></td>
+                                    <td><span class="badge bg-success">Fastest</span></td>
+                                    <td><span class="badge bg-danger">High</span></td>
+                                    <td><i class="fas fa-times text-danger"></i></td>
+                                    <td>Small indexes (&lt;10M)</td>
+                                </tr>
+                                <tr class="table-info">
+                                    <td><strong>OFFHEAP</strong></td>
+                                    <td>Direct Memory</td>
+                                    <td><span class="badge bg-info">Fast</span></td>
+                                    <td><span class="badge bg-info">Fast</span></td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><i class="fas fa-times text-danger"></i></td>
+                                    <td>Large indexes, avoid GC</td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td><strong>DISK (RocksDB)</strong></td>
+                                    <td>Disk</td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-success">Fast</span></td>
+                                    <td><span class="badge bg-success">Minimal</span></td>
+                                    <td><i class="fas fa-check text-success"></i></td>
+                                    <td>Write-heavy workloads</td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td><strong>DISK (LMDB)</strong></td>
+                                    <td>Disk</td>
+                                    <td><span class="badge bg-success">Fast</span></td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-success">Minimal</span></td>
+                                    <td><i class="fas fa-check text-success"></i></td>
+                                    <td>Read-heavy workloads</td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td><strong>DISK (SQLite)</strong></td>
+                                    <td>Disk</td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-success">Minimal</span></td>
+                                    <td><i class="fas fa-check text-success"></i></td>
+                                    <td>Portable, debugging</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h6 class="mt-3">Disk Index Directory Structure</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code># Configured via: kuber.indexing.disk-directory
+./kuberdata/indexes/
+├── rocksdb/      # If disk-backend=rocksdb
+├── lmdb/         # If disk-backend=lmdb
+└── sqlite/       # If disk-backend=sqlite</code></pre>
+                        
+                        <h6 class="mt-3">Configuration</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code># Index storage mode: HEAP, OFFHEAP, or DISK
+kuber.indexing.default-storage=HEAP
+
+# Per-type overrides (TRIGRAM indexes use lots of memory!)
+kuber.indexing.trigram-storage=OFFHEAP
+
+# Disk backend: rocksdb, lmdb, or sqlite
+kuber.indexing.disk-backend=rocksdb
+kuber.indexing.disk-directory=${kuber.base.datadir}/indexes
+kuber.indexing.disk-cache-size-mb=64
+kuber.indexing.disk-bloom-filter-enabled=true
+kuber.indexing.disk-reuse-on-startup=true</code></pre>
+                        
+                        <!-- Hybrid Query Strategy -->
+                        <h5 class="mt-5"><i class="fas fa-random me-2 text-purple"></i>Hybrid Query Strategy <span class="badge bg-success">v1.8.3</span></h5>
+                        <p>When no Kuber secondary index exists, the system can fall back to native database queries:</p>
+                        
+                        <pre class="bg-light p-3 rounded" style="font-family: monospace; font-size: 0.85rem;">
+JSEARCH query arrives
+        │
+        ▼
+┌───────────────────────────────────┐
+│ 1. Check Kuber Secondary Index    │  ← O(1) hash or O(log n) btree
+│    (HEAP / OFFHEAP / DISK)        │
+└───────────────────────────────────┘
+        │
+   Index EXISTS?
+   ├── YES → Return results (fastest)
+   │
+   └── NO ↓
+        │
+┌───────────────────────────────────┐
+│ 2. Try Native Database Query      │  ← Uses DB's own indexes
+│    PostgreSQL → GIN JSONB         │
+│    MongoDB    → Native queries    │
+│    SQLite     → JSON1 extension   │
+└───────────────────────────────────┘
+        │
+   Supported?
+   ├── YES → Return DB results (fast)
+   │
+   └── NO ↓
+        │
+┌───────────────────────────────────┐
+│ 3. Full Scan Fallback             │  ← Parallel processing
+│    (RocksDB, LMDB, Memory)        │
+└───────────────────────────────────┘
+</pre>
+                        
+                        <h6 class="mt-3">Native Query Support by Backend</h6>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Data Backend</th>
+                                    <th>Native JSON Query</th>
+                                    <th>Technology</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>PostgreSQL</td>
+                                    <td><span class="badge bg-success">✓ Supported</span></td>
+                                    <td>GIN index + JSONB <code>@&gt;</code> operator</td>
+                                </tr>
+                                <tr>
+                                    <td>MongoDB</td>
+                                    <td><span class="badge bg-success">✓ Supported</span></td>
+                                    <td>Native <code>$eq</code>, <code>$gt</code>, <code>$in</code> queries</td>
+                                </tr>
+                                <tr>
+                                    <td>SQLite</td>
+                                    <td><span class="badge bg-success">✓ Supported</span></td>
+                                    <td>JSON1 extension (<code>json_extract</code>)</td>
+                                </tr>
+                                <tr>
+                                    <td>RocksDB</td>
+                                    <td><span class="badge bg-danger">✗ Not Supported</span></td>
+                                    <td>Key-value only → Must create Kuber indexes</td>
+                                </tr>
+                                <tr>
+                                    <td>LMDB</td>
+                                    <td><span class="badge bg-danger">✗ Not Supported</span></td>
+                                    <td>Key-value only → Must create Kuber indexes</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h6 class="mt-3">Hybrid Query Configuration</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code># Enable native DB query fallback when no Kuber index exists
+kuber.indexing.hybrid-query-enabled=true
+
+# Only use native queries if region has more entries than threshold
+kuber.indexing.hybrid-query-threshold=10000</code></pre>
+                        
                         <!-- Architecture Diagram -->
                         <h5 class="mt-4"><i class="fas fa-sitemap me-2 text-secondary"></i>Architecture</h5>
                         <pre class="bg-dark text-light p-3 rounded"><code>┌─────────────────────────────────────────────────────────────────────┐
-│                         KUBER v1.8.2                                │
+│                         KUBER v1.8.3                                │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌────────────────┐  │

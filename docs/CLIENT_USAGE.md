@@ -1,6 +1,6 @@
 # Kuber Client Usage Guide
 
-**Version 1.8.2**
+**Version 1.8.3**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -254,7 +254,7 @@ producer.send('ccs_cache_request', json.dumps(request).encode())
 <dependency>
     <groupId>com.kuber</groupId>
     <artifactId>kuber-client-java</artifactId>
-    <version>1.8.2</version>
+    <version>1.8.3</version>
 </dependency>
 ```
 
@@ -819,7 +819,7 @@ JGET user:1
 | Pattern | Description | Example |
 |---------|-------------|---------|
 | `field=value` | Equals | `status=active` |
-| `field=[v1\|v2\|v3]` | IN clause (v1.8.2) | `status=[active\|pending]` |
+| `field=[v1\|v2\|v3]` | IN clause (v1.8.3) | `status=[active\|pending]` |
 | `field!=value` | Not equals | `status!=deleted` |
 | `field>value` | Greater than | `age>25` |
 | `field>=value` | Greater or equal | `age>=18` |
@@ -839,13 +839,13 @@ results = client.json_search('age>25', region='users')
 # Find products under $50
 products = client.json_search('price<50', region='products')
 
-# IN clause - match multiple values (v1.8.2)
+# IN clause - match multiple values (v1.8.3)
 results = client.json_search('status=[active|pending]')
 
-# Multiple attributes with IN clauses (v1.8.2)
+# Multiple attributes with IN clauses (v1.8.3)
 results = client.json_search('status=[active|pending],country=[USA|UK|CA]')
 
-# Using convenience method with dict (v1.8.2)
+# Using convenience method with dict (v1.8.3)
 conditions = {
     "status": ["active", "pending"],
     "country": ["USA", "UK", "CA"]
@@ -862,13 +862,13 @@ query = KuberClient.build_in_clause_query(conditions)
 // Simple search
 List<JsonNode> results = client.jsonSearch("age>25");
 
-// IN clause - multiple values for one field (v1.8.2)
+// IN clause - multiple values for one field (v1.8.3)
 results = client.jsonSearch("status=[active|pending]");
 
-// Multiple attributes with IN clauses (v1.8.2)
+// Multiple attributes with IN clauses (v1.8.3)
 results = client.jsonSearch("status=[active|pending],country=[USA|UK]");
 
-// Using convenience method with Map (v1.8.2)
+// Using convenience method with Map (v1.8.3)
 Map<String, List<String>> conditions = new LinkedHashMap<>();
 conditions.put("status", Arrays.asList("active", "pending"));
 conditions.put("country", Arrays.asList("USA", "UK", "CA"));
@@ -884,13 +884,13 @@ String query = KuberClient.buildInClauseQuery(conditions);
 // Simple search
 var results = await client.JsonSearchAsync<User>("age>25");
 
-// IN clause - multiple values (v1.8.2)
+// IN clause - multiple values (v1.8.3)
 results = await client.JsonSearchAsync<User>("status=[active|pending]");
 
-// Multiple attributes with IN clauses (v1.8.2)
+// Multiple attributes with IN clauses (v1.8.3)
 results = await client.JsonSearchAsync<Trade>("status=[active|pending],country=[USA|UK]");
 
-// Using convenience method with Dictionary (v1.8.2)
+// Using convenience method with Dictionary (v1.8.3)
 var conditions = new Dictionary<string, List<string>>
 {
     { "status", new List<string> { "active", "pending" } },
@@ -908,10 +908,10 @@ string query = KuberClient.BuildInClauseQuery(conditions);
 # Simple search
 JSEARCH status=active
 
-# IN clause (v1.8.2)
+# IN clause (v1.8.3)
 JSEARCH status=[active|pending]
 
-# Multiple IN clauses (v1.8.2)
+# Multiple IN clauses (v1.8.3)
 JSEARCH status=[active|pending],country=[USA|UK|CA]
 ```
 

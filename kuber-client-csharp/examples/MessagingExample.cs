@@ -36,7 +36,7 @@ public static class MessagingExample
     {
         Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
         Console.WriteLine("║        KUBER REQUEST/RESPONSE MESSAGING - C# CLIENT                 ║");
-        Console.WriteLine("║                        Version 1.7.0                                ║");
+        Console.WriteLine("║                        Version 1.8.3                                ║");
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
         Console.WriteLine();
 

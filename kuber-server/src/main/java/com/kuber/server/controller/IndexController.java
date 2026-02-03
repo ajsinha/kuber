@@ -32,8 +32,8 @@ import java.util.stream.Collectors;
  *   <li>Statistics and monitoring endpoints</li>
  * </ul>
  * 
- * @version 1.8.2
- * @since 1.8.2
+ * @version 1.8.3
+ * @since 1.8.3
  */
 @Controller
 @RequestMapping

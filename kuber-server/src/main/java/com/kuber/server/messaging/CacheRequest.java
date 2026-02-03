@@ -54,7 +54,7 @@ import java.util.Map;
  *   <li>REGIONS - List regions</li>
  * </ul>
  * 
- * @version 1.7.0
+ * @version 1.8.3
  */
 @Data
 @NoArgsConstructor

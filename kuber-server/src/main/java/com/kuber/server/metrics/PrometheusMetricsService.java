@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Metrics include cache operations, memory usage, region statistics,
  * and performance counters.
  * 
- * @version 1.8.2
+ * @version 1.8.3
  */
 @Slf4j
 @Service
@@ -187,7 +187,7 @@ public class PrometheusMetricsService implements MeterBinder {
         Gauge.builder("kuber_server_info", () -> 1)
                 .description("Kuber server information")
                 .tag("application", "kuber")
-                .tag("version", "1.7.9")
+                .tag("version", "1.8.3")
                 .tag("persistence", kuberProperties.getPersistence().getType())
                 .register(meterRegistry);
 

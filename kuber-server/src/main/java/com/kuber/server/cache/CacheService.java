@@ -32,6 +32,8 @@ import com.kuber.server.factory.FactoryProvider;
 import com.kuber.server.persistence.PersistenceOperationLock;
 import com.kuber.server.persistence.PersistenceStore;
 import com.kuber.server.replication.ReplicationManager;
+import com.kuber.server.replication.ReplicationOpLog;
+import com.kuber.server.replication.ReplicationOpLogEntry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -79,6 +81,9 @@ public class CacheService {
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
+    
+    @Autowired(required = false)
+    private ReplicationOpLog replicationOpLog;
     
     // BackupRestoreService for region lock checking during restore
     private com.kuber.server.backup.BackupRestoreService backupRestoreService;
@@ -647,6 +652,11 @@ public class CacheService {
         
         eventPublisher.publish(CacheEvent.regionCreated(name, properties.getNodeId()));
         
+        // Append to replication oplog (PRIMARY only)
+        if (replicationOpLog != null && (replicationManager == null || replicationManager.isPrimary())) {
+            replicationOpLog.append(ReplicationOpLogEntry.regionCreate(region));
+        }
+        
         log.info("Created region '{}' with memory limit {}", name, getEffectiveMemoryLimit(name));
         return region;
     }
@@ -718,6 +728,11 @@ public class CacheService {
         
         eventPublisher.publish(CacheEvent.regionDeleted(name, properties.getNodeId()));
         
+        // Append to replication oplog (PRIMARY only)
+        if (replicationOpLog != null && (replicationManager == null || replicationManager.isPrimary())) {
+            replicationOpLog.append(ReplicationOpLogEntry.regionDelete(name));
+        }
+        
         log.info("Deleted region: {} (KeyIndex and value cache cleared)", name);
     }
     
@@ -755,6 +770,11 @@ public class CacheService {
                 .timestamp(Instant.now())
                 .sourceNodeId(properties.getNodeId())
                 .build());
+        
+        // Append to replication oplog (PRIMARY only)
+        if (replicationOpLog != null && (replicationManager == null || replicationManager.isPrimary())) {
+            replicationOpLog.append(ReplicationOpLogEntry.regionPurge(name));
+        }
         
         log.info("Purged region: {} (KeyIndex and value cache cleared)", name);
     }
@@ -1224,6 +1244,11 @@ public class CacheService {
             // Trigger async event publishing (Kafka/ActiveMQ)
             if (publishingService != null) {
                 publishingService.publishDelete(region, key, properties.getNodeId());
+            }
+            
+            // Append to replication oplog (PRIMARY only)
+            if (replicationOpLog != null && (replicationManager == null || replicationManager.isPrimary())) {
+                replicationOpLog.append(ReplicationOpLogEntry.delete(region, key));
             }
             
             return true;
@@ -2150,6 +2175,11 @@ public class CacheService {
         
         recordStatistic(region, KuberConstants.STAT_SETS);
         metricsService.recordSet(region);
+        
+        // Append to replication oplog (PRIMARY only)
+        if (replicationOpLog != null && (replicationManager == null || replicationManager.isPrimary())) {
+            replicationOpLog.append(ReplicationOpLogEntry.set(region, key, entry));
+        }
     }
     
     /**
@@ -2946,6 +2976,150 @@ public class CacheService {
         if (replicationManager != null && !replicationManager.isPrimary()) {
             throw new ReadOnlyException();
         }
+    }
+    
+    // ==================== REPLICATION APPLY METHODS ====================
+    // These methods are called by ReplicationSyncService on SECONDARY nodes.
+    // They bypass checkWriteAccess() because the data comes from the PRIMARY
+    // via the replication protocol, not from external clients.
+    // They also skip oplog append (to avoid feedback loops).
+    
+    /**
+     * Apply a replicated SET operation from the PRIMARY.
+     * Updates KeyIndex, value cache, and persistence without write-access check.
+     */
+    public void applyReplicatedSet(String region, String key, CacheEntry entry) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex == null || valueCache == null) {
+            log.warn("Replication: cannot apply SET for unknown region '{}', key '{}'", region, key);
+            return;
+        }
+        
+        // Update KeyIndex
+        keyIndex.putFromCacheEntry(entry, ValueLocation.BOTH);
+        
+        // Update value cache
+        valueCache.put(key, entry);
+        
+        // Persist asynchronously
+        persistenceStore.saveEntryAsync(entry);
+        
+        recordStatistic(region, KuberConstants.STAT_SETS);
+    }
+    
+    /**
+     * Apply a replicated DELETE operation from the PRIMARY.
+     */
+    public void applyReplicatedDelete(String region, String key) {
+        KeyIndexInterface keyIndex = keyIndices.get(region);
+        CacheProxy<String, CacheEntry> valueCache = regionCaches.get(region);
+        
+        if (keyIndex == null || valueCache == null) {
+            log.debug("Replication: cannot apply DELETE for unknown region '{}'", region);
+            return;
+        }
+        
+        keyIndex.remove(key);
+        valueCache.invalidate(key);
+        
+        try {
+            persistenceStore.deleteEntry(region, key);
+        } catch (Exception e) {
+            // Entry may not exist on disk yet
+        }
+        
+        recordStatistic(region, KuberConstants.STAT_DELETES);
+    }
+    
+    /**
+     * Apply a replicated REGION_CREATE operation from the PRIMARY.
+     * Creates the region locally without write-access check.
+     */
+    public void applyReplicatedRegionCreate(String name, String description) {
+        if (regions.containsKey(name)) {
+            log.debug("Replication: region '{}' already exists, skipping create", name);
+            return;
+        }
+        
+        String collectionName = "kuber_" + name.toLowerCase();
+        
+        CacheRegion region = CacheRegion.builder()
+                .name(name)
+                .description(description)
+                .collectionName(collectionName)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        
+        regions.put(name, region);
+        calculateMemoryLimitForNewRegion(name);
+        createCacheForRegion(name);
+        metricsService.registerRegion(name);
+        
+        try {
+            persistenceStore.saveRegion(region);
+        } catch (Exception e) {
+            log.warn("Replication: failed to persist replicated region '{}': {}", name, e.getMessage());
+        }
+        
+        log.info("Replication: created region '{}'", name);
+    }
+    
+    /**
+     * Apply a replicated REGION_DELETE operation from the PRIMARY.
+     */
+    public void applyReplicatedRegionDelete(String name) {
+        CacheRegion region = regions.get(name);
+        if (region == null) {
+            log.debug("Replication: region '{}' not found for delete, skipping", name);
+            return;
+        }
+        
+        keyIndices.remove(name);
+        CacheProxy<String, CacheEntry> cache = regionCaches.remove(name);
+        if (cache != null) {
+            cache.invalidateAll();
+        }
+        regions.remove(name);
+        statistics.remove(name);
+        
+        try {
+            persistenceStore.deleteRegion(name);
+        } catch (Exception e) {
+            log.warn("Replication: failed to delete region '{}' from persistence: {}", name, e.getMessage());
+        }
+        
+        log.info("Replication: deleted region '{}'", name);
+    }
+    
+    /**
+     * Apply a replicated REGION_PURGE operation from the PRIMARY.
+     */
+    public void applyReplicatedRegionPurge(String name) {
+        CacheRegion region = regions.get(name);
+        if (region == null) {
+            log.debug("Replication: region '{}' not found for purge, skipping", name);
+            return;
+        }
+        
+        KeyIndexInterface keyIndex = keyIndices.get(name);
+        if (keyIndex != null) {
+            keyIndex.clear();
+        }
+        
+        CacheProxy<String, CacheEntry> cache = regionCaches.get(name);
+        if (cache != null) {
+            cache.invalidateAll();
+        }
+        
+        region.setEntryCount(0);
+        region.setUpdatedAt(Instant.now());
+        
+        persistenceStore.purgeRegion(name);
+        
+        log.info("Replication: purged region '{}'", name);
     }
     
     /**

@@ -33,8 +33,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Thread-safe implementation using ConcurrentSkipListMap.
  * 
- * @version 1.8.2
- * @since 1.8.2
+ * @version 1.8.3
+ * @since 1.8.3
  */
 @Slf4j
 public class BTreeIndex implements SecondaryIndex {
