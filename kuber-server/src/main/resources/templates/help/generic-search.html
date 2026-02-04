@@ -5,7 +5,7 @@
   ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{layout :: head('Generic Search API')}"></head>
+<head th:replace="~{layout :: head('Generic Search &amp; Update API')}"></head>
 <body class="d-flex flex-column min-vh-100">
 
 <nav th:replace="~{layout :: navbar}"></nav>
@@ -16,19 +16,53 @@
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Generic Search API</li>
+                <li class="breadcrumb-item active" aria-current="page">Generic Search &amp; Update API</li>
             </ol>
         </nav>
 
         <!-- Content -->
         <div class="row">
             <div class="col-lg-10 mx-auto">
-                <h1 class="display-5 mb-4"><i class="fas fa-search-plus me-3 text-primary"></i>Generic Search API</h1>
+                <h1 class="display-5 mb-4"><i class="fas fa-search-plus me-3 text-primary"></i>Generic Search &amp; Update API</h1>
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 1.9.0 Enhanced</strong> - Unified search API with multi-key, multi-pattern, and advanced JSON search capabilities.
+                    <strong>Version 2.0.0 Enhanced</strong> - Unified search and update API with multi-key, multi-pattern, advanced JSON search, and smart merge capabilities.
                 </div>
+                
+                <!-- Quick Navigation -->
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-compass me-2"></i>Quick Navigation</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-search me-2"></i>Search API</h6>
+                                <ul class="list-unstyled ms-3">
+                                    <li><a href="#search-overview">Overview</a></li>
+                                    <li><a href="#search-request">Request Format</a></li>
+                                    <li><a href="#search-modes">Search Modes</a></li>
+                                    <li><a href="#search-examples">Examples</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-edit me-2"></i>Update API</h6>
+                                <ul class="list-unstyled ms-3">
+                                    <li><a href="#update-overview">Overview</a></li>
+                                    <li><a href="#update-request">Request Format</a></li>
+                                    <li><a href="#update-merge">Smart Merge</a></li>
+                                    <li><a href="#update-examples">Examples</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- SEARCH API SECTION                         -->
+                <!-- ========================================== -->
+                <h2 class="border-bottom pb-2 mb-4" id="search-overview"><i class="fas fa-search me-2 text-primary"></i>Generic Search API</h2>
 
                 <!-- Overview -->
                 <div class="card mb-4">
@@ -44,7 +78,7 @@
 POST /api/v1/genericsearch
 POST /api/v2/genericsearch</code></pre>
 
-                        <h6 class="mt-3">Key Features (v1.9.0)</h6>
+                        <h6 class="mt-3">Key Features (v2.0.0)</h6>
                         <div class="row">
                             <div class="col-md-6">
                                 <ul>
@@ -65,7 +99,7 @@ POST /api/v2/genericsearch</code></pre>
                 </div>
 
                 <!-- Request Format -->
-                <div class="card mb-4">
+                <div class="card mb-4" id="search-request">
                     <div class="card-header bg-dark text-white">
                         <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Request Format</h5>
                     </div>
@@ -82,7 +116,7 @@ POST /api/v2/genericsearch</code></pre>
     
     // JSON Attribute Search
     "type": "json",                     // Enable JSON search
-    "criteria": {                       // v1.9.0 format
+    "criteria": {                       // v2.0.0 format
         "status": "active",             // Equality match
         "role": ["admin", "manager"],   // IN operator (match any)
         "email": {"regex": ".*@company\\.com"}, // Regex match
@@ -112,7 +146,7 @@ POST /api/v2/genericsearch</code></pre>
 }</code></pre>
 
                         <!-- Mode 2: Multiple Keys -->
-                        <h6 class="text-primary mt-4">Mode 2: Multiple Keys Lookup <span class="badge bg-success">NEW in v1.9.0</span></h6>
+                        <h6 class="text-primary mt-4">Mode 2: Multiple Keys Lookup <span class="badge bg-success">NEW in v2.0.0</span></h6>
                         <p>Retrieve multiple specific keys at once.</p>
                         <pre class="bg-dark text-light p-3 rounded"><code>{
     "apiKey": "kub_xxx",
@@ -130,7 +164,7 @@ POST /api/v2/genericsearch</code></pre>
 }</code></pre>
 
                         <!-- Mode 4: Multiple Patterns -->
-                        <h6 class="text-primary mt-4">Mode 4: Multiple Key Patterns <span class="badge bg-success">NEW in v1.9.0</span></h6>
+                        <h6 class="text-primary mt-4">Mode 4: Multiple Key Patterns <span class="badge bg-success">NEW in v2.0.0</span></h6>
                         <p>Search keys matching any of multiple regex patterns (OR logic between patterns).</p>
                         <pre class="bg-dark text-light p-3 rounded"><code>{
     "apiKey": "kub_xxx",
@@ -139,7 +173,7 @@ POST /api/v2/genericsearch</code></pre>
 }</code></pre>
 
                         <!-- Mode 5: JSON Search -->
-                        <h6 class="text-primary mt-4">Mode 5: JSON Attribute Search <span class="badge bg-success">Enhanced in v1.9.0</span></h6>
+                        <h6 class="text-primary mt-4">Mode 5: JSON Attribute Search <span class="badge bg-success">Enhanced in v2.0.0</span></h6>
                         <p>Search JSON documents by attribute values. All criteria use AND logic.</p>
                         <pre class="bg-dark text-light p-3 rounded"><code>{
     "apiKey": "kub_xxx",
@@ -192,19 +226,19 @@ POST /api/v2/genericsearch</code></pre>
                                     <tr class="table-warning">
                                         <td><code>contains</code></td>
                                         <td><code>"field": {"contains": "substring"}</code></td>
-                                        <td>Substring match <span class="badge bg-dark">v1.9.0</span></td>
+                                        <td>Substring match <span class="badge bg-dark">v2.0.0</span></td>
                                         <td><code>"name": {"contains": "smith"}</code></td>
                                     </tr>
                                     <tr class="table-info">
                                         <td><code>prefix</code></td>
                                         <td><code>"field": {"prefix": "value"}</code></td>
-                                        <td>Starts with <span class="badge bg-dark">v1.9.0</span></td>
+                                        <td>Starts with <span class="badge bg-dark">v2.0.0</span></td>
                                         <td><code>"sku": {"prefix": "NYC-"}</code></td>
                                     </tr>
                                     <tr class="table-info">
                                         <td><code>startswith</code></td>
                                         <td><code>"field": {"startswith": "value"}</code></td>
-                                        <td>Alias for prefix <span class="badge bg-dark">v1.9.0</span></td>
+                                        <td>Alias for prefix <span class="badge bg-dark">v2.0.0</span></td>
                                         <td><code>"phone": {"startswith": "+1"}</code></td>
                                     </tr>
                                     <tr>
@@ -365,7 +399,7 @@ POST /api/v2/genericsearch</code></pre>
                 <!-- Parallel Search Performance -->
                 <div class="card mb-4">
                     <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Parallel Search (v1.9.0)</h5>
+                        <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Parallel Search (v2.0.0)</h5>
                     </div>
                     <div class="card-body">
                         <p>Both JSON searches and key pattern searches now use <strong>parallel processing</strong> for significantly improved performance on large datasets.</p>
@@ -472,7 +506,7 @@ Response:
                 <!-- Secondary Indexing Performance -->
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v1.9.0)</h5>
+                        <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v2.0.0)</h5>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-success">
@@ -548,7 +582,7 @@ Response:
                             </div>
                             <div class="col-md-6 mb-2">
                                 <div class="card border-warning">
-                                    <div class="card-header bg-warning text-dark py-2">TRIGRAM Index <span class="badge bg-dark ms-1">v1.9.0</span></div>
+                                    <div class="card-header bg-warning text-dark py-2">TRIGRAM Index <span class="badge bg-dark ms-1">v2.0.0</span></div>
                                     <div class="card-body py-2">
                                         <p class="small mb-1"><strong>Accelerates regex/pattern searches</strong></p>
                                         <p class="small mb-0">Best for: <code>email {"regex": ".*@gmail\\.com"}</code>, <code>{"contains": "smith"}</code></p>
@@ -557,7 +591,7 @@ Response:
                             </div>
                             <div class="col-md-6 mb-2">
                                 <div class="card border-info">
-                                    <div class="card-header bg-info text-white py-2">PREFIX Index <span class="badge bg-light text-dark ms-1">v1.9.0</span></div>
+                                    <div class="card-header bg-info text-white py-2">PREFIX Index <span class="badge bg-light text-dark ms-1">v2.0.0</span></div>
                                     <div class="card-body py-2">
                                         <p class="small mb-1"><strong>O(prefix len) lookup</strong></p>
                                         <p class="small mb-0">Best for: <code>{"prefix": "NYC-"}</code>, <code>{"startswith": "+1-212"}</code></p>
@@ -601,6 +635,271 @@ Response:
                     </div>
                 </div>
 
+                <!-- ========================================== -->
+                <!-- UPDATE API SECTION                         -->
+                <!-- ========================================== -->
+                <h2 class="border-bottom pb-2 mb-4 mt-5" id="update-overview"><i class="fas fa-edit me-2 text-warning"></i>Generic Update API</h2>
+
+                <!-- Update Overview -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>The Generic Update API provides a unified endpoint for creating and updating cache entries.
+                           When updating JSON data, it intelligently merges new values with existing data using JUPDATE logic.</p>
+                        
+                        <h6 class="mt-3">Endpoint</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>POST /api/genericupdate
+POST /api/v1/genericupdate
+POST /api/v2/genericupdate</code></pre>
+
+                        <h6 class="mt-3">Key Features</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul>
+                                    <li>Create new entries with any value type</li>
+                                    <li>Replace existing values entirely</li>
+                                    <li>Smart JSON merging with JUPDATE</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul>
+                                    <li>Deep merge for nested objects</li>
+                                    <li>Optional TTL support</li>
+                                    <li>Auto-create regions if not exist</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Update Request Format -->
+                <div class="card mb-4" id="update-request">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Request Format</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "apiKey": "kub_your_api_key",      // Required: API key for authentication
+    "region": "users",                  // Required: Target region (auto-created if needed)
+    "key": "user:123",                  // Required: Cache key to set/update
+    "value": {...},                     // Required: Value (object, array, or scalar)
+    "type": "json",                     // Optional: Set to "json" for merge semantics
+    "ttl": 3600                         // Optional: TTL in seconds (-1 = no expiry)
+}</code></pre>
+
+                        <h6 class="mt-3">Request Parameters</h6>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>apiKey</code></td>
+                                    <td>string</td>
+                                    <td><span class="badge bg-danger">Yes</span></td>
+                                    <td>API key for authentication (starts with <code>kub_</code>)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>region</code></td>
+                                    <td>string</td>
+                                    <td><span class="badge bg-danger">Yes</span></td>
+                                    <td>Target region name (auto-created if doesn't exist)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>key</code></td>
+                                    <td>string</td>
+                                    <td><span class="badge bg-danger">Yes</span></td>
+                                    <td>Cache key to create or update</td>
+                                </tr>
+                                <tr>
+                                    <td><code>value</code></td>
+                                    <td>any</td>
+                                    <td><span class="badge bg-danger">Yes</span></td>
+                                    <td>Value to set (object, array, string, number, boolean)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>type</code></td>
+                                    <td>string</td>
+                                    <td><span class="badge bg-secondary">No</span></td>
+                                    <td>Set to <code>"json"</code> for JSON merge semantics</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ttl</code></td>
+                                    <td>number</td>
+                                    <td><span class="badge bg-secondary">No</span></td>
+                                    <td>Time-to-live in seconds (default: -1 = no expiry)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Merge Behavior -->
+                <div class="card mb-4" id="update-merge">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Behavior &amp; Smart Merge</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Operation Logic</h6>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Key Exists?</th>
+                                    <th>Type</th>
+                                    <th>Action</th>
+                                    <th>Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge bg-secondary">No</span></td>
+                                    <td>any</td>
+                                    <td><strong>CREATE</strong></td>
+                                    <td>New entry created with given value</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-success">Yes</span></td>
+                                    <td>not "json"</td>
+                                    <td><strong>REPLACE</strong></td>
+                                    <td>Value replaced entirely</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-success">Yes</span></td>
+                                    <td>"json"</td>
+                                    <td><strong>MERGE</strong></td>
+                                    <td>Values merged using JUPDATE logic</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h6 class="mt-4">JUPDATE Merge Logic</h6>
+                        <p>When <code>type="json"</code> and key exists, the following merge rules apply:</p>
+                        <ul>
+                            <li><strong>Existing fields not in request</strong> → <span class="text-success">Preserved</span></li>
+                            <li><strong>Fields in both</strong> → <span class="text-warning">Overwritten with new value</span></li>
+                            <li><strong>New fields in request</strong> → <span class="text-primary">Added</span></li>
+                            <li><strong>Nested objects</strong> → <span class="text-info">Deep merged recursively</span></li>
+                            <li><strong>Arrays</strong> → <span class="text-danger">Replaced entirely (not merged)</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Update Examples -->
+                <div class="card mb-4" id="update-examples">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-code me-2"></i>Update Examples</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Example 1: Create -->
+                        <h6><i class="fas fa-plus-circle text-success me-2"></i>Example 1: Create New Entry</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST http://localhost:8080/api/genericupdate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "kub_xxxxx",
+    "region": "users",
+    "key": "user:1",
+    "value": {"name": "John Doe", "email": "john@example.com", "age": 30},
+    "type": "json",
+    "ttl": 86400
+  }'</code></pre>
+                        <p class="small text-muted">Response: <code>{"success":true, "operation":"created", ...}</code></p>
+
+                        <!-- Example 2: Merge -->
+                        <h6 class="mt-4"><i class="fas fa-object-group text-primary me-2"></i>Example 2: Merge/Update JSON</h6>
+                        <p class="small text-muted">Existing value: <code>{"name": "John Doe", "email": "john@example.com", "age": 30}</code></p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST http://localhost:8080/api/genericupdate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "kub_xxxxx",
+    "region": "users",
+    "key": "user:1",
+    "value": {"email": "john.new@example.com", "city": "NYC", "verified": true},
+    "type": "json"
+  }'</code></pre>
+                        <p class="small text-muted">Result: <code>{"name": "John Doe", "email": "john.new@example.com", "age": 30, "city": "NYC", "verified": true}</code></p>
+
+                        <!-- Example 3: Deep Merge -->
+                        <h6 class="mt-4"><i class="fas fa-layer-group text-info me-2"></i>Example 3: Deep Merge Nested Objects</h6>
+                        <p class="small text-muted">Existing value:</p>
+                        <pre class="bg-light p-2 rounded small"><code>{"profile": {"name": "John", "settings": {"theme": "dark", "notifications": true}}, "lastLogin": "2025-01-01"}</code></pre>
+                        <pre class="bg-dark text-light p-3 rounded"><code>curl -X POST http://localhost:8080/api/genericupdate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "kub_xxxxx",
+    "region": "users",
+    "key": "user:1",
+    "value": {"profile": {"settings": {"theme": "light", "language": "en"}}},
+    "type": "json"
+  }'</code></pre>
+                        <p class="small text-muted">Result (deep merged):</p>
+                        <pre class="bg-light p-2 rounded small"><code>{"profile": {"name": "John", "settings": {"theme": "light", "notifications": true, "language": "en"}}, "lastLogin": "2025-01-01"}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Update Response -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-reply me-2"></i>Update Response Format</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Success Response</h6>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+    "success": true,
+    "operation": "created",      // "created", "replaced", or "merged"
+    "region": "users",
+    "key": "user:123",
+    "value": {...},              // The resulting value after operation
+    "ttl": 3600                  // Only if TTL was set
+}</code></pre>
+
+                        <h6 class="mt-3">Operation Values</h6>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Operation</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>created</code></td>
+                                    <td>New entry was created (key didn't exist)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>replaced</code></td>
+                                    <td>Existing value was replaced entirely (non-JSON type)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>merged</code></td>
+                                    <td>Existing JSON was merged with new values (type="json")</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Best Practices -->
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Best Practices</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul>
+                            <li><strong>Use JSON Type for Partial Updates:</strong> When you only need to update specific fields, use <code>type: "json"</code> to merge instead of replacing the entire document.</li>
+                            <li><strong>Set Appropriate TTLs:</strong> Use TTL for session data, caches, and temporary values. Omit TTL for permanent data.</li>
+                            <li><strong>Check Operation Result:</strong> The <code>operation</code> field tells you what happened: <code>created</code>, <code>replaced</code>, or <code>merged</code>.</li>
+                            <li><strong>Combine Search + Update:</strong> Use <code>/api/genericsearch</code> to find entries and <code>/api/genericupdate</code> to modify them.</li>
+                        </ul>
+                    </div>
+                </div>
+
                 <!-- Back Button -->
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary">
@@ -618,7 +917,7 @@ Response:
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.9.0</p>
+                    <p class="text-muted small mb-0">Version 2.0.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

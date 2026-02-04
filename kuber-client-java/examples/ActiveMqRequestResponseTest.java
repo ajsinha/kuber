@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Correlate requests with responses using message IDs</li>
  * </ul>
  * 
- * @version 1.9.0
+ * @version 2.0.0
  */
 public class ActiveMqRequestResponseTest {
     

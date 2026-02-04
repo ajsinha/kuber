@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * Controller for the main dashboard and home pages.
  * Shows only regions the user has access to.
  * 
- * @version 1.9.0
+ * @version 2.0.0
  */
 @Controller
 @RequiredArgsConstructor

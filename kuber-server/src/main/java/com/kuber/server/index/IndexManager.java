@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Without index (full scan): O(n)</li>
  * </ul>
  * 
- * @version 1.9.0
+ * @version 2.0.0
  * @since 1.9.0
  */
 @Service
@@ -666,33 +666,81 @@ public class IndexManager implements IndexConfiguration.IndexConfigurationListen
             index.clear();
         }
         
-        // Get all keys in region
-        Set<String> keys = cacheService.keys(region, "*");
-        if (keys == null || keys.isEmpty()) {
-            log.debug("No documents in region {} for indexing", region);
-            return;
-        }
-        
         AtomicInteger indexed = new AtomicInteger(0);
         
-        // Index all documents
-        for (String key : keys) {
-            try {
-                JsonNode document = cacheService.jsonGet(region, key, "$");
-                if (document != null) {
-                    for (Map.Entry<String, SecondaryIndex> entry : fieldIndexes.entrySet()) {
-                        String field = entry.getKey();
-                        SecondaryIndex index = entry.getValue();
-                        
-                        Object fieldValue = extractFieldValue(document, field);
-                        if (fieldValue != null) {
-                            index.add(fieldValue, key);
-                        }
+        // v2.0.0: Stream from persistence to avoid cache eviction pressure
+        boolean usePeristence = properties.getIndexing().isRebuildFromPersistence() 
+                && cacheService.hasPersistenceStore();
+        
+        if (usePeristence) {
+            log.info("Streaming entries from persistence (avoids cache eviction pressure)");
+            
+            AtomicInteger progressCounter = new AtomicInteger(0);
+            final int logInterval = 10000; // Log every 10K entries
+            
+            cacheService.streamEntriesFromPersistence(region, (key, document) -> {
+                for (Map.Entry<String, SecondaryIndex> indexEntry : fieldIndexes.entrySet()) {
+                    String field = indexEntry.getKey();
+                    SecondaryIndex index = indexEntry.getValue();
+                    
+                    Object fieldValue = extractFieldValue(document, field);
+                    if (fieldValue != null) {
+                        index.add(fieldValue, key);
                     }
-                    indexed.incrementAndGet();
                 }
-            } catch (Exception e) {
-                log.trace("Error indexing key {}: {}", key, e.getMessage());
+                indexed.incrementAndGet();
+                
+                // Progress logging
+                int current = progressCounter.incrementAndGet();
+                if (current % logInterval == 0) {
+                    log.info("Index rebuild progress: {} documents processed", current);
+                }
+            });
+        } else {
+            // Fallback to cache-based loading (original behavior)
+            Set<String> keys = cacheService.keys(region, "*");
+            if (keys == null || keys.isEmpty()) {
+                log.debug("No documents in region {} for indexing", region);
+                return;
+            }
+            
+            int batchSize = properties.getIndexing().getRebuildBatchSize();
+            int totalKeys = keys.size();
+            
+            List<String> keyList = new ArrayList<>(keys);
+            int totalBatches = (keyList.size() + batchSize - 1) / batchSize;
+            
+            log.info("Processing {} keys in {} batches (batch size: {})", keyList.size(), totalBatches, batchSize);
+            
+            for (int batch = 0; batch < totalBatches; batch++) {
+                int fromIndex = batch * batchSize;
+                int toIndex = Math.min(fromIndex + batchSize, keyList.size());
+                List<String> batchKeys = keyList.subList(fromIndex, toIndex);
+                
+                Map<String, JsonNode> batchDocuments = cacheService.jsonGetBatch(region, batchKeys);
+                
+                for (Map.Entry<String, JsonNode> docEntry : batchDocuments.entrySet()) {
+                    String key = docEntry.getKey();
+                    JsonNode document = docEntry.getValue();
+                    
+                    if (document != null) {
+                        for (Map.Entry<String, SecondaryIndex> indexEntry : fieldIndexes.entrySet()) {
+                            String field = indexEntry.getKey();
+                            SecondaryIndex index = indexEntry.getValue();
+                            
+                            Object fieldValue = extractFieldValue(document, field);
+                            if (fieldValue != null) {
+                                index.add(fieldValue, key);
+                            }
+                        }
+                        indexed.incrementAndGet();
+                    }
+                }
+                
+                if ((batch + 1) % 10 == 0 || batch == totalBatches - 1) {
+                    int progress = (int) ((batch + 1) * 100.0 / totalBatches);
+                    log.info("Index rebuild progress: {}% ({}/{} documents)", progress, indexed.get(), totalKeys);
+                }
             }
         }
         

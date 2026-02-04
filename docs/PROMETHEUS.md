@@ -1,6 +1,6 @@
 # Prometheus Integration Guide
 
-**Kuber v1.9.0+**
+**Kuber v2.0.0+**
 
 This guide covers the Prometheus metrics integration for monitoring Kuber cache performance, 
 resource usage, and operational health.
@@ -231,7 +231,7 @@ version: '3.8'
 
 services:
   kuber:
-    image: kuber-cache:1.9.0
+    image: kuber-cache:2.0.0
     ports:
       - "8080:8080"
       - "6380:6380"

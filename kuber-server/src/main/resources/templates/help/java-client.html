@@ -33,7 +33,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-shield-alt me-2"></i>
-                    <strong>v1.9.0: Role-Based Access Control</strong><br>
+                    <strong>v2.0.0: Role-Based Access Control</strong><br>
                     Operations are authorized based on the user's roles. API keys inherit permissions from the associated user.
                     Ensure your user has appropriate permissions (READ, WRITE, DELETE) for the regions you access.
                     See <a href="/help/security">Security &amp; RBAC</a> for details.
@@ -74,7 +74,7 @@
                     <pre class="bg-dark text-light p-3 rounded"><code>&lt;dependency&gt;
     &lt;groupId&gt;com.kuber&lt;/groupId&gt;
     &lt;artifactId&gt;kuber-client-java&lt;/artifactId&gt;
-    &lt;version&gt;1.9.0&lt;/version&gt;
+    &lt;version&gt;2.0.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
                     <h4 class="mt-4">Basic Usage</h4>
@@ -372,19 +372,19 @@ cd kuber-client-java
 mvn clean package
 
 # Run JSON demo
-java -cp target/kuber-client-java-1.9.0.jar \
+java -cp target/kuber-client-java-2.0.0.jar \
     com.kuber.client.examples.KuberJsonDemo localhost 6380 kub_your_api_key
 
 # Run Redis example
-java -cp target/kuber-client-java-1.9.0.jar \
+java -cp target/kuber-client-java-2.0.0.jar \
     com.kuber.client.examples.KuberRedisExample localhost 6380 kub_your_api_key
 
 # Run REST example
-java -cp target/kuber-client-java-1.9.0.jar \
+java -cp target/kuber-client-java-2.0.0.jar \
     com.kuber.client.examples.KuberRestExample localhost 8080 kub_your_api_key
 
 # Run Messaging example (v1.7.1)
-java -cp target/kuber-client-java-1.9.0.jar \
+java -cp target/kuber-client-java-2.0.0.jar \
     com.kuber.client.examples.KuberMessagingExample</code></pre>
                     
                     <div class="alert alert-secondary mt-3">
@@ -557,7 +557,7 @@ public class KuberCompleteExample {
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 1.9.0</p>
+                    <p class="text-muted small mb-0">Version 2.0.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

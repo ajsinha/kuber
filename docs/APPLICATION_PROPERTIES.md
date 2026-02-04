@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 1.9.0**
+**Version 2.0.0**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 

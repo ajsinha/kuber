@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v1.9.0 - Persistence Configuration Help
+  ~ Kuber v2.0.0 - Persistence Configuration Help
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Persistence Configuration')}"></head>
@@ -23,7 +23,7 @@
     
     <div class="alert alert-info">
         <i class="fas fa-info-circle me-2"></i>
-        <strong>Persistence Backends:</strong> Kuber supports 7 persistence backends &mdash; <strong>RocksDB</strong>, <strong>LMDB</strong>, <strong>SQLite</strong>, <strong>PostgreSQL</strong>, <strong>MongoDB</strong>, <strong>Aerospike</strong> <span class="badge bg-success">NEW in 1.9.0</span>, and <strong>Memory</strong> (no persistence). Each backend is fully interchangeable via a single configuration property. This guide covers how to choose, configure, and tune each backend for your workload.
+        <strong>Persistence Backends:</strong> Kuber supports 7 persistence backends &mdash; <strong>RocksDB</strong>, <strong>LMDB</strong>, <strong>SQLite</strong>, <strong>PostgreSQL</strong>, <strong>MongoDB</strong>, <strong>Aerospike</strong> <span class="badge bg-success">NEW in 2.0.0</span>, and <strong>Memory</strong> (no persistence). Each backend is fully interchangeable via a single configuration property. This guide covers how to choose, configure, and tune each backend for your workload.
     </div>
 
     <!-- Table of Contents -->
@@ -56,7 +56,7 @@
                     <ul class="list-unstyled">
                         <li><a href="#postgresql">PostgreSQL</a></li>
                         <li><a href="#mongodb">MongoDB</a></li>
-                        <li><a href="/help/aerospike">Aerospike</a> <span class="badge bg-success">NEW</span></li>
+                        <li><a href="#aerospike">Aerospike</a> <span class="badge bg-success">NEW</span></li>
                         <li><a href="#async-writes">Async Batched Writes</a></li>
                         <li><a href="#migration">Migrating Between Backends</a></li>
                     </ul>
@@ -73,11 +73,11 @@
             <h4 class="mb-0"><i class="fas fa-compass me-2"></i>Choosing a Persistence Backend</h4>
         </div>
         <div class="card-body">
-            <p>The persistence backend is responsible for durably storing cache data so it survives server restarts. Every backend implements the same <code>PersistenceStore</code> interface with full feature parity (as of v1.9.0), so your choice comes down to <strong>operational requirements</strong>, <strong>performance characteristics</strong>, and <strong>deployment constraints</strong>.</p>
+            <p>The persistence backend is responsible for durably storing cache data so it survives server restarts. Every backend implements the same <code>PersistenceStore</code> interface with full feature parity (as of v2.0.0), so your choice comes down to <strong>operational requirements</strong>, <strong>performance characteristics</strong>, and <strong>deployment constraints</strong>.</p>
             
             <p>To select a backend, set this single property in <code>application.properties</code>:</p>
             
-            <pre class="bg-dark text-light p-3 rounded"><code># Supported types: rocksdb, lmdb, mongodb, sqlite, postgresql, memory
+            <pre class="bg-dark text-light p-3 rounded"><code># Supported types: rocksdb, lmdb, mongodb, sqlite, postgresql, aerospike, memory
 kuber.persistence.type=rocksdb</code></pre>
             
             <div class="alert alert-warning mt-3">
@@ -99,13 +99,14 @@ kuber.persistence.type=rocksdb</code></pre>
                 <table class="table table-bordered table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width: 16%">Feature</th>
-                            <th class="text-center" style="width: 14%">RocksDB</th>
-                            <th class="text-center" style="width: 14%">LMDB</th>
-                            <th class="text-center" style="width: 14%">SQLite</th>
-                            <th class="text-center" style="width: 14%">PostgreSQL</th>
-                            <th class="text-center" style="width: 14%">MongoDB</th>
-                            <th class="text-center" style="width: 14%">Memory</th>
+                            <th style="width: 14%">Feature</th>
+                            <th class="text-center" style="width: 12%">RocksDB</th>
+                            <th class="text-center" style="width: 12%">LMDB</th>
+                            <th class="text-center" style="width: 12%">SQLite</th>
+                            <th class="text-center" style="width: 12%">PostgreSQL</th>
+                            <th class="text-center" style="width: 12%">MongoDB</th>
+                            <th class="text-center" style="width: 12%">Aerospike</th>
+                            <th class="text-center" style="width: 12%">Memory</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -116,6 +117,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="badge bg-success">Embedded</span></td>
                             <td class="text-center"><span class="badge bg-info">External</span></td>
                             <td class="text-center"><span class="badge bg-info">External</span></td>
+                            <td class="text-center"><span class="badge bg-warning text-dark">Distributed</span></td>
                             <td class="text-center"><span class="badge bg-secondary">None</span></td>
                         </tr>
                         <tr>
@@ -126,6 +128,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
                             <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                         </tr>
                         <tr>
                             <td><strong>Read Speed</strong></td>
@@ -135,12 +138,14 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
                             <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                         </tr>
                         <tr>
                             <td><strong>Large Datasets</strong></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
                             <td class="text-center"><span class="text-warning fw-bold">★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                             <td class="text-center"><span class="text-danger fw-bold">★</span></td>
@@ -152,6 +157,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                             <td class="text-center"><span class="text-success fw-bold">★★★★</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">★★★★★</span></td>
                             <td class="text-center"><span class="text-danger fw-bold">★</span></td>
                         </tr>
                         <tr>
@@ -159,6 +165,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="text-success">Low</span></td>
                             <td class="text-center"><span class="text-success">Lowest</span></td>
                             <td class="text-center"><span class="text-success">Low</span></td>
+                            <td class="text-center"><span class="text-warning">Medium</span></td>
                             <td class="text-center"><span class="text-warning">Medium</span></td>
                             <td class="text-center"><span class="text-warning">Medium</span></td>
                             <td class="text-center"><span class="text-success">None</span></td>
@@ -170,6 +177,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="badge bg-success">None</span></td>
                             <td class="text-center"><span class="badge bg-warning text-dark">PostgreSQL</span></td>
                             <td class="text-center"><span class="badge bg-warning text-dark">MongoDB</span></td>
+                            <td class="text-center"><span class="badge bg-warning text-dark">Aerospike</span></td>
                             <td class="text-center"><span class="badge bg-success">None</span></td>
                         </tr>
                         <tr>
@@ -180,12 +188,14 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><span class="text-success fw-bold">JSONB + GIN</span></td>
                             <td class="text-center"><span class="text-success fw-bold">Native BSON</span></td>
                             <td class="text-center">Client-side</td>
+                            <td class="text-center">Client-side</td>
                         </tr>
                         <tr>
                             <td><strong>Shared Access</strong></td>
                             <td class="text-center"><span class="text-danger">Single Process</span></td>
                             <td class="text-center"><span class="text-danger">Single Process</span></td>
                             <td class="text-center"><span class="text-danger">Single Process</span></td>
+                            <td class="text-center"><span class="text-success">Multi-Process</span></td>
                             <td class="text-center"><span class="text-success">Multi-Process</span></td>
                             <td class="text-center"><span class="text-success">Multi-Process</span></td>
                             <td class="text-center"><span class="text-danger">Single Process</span></td>
@@ -197,7 +207,28 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center">Compact <small class="text-muted">(VACUUM)</small></td>
                             <td class="text-center">Managed <small class="text-muted">(autovacuum)</small></td>
                             <td class="text-center">Managed <small class="text-muted">(WiredTiger)</small></td>
+                            <td class="text-center">Managed <small class="text-muted">(defrag)</small></td>
                             <td class="text-center">N/A</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Native TTL</strong></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-success">✅</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">✅ Best</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Horizontal Scale</strong></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
+                            <td class="text-center"><span class="text-warning">Complex</span></td>
+                            <td class="text-center"><span class="text-success">Sharding</span></td>
+                            <td class="text-center"><span class="text-success fw-bold">Auto-Sharding</span></td>
+                            <td class="text-center"><span class="text-danger">❌</span></td>
                         </tr>
                         <tr>
                             <td><strong>Best For</strong></td>
@@ -206,6 +237,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td class="text-center"><small>Development, small deployments</small></td>
                             <td class="text-center"><small>Enterprise with existing PG infra</small></td>
                             <td class="text-center"><small>Document queries, existing Mongo infra</small></td>
+                            <td class="text-center"><small>Sub-ms latency, horizontal scale</small></td>
                             <td class="text-center"><small>Testing, ephemeral caches</small></td>
                         </tr>
                     </tbody>
@@ -258,6 +290,15 @@ kuber.persistence.type=rocksdb</code></pre>
                         <li>You need <strong>horizontal scalability</strong> via sharding for the persistence tier</li>
                     </ul>
                     
+                    <h5 class="text-warning mt-4"><i class="fas fa-bolt me-1"></i> Use <strong>Aerospike</strong> if&hellip; <span class="badge bg-success">NEW</span></h5>
+                    <ul>
+                        <li>You need <strong>sub-millisecond latency</strong> for both reads and writes</li>
+                        <li>You want <strong>native TTL support</strong> with automatic record expiration</li>
+                        <li>You need <strong>horizontal scalability</strong> with auto-sharding across cluster nodes</li>
+                        <li>You're running <strong>high-throughput workloads</strong> (100K+ ops/sec)</li>
+                        <li>You want a <strong>distributed persistence layer</strong> for multi-datacenter deployments</li>
+                    </ul>
+                    
                     <h5 class="text-warning mt-4"><i class="fas fa-check-circle me-1"></i> Use <strong>SQLite</strong> if&hellip;</h5>
                     <ul>
                         <li>You need a <strong>simple, file-based</strong> persistence with SQL query capability</li>
@@ -300,7 +341,7 @@ kuber.persistence.type=rocksdb</code></pre>
                             <td><code>rocksdb</code></td>
                             <td>
                                 <strong>The persistence backend to use.</strong>
-                                Accepted values: <code>rocksdb</code>, <code>lmdb</code>, <code>sqlite</code>, <code>postgresql</code>, <code>mongodb</code>, <code>memory</code>.
+                                Accepted values: <code>rocksdb</code>, <code>lmdb</code>, <code>sqlite</code>, <code>postgresql</code>, <code>mongodb</code>, <code>aerospike</code>, <code>memory</code>.
                                 Changing this value requires a restart. Data is <strong>not migrated automatically</strong> between backends &mdash; use backup/restore to move data.
                             </td>
                         </tr>
@@ -889,6 +930,261 @@ kuber.mongo.database=kuber</code></pre>
     </div>
 
     <!-- ================================================================ -->
+    <!-- AEROSPIKE                                                         -->
+    <!-- ================================================================ -->
+    <div class="card mb-4" id="aerospike">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #c41200 0%, #ff6b35 100%);">
+            <h4 class="mb-0"><i class="fas fa-bolt me-2"></i>Aerospike <span class="badge bg-light text-dark ms-2">NEW in 2.0.0</span></h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h5>Overview</h5>
+                    <p>
+                        Aerospike is a distributed, scalable NoSQL database optimized for flash storage (SSDs). It delivers <strong>sub-millisecond latency</strong> at scale with automatic data distribution across cluster nodes. Kuber leverages Aerospike's <strong>native TTL support</strong> for automatic record expiration &mdash; perfect for caching workloads where entries should expire without manual cleanup.
+                    </p>
+                    <p>
+                        Each Kuber region maps to an Aerospike <strong>Set</strong> within a configured <strong>Namespace</strong>. JSON values are stored as serialized strings in the <code>"v"</code> Bin, with creation timestamps in the <code>"ct"</code> Bin. Aerospike handles TTL-based expiration automatically at the storage layer, meaning expired records are cleaned up with zero application overhead.
+                    </p>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Aerospike Terminology:</strong>
+                        <strong>Namespace</strong> = Database (must be pre-configured in <code>aerospike.conf</code>),
+                        <strong>Set</strong> = Table/Collection (created automatically),
+                        <strong>Record</strong> = Row/Document,
+                        <strong>Bin</strong> = Column/Field.
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-plus-circle me-1"></i> Strengths</h6>
+                            <ul class="small mb-2">
+                                <li>Sub-millisecond read/write latency</li>
+                                <li>Native TTL with automatic expiration</li>
+                                <li>Horizontal scaling with auto-sharding</li>
+                                <li>Flash/SSD optimized storage engine</li>
+                                <li>Strong consistency (COMMIT_ALL)</li>
+                                <li>Efficient batch operations</li>
+                            </ul>
+                            <h6 class="card-title text-warning"><i class="fas fa-exclamation-circle me-1"></i> Considerations</h6>
+                            <ul class="small mb-0">
+                                <li>Requires external Aerospike cluster</li>
+                                <li>Namespace must be pre-configured</li>
+                                <li>No native JSON query (client-side filtering)</li>
+                                <li>Community Edition has some limits</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5><i class="fas fa-server me-2"></i>Prerequisites</h5>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Important:</strong> Unlike other backends, you must configure the Aerospike namespace <em>before</em> starting Kuber. Aerospike does not support dynamic namespace creation.
+            </div>
+            
+            <p>1. Install Aerospike Server (Ubuntu/Debian):</p>
+            <pre class="bg-dark text-light p-3 rounded"><code># Add Aerospike repository
+wget -O aerospike.deb https://download.aerospike.com/artifacts/aerospike-server-community/7.0.0/aerospike-server-community_7.0.0_amd64.deb
+sudo dpkg -i aerospike.deb
+
+# Start service
+sudo systemctl start aerospike
+sudo systemctl enable aerospike</code></pre>
+            
+            <p class="mt-3">2. Configure namespace in <code>/etc/aerospike/aerospike.conf</code>:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code>namespace kuber {
+    replication-factor 2
+    memory-size 4G
+    default-ttl 0          # 0 = use record TTL, no namespace-level default
+    
+    # For persistence (optional - remove for pure in-memory)
+    storage-engine device {
+        file /opt/aerospike/data/kuber.dat
+        filesize 16G
+        data-in-memory false   # true for hybrid memory+disk
+    }
+}</code></pre>
+            
+            <p class="mt-3">3. Restart Aerospike and verify:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code>sudo systemctl restart aerospike
+aql -c "show namespaces"   # Should show 'kuber'</code></pre>
+            
+            <h5 class="mt-4"><i class="fas fa-code me-2"></i>Minimal Configuration</h5>
+            <pre class="bg-dark text-light p-3 rounded"><code>kuber.persistence.type=aerospike
+kuber.persistence.aerospike.hosts=localhost:3000
+kuber.persistence.aerospike.namespace=kuber</code></pre>
+            
+            <h5 class="mt-4"><i class="fas fa-cog me-2"></i>All Properties</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr><th style="width:40%">Property</th><th style="width:12%">Default</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.hosts</code></td>
+                            <td><code>localhost:3000</code></td>
+                            <td>
+                                <strong>Aerospike cluster seed hosts.</strong>
+                                Comma-separated list of <code>host:port</code> pairs. The client will discover the full cluster topology from these seeds.
+                                <br><br>
+                                Examples:
+                                <br><code>localhost:3000</code> (single node)
+                                <br><code>node1:3000,node2:3000,node3:3000</code> (cluster)
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.namespace</code></td>
+                            <td><code>kuber</code></td>
+                            <td>
+                                <strong>Aerospike namespace name.</strong>
+                                Must match a namespace configured in <code>aerospike.conf</code>. The namespace <strong>must exist before Kuber starts</strong> &mdash; Aerospike does not support dynamic namespace creation.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.username</code></td>
+                            <td><em>(empty)</em></td>
+                            <td><strong>Username for authentication.</strong> Only required if Aerospike security is enabled (Enterprise Edition feature). Leave empty for unauthenticated connections.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.password</code></td>
+                            <td><em>(empty)</em></td>
+                            <td><strong>Password for authentication.</strong> Use environment variable substitution in production: <code>${AEROSPIKE_PASSWORD}</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.connection-timeout-ms</code></td>
+                            <td><code>5000</code></td>
+                            <td><strong>Timeout (ms) for establishing connections to cluster nodes.</strong> Increase for high-latency networks.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.socket-timeout-ms</code></td>
+                            <td><code>30000</code></td>
+                            <td><strong>Socket timeout (ms) for read/write operations.</strong> This is the maximum time to wait for a response from the server.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.max-conns-per-node</code></td>
+                            <td><code>300</code></td>
+                            <td><strong>Maximum connections per cluster node.</strong> The Aerospike client maintains a pool of connections to each node. 300 is sufficient for most workloads; increase for very high concurrency.</td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.send-key</code></td>
+                            <td><code>true</code></td>
+                            <td>
+                                <strong>Store the user key with each record.</strong>
+                                When <code>true</code>, the original key string is stored alongside the record, enabling key retrieval during scans. Required for Kuber's region listing functionality.
+                                <br><br>
+                                <em>Note:</em> This adds ~50-100 bytes per record. Set to <code>false</code> only if you never need to list keys and want minimal storage.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.commit-level</code></td>
+                            <td><code>COMMIT_ALL</code></td>
+                            <td>
+                                <strong>Write consistency level.</strong>
+                                <br><br>
+                                <strong><code>COMMIT_ALL</code></strong> (default): Wait for all replicas to acknowledge. Maximum durability.
+                                <br>
+                                <strong><code>COMMIT_MASTER</code></strong>: Return after master acknowledges. Faster but risk of data loss if master fails before replication.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.replica</code></td>
+                            <td><code>SEQUENCE</code></td>
+                            <td>
+                                <strong>Read replica policy.</strong>
+                                <br><br>
+                                <strong><code>SEQUENCE</code></strong> (default): Try master first, then replicas in sequence.
+                                <br>
+                                <strong><code>MASTER</code></strong>: Always read from master (strongest consistency).
+                                <br>
+                                <strong><code>MASTER_PROLES</code></strong>: Distribute reads across master and replicas (best throughput).
+                                <br>
+                                <strong><code>RANDOM</code></strong>: Random replica selection.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>kuber.persistence.aerospike.default-ttl</code></td>
+                            <td><code>-1</code></td>
+                            <td>
+                                <strong>Default record TTL in seconds.</strong>
+                                <br><br>
+                                <strong><code>-1</code></strong> (default): Use namespace default TTL.
+                                <br>
+                                <strong><code>0</code></strong>: Records never expire.
+                                <br>
+                                <strong><code>&gt;0</code></strong>: Records expire after this many seconds.
+                                <br><br>
+                                <em>TTL Priority:</em> Entry-level TTL → Region default TTL → This config → Namespace default TTL
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5 class="mt-4"><i class="fas fa-database me-2"></i>Data Model Mapping</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Kuber Concept</th><th>Aerospike Concept</th><th>Details</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Region</td><td>Set</td><td>Each region maps to an Aerospike Set within the namespace</td></tr>
+                        <tr><td>Cache Key</td><td>Record Primary Key</td><td>String key stored as user key (with <code>send-key=true</code>)</td></tr>
+                        <tr><td>JSON Value</td><td><code>"v"</code> Bin (String)</td><td>Serialized JSON stored as String bin</td></tr>
+                        <tr><td>Created Timestamp</td><td><code>"ct"</code> Bin (Long)</td><td>Epoch milliseconds</td></tr>
+                        <tr><td>TTL</td><td>Record TTL</td><td>Native Aerospike per-record expiration</td></tr>
+                        <tr><td>Region Metadata</td><td><code>_kuber_regions</code> Set</td><td>Stores region definitions</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5 class="mt-4"><i class="fas fa-tachometer-alt me-2"></i>Performance Characteristics</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <h3 class="text-success">&lt;1 ms</h3>
+                            <p class="mb-0 text-muted">Point read latency</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <h3 class="text-primary">&lt;1 ms</h3>
+                            <p class="mb-0 text-muted">Write latency</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-warning">
+                        <div class="card-body text-center">
+                            <h3 class="text-warning">100K+</h3>
+                            <p class="mb-0 text-muted">ops/sec per node</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-info">
+                        <div class="card-body text-center">
+                            <h3 class="text-info">Linear</h3>
+                            <p class="mb-0 text-muted">Horizontal scale</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-success mt-4">
+                <i class="fas fa-book me-2"></i>
+                For detailed Aerospike documentation including cluster setup, monitoring, and troubleshooting, see the dedicated <a href="/help/aerospike" class="alert-link">Aerospike Help Page</a>.
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================ -->
     <!-- MEMORY                                                            -->
     <!-- ================================================================ -->
     <div class="card mb-4" id="memory">
@@ -1002,7 +1298,7 @@ kuber.persistence.sync-individual-writes=true</code></pre>
         <div class="row">
             <div class="col-md-6">
                 <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                <p class="text-muted small mb-0">Version 1.9.0</p>
+                <p class="text-muted small mb-0">Version 2.0.0</p>
             </div>
             <div class="col-md-6 text-end">
                 <p class="text-muted small mb-0">

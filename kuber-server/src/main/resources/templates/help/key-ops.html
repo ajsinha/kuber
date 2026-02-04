@@ -37,7 +37,7 @@
                                     <tr><td><code>DEL</code></td><td><code>DEL key [key ...]</code></td><td>Delete one or more keys</td></tr>
                                     <tr><td><code>EXISTS</code></td><td><code>EXISTS key [key ...]</code></td><td>Check if key(s) exist</td></tr>
                                     <tr><td><code>KEYS</code></td><td><code>KEYS pattern</code></td><td>Find keys matching glob pattern</td></tr>
-                                    <tr class="table-info"><td><code>KEYS/REGEX</code></td><td><code>GET /api/cache/{region}/keys/regex</code></td><td>Find keys matching regex (REST only, v1.9.0)</td></tr>
+                                    <tr class="table-info"><td><code>KEYS/REGEX</code></td><td><code>GET /api/cache/{region}/keys/regex</code></td><td>Find keys matching regex (REST only, v2.0.0)</td></tr>
                                     <tr><td><code>SCAN</code></td><td><code>SCAN cursor [MATCH pattern] [COUNT count]</code></td><td>Incrementally iterate keys</td></tr>
                                     <tr><td><code>TYPE</code></td><td><code>TYPE key</code></td><td>Get type of value at key</td></tr>
                                     <tr><td><code>RENAME</code></td><td><code>RENAME key newkey</code></td><td>Rename a key</td></tr>
@@ -232,7 +232,7 @@ Console.WriteLine($"Total keys: {allKeys.Count()}");</code></pre>
                 <!-- KEYS REGEX - REST API Only -->
                 <div class="card mb-4">
                     <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><code>KEYS REGEX</code> - Find Keys by Regular Expression <span class="badge bg-light text-dark ms-2">v1.9.0</span></h5>
+                        <h5 class="mb-0"><code>KEYS REGEX</code> - Find Keys by Regular Expression <span class="badge bg-light text-dark ms-2">v2.0.0</span></h5>
                     </div>
                     <div class="card-body">
                         <p>Find keys matching a Java regular expression pattern. More powerful than glob patterns - supports full regex syntax. <strong>REST API only</strong> (not available via Redis protocol).</p>
@@ -514,7 +514,7 @@ foreach (var kv in results) {
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.9.0</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.0.0</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

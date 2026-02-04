@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  * Implements Spring Security's UserDetailsService for authentication.
  * Loads users from JSON file and provides user management functionality.
  * 
- * @version 1.9.0
+ * @version 2.0.0
  * @since 1.7.3
  */
 @Slf4j

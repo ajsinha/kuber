@@ -46,8 +46,9 @@ import java.util.zip.GZIPOutputStream;
 /**
  * Service for backup and restore of cache regions.
  * 
- * <p>Supports RocksDB and LMDB persistence stores. SQL databases (SQLite, PostgreSQL)
- * have their own backup mechanisms and are not supported by this service.
+ * <p>Supports all persistence stores except MEMORY: RocksDB, LMDB, PostgreSQL, 
+ * SQLite, MongoDB, and Aerospike. Each store uses its own forEachEntry implementation
+ * for efficient streaming backup.
  * 
  * <h3>Backup</h3>
  * <ul>
@@ -67,7 +68,7 @@ import java.util.zip.GZIPOutputStream;
  *   <li>Processed files moved to backup directory after restore</li>
  * </ul>
  * 
- * @version 1.5.0
+ * @version 2.0.0
  */
 @Service
 @Slf4j
@@ -133,12 +134,12 @@ public class BackupRestoreService {
             return;
         }
         
-        // Check persistence type - only support RocksDB and LMDB
+        // Check persistence type - support all except MEMORY
+        // v2.0.0: Extended support to PostgreSQL, SQLite, MongoDB, Aerospike (was RocksDB/LMDB only)
         PersistenceStore.PersistenceType type = persistenceStore.getType();
-        if (type != PersistenceStore.PersistenceType.ROCKSDB && 
-            type != PersistenceStore.PersistenceType.LMDB) {
+        if (type == PersistenceStore.PersistenceType.MEMORY) {
             log.info("Backup/restore service not supported for {} persistence. " +
-                    "Only RocksDB and LMDB are supported.", type);
+                    "MEMORY persistence has nothing to backup.", type);
             return;
         }
         

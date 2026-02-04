@@ -45,6 +45,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -105,6 +106,9 @@ public class CacheService {
     
     // Statistics
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
+    
+    // v2.0.0: Eviction counters per region (for periodic summary logging)
+    private final Map<String, AtomicLong> evictionCounters = new ConcurrentHashMap<>();
     
     // Initialization state - prevents operations before recovery is complete
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -425,8 +429,8 @@ public class CacheService {
                             if (cause == CacheConfig.RemovalCause.SIZE) {
                                 // Value evicted due to size - still exists on disk
                                 idx.updateLocation((String) key, ValueLocation.DISK);
-                                log.debug("Value for '{}' evicted from memory in region '{}' (still on disk)", 
-                                        key, regionName);
+                                // v2.0.0: Increment eviction counter for periodic summary logging
+                                evictionCounters.computeIfAbsent(regionName, k -> new AtomicLong(0)).incrementAndGet();
                             } else if (cause == CacheConfig.RemovalCause.EXPIRED) {
                                 // Entry expired - will be cleaned up by expiration service
                                 recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
@@ -1762,6 +1766,76 @@ public class CacheService {
             return null;
         }
         return JsonUtils.getPath(entry.getJsonValue(), path);
+    }
+    
+    /**
+     * Batch get JSON documents for multiple keys.
+     * v2.0.0: Optimized for index rebuild - reduces GC pressure by batching.
+     * 
+     * @param region Region name
+     * @param keys List of keys to retrieve
+     * @return Map of key to JsonNode (only non-null values included)
+     */
+    public Map<String, JsonNode> jsonGetBatch(String region, List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        
+        Map<String, JsonNode> result = new HashMap<>(keys.size());
+        CacheProxy<String, CacheEntry> cache = regionCaches.get(region);
+        
+        if (cache == null) {
+            return result;
+        }
+        
+        // Batch get from cache using asMap() for efficiency
+        Map<String, CacheEntry> cacheMap = cache.asMap();
+        
+        for (String key : keys) {
+            CacheEntry cacheEntry = cacheMap.get(key);
+            if (cacheEntry != null && cacheEntry.getJsonValue() != null && !cacheEntry.isExpired()) {
+                result.put(key, cacheEntry.getJsonValue());
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Stream entries directly from persistence store, bypassing cache.
+     * v2.0.0: Used for index rebuild to avoid cache eviction pressure.
+     * 
+     * <p>This method reads directly from disk without loading into cache,
+     * which prevents eviction cascades during large index rebuilds.
+     * 
+     * @param region Region name
+     * @param consumer Consumer to process each entry (key, JsonNode)
+     * @return Number of entries processed
+     */
+    public long streamEntriesFromPersistence(String region, java.util.function.BiConsumer<String, JsonNode> consumer) {
+        if (persistenceStore == null) {
+            log.warn("No persistence store available for streaming");
+            return 0;
+        }
+        
+        AtomicLong count = new AtomicLong(0);
+        
+        persistenceStore.forEachEntry(region, entry -> {
+            if (entry != null && !entry.isExpired() && entry.getJsonValue() != null) {
+                consumer.accept(entry.getKey(), entry.getJsonValue());
+                count.incrementAndGet();
+            }
+        });
+        
+        return count.get();
+    }
+    
+    /**
+     * Check if persistence store is available.
+     * @return true if persistence is configured and available
+     */
+    public boolean hasPersistenceStore() {
+        return persistenceStore != null && persistenceStore.getType() != PersistenceStore.PersistenceType.MEMORY;
     }
     
     public boolean jsonDelete(String region, String key, String path) {
@@ -3513,9 +3587,10 @@ public class CacheService {
                 recordStatistic(regionName, "evictions");
             }
             
+            // v2.0.0: Increment eviction counter for periodic summary logging
             if (!keysToEvict.isEmpty()) {
-                log.debug("Evicted {} values from region '{}' to disk (keys remain in index)", 
-                        keysToEvict.size(), regionName);
+                evictionCounters.computeIfAbsent(regionName, k -> new AtomicLong(0))
+                        .addAndGet(keysToEvict.size());
             }
         }
         
@@ -3583,8 +3658,10 @@ public class CacheService {
             recordStatistic(region, "evictions");
         }
         
+        // v2.0.0: Increment eviction counter for periodic summary logging
         if (evicted > 0) {
-            log.debug("Count-based eviction: evicted {} values from region '{}' to disk", evicted, region);
+            evictionCounters.computeIfAbsent(region, k -> new AtomicLong(0))
+                    .addAndGet(evicted);
         }
         
         return evicted;
@@ -3751,6 +3828,45 @@ public class CacheService {
                 log.info("Cleaned up {} expired entries from region '{}' (removed from index and cache)", 
                         uniqueExpiredKeys.size(), regionName);
             }
+        }
+    }
+    
+    // ==================== Eviction Summary Logging (v2.0.0) ====================
+    
+    /**
+     * Log eviction summary every minute.
+     * Only logs at INFO level when there are evictions.
+     * 
+     * @since 2.0.0
+     */
+    @Scheduled(fixedRate = 60000)  // Every 1 minute
+    public void logEvictionSummary() {
+        // Skip if not initialized or shutting down
+        if (!initialized.get() || shuttingDown) {
+            return;
+        }
+        
+        // Collect and reset counters atomically
+        Map<String, Long> evictions = new HashMap<>();
+        long totalEvictions = 0;
+        
+        for (Map.Entry<String, AtomicLong> entry : evictionCounters.entrySet()) {
+            long count = entry.getValue().getAndSet(0);
+            if (count > 0) {
+                evictions.put(entry.getKey(), count);
+                totalEvictions += count;
+            }
+        }
+        
+        // Log summary - INFO for evictions, DEBUG for no evictions
+        if (!evictions.isEmpty()) {
+            StringBuilder sb = new StringBuilder("Cache eviction summary (last 60s): ");
+            evictions.forEach((region, count) -> 
+                sb.append(region).append("=").append(count).append(" "));
+            sb.append("[total=").append(totalEvictions).append("]");
+            log.info(sb.toString().trim());
+        } else {
+            log.debug("Cache eviction summary (last 60s): no evictions");
         }
     }
     

@@ -42,7 +42,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  *   <li>Segmented buffers support >2GB total storage</li>
  * </ul>
  * 
- * @version 1.9.0
+ * @version 2.0.0
  * @since 1.9.0
  */
 @Slf4j

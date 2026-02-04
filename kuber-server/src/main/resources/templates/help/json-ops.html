@@ -439,7 +439,7 @@ await client.JsonDeleteAsync("user:1001");</code></pre>
                         
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>v1.9.0:</strong> Added IN clause support for matching multiple values per attribute.
+                            <strong>v2.0.0:</strong> Added IN clause support for matching multiple values per attribute.
                         </div>
                         
                         <h6 class="mt-3">Supported Operators</h6>
@@ -461,7 +461,7 @@ await client.JsonDeleteAsync("user:1001");</code></pre>
                             </table>
                         </div>
                         
-                        <h6 class="mt-3">IN Clause Syntax (v1.9.0)</h6>
+                        <h6 class="mt-3">IN Clause Syntax (v2.0.0)</h6>
                         <p>Use <code>[value1|value2|value3]</code> to match any of multiple values:</p>
                         <div class="table-responsive mb-3">
                             <table class="table table-sm table-bordered">
@@ -494,11 +494,11 @@ JSET emp:4 {"name":"Jane","dept":"HR","salary":70000,"country":"USA"}
 JSEARCH dept=Engineering
 # Returns: [emp:1, emp:3] with values
 
-# IN clause - match multiple values (v1.9.0)
+# IN clause - match multiple values (v2.0.0)
 JSEARCH dept=[Engineering|Sales]
 # Returns: [emp:1, emp:2, emp:3]
 
-# IN clause on multiple attributes (v1.9.0)
+# IN clause on multiple attributes (v2.0.0)
 JSEARCH dept=[Engineering|Sales],country=[USA|UK]
 # Returns: [emp:1, emp:2] (Engineering/USA and Sales/UK)
 
@@ -530,14 +530,14 @@ JSEARCH dept=[Engineering|HR],salary>=70000
     for r in results:
         print(f"{r['key']}: {r['value']}")
     
-    # IN clause - multiple values for one field (v1.9.0)
+    # IN clause - multiple values for one field (v2.0.0)
     results = client.json_search('dept=[Engineering|Sales]')
     print(f"Engineering or Sales: {len(results)}")
     
-    # IN clause on multiple attributes (v1.9.0)
+    # IN clause on multiple attributes (v2.0.0)
     results = client.json_search('dept=[Engineering|Sales],country=[USA|UK]')
     
-    # Using convenience method with dict (v1.9.0)
+    # Using convenience method with dict (v2.0.0)
     conditions = {
         "dept": ["Engineering", "Sales"],
         "country": ["USA", "UK", "CA"]
@@ -564,13 +564,13 @@ JSEARCH dept=[Engineering|HR],salary>=70000
         System.out.println(r);
     }
     
-    // IN clause - multiple values for one field (v1.9.0)
+    // IN clause - multiple values for one field (v2.0.0)
     results = client.jsonSearch("dept=[Engineering|Sales]");
     
-    // IN clause on multiple attributes (v1.9.0)
+    // IN clause on multiple attributes (v2.0.0)
     results = client.jsonSearch("dept=[Engineering|Sales],country=[USA|UK]");
     
-    // Using convenience method with Map (v1.9.0)
+    // Using convenience method with Map (v2.0.0)
     Map&lt;String, List&lt;String&gt;&gt; conditions = new LinkedHashMap&lt;&gt;();
     conditions.put("dept", Arrays.asList("Engineering", "Sales"));
     conditions.put("country", Arrays.asList("USA", "UK", "CA"));
@@ -597,13 +597,13 @@ foreach (var r in results) {
     Console.WriteLine($"{r.Key}: {r.Value}");
 }
 
-// IN clause - multiple values for one field (v1.9.0)
+// IN clause - multiple values for one field (v2.0.0)
 results = await client.JsonSearchAsync&lt;Employee&gt;("dept=[Engineering|Sales]");
 
-// IN clause on multiple attributes (v1.9.0)
+// IN clause on multiple attributes (v2.0.0)
 results = await client.JsonSearchAsync&lt;Employee&gt;("dept=[Engineering|Sales],country=[USA|UK]");
 
-// Using convenience method with Dictionary (v1.9.0)
+// Using convenience method with Dictionary (v2.0.0)
 var conditions = new Dictionary&lt;string, List&lt;string&gt;&gt;
 {
     { "dept", new List&lt;string&gt; { "Engineering", "Sales" } },
@@ -707,7 +707,7 @@ results = await client.JsonSearchAsync&lt;Employee&gt;("name~=^J.*");</code></pr
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 1.9.0</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.0.0</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

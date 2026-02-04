@@ -43,7 +43,7 @@ import java.util.List;
  *   <li>UTF-32 LE: FF FE 00 00</li>
  * </ul>
  * 
- * @version 1.9.0
+ * @version 2.0.0
  * @since 1.7.9
  */
 @Slf4j

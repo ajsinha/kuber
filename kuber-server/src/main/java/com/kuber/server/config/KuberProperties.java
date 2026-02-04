@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "1.9.0";
+    private String version = "2.0.0";
     
     /**
      * Unique node identifier
@@ -1689,6 +1689,70 @@ public class KuberProperties {
          * Default: . (current working directory)
          */
         private String fileWatcherDirectory = ".";
+        
+        // ==================== Index Rebuild Optimization (v2.0.0) ====================
+        
+        /**
+         * Batch size for index rebuild operations.
+         * Documents are loaded and indexed in batches of this size to reduce
+         * GC pressure and improve rebuild performance.
+         * 
+         * <p>Larger batches are more efficient but use more memory during rebuild.
+         * Recommended values: 500-2000 for most workloads.
+         * 
+         * Default: 1000
+         * 
+         * @since 2.0.0
+         */
+        @Min(100)
+        private int rebuildBatchSize = 1000;
+        
+        /**
+         * Number of parallel batches to process during index rebuild.
+         * Higher values speed up rebuild but use more CPU and memory.
+         * 
+         * Default: 4 (usually matches available cores)
+         * 
+         * @since 2.0.0
+         */
+        @Min(1)
+        private int rebuildParallelBatches = 4;
+        
+        /**
+         * Maximum memory budget for secondary indexes in megabytes.
+         * When indexes exceed this budget, least-recently-used entries are evicted.
+         * Set to 0 to disable memory budget (unlimited).
+         * 
+         * Default: 0 (unlimited)
+         * 
+         * @since 2.0.0
+         */
+        private int maxMemoryMb = 0;
+        
+        /**
+         * Intern threshold for string value deduplication.
+         * Field values that appear more than this many times are interned
+         * to reduce memory usage.
+         * 
+         * Default: 100
+         * 
+         * @since 2.0.0
+         */
+        @Min(10)
+        private int internThreshold = 100;
+        
+        /**
+         * Stream entries directly from persistence during index rebuild.
+         * When true, bypasses the in-memory cache to avoid eviction pressure.
+         * When false, reads from cache (may cause eviction cascade on large datasets).
+         * 
+         * <p>Recommended: true for regions with more than 100K entries.
+         * 
+         * Default: true
+         * 
+         * @since 2.0.0
+         */
+        private boolean rebuildFromPersistence = true;
         
         /**
          * Default storage mode for secondary indexes.
