@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Thread-safe implementation using ConcurrentSkipListMap.
  * 
- * @version 2.0.0
+ * @version 2.1.0
  * @since 1.9.0
  */
 @Slf4j
@@ -132,7 +132,7 @@ public class BTreeIndex implements SecondaryIndex {
         }
         
         Set<String> result = index.get(comparableValue);
-        // v2.0.0: Return unmodifiable view instead of defensive copy
+        // v2.1.0: Return unmodifiable view instead of defensive copy
         return result != null ? Collections.unmodifiableSet(result) : Collections.emptySet();
     }
     

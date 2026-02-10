@@ -301,12 +301,13 @@
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
         [...popoverTriggerList].map(el => new bootstrap.Popover(el));
         
-        // Auto-dismiss alerts
+        // Auto-dismiss alerts (supports data-dismiss-delay for custom timeout)
         document.querySelectorAll('.alert-dismissible').forEach(alert => {
+            const delay = parseInt(alert.dataset.dismissDelay) || 5000;
             setTimeout(() => {
                 const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
                 bsAlert.close();
-            }, 5000);
+            }, delay);
         });
         
         // Format JSON in pre elements

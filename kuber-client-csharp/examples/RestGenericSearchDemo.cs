@@ -24,7 +24,7 @@
  *     
  * Or compile and run:
  *     csc RestGenericSearchDemo.cs
- *     RestGenericSearchDemo.exe localhost 7070 kub_admin
+ *     RestGenericSearchDemo.exe localhost 8080 kub_admin
  *
  * Dependencies: .NET 6.0+ (uses System.Net.Http and System.Text.Json)
  *
@@ -718,7 +718,7 @@ API Endpoints:
         public static async Task Main(string[] args)
         {
             string host = args.Length > 0 ? args[0] : "localhost";
-            int port = args.Length > 1 ? int.Parse(args[1]) : 7070;
+            int port = args.Length > 1 ? int.Parse(args[1]) : 8080;
             string apiKey = args.Length > 2 ? args[2] : "kub_admin";
             string region = args.Length > 3 ? args[3] : "search_demo_csharp";
 

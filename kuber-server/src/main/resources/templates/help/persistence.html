@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v2.0.0 - Persistence Configuration Help
+  ~ Kuber v2.1.0 - Persistence Configuration Help
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Persistence Configuration')}"></head>
@@ -23,7 +23,7 @@
     
     <div class="alert alert-info">
         <i class="fas fa-info-circle me-2"></i>
-        <strong>Persistence Backends:</strong> Kuber supports 7 persistence backends &mdash; <strong>RocksDB</strong>, <strong>LMDB</strong>, <strong>SQLite</strong>, <strong>PostgreSQL</strong>, <strong>MongoDB</strong>, <strong>Aerospike</strong> <span class="badge bg-success">NEW in 2.0.0</span>, and <strong>Memory</strong> (no persistence). Each backend is fully interchangeable via a single configuration property. This guide covers how to choose, configure, and tune each backend for your workload.
+        <strong>Persistence Backends:</strong> Kuber supports 7 persistence backends &mdash; <strong>RocksDB</strong>, <strong>LMDB</strong>, <strong>SQLite</strong>, <strong>PostgreSQL</strong>, <strong>MongoDB</strong>, <strong>Aerospike</strong> <span class="badge bg-success">NEW in 2.1.0</span>, and <strong>Memory</strong> (no persistence). Each backend is fully interchangeable via a single configuration property. This guide covers how to choose, configure, and tune each backend for your workload.
     </div>
 
     <!-- Table of Contents -->
@@ -73,7 +73,7 @@
             <h4 class="mb-0"><i class="fas fa-compass me-2"></i>Choosing a Persistence Backend</h4>
         </div>
         <div class="card-body">
-            <p>The persistence backend is responsible for durably storing cache data so it survives server restarts. Every backend implements the same <code>PersistenceStore</code> interface with full feature parity (as of v2.0.0), so your choice comes down to <strong>operational requirements</strong>, <strong>performance characteristics</strong>, and <strong>deployment constraints</strong>.</p>
+            <p>The persistence backend is responsible for durably storing cache data so it survives server restarts. Every backend implements the same <code>PersistenceStore</code> interface with full feature parity (as of v2.1.0), so your choice comes down to <strong>operational requirements</strong>, <strong>performance characteristics</strong>, and <strong>deployment constraints</strong>.</p>
             
             <p>To select a backend, set this single property in <code>application.properties</code>:</p>
             
@@ -934,7 +934,7 @@ kuber.mongo.database=kuber</code></pre>
     <!-- ================================================================ -->
     <div class="card mb-4" id="aerospike">
         <div class="card-header text-white" style="background: linear-gradient(135deg, #c41200 0%, #ff6b35 100%);">
-            <h4 class="mb-0"><i class="fas fa-bolt me-2"></i>Aerospike <span class="badge bg-light text-dark ms-2">NEW in 2.0.0</span></h4>
+            <h4 class="mb-0"><i class="fas fa-bolt me-2"></i>Aerospike <span class="badge bg-light text-dark ms-2">NEW in 2.1.0</span></h4>
         </div>
         <div class="card-body">
             <div class="row mb-4">
@@ -1298,7 +1298,7 @@ kuber.persistence.sync-individual-writes=true</code></pre>
         <div class="row">
             <div class="col-md-6">
                 <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                <p class="text-muted small mb-0">Version 2.0.0</p>
+                <p class="text-muted small mb-0">Version 2.1.0</p>
             </div>
             <div class="col-md-6 text-end">
                 <p class="text-muted small mb-0">

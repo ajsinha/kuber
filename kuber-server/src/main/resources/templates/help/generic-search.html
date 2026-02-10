@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.0.0 Enhanced</strong> - Unified search and update API with multi-key, multi-pattern, advanced JSON search, and smart merge capabilities.
+                    <strong>Version 2.1.0 Enhanced</strong> - Unified search and update API with multi-key, multi-pattern, advanced JSON search, and smart merge capabilities.
                 </div>
                 
                 <!-- Quick Navigation -->
@@ -78,7 +78,7 @@
 POST /api/v1/genericsearch
 POST /api/v2/genericsearch</code></pre>
 
-                        <h6 class="mt-3">Key Features (v2.0.0)</h6>
+                        <h6 class="mt-3">Key Features (v2.1.0)</h6>
                         <div class="row">
                             <div class="col-md-6">
                                 <ul>
@@ -116,7 +116,7 @@ POST /api/v2/genericsearch</code></pre>
     
     // JSON Attribute Search
     "type": "json",                     // Enable JSON search
-    "criteria": {                       // v2.0.0 format
+    "criteria": {                       // v2.1.0 format
         "status": "active",             // Equality match
         "role": ["admin", "manager"],   // IN operator (match any)
         "email": {"regex": ".*@company\\.com"}, // Regex match
@@ -146,7 +146,7 @@ POST /api/v2/genericsearch</code></pre>
 }</code></pre>
 
                         <!-- Mode 2: Multiple Keys -->
-                        <h6 class="text-primary mt-4">Mode 2: Multiple Keys Lookup <span class="badge bg-success">NEW in v2.0.0</span></h6>
+                        <h6 class="text-primary mt-4">Mode 2: Multiple Keys Lookup <span class="badge bg-success">NEW in v2.1.0</span></h6>
                         <p>Retrieve multiple specific keys at once.</p>
                         <pre class="bg-dark text-light p-3 rounded"><code>{
     "apiKey": "kub_xxx",
@@ -164,7 +164,7 @@ POST /api/v2/genericsearch</code></pre>
 }</code></pre>
 
                         <!-- Mode 4: Multiple Patterns -->
-                        <h6 class="text-primary mt-4">Mode 4: Multiple Key Patterns <span class="badge bg-success">NEW in v2.0.0</span></h6>
+                        <h6 class="text-primary mt-4">Mode 4: Multiple Key Patterns <span class="badge bg-success">NEW in v2.1.0</span></h6>
                         <p>Search keys matching any of multiple regex patterns (OR logic between patterns).</p>
                         <pre class="bg-dark text-light p-3 rounded"><code>{
     "apiKey": "kub_xxx",
@@ -173,7 +173,7 @@ POST /api/v2/genericsearch</code></pre>
 }</code></pre>
 
                         <!-- Mode 5: JSON Search -->
-                        <h6 class="text-primary mt-4">Mode 5: JSON Attribute Search <span class="badge bg-success">Enhanced in v2.0.0</span></h6>
+                        <h6 class="text-primary mt-4">Mode 5: JSON Attribute Search <span class="badge bg-success">Enhanced in v2.1.0</span></h6>
                         <p>Search JSON documents by attribute values. All criteria use AND logic.</p>
                         <pre class="bg-dark text-light p-3 rounded"><code>{
     "apiKey": "kub_xxx",
@@ -226,19 +226,19 @@ POST /api/v2/genericsearch</code></pre>
                                     <tr class="table-warning">
                                         <td><code>contains</code></td>
                                         <td><code>"field": {"contains": "substring"}</code></td>
-                                        <td>Substring match <span class="badge bg-dark">v2.0.0</span></td>
+                                        <td>Substring match <span class="badge bg-dark">v2.1.0</span></td>
                                         <td><code>"name": {"contains": "smith"}</code></td>
                                     </tr>
                                     <tr class="table-info">
                                         <td><code>prefix</code></td>
                                         <td><code>"field": {"prefix": "value"}</code></td>
-                                        <td>Starts with <span class="badge bg-dark">v2.0.0</span></td>
+                                        <td>Starts with <span class="badge bg-dark">v2.1.0</span></td>
                                         <td><code>"sku": {"prefix": "NYC-"}</code></td>
                                     </tr>
                                     <tr class="table-info">
                                         <td><code>startswith</code></td>
                                         <td><code>"field": {"startswith": "value"}</code></td>
-                                        <td>Alias for prefix <span class="badge bg-dark">v2.0.0</span></td>
+                                        <td>Alias for prefix <span class="badge bg-dark">v2.1.0</span></td>
                                         <td><code>"phone": {"startswith": "+1"}</code></td>
                                     </tr>
                                     <tr>
@@ -399,7 +399,7 @@ POST /api/v2/genericsearch</code></pre>
                 <!-- Parallel Search Performance -->
                 <div class="card mb-4">
                     <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Parallel Search (v2.0.0)</h5>
+                        <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Parallel Search (v2.1.0)</h5>
                     </div>
                     <div class="card-body">
                         <p>Both JSON searches and key pattern searches now use <strong>parallel processing</strong> for significantly improved performance on large datasets.</p>
@@ -506,7 +506,7 @@ Response:
                 <!-- Secondary Indexing Performance -->
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v2.0.0)</h5>
+                        <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v2.1.0)</h5>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-success">
@@ -582,7 +582,7 @@ Response:
                             </div>
                             <div class="col-md-6 mb-2">
                                 <div class="card border-warning">
-                                    <div class="card-header bg-warning text-dark py-2">TRIGRAM Index <span class="badge bg-dark ms-1">v2.0.0</span></div>
+                                    <div class="card-header bg-warning text-dark py-2">TRIGRAM Index <span class="badge bg-dark ms-1">v2.1.0</span></div>
                                     <div class="card-body py-2">
                                         <p class="small mb-1"><strong>Accelerates regex/pattern searches</strong></p>
                                         <p class="small mb-0">Best for: <code>email {"regex": ".*@gmail\\.com"}</code>, <code>{"contains": "smith"}</code></p>
@@ -591,7 +591,7 @@ Response:
                             </div>
                             <div class="col-md-6 mb-2">
                                 <div class="card border-info">
-                                    <div class="card-header bg-info text-white py-2">PREFIX Index <span class="badge bg-light text-dark ms-1">v2.0.0</span></div>
+                                    <div class="card-header bg-info text-white py-2">PREFIX Index <span class="badge bg-light text-dark ms-1">v2.1.0</span></div>
                                     <div class="card-body py-2">
                                         <p class="small mb-1"><strong>O(prefix len) lookup</strong></p>
                                         <p class="small mb-0">Best for: <code>{"prefix": "NYC-"}</code>, <code>{"startswith": "+1-212"}</code></p>
@@ -917,7 +917,7 @@ POST /api/v2/genericupdate</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.0.0</p>
+                    <p class="text-muted small mb-0">Version 2.1.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

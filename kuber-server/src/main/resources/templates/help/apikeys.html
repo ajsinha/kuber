@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>v1.6.5: API Key Required for All Programmatic Access</strong><br>
+                    <strong>v2.1.0: API Key Required for All Programmatic Access</strong><br>
                     All client applications (Java, Python, CLI) must use API keys. Username/password is only for Web UI.
                 </div>
 
@@ -112,7 +112,7 @@ AUTH APIKEY kub_your_api_key_here
 # Or directly with the key
 AUTH kub_your_api_key_here</code></pre>
                     
-                    <h4 class="mt-4">Python Client (v1.6.5)</h4>
+                    <h4 class="mt-4">Python Client (v2.1.0)</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient, KuberRestClient
 
 # Redis Protocol Client
@@ -130,7 +130,7 @@ r = redis.Redis(host='localhost', port=6380, decode_responses=True)
 r.execute_command('AUTH', 'kub_your_api_key_here')
 r.set('key', 'value')</code></pre>
                     
-                    <h4 class="mt-4">Java Client (v1.6.5)</h4>
+                    <h4 class="mt-4">Java Client (v2.1.0)</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>// Redis Protocol Client
 KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key_here");
 client.set("key", "value");
@@ -256,7 +256,7 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
                     
                     <div class="alert alert-success">
                         <i class="fas fa-folder-open me-2"></i>
-                        <strong>v1.6.5 Secure Folder:</strong> Security files are stored in a dedicated secure folder.
+                        <strong>v2.1.0 Secure Folder:</strong> Security files are stored in a dedicated secure folder.
                     </div>
                     
                     <h4>File Locations</h4>

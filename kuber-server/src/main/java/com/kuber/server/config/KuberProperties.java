@@ -57,7 +57,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "2.0.0";
+    private String version = "2.1.0";
     
     /**
      * Unique node identifier
@@ -1690,7 +1690,7 @@ public class KuberProperties {
          */
         private String fileWatcherDirectory = ".";
         
-        // ==================== Index Rebuild Optimization (v2.0.0) ====================
+        // ==================== Index Rebuild Optimization (v2.1.0) ====================
         
         /**
          * Batch size for index rebuild operations.

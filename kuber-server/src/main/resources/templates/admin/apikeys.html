@@ -38,18 +38,33 @@
         </div>
         
         <!-- New Key Alert (shows full key after generation) -->
-        <div th:if="${newKeyValue}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <div th:if="${newKeyValue}" class="alert alert-success alert-dismissible fade show" role="alert" data-dismiss-delay="30000" id="newKeyAlert">
             <h5 class="alert-heading"><i class="fas fa-check-circle me-2"></i>API Key Generated Successfully!</h5>
             <p>Your new API key <strong th:text="${newKeyName}">Key Name</strong> has been created. 
                <strong class="text-danger">Copy it now - it won't be shown again!</strong></p>
             <hr>
-            <div class="input-group mb-0">
+            <div class="input-group mb-2">
                 <input type="text" class="form-control font-monospace" th:value="${newKeyValue}" id="newKeyInput" readonly>
                 <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('newKeyInput')">
                     <i class="fas fa-copy"></i> Copy
                 </button>
             </div>
+            <small class="text-muted"><i class="fas fa-clock me-1"></i>This message will disappear in <span id="keyCountdown">30</span> seconds</small>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <script>
+                (function() {
+                    var seconds = 30;
+                    var el = document.getElementById('keyCountdown');
+                    var timer = setInterval(function() {
+                        seconds--;
+                        if (el) el.textContent = seconds;
+                        if (seconds <= 0) clearInterval(timer);
+                    }, 1000);
+                    document.getElementById('newKeyAlert').addEventListener('closed.bs.alert', function() {
+                        clearInterval(timer);
+                    });
+                })();
+            </script>
         </div>
         
         <!-- Statistics -->

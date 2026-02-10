@@ -14,7 +14,7 @@ Kuber Client - Redis Protocol Client Implementation
 This client uses the Redis protocol with Kuber extensions for regions and JSON queries.
 For REST API access, use KuberRestClient from kuber.rest_client module.
 
-v1.6.5: API Key Authentication ONLY
+v2.1.0: API Key Authentication ONLY
 All programmatic access requires an API key (starts with "kub_").
 Username/password authentication is only for the Web UI.
 
@@ -44,7 +44,7 @@ class KuberClient:
     """
     Python client for Kuber Distributed Cache using Redis Protocol.
     
-    v1.6.5: API Key Authentication ONLY.
+    v2.1.0: API Key Authentication ONLY.
     All programmatic access requires an API key (starts with "kub_").
     Username/password authentication is only for the Web UI.
     

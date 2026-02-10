@@ -22,7 +22,7 @@ import java.util.*;
  * Comprehensive examples demonstrating all capabilities of the Kuber Java REST client
  * using pure HTTP REST API endpoints.
  * 
- * v1.6.5: API Key authentication required.
+ * v2.1.0: API Key authentication required.
  * 
  * Features demonstrated:
  * - Server operations (ping, info, status, stats)
@@ -58,7 +58,7 @@ public class KuberRestExample {
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - HTTP REST API (v1.6.5)                         ║
+            ║   KUBER JAVA CLIENT - HTTP REST API (v2.1.0)                         ║
             ║                                                                      ║
             ║   Protocol: HTTP REST (API Key Authentication)                       ║
             ╚══════════════════════════════════════════════════════════════════════╝

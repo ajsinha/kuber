@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Without index (full scan): O(n)</li>
  * </ul>
  * 
- * @version 2.0.0
+ * @version 2.1.0
  * @since 1.9.0
  */
 @Service
@@ -668,7 +668,7 @@ public class IndexManager implements IndexConfiguration.IndexConfigurationListen
         
         AtomicInteger indexed = new AtomicInteger(0);
         
-        // v2.0.0: Stream from persistence to avoid cache eviction pressure
+        // v2.1.0: Stream from persistence to avoid cache eviction pressure
         boolean usePeristence = properties.getIndexing().isRebuildFromPersistence() 
                 && cacheService.hasPersistenceStore();
         

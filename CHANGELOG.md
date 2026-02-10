@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [2.0.0] - 2026-02-04 - INDEX OPTIMIZATION & PERFORMANCE OVERHAUL
+## [2.1.0] - 2026-02-04 - INDEX OPTIMIZATION & PERFORMANCE OVERHAUL
 
 ### 🚀 Major Index Performance Improvements
 
@@ -46,7 +46,7 @@ kuber.indexing.intern-threshold=100
 
 ### Performance Impact
 
-| Metric | Before (1.9.0) | After (2.0.0) | Improvement |
+| Metric | Before (1.9.0) | After (2.1.0) | Improvement |
 |--------|----------------|---------------|-------------|
 | Index rebuild (1M docs) | ~300s | ~15s | **20x faster** |
 | GC pause during rebuild | ~500ms | ~20ms | **25x reduction** |
@@ -1079,7 +1079,7 @@ All cache operations are supported via messaging:
 
 ### ⚠️ BREAKING CHANGE: Authentication Model
 
-**v1.6.5 enforces API Key authentication for ALL programmatic access.**
+**v2.1.0 enforces API Key authentication for ALL programmatic access.**
 
 | Access Method | Authentication | Description |
 |---------------|----------------|-------------|
@@ -1141,7 +1141,7 @@ client = KuberClient('localhost', 6380, username='admin', password='password')
 rest = KuberRestClient('localhost', 8080, username='admin', password='password')
 ```
 
-**After (v1.6.5):**
+**After (v2.1.0):**
 ```java
 // Java - API Key required
 KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key");

@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
  * Handles Redis protocol commands via MINA.
  * Supports standard Redis commands plus Kuber extensions for regions and JSON.
  * 
- * Authentication (v1.6.5):
+ * Authentication (v2.1.0):
  * - API Key ONLY: AUTH kub_xxx... or AUTH APIKEY kub_xxx...
  * - Username/password authentication is only for Web UI
  * 
@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  * - Admin users have full access to all operations
  * - Other users need specific roles granting READ/WRITE/DELETE
  *
- * @version 2.0.0
+ * @version 2.1.0
  */
 @Slf4j
 @Component
@@ -507,7 +507,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
     
     /**
      * Handle AUTH command.
-     * v1.6.5: API Key authentication ONLY for Redis protocol.
+     * v2.1.0: API Key authentication ONLY for Redis protocol.
      * 
      * Supported formats:
      * 1. AUTH kub_xxx... - API key direct (recommended)
@@ -568,7 +568,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
      * - CLIENT ID: Get session ID
      * - CLIENT INFO: Get current client info
      * 
-     * @version 2.0.0
+     * @version 2.1.0
      */
     private RedisResponse handleClient(IoSession session, List<String> args) {
         if (args.isEmpty()) {

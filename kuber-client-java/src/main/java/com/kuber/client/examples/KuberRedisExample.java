@@ -23,7 +23,7 @@ import java.util.*;
  * Comprehensive examples demonstrating all capabilities of the Kuber Java client
  * using Redis protocol with Kuber extensions.
  * 
- * v1.6.5: API Key authentication required.
+ * v2.1.0: API Key authentication required.
  * 
  * Features demonstrated:
  * - Basic string operations (GET, SET, MGET, MSET, INCR, DECR)
@@ -59,7 +59,7 @@ public class KuberRedisExample {
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v1.6.5)        ║
+            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v2.1.0)        ║
             ║                                                                      ║
             ║   Protocol: Redis RESP with Kuber Extensions (API Key Auth)          ║
             ╚══════════════════════════════════════════════════════════════════════╝

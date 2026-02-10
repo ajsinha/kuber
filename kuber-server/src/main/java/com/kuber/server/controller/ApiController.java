@@ -39,10 +39,10 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 2.0.0
+ * @version 2.1.0
  */
 @RestController
-@RequestMapping("/api")
+@RequestMapping({"/api", "/api/v1"})
 @RequiredArgsConstructor
 public class ApiController {
     
@@ -57,6 +57,14 @@ public class ApiController {
     
     // ==================== Server Info ====================
     
+    @GetMapping("/ping")
+    public ResponseEntity<Map<String, Object>> ping() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "OK");
+        result.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.ok(result);
+    }
+    
     @GetMapping("/info")
     public ResponseEntity<Map<String, Object>> getInfo() {
         Map<String, Object> info = cacheService.getServerInfo();
@@ -66,6 +74,16 @@ public class ApiController {
         return ResponseEntity.ok(info);
     }
     
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("status", "UP");
+        status.put("nodeId", properties.getNodeId());
+        status.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
+        status.put("version", properties.getVersion());
+        return ResponseEntity.ok(status);
+    }
+    
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> getHealth() {
         Map<String, Object> health = new HashMap<>();
@@ -73,6 +91,13 @@ public class ApiController {
         health.put("nodeId", properties.getNodeId());
         health.put("isPrimary", replicationManager == null || replicationManager.isPrimary());
         return ResponseEntity.ok(health);
+    }
+    
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStats() {
+        Map<String, Object> stats = cacheService.getServerInfo();
+        stats.put("searchStats", parallelJsonSearchService.getStatistics());
+        return ResponseEntity.ok(stats);
     }
     
     /**
@@ -399,6 +424,50 @@ public class ApiController {
         return ResponseEntity.ok(result);
     }
     
+    @GetMapping("/cache/{region}/{key}/exists")
+    public ResponseEntity<Map<String, Object>> keyExists(@PathVariable String region,
+                                                          @PathVariable String key) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        boolean exists = cacheService.exists(region, key);
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("exists", exists);
+        return ResponseEntity.ok(result);
+    }
+    
+    @GetMapping("/cache/{region}/{key}/ttl")
+    public ResponseEntity<Map<String, Object>> getKeyTtl(@PathVariable String region,
+                                                          @PathVariable String key) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        long ttl = cacheService.ttl(region, key);
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("ttl", ttl);
+        return ResponseEntity.ok(result);
+    }
+    
+    @GetMapping("/cache/{region}/size")
+    public ResponseEntity<Map<String, Object>> getRegionSize(@PathVariable String region) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        Set<String> allKeys = cacheService.keys(region, "*", Integer.MAX_VALUE);
+        Map<String, Object> result = new HashMap<>();
+        result.put("region", region);
+        result.put("size", allKeys.size());
+        return ResponseEntity.ok(result);
+    }
+    
     // ==================== JSON Operations ====================
     
     @GetMapping("/cache/{region}/{key}/json")
@@ -461,6 +530,134 @@ public class ApiController {
         }
         
         return ResponseEntity.ok(results);
+    }
+    
+    // ==================== JSON Alternative Paths ====================
+    
+    @GetMapping("/json/{region}/{key}")
+    public ResponseEntity<?> getJsonAlt(@PathVariable String region,
+                                         @PathVariable String key,
+                                         @RequestParam(defaultValue = "$") String path) {
+        return getJson(region, key, path);
+    }
+    
+    @PutMapping("/json/{region}/{key}")
+    public ResponseEntity<?> setJsonAlt(@PathVariable String region,
+                                         @PathVariable String key,
+                                         @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        
+        Object value = body.get("value");
+        Long ttlValue = body.containsKey("ttl") ? ((Number) body.get("ttl")).longValue() : -1L;
+        
+        JsonNode json = JsonUtils.parse(JsonUtils.toJson(value));
+        cacheService.jsonSet(region, key, "$", json, ttlValue);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("status", "OK");
+        return ResponseEntity.ok(result);
+    }
+    
+    @DeleteMapping("/json/{region}/{key}")
+    public ResponseEntity<?> deleteJsonAlt(@PathVariable String region,
+                                            @PathVariable String key,
+                                            @RequestParam(defaultValue = "$") String path) {
+        if (!authorizationService.canDelete(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "DELETE permission denied for region: " + region));
+        }
+        
+        boolean deleted = cacheService.jsonDelete(region, key, path);
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("deleted", deleted);
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/json/{region}/search")
+    public ResponseEntity<?> searchJsonAlt(@PathVariable String region,
+                                            @RequestBody SearchRequest request) {
+        return searchJson(region, request);
+    }
+    
+    @DeleteMapping("/cache/{region}/{key}/json")
+    public ResponseEntity<?> deleteJson(@PathVariable String region,
+                                         @PathVariable String key,
+                                         @RequestParam(defaultValue = "$") String path) {
+        if (!authorizationService.canDelete(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "DELETE permission denied for region: " + region));
+        }
+        
+        boolean deleted = cacheService.jsonDelete(region, key, path);
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("deleted", deleted);
+        return ResponseEntity.ok(result);
+    }
+    
+    // ==================== Bulk Operations ====================
+    
+    @PostMapping("/cache/{region}/import")
+    public ResponseEntity<?> bulkImport(@PathVariable String region,
+                                         @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> entries = (List<Map<String, Object>>) body.get("entries");
+        int imported = 0;
+        if (entries != null) {
+            for (Map<String, Object> entry : entries) {
+                String key = (String) entry.get("key");
+                Object value = entry.get("value");
+                long ttl = entry.containsKey("ttl") ? ((Number) entry.get("ttl")).longValue() : -1L;
+                
+                if (value instanceof Map || value instanceof List) {
+                    JsonNode json = JsonUtils.parse(JsonUtils.toJson(value));
+                    cacheService.jsonSet(region, key, "$", json, ttl);
+                } else {
+                    cacheService.set(region, key, String.valueOf(value), ttl);
+                }
+                imported++;
+            }
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("imported", imported);
+        result.put("status", "OK");
+        return ResponseEntity.ok(result);
+    }
+    
+    @GetMapping("/cache/{region}/export")
+    public ResponseEntity<?> bulkExport(@PathVariable String region,
+                                         @RequestParam(defaultValue = "*") String pattern) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        Set<String> keys = cacheService.keys(region, pattern, 10000);
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (String key : keys) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("key", key);
+            String value = cacheService.get(region, key);
+            entry.put("value", value);
+            entry.put("ttl", cacheService.ttl(region, key));
+            entries.add(entry);
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("entries", entries);
+        result.put("count", entries.size());
+        return ResponseEntity.ok(result);
     }
     
     // ==================== Generic Search API (v1.7.9 Enhanced) ====================
@@ -1127,6 +1324,49 @@ public class ApiController {
         }
     }
     
+    // ==================== Hash Alternative Paths ====================
+    
+    @GetMapping("/hash/{region}/{key}")
+    public ResponseEntity<Map<String, String>> getHashAlt(@PathVariable String region,
+                                                          @PathVariable String key) {
+        return getHash(region, key);
+    }
+    
+    @GetMapping("/hash/{region}/{key}/{field}")
+    public ResponseEntity<Map<String, Object>> getHashFieldAlt(@PathVariable String region,
+                                                                @PathVariable String key,
+                                                                @PathVariable String field) {
+        return getHashField(region, key, field);
+    }
+    
+    @PutMapping("/hash/{region}/{key}/{field}")
+    public ResponseEntity<Map<String, Object>> setHashFieldAlt(@PathVariable String region,
+                                                                @PathVariable String key,
+                                                                @PathVariable String field,
+                                                                @RequestBody ValueRequest request) {
+        return setHashField(region, key, field, request);
+    }
+    
+    @DeleteMapping("/hash/{region}/{key}/{field}")
+    public ResponseEntity<Map<String, Object>> deleteHashFieldAlt(@PathVariable String region,
+                                                                   @PathVariable String key,
+                                                                   @PathVariable String field) {
+        return deleteHashField(region, key, field);
+    }
+    
+    @PostMapping("/hash/{region}/{key}/mset")
+    public ResponseEntity<Map<String, Object>> setHashMultipleAlt(@PathVariable String region,
+                                                                   @PathVariable String key,
+                                                                   @RequestBody Map<String, Object> body) {
+        return setHashMultiple(region, key, body);
+    }
+    
+    @GetMapping("/hash/{region}/{key}/keys")
+    public ResponseEntity<Map<String, Object>> getHashKeysAlt(@PathVariable String region,
+                                                               @PathVariable String key) {
+        return getHashKeys(region, key);
+    }
+    
     // ==================== Hash Operations ====================
     
     @GetMapping("/cache/{region}/{key}/hash")
@@ -1166,24 +1406,147 @@ public class ApiController {
         return ResponseEntity.ok(result);
     }
     
+    @PutMapping("/cache/{region}/{key}/hash")
+    public ResponseEntity<Map<String, Object>> setHashMultiple(@PathVariable String region,
+                                                                @PathVariable String key,
+                                                                @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        
+        @SuppressWarnings("unchecked")
+        Map<String, String> fields = (Map<String, String>) body.get("fields");
+        if (fields != null) {
+            for (Map.Entry<String, String> entry : fields.entrySet()) {
+                cacheService.hset(region, key, entry.getKey(), entry.getValue());
+            }
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "OK");
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/cache/{region}/{key}/hash/mget")
+    public ResponseEntity<Map<String, Object>> hashMultiGet(@PathVariable String region,
+                                                             @PathVariable String key,
+                                                             @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<String> fields = (List<String>) body.get("fields");
+        List<String> values = new ArrayList<>();
+        if (fields != null) {
+            for (String field : fields) {
+                values.add(cacheService.hget(region, key, field));
+            }
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("values", values);
+        return ResponseEntity.ok(result);
+    }
+    
+    @DeleteMapping("/cache/{region}/{key}/hash/{field}")
+    public ResponseEntity<Map<String, Object>> deleteHashField(@PathVariable String region,
+                                                                @PathVariable String key,
+                                                                @PathVariable String field) {
+        if (!authorizationService.canDelete(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "DELETE permission denied for region: " + region));
+        }
+        
+        boolean deleted = cacheService.hdel(region, key, field);
+        Map<String, Object> result = new HashMap<>();
+        result.put("field", field);
+        result.put("deleted", deleted);
+        return ResponseEntity.ok(result);
+    }
+    
+    @GetMapping("/cache/{region}/{key}/hash/keys")
+    public ResponseEntity<Map<String, Object>> getHashKeys(@PathVariable String region,
+                                                            @PathVariable String key) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        Set<String> keys = cacheService.hkeys(region, key);
+        Map<String, Object> result = new HashMap<>();
+        result.put("keys", new ArrayList<>(keys));
+        return ResponseEntity.ok(result);
+    }
+    
+    @GetMapping("/cache/{region}/{key}/hash/values")
+    public ResponseEntity<Map<String, Object>> getHashValues(@PathVariable String region,
+                                                              @PathVariable String key) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        Collection<String> values = cacheService.hvals(region, key);
+        Map<String, Object> result = new HashMap<>();
+        result.put("values", new ArrayList<>(values));
+        return ResponseEntity.ok(result);
+    }
+    
     // ==================== Batch Operations ====================
     
     @PostMapping("/cache/{region}/mget")
-    public ResponseEntity<Map<String, String>> mget(@PathVariable String region,
-                                                    @RequestBody List<String> keys) {
+    public ResponseEntity<?> mget(@PathVariable String region,
+                                   @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canRead(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "READ permission denied for region: " + region));
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<String> keys = (List<String>) body.get("keys");
         List<String> values = cacheService.mget(region, keys);
         
-        Map<String, String> result = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
+        result.put("values", values);
+        
+        Map<String, String> keyValueMap = new HashMap<>();
         for (int i = 0; i < keys.size(); i++) {
-            result.put(keys.get(i), values.get(i));
+            keyValueMap.put(keys.get(i), values.get(i));
         }
+        result.put("entries", keyValueMap);
         
         return ResponseEntity.ok(result);
     }
     
     @PostMapping("/cache/{region}/mset")
     public ResponseEntity<Map<String, Object>> mset(@PathVariable String region,
-                                                    @RequestBody Map<String, String> entries) {
+                                                    @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        
+        @SuppressWarnings("unchecked")
+        Object entriesObj = body.get("entries");
+        Map<String, String> entries = new HashMap<>();
+        
+        if (entriesObj instanceof Map) {
+            // Direct map format: {"entries": {"key1": "val1", "key2": "val2"}}
+            @SuppressWarnings("unchecked")
+            Map<String, String> map = (Map<String, String>) entriesObj;
+            entries = map;
+        } else if (entriesObj instanceof List) {
+            // List format: {"entries": [{"key": "k1", "value": "v1"}, ...]}
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> list = (List<Map<String, String>>) entriesObj;
+            for (Map<String, String> item : list) {
+                entries.put(item.get("key"), item.get("value"));
+            }
+        }
+        
         cacheService.mset(region, entries);
         
         Map<String, Object> result = new HashMap<>();
@@ -1198,8 +1561,19 @@ public class ApiController {
     @PostMapping("/cache/{region}/{key}/expire")
     public ResponseEntity<Map<String, Object>> setExpire(@PathVariable String region,
                                                          @PathVariable String key,
-                                                         @RequestParam long seconds) {
-        boolean result = cacheService.expire(region, key, seconds);
+                                                         @RequestBody(required = false) Map<String, Object> body,
+                                                         @RequestParam(required = false) Long seconds) {
+        long ttlSeconds;
+        if (seconds != null) {
+            ttlSeconds = seconds;
+        } else if (body != null) {
+            Number ttlNum = (Number) body.getOrDefault("seconds", body.get("ttl"));
+            ttlSeconds = ttlNum != null ? ttlNum.longValue() : 0;
+        } else {
+            ttlSeconds = 0;
+        }
+        
+        boolean result = cacheService.expire(region, key, ttlSeconds);
         
         Map<String, Object> response = new HashMap<>();
         response.put("key", key);

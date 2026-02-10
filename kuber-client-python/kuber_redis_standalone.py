@@ -19,7 +19,7 @@ A comprehensive standalone Python client for Kuber Distributed Cache using
 Redis protocol with Kuber extensions. This client does not depend on any
 external Kuber library - it directly implements the Redis wire protocol.
 
-v1.6.5: API Key Authentication ONLY
+v2.1.0: API Key Authentication ONLY
 All programmatic access requires an API key (starts with "kub_").
 Username/password authentication is only for the Web UI.
 
@@ -51,7 +51,7 @@ class KuberRedisClient:
     """
     Standalone Redis protocol client for Kuber Distributed Cache.
     
-    v1.6.5: API Key Authentication ONLY.
+    v2.1.0: API Key Authentication ONLY.
     All programmatic access requires an API key (starts with "kub_").
     Username/password authentication is only for the Web UI.
     
@@ -1657,7 +1657,7 @@ Examples:
             print_section("ALL EXAMPLES COMPLETED SUCCESSFULLY")
             print("""
     This standalone client demonstrated:
-    ✓ API Key authentication (v1.6.5)
+    ✓ API Key authentication (v2.1.0)
     ✓ Basic string operations (GET, SET, INCR, DECR, APPEND)
     ✓ Multi-key operations (MGET, MSET)
     ✓ Key pattern search (KEYS with wildcards, SCAN)

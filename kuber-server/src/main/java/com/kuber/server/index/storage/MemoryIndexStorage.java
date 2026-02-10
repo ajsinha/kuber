@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  *   <li>May cause GC pressure with large indexes</li>
  * </ul>
  * 
- * @version 2.0.0
+ * @version 2.1.0
  * @since 1.9.0
  */
 @Slf4j

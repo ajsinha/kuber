@@ -14,7 +14,7 @@ Kuber REST Client - HTTP REST API Client Implementation
 This client uses the HTTP REST API for all operations.
 For Redis protocol access, use KuberClient from kuber.client module.
 
-v1.6.5: API Key Authentication ONLY
+v2.1.0: API Key Authentication ONLY
 All programmatic access requires an API key (starts with "kub_").
 Username/password authentication is only for the Web UI.
 
@@ -50,7 +50,7 @@ class KuberRestClient:
     """
     Python client for Kuber Distributed Cache using HTTP REST API.
     
-    v1.6.5: API Key Authentication ONLY.
+    v2.1.0: API Key Authentication ONLY.
     All programmatic access requires an API key (starts with "kub_").
     Username/password authentication is only for the Web UI.
     

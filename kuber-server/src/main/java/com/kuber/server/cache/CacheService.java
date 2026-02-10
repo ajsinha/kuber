@@ -107,7 +107,7 @@ public class CacheService {
     // Statistics
     private final Map<String, Map<String, Long>> statistics = new ConcurrentHashMap<>();
     
-    // v2.0.0: Eviction counters per region (for periodic summary logging)
+    // v2.1.0: Eviction counters per region (for periodic summary logging)
     private final Map<String, AtomicLong> evictionCounters = new ConcurrentHashMap<>();
     
     // Initialization state - prevents operations before recovery is complete
@@ -429,7 +429,7 @@ public class CacheService {
                             if (cause == CacheConfig.RemovalCause.SIZE) {
                                 // Value evicted due to size - still exists on disk
                                 idx.updateLocation((String) key, ValueLocation.DISK);
-                                // v2.0.0: Increment eviction counter for periodic summary logging
+                                // v2.1.0: Increment eviction counter for periodic summary logging
                                 evictionCounters.computeIfAbsent(regionName, k -> new AtomicLong(0)).incrementAndGet();
                             } else if (cause == CacheConfig.RemovalCause.EXPIRED) {
                                 // Entry expired - will be cleaned up by expiration service
@@ -1770,7 +1770,7 @@ public class CacheService {
     
     /**
      * Batch get JSON documents for multiple keys.
-     * v2.0.0: Optimized for index rebuild - reduces GC pressure by batching.
+     * v2.1.0: Optimized for index rebuild - reduces GC pressure by batching.
      * 
      * @param region Region name
      * @param keys List of keys to retrieve
@@ -1803,7 +1803,7 @@ public class CacheService {
     
     /**
      * Stream entries directly from persistence store, bypassing cache.
-     * v2.0.0: Used for index rebuild to avoid cache eviction pressure.
+     * v2.1.0: Used for index rebuild to avoid cache eviction pressure.
      * 
      * <p>This method reads directly from disk without loading into cache,
      * which prevents eviction cascades during large index rebuilds.
@@ -3587,7 +3587,7 @@ public class CacheService {
                 recordStatistic(regionName, "evictions");
             }
             
-            // v2.0.0: Increment eviction counter for periodic summary logging
+            // v2.1.0: Increment eviction counter for periodic summary logging
             if (!keysToEvict.isEmpty()) {
                 evictionCounters.computeIfAbsent(regionName, k -> new AtomicLong(0))
                         .addAndGet(keysToEvict.size());
@@ -3658,7 +3658,7 @@ public class CacheService {
             recordStatistic(region, "evictions");
         }
         
-        // v2.0.0: Increment eviction counter for periodic summary logging
+        // v2.1.0: Increment eviction counter for periodic summary logging
         if (evicted > 0) {
             evictionCounters.computeIfAbsent(region, k -> new AtomicLong(0))
                     .addAndGet(evicted);
@@ -3831,7 +3831,7 @@ public class CacheService {
         }
     }
     
-    // ==================== Eviction Summary Logging (v2.0.0) ====================
+    // ==================== Eviction Summary Logging (v2.1.0) ====================
     
     /**
      * Log eviction summary every minute.

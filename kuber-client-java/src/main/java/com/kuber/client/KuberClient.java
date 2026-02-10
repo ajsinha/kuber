@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Java client for Kuber Distributed Cache using Redis Protocol.
  * Supports Redis protocol with Kuber extensions for regions and JSON queries.
  * 
- * <p><strong>v1.6.5: API Key Authentication ONLY</strong></p>
+ * <p><strong>v2.1.0: API Key Authentication ONLY</strong></p>
  * <p>All programmatic access requires an API key (starts with "kub_").
  * Username/password authentication is only for the Web UI.</p>
  * 
@@ -43,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * }
  * </pre>
  * 
- * @version 1.6.5
+ * @version 2.1.0
  */
 @Slf4j
 public class KuberClient implements AutoCloseable {

@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  *   <li>Memory: Efficient for values with common prefixes</li>
  * </ul>
  * 
- * @version 2.0.0
+ * @version 2.1.0
  * @since 1.9.0
  */
 @Slf4j

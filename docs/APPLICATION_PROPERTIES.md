@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 2.0.0**
+**Version 2.1.0**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -28,7 +28,7 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `1.9.0` | Current application version (read-only) |
+| `kuber.version` | `2.1.0` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
 | `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json, request_response.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
@@ -144,7 +144,7 @@ Data storage backend settings.
 
 ## Security Configuration
 
-> ⚠️ **v1.6.5+**: API Keys required for all programmatic access. Username/password only for Web UI.
+> ⚠️ **v2.1.0+**: API Keys required for all programmatic access. Username/password only for Web UI.
 
 | Property | Default | Description |
 |----------|---------|-------------|

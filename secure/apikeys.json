@@ -1,4 +1,14 @@
 [ {
+  "keyId" : "key_9638dc14",
+  "keyValue" : "kub_bcc4f675907581cc91bcfe973bcd4d55fd68b936ea62eccd0f73602ae3273c94",
+  "name" : "ash",
+  "userId" : "admin",
+  "roles" : [ "USER", "OPERATOR", "ADMIN" ],
+  "createdAt" : "2026-02-10T21:38:44.461155531Z",
+  "lastUsedAt" : "2026-02-10T21:41:56.999898510Z",
+  "expiresAt" : null,
+  "active" : true
+}, {
   "keyId" : "key_1826aee9",
   "keyValue" : "kub_d427a1192ad2e45e8376e518f958b882cbdd98fdbded654ecb4e0efe70968d08",
   "name" : "admin2",

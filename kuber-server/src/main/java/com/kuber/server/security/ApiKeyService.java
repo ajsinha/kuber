@@ -147,7 +147,7 @@ public class ApiKeyService {
         log.error("║                                                                                               ║");
         log.error("║    IMPACT:                                                                                    ║");
         log.error("║    • All programmatic access (Redis protocol, REST API, clients) will FAIL                   ║");
-        log.error("║    • API Key authentication is REQUIRED as of v1.6.5                                         ║");
+        log.error("║    • API Key authentication is REQUIRED as of v2.1.0                                         ║");
         log.error("║                                                                                               ║");
         log.error("║    ACTION REQUIRED:                                                                           ║");
         log.error("║    1. Log into Web UI with username/password                                                  ║");

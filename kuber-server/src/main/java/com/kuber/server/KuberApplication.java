@@ -43,7 +43,7 @@ import java.util.Properties;
  * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
  * 
  * @author Ashutosh Sinha
- * @version 1.6.1
+ * @version 2.1.0
  */
 @SpringBootApplication(exclude = {
     MongoAutoConfiguration.class,
@@ -53,7 +53,7 @@ import java.util.Properties;
 @EnableScheduling
 public class KuberApplication {
     
-    private static final String DEFAULT_VERSION = "1.6.5";
+    private static final String DEFAULT_VERSION = "2.1.0";
     
     public static void main(String[] args) {
         // Print banner

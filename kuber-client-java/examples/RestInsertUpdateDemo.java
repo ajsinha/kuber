@@ -21,7 +21,7 @@
  *     java RestInsertUpdateDemo [host] [port] [apiKey]
  *
  * Example:
- *     java RestInsertUpdateDemo localhost 7070 kub_admin
+ *     java RestInsertUpdateDemo localhost 8080 kub_admin
  *
  * Dependencies: None (uses only JDK classes)
  *
@@ -597,7 +597,7 @@ Request Body for JUPDATE:
 
     public static void main(String[] args) {
         String host = args.length > 0 ? args[0] : "localhost";
-        int port = args.length > 1 ? Integer.parseInt(args[1]) : 7070;
+        int port = args.length > 1 ? Integer.parseInt(args[1]) : 8080;
         String apiKey = args.length > 2 ? args[2] : "kub_admin";
         String region = args.length > 3 ? args[3] : "update_demo_java";
 

@@ -39,7 +39,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
  * - Admin role required for /admin/** paths
  * - RBAC checks performed by AuthorizationService for cache operations
  *
- * @version 2.0.0
+ * @version 2.1.0
  */
 @Configuration
 @EnableWebSecurity
@@ -60,11 +60,15 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/**")
+                .ignoringRequestMatchers("/ping", "/health", "/info", "/status", "/stats")
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/logout", "/error", "/help/**", "/help", "/about").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/ping", "/health", "/info", "/status", "/stats").permitAll()
+                .requestMatchers("/api/ping", "/api/health", "/api/info", "/api/status", "/api/stats").permitAll()
+                .requestMatchers("/api/v1/ping", "/api/v1/health", "/api/v1/info", "/api/v1/status", "/api/v1/stats").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

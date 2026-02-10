@@ -68,7 +68,7 @@ import java.util.zip.GZIPOutputStream;
  *   <li>Processed files moved to backup directory after restore</li>
  * </ul>
  * 
- * @version 2.0.0
+ * @version 2.1.0
  */
 @Service
 @Slf4j
@@ -135,7 +135,7 @@ public class BackupRestoreService {
         }
         
         // Check persistence type - support all except MEMORY
-        // v2.0.0: Extended support to PostgreSQL, SQLite, MongoDB, Aerospike (was RocksDB/LMDB only)
+        // v2.1.0: Extended support to PostgreSQL, SQLite, MongoDB, Aerospike (was RocksDB/LMDB only)
         PersistenceStore.PersistenceType type = persistenceStore.getType();
         if (type == PersistenceStore.PersistenceType.MEMORY) {
             log.info("Backup/restore service not supported for {} persistence. " +

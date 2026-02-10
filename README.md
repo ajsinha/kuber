@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 2.0.0
+Version 2.1.0
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,8 +13,8 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
-- **Secondary Indexing (v2.0.0)**: O(1) hash and O(log n) B-tree indexes for 100-1000x faster JSON searches
-- **Hybrid Index Storage (v2.0.0)**: In-memory indexes for speed + RocksDB persistence for durability
+- **Secondary Indexing (v2.1.0)**: O(1) hash and O(log n) B-tree indexes for 100-1000x faster JSON searches
+- **Hybrid Index Storage (v2.1.0)**: In-memory indexes for speed + RocksDB persistence for durability
 - **Role-Based Access Control (v1.7.3)**: Enterprise RBAC with region-specific permissions (READ/WRITE/DELETE)
 - **Off-Heap Key Index (v1.3.2 - segmented, >2GB)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
 - **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
@@ -145,7 +145,7 @@ kuber.cache.value-cache-max-percent=20
 kuber.cache.value-cache-max-entries=10000
 ```
 
-### Warm Objects (v2.0.0)
+### Warm Objects (v2.1.0)
 
 Kuber can maintain a minimum number of "warm" (in-memory) objects per region, ensuring frequently accessed data stays in memory for optimal read performance:
 
@@ -175,7 +175,7 @@ kuber.cache.region-warm-object-counts.session=10000
 - Works with eviction services (respects memory limits)
 - Falls back to default behavior if not configured
 
-### Prometheus Monitoring (v2.0.0)
+### Prometheus Monitoring (v2.1.0)
 
 Kuber integrates with Prometheus for comprehensive metrics monitoring:
 
@@ -210,7 +210,7 @@ scrape_configs:
 
 See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Grafana dashboards and alerting rules.
 
-### Generic Search API (v2.0.0)
+### Generic Search API (v2.1.0)
 
 Enhanced search API with multiple search modes and flexible JSON attribute querying:
 
@@ -266,7 +266,7 @@ Enhanced search API with multiple search modes and flexible JSON attribute query
 
 See [docs/GENERIC_SEARCH_API.md](docs/GENERIC_SEARCH_API.md) for complete documentation.
 
-### Generic Update API (v2.0.0)
+### Generic Update API (v2.1.0)
 
 Unified SET/UPDATE operation with intelligent JSON merging:
 
@@ -334,7 +334,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-2.0.0.jar
+        -jar kuber-server/target/kuber-server-2.1.0.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -619,7 +619,7 @@ Create `secure/request_response.json`:
 }
 ```
 
-### Test Clients (v2.0.0)
+### Test Clients (v2.1.0)
 
 Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
 
@@ -658,7 +658,7 @@ python kafka_diagnostics.py --live --watch-only          # Live watch mode
 
 > **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
 
-### Request/Response Logging (v2.0.0)
+### Request/Response Logging (v2.1.0)
 
 All request/response pairs can be logged to files for debugging and auditing:
 
@@ -1030,7 +1030,7 @@ RBAC is enforced on:
 
 Users only see regions they have access to in the UI.
 
-### SSL/TLS Configuration (v2.0.0)
+### SSL/TLS Configuration (v2.1.0)
 
 Kuber supports SSL/TLS encryption for secure communications:
 

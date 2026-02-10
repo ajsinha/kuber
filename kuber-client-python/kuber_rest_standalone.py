@@ -19,7 +19,7 @@ A comprehensive standalone Python client for Kuber Distributed Cache using
 pure HTTP REST API. This client does not depend on any external Kuber library
 and uses only the standard library (urllib).
 
-v1.6.5: API Key Authentication ONLY
+v2.1.0: API Key Authentication ONLY
 All programmatic access requires an API key (starts with "kub_").
 Username/password authentication is only for the Web UI.
 
@@ -55,7 +55,7 @@ class KuberRestClient:
     """
     Standalone REST API client for Kuber Distributed Cache.
     
-    v1.6.5: API Key Authentication ONLY.
+    v2.1.0: API Key Authentication ONLY.
     All programmatic access requires an API key (starts with "kub_").
     Username/password authentication is only for the Web UI.
     
@@ -102,7 +102,7 @@ class KuberRestClient:
         
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
-            path: API path (e.g., /api/v1/cache/key)
+            path: API path (e.g., /api/v1/cache/region/key)
             data: Request body (will be JSON encoded)
             params: Query parameters
             
@@ -221,7 +221,7 @@ class KuberRestClient:
                 'emailAddress': 'email'
             })
         """
-        self._request('PUT', f'/api/regions/{region}/attributemapping', mapping)
+        self._request('PUT', f'/api/v1/regions/{region}/attributemapping', mapping)
     
     def get_attribute_mapping(self, region: str) -> Optional[Dict[str, str]]:
         """
@@ -238,7 +238,7 @@ class KuberRestClient:
             # Returns: {"firstName": "first_name", "lastName": "last_name"}
         """
         try:
-            result = self._request('GET', f'/api/regions/{region}/attributemapping')
+            result = self._request('GET', f'/api/v1/regions/{region}/attributemapping')
             return result if result else None
         except KuberRestError:
             return None
@@ -253,7 +253,7 @@ class KuberRestClient:
         Example:
             client.clear_attribute_mapping('users')
         """
-        self._request('DELETE', f'/api/regions/{region}/attributemapping')
+        self._request('DELETE', f'/api/v1/regions/{region}/attributemapping')
     
     # ==================== Cache Operations ====================
     
@@ -308,8 +308,8 @@ class KuberRestClient:
         """Check if key exists."""
         r = region or self.current_region
         try:
-            result = self._request('HEAD', f'/api/v1/cache/{r}/{key}')
-            return True
+            result = self._request('GET', f'/api/v1/cache/{r}/{key}/exists')
+            return result.get('exists', False) if result else False
         except KuberRestError:
             return False
     
@@ -322,7 +322,7 @@ class KuberRestClient:
     def expire(self, key: str, seconds: int, region: Optional[str] = None):
         """Set key expiration."""
         r = region or self.current_region
-        self._request('PUT', f'/api/v1/cache/{r}/{key}/expire', {'ttl': seconds})
+        self._request('POST', f'/api/v1/cache/{r}/{key}/expire', {'seconds': seconds})
     
     def mget(self, keys: List[str], region: Optional[str] = None) -> List[Optional[str]]:
         """Get multiple values."""
@@ -347,14 +347,14 @@ class KuberRestClient:
         - ? matches single character
         """
         r = region or self.current_region
-        result = self._request('GET', f'/api/v1/cache/{r}/keys', {'pattern': pattern})
-        return result.get('keys', []) if result else []
+        result = self._request('GET', f'/api/v1/cache/{r}/keys', params={'pattern': pattern})
+        return result if isinstance(result, list) else (result.get('keys', []) if isinstance(result, dict) else [])
     
     def dbsize(self, region: Optional[str] = None) -> int:
         """Get number of keys in region."""
         r = region or self.current_region
         result = self._request('GET', f'/api/v1/cache/{r}/size')
-        return result.get('size', 0) if result else 0
+        return result.get('size', 0) if isinstance(result, dict) else 0
     
     def ksearch(self, regex_pattern: str, region: Optional[str] = None, 
                 limit: int = 1000) -> List[Dict[str, Any]]:
@@ -380,8 +380,8 @@ class KuberRestClient:
                 print(f"Key: {item['key']}, Value: {item['value']}")
         """
         r = region or self.current_region
-        result = self._request('GET', f'/api/cache/{r}/ksearch', 
-                              {'pattern': regex_pattern, 'limit': limit})
+        result = self._request('GET', f'/api/v1/cache/{r}/ksearch', 
+                              params={'pattern': regex_pattern, 'limit': limit})
         return result if isinstance(result, list) else []
     
     # ==================== Hash Operations ====================
@@ -390,7 +390,7 @@ class KuberRestClient:
         """Get hash field value."""
         r = region or self.current_region
         result = self._request('GET', f'/api/v1/cache/{r}/{key}/hash/{field}')
-        return result.get('value') if result else None
+        return result.get('value') if isinstance(result, dict) else result
     
     def hset(self, key: str, field: str, value: str, region: Optional[str] = None):
         """Set hash field."""
@@ -406,13 +406,13 @@ class KuberRestClient:
         """Get multiple hash fields."""
         r = region or self.current_region
         result = self._request('POST', f'/api/v1/cache/{r}/{key}/hash/mget', {'fields': fields})
-        return result.get('values', [None] * len(fields)) if result else [None] * len(fields)
+        return result.get('values', [None] * len(fields)) if isinstance(result, dict) else [None] * len(fields)
     
     def hgetall(self, key: str, region: Optional[str] = None) -> Dict[str, str]:
         """Get all hash fields and values."""
         r = region or self.current_region
         result = self._request('GET', f'/api/v1/cache/{r}/{key}/hash')
-        return result.get('fields', {}) if result else {}
+        return result if isinstance(result, dict) else {}
     
     def hdel(self, key: str, field: str, region: Optional[str] = None) -> bool:
         """Delete hash field."""
@@ -427,13 +427,13 @@ class KuberRestClient:
         """Get all hash field names."""
         r = region or self.current_region
         result = self._request('GET', f'/api/v1/cache/{r}/{key}/hash/keys')
-        return result.get('keys', []) if result else []
+        return result.get('keys', []) if isinstance(result, dict) else (result if isinstance(result, list) else [])
     
     def hvals(self, key: str, region: Optional[str] = None) -> List[str]:
         """Get all hash values."""
         r = region or self.current_region
         result = self._request('GET', f'/api/v1/cache/{r}/{key}/hash/values')
-        return result.get('values', []) if result else []
+        return result.get('values', []) if isinstance(result, dict) else (result if isinstance(result, list) else [])
     
     # ==================== JSON Operations ====================
     
@@ -473,7 +473,7 @@ class KuberRestClient:
         r = region or self.current_region
         params = {'path': path} if path != '$' else None
         result = self._request('GET', f'/api/v1/json/{r}/{key}', params=params)
-        return result.get('value') if result else None
+        return result.get('value') if isinstance(result, dict) else result
     
     def json_delete(self, key: str, path: str = '$', region: Optional[str] = None) -> bool:
         """Delete a JSON document or path."""
@@ -506,7 +506,7 @@ class KuberRestClient:
         """
         r = region or self.current_region
         result = self._request('POST', f'/api/v1/json/{r}/search', {'query': query})
-        return result.get('results', []) if result else []
+        return result.get('results', []) if isinstance(result, dict) else (result if isinstance(result, list) else [])
     
     # ==================== Generic Search API ====================
     
@@ -594,7 +594,7 @@ class KuberRestClient:
         if limit:
             request_body["limit"] = limit
         
-        result = self._request('POST', '/api/genericsearch', request_body)
+        result = self._request('POST', '/api/v1/genericsearch', request_body)
         return result if isinstance(result, list) else []
     
     # ==================== Bulk Operations ====================
@@ -1247,10 +1247,10 @@ def cleanup(client: KuberRestClient):
 def main():
     """Main function to run all examples."""
     parser = argparse.ArgumentParser(
-        description='Kuber Standalone Python Client - HTTP REST API Examples (v1.6.5)',
+        description='Kuber Standalone Python Client - HTTP REST API Examples (v2.1.0)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-v1.6.5: API Key Authentication ONLY
+v2.1.0: API Key Authentication ONLY
 All programmatic access requires an API key (starts with "kub_").
 Username/password authentication is only for the Web UI.
 
@@ -1285,7 +1285,7 @@ Environment variable:
     
     print(f"""
 ╔══════════════════════════════════════════════════════════════════════╗
-║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v1.6.5)          ║
+║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v2.1.0)          ║
 ║                                                                      ║
 ║     Connecting to: {protocol}://{args.host}:{args.port:<36}║
 ║     Authentication: API Key ({api_key[:12]}...{api_key[-4:]})                     ║

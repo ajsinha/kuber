@@ -51,7 +51,7 @@ For comprehensive examples, see:
 from .client import KuberClient, KuberException
 from .rest_client import KuberRestClient, KuberRestException
 
-__version__ = "1.9.0"
+__version__ = "2.1.0"
 __author__ = "Ashutosh Sinha"
 __email__ = "ajsinha@gmail.com"
 

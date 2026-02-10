@@ -28,7 +28,7 @@ import java.util.*;
 /**
  * Standalone REST API client for Kuber Distributed Cache.
  * 
- * <p><strong>v1.6.5: API Key Authentication ONLY</strong></p>
+ * <p><strong>v2.1.0: API Key Authentication ONLY</strong></p>
  * <p>All programmatic access requires an API key (starts with "kub_").
  * Username/password authentication is only for the Web UI.</p>
  * 
@@ -52,7 +52,7 @@ import java.util.*;
  * client.close();
  * </pre>
  * 
- * @version 1.6.5
+ * @version 2.1.0
  */
 @Slf4j
 public class KuberRestClient implements AutoCloseable {
@@ -300,7 +300,7 @@ public class KuberRestClient implements AutoCloseable {
      * </pre>
      */
     public void setAttributeMapping(String region, Map<String, String> mapping) throws IOException {
-        request("PUT", "/api/regions/" + region + "/attributemapping", mapping);
+        request("PUT", "/api/v1/regions/" + region + "/attributemapping", mapping);
     }
     
     /**
@@ -312,7 +312,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public Map<String, String> getAttributeMapping(String region) throws IOException {
         try {
-            JsonNode result = request("GET", "/api/regions/" + region + "/attributemapping");
+            JsonNode result = request("GET", "/api/v1/regions/" + region + "/attributemapping");
             if (result != null && !result.isNull()) {
                 return objectMapper.convertValue(result, new TypeReference<Map<String, String>>() {});
             }
@@ -329,7 +329,7 @@ public class KuberRestClient implements AutoCloseable {
      * @throws IOException if communication error occurs
      */
     public void clearAttributeMapping(String region) throws IOException {
-        request("DELETE", "/api/regions/" + region + "/attributemapping");
+        request("DELETE", "/api/v1/regions/" + region + "/attributemapping");
     }
     
     // ==================== Cache Operations ====================
@@ -413,8 +413,8 @@ public class KuberRestClient implements AutoCloseable {
      */
     public boolean exists(String key, String region) throws IOException {
         try {
-            request("GET", "/api/v1/cache/" + region + "/" + key);
-            return true;
+            JsonNode result = request("GET", "/api/v1/cache/" + region + "/" + key + "/exists");
+            return result != null && result.path("exists").asBoolean(false);
         } catch (KuberRestException e) {
             return false;
         }
@@ -447,8 +447,8 @@ public class KuberRestClient implements AutoCloseable {
      */
     public void expire(String key, long seconds, String region) throws IOException {
         Map<String, Object> body = new HashMap<>();
-        body.put("ttl", seconds);
-        request("PUT", "/api/v1/cache/" + region + "/" + key + "/expire", body);
+        body.put("seconds", seconds);
+        request("POST", "/api/v1/cache/" + region + "/" + key + "/expire", body);
     }
     
     /**
@@ -560,7 +560,7 @@ public class KuberRestClient implements AutoCloseable {
      * @return List of matching keys
      */
     public List<String> keysRegex(String regexPattern, String region, int limit) throws IOException {
-        JsonNode result = request("GET", "/api/cache/" + region + "/keys/regex?pattern=" + 
+        JsonNode result = request("GET", "/api/v1/cache/" + region + "/keys/regex?pattern=" + 
                 java.net.URLEncoder.encode(regexPattern, "UTF-8") + "&limit=" + limit);
         
         List<String> keyList = new ArrayList<>();
@@ -616,7 +616,7 @@ public class KuberRestClient implements AutoCloseable {
      * @return List of maps with keys: key, value, type, ttl
      */
     public List<Map<String, Object>> ksearch(String regexPattern, String region, int limit) throws IOException {
-        JsonNode result = request("GET", "/api/cache/" + region + "/ksearch?pattern=" + 
+        JsonNode result = request("GET", "/api/v1/cache/" + region + "/ksearch?pattern=" + 
                 java.net.URLEncoder.encode(regexPattern, "UTF-8") + "&limit=" + limit);
         if (result != null && result.isArray()) {
             List<Map<String, Object>> results = new ArrayList<>();
@@ -933,7 +933,7 @@ public class KuberRestClient implements AutoCloseable {
             body.put("limit", request.getLimit());
         }
         
-        JsonNode result = request("POST", "/api/genericsearch", body);
+        JsonNode result = request("POST", "/api/v1/genericsearch", body);
         
         List<JsonNode> results = new ArrayList<>();
         if (result != null && result.isArray()) {

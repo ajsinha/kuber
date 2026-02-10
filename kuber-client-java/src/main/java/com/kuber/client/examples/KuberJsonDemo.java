@@ -11,7 +11,7 @@
  * d) Regex search on JSON attribute values
  * e) Search keys using regex pattern
  *
- * v1.6.5 - API Key Authentication Required
+ * v2.1.0 - API Key Authentication Required
  * 
  * Compile: javac KuberJsonDemo.java
  * Run: java KuberJsonDemo [host] [port] [api-key]
