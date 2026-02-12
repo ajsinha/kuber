@@ -31,7 +31,7 @@
         <!-- Summary Cards -->
         <div class="row mb-4">
             <div class="col-md-4"><div class="card bg-primary text-white"><div class="card-body text-center"><i class="fas fa-database fa-2x mb-2"></i><h4 th:text="${regionCount}">0</h4><p class="mb-0">Regions</p></div></div></div>
-            <div class="col-md-4"><div class="card bg-success text-white"><div class="card-body text-center"><i class="fas fa-check-circle fa-2x mb-2"></i><h4 th:text="${enabledCount}">0</h4><p class="mb-0">Publishing Enabled</p></div></div></div>
+            <div class="col-md-4"><div class="card bg-success text-white"><div class="card-body text-center"><i class="fas fa-link fa-2x mb-2"></i><h4 th:text="${enabledCount}">0</h4><p class="mb-0">Connected</p></div></div></div>
             <div class="col-md-4"><div class="card bg-secondary text-white"><div class="card-body text-center"><i class="fas fa-file-code fa-2x mb-2"></i><p class="mb-0 small text-truncate" th:title="${configFile}" th:text="${configFile}">path</p></div></div></div>
         </div>
 
@@ -51,8 +51,8 @@
                             <tr th:each="r : ${regions}">
                                 <td><strong th:text="${r.name}"></strong></td>
                                 <td>
-                                    <span th:if="${r.enabled}" class="badge bg-success">Enabled</span>
-                                    <span th:unless="${r.enabled}" class="badge bg-secondary">Disabled</span>
+                                    <span th:if="${r.enabled}" class="badge bg-success"><i class="fas fa-link me-1"></i>Connected</span>
+                                    <span th:unless="${r.enabled}" class="badge bg-secondary"><i class="fas fa-unlink me-1"></i>Disconnected</span>
                                 </td>
                                 <td><span class="badge bg-primary" th:text="${r.destinationCount}">0</span></td>
                                 <td>
@@ -65,8 +65,8 @@
                                     </div>
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    <button th:if="${r.enabled}" class="btn btn-sm btn-outline-warning" th:data-name="${r.name}" onclick="toggleRegion(this.dataset.name, false)" title="Disable"><i class="fas fa-pause"></i></button>
-                                    <button th:unless="${r.enabled}" class="btn btn-sm btn-outline-success" th:data-name="${r.name}" onclick="toggleRegion(this.dataset.name, true)" title="Enable"><i class="fas fa-play"></i></button>
+                                    <button th:if="${r.enabled}" class="btn btn-sm btn-outline-danger" th:data-name="${r.name}" onclick="toggleRegion(this.dataset.name, false)" title="Disconnect - stop publishing events"><i class="fas fa-unlink me-1"></i>Disconnect</button>
+                                    <button th:unless="${r.enabled}" class="btn btn-sm btn-outline-success" th:data-name="${r.name}" onclick="toggleRegion(this.dataset.name, true)" title="Connect - start publishing events"><i class="fas fa-plug me-1"></i>Connect</button>
                                     <button class="btn btn-sm btn-outline-danger ms-1" th:data-name="${r.name}" onclick="deleteRegion(this.dataset.name)" title="Delete"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>

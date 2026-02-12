@@ -197,7 +197,7 @@
                         <i class="fas fa-server me-1"></i>Broker Registry
                     </a>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     <div th:if="${config == null || config.brokers.isEmpty()}" class="text-center text-muted py-4">
                         <i class="fas fa-inbox fa-3x mb-3"></i>
                         <p>No channels configured.</p>
@@ -213,146 +213,150 @@
                         If no brokers exist, <a href="/admin/brokers/add">add one</a> first.</p>
                     </div>
                     
-                    <div th:if="${config != null && !config.brokers.isEmpty()}" class="row">
-                        <div th:each="entry : ${config.brokers}" class="col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center"
-                                     th:classappend="${entry.value.enabled} ? 'bg-success-subtle' : 'bg-secondary-subtle'">
-                                    <div>
-                                        <i th:class="'fas me-2 ' + 
-                                            (${entry.value.type == 'kafka'} ? 'fa-stream' : 
-                                            (${entry.value.type == 'rabbitmq'} ? 'fa-rabbit' : 
-                                            (${entry.value.type == 'activemq'} ? 'fa-bolt' : 'fa-server')))"></i>
-                                        <strong th:text="${entry.value.displayName} ?: ${entry.key}">Channel</strong>
-                                        <!-- Status badges -->
-                                        <span th:if="${brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).connected}" 
-                                              class="badge bg-success ms-2">
+                    <div th:if="${config != null && !config.brokers.isEmpty()}" class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Channel</th>
+                                    <th>Broker</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Request Topics</th>
+                                    <th>Stats</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="entry : ${config.brokers}" 
+                                    th:classappend="${!entry.value.enabled} ? 'table-secondary' : ''">
+                                    <!-- Channel Name -->
+                                    <td>
+                                        <strong th:text="${entry.key}">channel</strong>
+                                    </td>
+                                    <!-- Broker Name (from registry) -->
+                                    <td>
+                                        <a th:href="@{/admin/brokers}" class="text-decoration-none" title="View in Broker Registry">
+                                            <i class="fas fa-server text-muted me-1"></i>
+                                            <span th:text="${entry.value.displayName} ?: ${entry.key}">broker</span>
+                                        </a>
+                                    </td>
+                                    <!-- Broker Type -->
+                                    <td>
+                                        <span class="badge" 
+                                              th:classappend="${entry.value.type == 'kafka'} ? 'bg-warning text-dark' : (${entry.value.type == 'rabbitmq'} ? 'bg-success' : (${entry.value.type == 'activemq'} ? 'bg-info' : (${entry.value.type == 'ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
+                                              th:text="${entry.value.type}">kafka</span>
+                                    </td>
+                                    <!-- Connection Status -->
+                                    <td>
+                                        <span th:if="${brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).connected && !(brokerStats.get(entry.key).paused)}" 
+                                              class="badge bg-success">
                                             <i class="fas fa-link me-1"></i>Connected
                                         </span>
                                         <span th:if="${brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).paused}" 
-                                              class="badge bg-warning ms-2">
+                                              class="badge bg-warning">
                                             <i class="fas fa-pause me-1"></i>Paused
                                         </span>
                                         <span th:if="${entry.value.enabled && (brokerStats == null || !brokerStats.containsKey(entry.key) || !brokerStats.get(entry.key).connected)}" 
-                                              class="badge bg-danger ms-2">
+                                              class="badge bg-danger">
                                             <i class="fas fa-unlink me-1"></i>Disconnected
                                         </span>
                                         <span th:if="${!entry.value.enabled}" 
-                                              class="badge bg-secondary ms-2">
+                                              class="badge bg-secondary">
                                             <i class="fas fa-power-off me-1"></i>Disabled
                                         </span>
-                                    </div>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-danger" 
+                                    </td>
+                                    <!-- Request Topics -->
+                                    <td>
+                                        <div th:if="${entry.value.requestTopics.isEmpty()}" class="text-muted small">None</div>
+                                        <div th:each="topic : ${entry.value.requestTopics}" class="mb-1">
+                                            <span class="badge bg-primary me-1" th:text="${topic}">topic</span>
+                                            <i class="fas fa-arrow-right text-muted small mx-1"></i>
+                                            <span class="badge bg-secondary" th:text="${T(com.kuber.server.messaging.MessagingConfig).getResponseTopic(topic)}">response</span>
+                                            <button class="btn btn-link btn-sm text-danger p-0 ms-1"
+                                                    th:data-channel="${entry.key}"
+                                                    th:data-topic="${topic}"
+                                                    onclick="removeTopic(this.getAttribute('data-channel'), this.getAttribute('data-topic'))"
+                                                    title="Remove topic">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        <button class="btn btn-outline-primary btn-sm mt-1"
                                                 th:data-channel="${entry.key}"
-                                                onclick="removeChannel(this.getAttribute('data-channel'))"
-                                                title="Remove Channel">
-                                            <i class="fas fa-trash"></i>
+                                                onclick="addTopic(this.getAttribute('data-channel'))"
+                                                title="Add request topic">
+                                            <i class="fas fa-plus"></i>
                                         </button>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <p class="mb-2">
-                                        <small class="text-muted">Broker Type:</small>
-                                        <span class="badge bg-info" th:text="${entry.value.type}">kafka</span>
-                                        <a th:href="@{/admin/brokers}" class="text-muted small ms-2" title="View in Broker Registry">
-                                            <i class="fas fa-external-link-alt"></i>
-                                        </a>
-                                    </p>
-                                    <p class="mb-2">
-                                        <small class="text-muted">Connection:</small>
-                                        <code class="small" th:text="${entry.value.connectionSummary}">localhost:9092</code>
-                                    </p>
-                                    
-                                    <!-- Channel Control Buttons -->
-                                    <div class="d-flex gap-2 mb-3 mt-3 border-top border-bottom py-3">
+                                    </td>
+                                    <!-- Stats -->
+                                    <td>
+                                        <div th:if="${brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).connected}">
+                                            <small class="text-muted">
+                                                <i class="fas fa-inbox text-primary me-1"></i><span th:text="${brokerStats.get(entry.key).messagesReceived}">0</span>
+                                                <i class="fas fa-check text-success ms-2 me-1"></i><span th:text="${brokerStats.get(entry.key).messagesPublished}">0</span>
+                                                <i class="fas fa-exclamation-triangle text-danger ms-2 me-1"></i><span th:text="${brokerStats.get(entry.key).errors}">0</span>
+                                            </small>
+                                        </div>
+                                        <small th:if="${brokerStats == null || !brokerStats.containsKey(entry.key) || !brokerStats.get(entry.key).connected}" class="text-muted">—</small>
+                                    </td>
+                                    <!-- Actions -->
+                                    <td class="text-end text-nowrap">
+                                        <!-- Connect (Enable) -->
                                         <button th:if="${!entry.value.enabled}" 
-                                                class="btn btn-success btn-sm"
+                                                class="btn btn-sm btn-outline-success"
                                                 th:data-channel="${entry.key}"
                                                 onclick="enableChannel(this.getAttribute('data-channel'))"
-                                                title="Enable channel and connect">
-                                            <i class="fas fa-play me-1"></i>Enable
+                                                title="Connect to broker">
+                                            <i class="fas fa-plug me-1"></i>Connect
                                         </button>
+                                        <!-- Disconnect (Disable) -->
                                         <button th:if="${entry.value.enabled}" 
-                                                class="btn btn-danger btn-sm"
+                                                class="btn btn-sm btn-outline-danger"
                                                 th:data-channel="${entry.key}"
                                                 onclick="disableChannel(this.getAttribute('data-channel'))"
-                                                title="Disable channel and disconnect">
-                                            <i class="fas fa-stop me-1"></i>Disable
+                                                title="Disconnect from broker">
+                                            <i class="fas fa-unlink me-1"></i>Disconnect
                                         </button>
-                                        
+                                        <!-- Pause -->
                                         <button th:if="${entry.value.enabled && brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).connected && !brokerStats.get(entry.key).paused}" 
-                                                class="btn btn-warning btn-sm"
+                                                class="btn btn-sm btn-outline-warning ms-1"
                                                 th:data-channel="${entry.key}"
                                                 onclick="pauseChannel(this.getAttribute('data-channel'))"
-                                                title="Pause message consumption">
-                                            <i class="fas fa-pause me-1"></i>Pause
+                                                title="Pause consumption">
+                                            <i class="fas fa-pause"></i>
                                         </button>
+                                        <!-- Resume -->
                                         <button th:if="${entry.value.enabled && brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).paused}" 
-                                                class="btn btn-info btn-sm"
+                                                class="btn btn-sm btn-outline-info ms-1"
                                                 th:data-channel="${entry.key}"
                                                 onclick="resumeChannel(this.getAttribute('data-channel'))"
-                                                title="Resume message consumption">
-                                            <i class="fas fa-play me-1"></i>Resume
+                                                title="Resume consumption">
+                                            <i class="fas fa-play"></i>
                                         </button>
-                                        
+                                        <!-- Reconnect -->
                                         <button th:if="${entry.value.enabled && (brokerStats == null || !brokerStats.containsKey(entry.key) || !brokerStats.get(entry.key).connected)}" 
-                                                class="btn btn-primary btn-sm"
+                                                class="btn btn-sm btn-outline-primary ms-1"
                                                 th:data-channel="${entry.key}"
                                                 onclick="enableChannel(this.getAttribute('data-channel'))"
-                                                title="Reconnect to broker">
-                                            <i class="fas fa-sync me-1"></i>Reconnect
+                                                title="Reconnect">
+                                            <i class="fas fa-sync"></i>
                                         </button>
-                                        
+                                        <!-- Logs -->
                                         <a th:href="@{/admin/messaging/logs(broker=${entry.key})}" 
-                                           class="btn btn-outline-secondary btn-sm ms-auto"
-                                           title="View request/response logs">
-                                            <i class="fas fa-file-alt me-1"></i>View Logs
+                                           class="btn btn-sm btn-outline-secondary ms-1"
+                                           title="View logs">
+                                            <i class="fas fa-file-alt"></i>
                                         </a>
-                                    </div>
-                                    
-                                    <h6>Request Topics:</h6>
-                                    <div th:if="${entry.value.requestTopics.isEmpty()}" class="text-muted small">
-                                        No topics configured
-                                    </div>
-                                    <div th:each="topic : ${entry.value.requestTopics}" class="mb-1">
-                                        <span class="badge bg-primary me-1" th:text="${topic}">topic</span>
-                                        <span class="badge bg-secondary" th:text="'→ ' + ${T(com.kuber.server.messaging.MessagingConfig).getResponseTopic(topic)}">response</span>
-                                        <button class="btn btn-link btn-sm text-danger p-0 ms-2"
+                                        <!-- Remove -->
+                                        <button class="btn btn-sm btn-outline-danger ms-1" 
                                                 th:data-channel="${entry.key}"
-                                                th:data-topic="${topic}"
-                                                onclick="removeTopic(this.getAttribute('data-channel'), this.getAttribute('data-topic'))">
-                                            <i class="fas fa-times"></i>
+                                                onclick="removeChannel(this.getAttribute('data-channel'))"
+                                                title="Remove channel">
+                                            <i class="fas fa-trash"></i>
                                         </button>
-                                    </div>
-                                    <button class="btn btn-outline-primary btn-sm mt-2"
-                                            th:data-channel="${entry.key}"
-                                            onclick="addTopic(this.getAttribute('data-channel'))">
-                                        <i class="fas fa-plus me-1"></i>Add Topic
-                                    </button>
-                                    
-                                    <!-- Statistics (if connected) -->
-                                    <div th:if="${brokerStats != null && brokerStats.containsKey(entry.key) && brokerStats.get(entry.key).connected}" 
-                                         class="mt-3 pt-3 border-top">
-                                        <small class="text-muted">Statistics:</small>
-                                        <div class="row mt-2">
-                                            <div class="col-4 text-center">
-                                                <div class="small text-muted">Received</div>
-                                                <strong th:text="${brokerStats.get(entry.key).messagesReceived}">0</strong>
-                                            </div>
-                                            <div class="col-4 text-center">
-                                                <div class="small text-muted">Published</div>
-                                                <strong th:text="${brokerStats.get(entry.key).messagesPublished}">0</strong>
-                                            </div>
-                                            <div class="col-4 text-center">
-                                                <div class="small text-muted">Errors</div>
-                                                <strong class="text-danger" th:text="${brokerStats.get(entry.key).errors}">0</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

@@ -1,8 +1,8 @@
 {
-  "enabled" : false,
+  "enabled" : true,
   "brokers" : {
     "activemq_example" : {
-      "enabled" : false,
+      "enabled" : true,
       "type" : "activemq",
       "connection" : {
         "password" : "admin",
@@ -26,7 +26,7 @@
       "request_topics" : [ "ccs_cache_request" ]
     },
     "kafka_example" : {
-      "enabled" : false,
+      "enabled" : true,
       "type" : "kafka",
       "connection" : {
         "group_id" : "kuber-request-processor",
@@ -47,6 +47,29 @@
       "connectionSummary" : "kafka://localhost:9092",
       "display_name" : "Example Kafka",
       "request_topics" : [ "ccs_cache_request" ]
+    },
+    "kafka-local" : {
+      "enabled" : true,
+      "type" : "kafka",
+      "connection" : {
+        "bootstrap_servers" : "localhost:9092",
+        "group_id" : "kuber-request-processor"
+      },
+      "groupId" : "kuber-request-processor",
+      "host" : "localhost",
+      "port" : 5672,
+      "channel" : null,
+      "password" : null,
+      "username" : null,
+      "virtualHost" : "/",
+      "bootstrapServers" : "localhost:9092",
+      "brokerUrl" : null,
+      "queueManager" : null,
+      "autoOffsetReset" : "earliest",
+      "connName" : null,
+      "connectionSummary" : "kafka://localhost:9092",
+      "display_name" : "Kafka Local",
+      "request_topics" : [ "my_request" ]
     }
   },
   "max_queue_depth" : 100,

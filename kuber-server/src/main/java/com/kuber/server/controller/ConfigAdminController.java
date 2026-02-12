@@ -11,6 +11,7 @@
  */
 package com.kuber.server.controller;
 
+import com.kuber.server.cache.CacheService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -45,6 +46,7 @@ public class ConfigAdminController {
 
     private final KuberProperties properties;
     private final ObjectMapper objectMapper;
+    private final CacheService cacheService;
 
     @ModelAttribute
     public void addCurrentPage(Model model) {
@@ -88,6 +90,7 @@ public class ConfigAdminController {
     public String addRegionPage(Model model) {
         Map<String, BrokerDefinition> brokers = properties.getPublishing().getBrokers();
         model.addAttribute("brokerNames", new ArrayList<>(brokers.keySet()));
+        model.addAttribute("cacheRegionNames", new ArrayList<>(cacheService.getRegionNames()));
         return "admin/event-publishing-add";
     }
 
@@ -204,6 +207,14 @@ public class ConfigAdminController {
     @ResponseBody
     public ResponseEntity<?> saveBrokersRawJson(@RequestBody String content) {
         return saveJsonConfig(resolveConfigPath(properties.getPublishing().getBrokerConfigFile()), content);
+    }
+
+    // ======================== Cache Regions API (for dropdowns) ========================
+
+    @GetMapping("/api/config/cache-regions")
+    @ResponseBody
+    public ResponseEntity<?> getCacheRegionNames() {
+        return ResponseEntity.ok(new ArrayList<>(cacheService.getRegionNames()));
     }
 
     // ======================== Event Publishing List Page ========================
@@ -328,8 +339,17 @@ public class ConfigAdminController {
             }
             brokersNode.set(name, brokerNode);
             writeJsonFile(file, root);
+
+            // Sync in-memory properties so the UI reflects the change immediately
+            try {
+                BrokerDefinition def = objectMapper.treeToValue(brokerNode, BrokerDefinition.class);
+                properties.getPublishing().getBrokers().put(name, def);
+            } catch (Exception ex) {
+                log.warn("Admin: broker '{}' saved to file but could not sync to memory: {}", name, ex.getMessage());
+            }
+
             log.info("Admin: created broker '{}'", name);
-            return ResponseEntity.ok(Map.of("status", "OK", "message", "Broker '" + name + "' created. Restart to activate."));
+            return ResponseEntity.ok(Map.of("status", "OK", "message", "Broker '" + name + "' created."));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
@@ -346,8 +366,17 @@ public class ConfigAdminController {
             }
             regionsNode.set(name, regionNode);
             writeJsonFile(file, root);
+
+            // Sync in-memory properties so the UI reflects the change immediately
+            try {
+                RegionPublishingConfig cfg = objectMapper.treeToValue(regionNode, RegionPublishingConfig.class);
+                properties.getPublishing().getRegions().put(name, cfg);
+            } catch (Exception ex) {
+                log.warn("Admin: region '{}' saved to file but could not sync to memory: {}", name, ex.getMessage());
+            }
+
             log.info("Admin: created region '{}'", name);
-            return ResponseEntity.ok(Map.of("status", "OK", "message", "Region '" + name + "' created. Restart to activate."));
+            return ResponseEntity.ok(Map.of("status", "OK", "message", "Region '" + name + "' created."));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }

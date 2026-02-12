@@ -1,0 +1,11 @@
+{
+  "regions" : {
+    "default" : {
+      "enabled" : true,
+      "destinations" : [ {
+        "broker" : "kafka-local",
+        "topic" : "defq"
+      } ]
+    }
+  }
+}

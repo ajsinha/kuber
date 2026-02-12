@@ -40,8 +40,15 @@
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label">Region Name <span class="text-danger">*</span></label>
-                        <input type="text" id="regionName" class="form-control" placeholder="e.g. customers, trades, orders">
-                        <div class="form-text">The cache region whose events will be published.</div>
+                        <div class="input-group">
+                            <select id="regionName" class="form-select">
+                                <option value="">Select a cache region...</option>
+                            </select>
+                            <button class="btn btn-outline-secondary" type="button" onclick="refreshRegions()" title="Refresh region list">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Select the cache region whose events will be published. <a href="/admin/regions" target="_blank">Manage regions</a></div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Status</label>
@@ -134,8 +141,31 @@
 
 <script th:inline="javascript">
 const brokerNames = /*[[${brokerNames}]]*/ [];
+const initialRegions = /*[[${cacheRegionNames}]]*/ [];
 
 let destCount = 0;
+
+function populateRegionDropdown(regions) {
+    const select = document.getElementById('regionName');
+    const current = select.value;
+    // Keep only the placeholder
+    select.length = 1;
+    regions.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        select.appendChild(opt);
+    });
+    // Restore selection if still valid
+    if (current && regions.includes(current)) select.value = current;
+}
+
+function refreshRegions() {
+    fetch('/admin/api/config/cache-regions')
+        .then(r => r.json())
+        .then(regions => populateRegionDropdown(regions))
+        .catch(e => console.error('Failed to refresh regions:', e));
+}
 
 function addDestination() {
     if (brokerNames.length === 0) {
@@ -196,8 +226,13 @@ function showAlert(type, msg) {
     window.scrollTo(0, 0);
 }
 
-// Auto-add one destination row on load
-document.addEventListener('DOMContentLoaded', function() { addDestination(); });
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+    populateRegionDropdown(initialRegions);
+    addDestination();
+    // Auto-refresh region list every 15 seconds
+    setInterval(refreshRegions, 15000);
+});
 </script>
 
 </body>
