@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * kuber-shutdown.bat
  * </pre>
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Service
 @Slf4j

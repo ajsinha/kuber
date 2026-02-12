@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * API Key Format: kub_[64 random hex characters]
  * Example: kub_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
  *
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
@@ -147,7 +147,7 @@ public class ApiKeyService {
         log.error("║                                                                                               ║");
         log.error("║    IMPACT:                                                                                    ║");
         log.error("║    • All programmatic access (Redis protocol, REST API, clients) will FAIL                   ║");
-        log.error("║    • API Key authentication is REQUIRED as of v2.1.0                                         ║");
+        log.error("║    • API Key authentication is REQUIRED as of v2.2.0                                         ║");
         log.error("║                                                                                               ║");
         log.error("║    ACTION REQUIRED:                                                                           ║");
         log.error("║    1. Log into Web UI with username/password                                                  ║");

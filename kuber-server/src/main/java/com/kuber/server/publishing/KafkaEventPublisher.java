@@ -14,6 +14,7 @@ package com.kuber.server.publishing;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.config.KuberProperties.KafkaConfig;
 import com.kuber.server.config.KuberProperties.BrokerDefinition;
+import com.kuber.server.config.KuberProperties.BrokerSsl;
 import com.kuber.server.config.KuberProperties.DestinationConfig;
 import com.kuber.server.config.KuberProperties.RegionPublishingConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
@@ -84,10 +85,11 @@ public class KafkaEventPublisher implements EventPublisher {
         final String acks;
         final int batchSize;
         final int lingerMs;
+        final BrokerSsl ssl;
         
         DestinationBinding(String bootstrapServers, String topic, int partitions,
                           short replicationFactor, int retentionHours, String acks,
-                          int batchSize, int lingerMs) {
+                          int batchSize, int lingerMs, BrokerSsl ssl) {
             this.bootstrapServers = bootstrapServers;
             this.topic = topic;
             this.partitions = partitions;
@@ -96,6 +98,7 @@ public class KafkaEventPublisher implements EventPublisher {
             this.acks = acks;
             this.batchSize = batchSize;
             this.lingerMs = lingerMs;
+            this.ssl = ssl != null ? ssl : new BrokerSsl();
         }
     }
     
@@ -147,7 +150,8 @@ public class KafkaEventPublisher implements EventPublisher {
                                 broker.getRetentionHours(),
                                 broker.getAcks(),
                                 broker.getBatchSize(),
-                                broker.getLingerMs()
+                                broker.getLingerMs(),
+                                broker.getSsl()
                         ));
                         
                         log.info("Kafka destination for region '{}': broker={}, topic={}",
@@ -172,7 +176,8 @@ public class KafkaEventPublisher implements EventPublisher {
                         kafkaConfig.getRetentionHours(),
                         kafkaConfig.getAcks(),
                         kafkaConfig.getBatchSize(),
-                        kafkaConfig.getLingerMs()
+                        kafkaConfig.getLingerMs(),
+                        null
                 ));
                 
                 log.info("Kafka (legacy) for region '{}': server={}, topic={}",
@@ -321,7 +326,11 @@ public class KafkaEventPublisher implements EventPublisher {
             props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
             props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 5000);
             
-            log.info("Creating Kafka producer for bootstrap servers: {}", servers);
+            // Apply SSL/TLS settings if enabled
+            applyKafkaSslConfig(props, binding.ssl);
+            
+            log.info("Creating Kafka producer for bootstrap servers: {}{}", servers,
+                    binding.ssl.isEnabled() ? " [SSL]" : "");
             return new KafkaProducer<>(props);
         });
     }
@@ -332,6 +341,36 @@ public class KafkaEventPublisher implements EventPublisher {
         props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
         props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000);
         return AdminClient.create(props);
+    }
+    
+    /**
+     * Apply SSL/TLS configuration to Kafka client properties.
+     * Used for both producers and admin clients.
+     */
+    private void applyKafkaSslConfig(Properties props, BrokerSsl ssl) {
+        if (ssl == null || !ssl.isEnabled()) return;
+        
+        props.put("security.protocol", "SSL");
+        
+        if (!ssl.getProtocol().isBlank()) {
+            props.put("ssl.protocol", ssl.getProtocol());
+        }
+        if (!ssl.getTrustStorePath().isBlank()) {
+            props.put("ssl.truststore.location", ssl.getTrustStorePath());
+            props.put("ssl.truststore.password", ssl.getTrustStorePassword());
+            props.put("ssl.truststore.type", ssl.getTrustStoreType());
+        }
+        if (!ssl.getKeyStorePath().isBlank()) {
+            props.put("ssl.keystore.location", ssl.getKeyStorePath());
+            props.put("ssl.keystore.password", ssl.getKeyStorePassword());
+            props.put("ssl.keystore.type", ssl.getKeyStoreType());
+            if (!ssl.getKeyPassword().isBlank()) {
+                props.put("ssl.key.password", ssl.getKeyPassword());
+            }
+        }
+        if (!ssl.isHostnameVerification()) {
+            props.put("ssl.endpoint.identification.algorithm", "");
+        }
     }
     
     @Override

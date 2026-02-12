@@ -1,0 +1,219 @@
+{
+  "_comment": "Kuber Message Broker Definitions (v2.3.0)",
+  "_doc": "Broker configs loaded at startup. Referenced by event_publishing.json region destinations.",
+
+  "brokers": {
+
+    "kafka-prod": {
+      "enabled": false,
+      "type": "kafka",
+      "bootstrap-servers": "kafka1.prod:9093,kafka2.prod:9093,kafka3.prod:9093",
+      "partitions": 6,
+      "replication-factor": 3,
+      "retention-hours": 720,
+      "acks": "all",
+      "batch-size": 32768,
+      "linger-ms": 10,
+      "ssl": {
+        "enabled": true,
+        "mode": "jks",
+        "protocol": "TLSv1.3",
+        "trust-store-path": "/opt/kuber/certs/kafka-truststore.jks",
+        "trust-store-password": "changeit",
+        "trust-store-type": "JKS"
+      }
+    },
+
+    "kafka-sasl": {
+      "enabled": false,
+      "type": "kafka",
+      "bootstrap-servers": "kafka-secure.corp:9094",
+      "partitions": 12,
+      "replication-factor": 2,
+      "retention-hours": 168,
+      "acks": "1",
+      "ssl": {
+        "enabled": true,
+        "mode": "sasl_ssl",
+        "protocol": "TLSv1.3",
+        "sasl-mechanism": "SCRAM-SHA-512",
+        "sasl-jaas-config": "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"kuber_svc\" password=\"secret\";",
+        "trust-store-path": "/opt/kuber/certs/kafka-truststore.jks",
+        "trust-store-password": "changeit",
+        "trust-store-type": "JKS"
+      }
+    },
+
+    "kafka-mtls": {
+      "enabled": false,
+      "type": "kafka",
+      "bootstrap-servers": "kafka-mtls.prod:9093",
+      "partitions": 6,
+      "replication-factor": 3,
+      "acks": "all",
+      "ssl": {
+        "enabled": true,
+        "mode": "mtls_jks",
+        "protocol": "TLSv1.3",
+        "trust-store-path": "/opt/kuber/certs/truststore.jks",
+        "trust-store-password": "changeit",
+        "trust-store-type": "JKS",
+        "key-store-path": "/opt/kuber/certs/client-keystore.jks",
+        "key-store-password": "clientpass",
+        "key-store-type": "JKS",
+        "key-password": "clientpass"
+      }
+    },
+
+    "kafka-pem": {
+      "enabled": false,
+      "type": "kafka",
+      "bootstrap-servers": "kafka-cloud.example.com:9093",
+      "partitions": 3,
+      "replication-factor": 3,
+      "acks": "all",
+      "ssl": {
+        "enabled": true,
+        "mode": "mtls_pem",
+        "protocol": "TLSv1.3",
+        "trust-cert-path": "/opt/kuber/certs/ca-cert.pem",
+        "key-cert-path": "/opt/kuber/certs/client-cert.pem",
+        "key-path": "/opt/kuber/certs/client-key.pem"
+      }
+    },
+
+    "kafka-analytics": {
+      "enabled": false,
+      "type": "kafka",
+      "bootstrap-servers": "kafka-analytics.internal:9092",
+      "partitions": 12,
+      "replication-factor": 2,
+      "retention-hours": 168,
+      "acks": "1"
+    },
+
+    "activemq-legacy": {
+      "enabled": false,
+      "type": "activemq",
+      "broker-url": "tcp://activemq.legacy.corp:61616",
+      "username": "kuber_svc",
+      "password": "secret123",
+      "ttl-seconds": 172800,
+      "persistent": true
+    },
+
+    "activemq-ssl": {
+      "enabled": false,
+      "type": "activemq",
+      "broker-url": "ssl://activemq-secure.corp:61617",
+      "username": "kuber_svc",
+      "password": "secret123",
+      "ttl-seconds": 86400,
+      "persistent": true,
+      "ssl": {
+        "enabled": true,
+        "mode": "mtls_jks",
+        "protocol": "TLSv1.3",
+        "trust-store-path": "/opt/kuber/certs/activemq-truststore.jks",
+        "trust-store-password": "changeit",
+        "trust-store-type": "JKS",
+        "key-store-path": "/opt/kuber/certs/client-keystore.jks",
+        "key-store-password": "clientpass",
+        "key-store-type": "JKS"
+      }
+    },
+
+    "rabbitmq-main": {
+      "enabled": false,
+      "type": "rabbitmq",
+      "host": "rabbitmq.internal",
+      "port": 5672,
+      "virtual-host": "/kuber",
+      "username": "kuber_publisher",
+      "password": "rabbitsecret",
+      "exchange-type": "topic",
+      "durable": true,
+      "ttl-seconds": 86400
+    },
+
+    "rabbitmq-ssl": {
+      "enabled": false,
+      "type": "rabbitmq",
+      "host": "rabbitmq-secure.internal",
+      "port": 5671,
+      "virtual-host": "/kuber",
+      "username": "kuber_publisher",
+      "password": "rabbitsecret",
+      "exchange-type": "topic",
+      "durable": true,
+      "ssl": {
+        "enabled": true,
+        "mode": "pem",
+        "protocol": "TLSv1.3",
+        "trust-cert-path": "/opt/kuber/certs/ca-cert.pem",
+        "hostname-verification": true
+      }
+    },
+
+    "rabbitmq-mtls": {
+      "enabled": false,
+      "type": "rabbitmq",
+      "host": "rabbitmq-mtls.internal",
+      "port": 5671,
+      "virtual-host": "/",
+      "exchange-type": "topic",
+      "durable": true,
+      "ssl": {
+        "enabled": true,
+        "mode": "mtls_pem",
+        "protocol": "TLSv1.3",
+        "trust-cert-path": "/opt/kuber/certs/ca-cert.pem",
+        "key-cert-path": "/opt/kuber/certs/client-cert.pem",
+        "key-path": "/opt/kuber/certs/client-key.pem"
+      }
+    },
+
+    "ibm-finance": {
+      "enabled": false,
+      "type": "ibmmq",
+      "host": "mq.finance.corp",
+      "port": 1414,
+      "queue-manager": "FINANCE.QM",
+      "channel": "KUBER.SVRCONN",
+      "username": "kuber_mq",
+      "password": "mqsecret",
+      "persistent": true,
+      "ttl-seconds": 0,
+      "ssl": {
+        "enabled": false,
+        "mode": "jks",
+        "cipher-suite": "TLS_RSA_WITH_AES_256_CBC_SHA256",
+        "trust-store-path": "/opt/kuber/certs/ibmmq-truststore.jks",
+        "trust-store-password": "changeit",
+        "trust-store-type": "JKS",
+        "key-store-path": "/opt/kuber/certs/ibmmq-keystore.jks",
+        "key-store-password": "clientpass",
+        "key-store-type": "JKS"
+      }
+    },
+
+    "audit-files": {
+      "enabled": false,
+      "type": "file",
+      "directory": "./kuberdata/log/kuber/audit",
+      "max-file-size-mb": 100,
+      "rotation-policy": "daily",
+      "retention-days": 365,
+      "compress": true
+    },
+
+    "archive-files": {
+      "enabled": false,
+      "type": "file",
+      "directory": "./kuberdata/archive/kuber-events",
+      "max-file-size-mb": 500,
+      "rotation-policy": "daily",
+      "retention-days": 730
+    }
+  }
+}

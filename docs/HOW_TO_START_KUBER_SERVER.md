@@ -1,6 +1,6 @@
 # How to Start Kuber Server
 
-**Version 2.1.0**
+**Version 2.3.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -98,7 +98,7 @@ mvn clean install
 
 After successful build, the server JAR is located at:
 ```
-kuber-server/target/kuber-server-2.1.0.jar
+kuber-server/target/kuber-server-2.3.0.jar
 ```
 
 ### Build Specific Module
@@ -127,17 +127,17 @@ dotnet build
 ```bash
 # Basic start (includes required JVM options)
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server/target/kuber-server-2.1.0.jar
+     -jar kuber-server/target/kuber-server-2.3.0.jar
 
 # With specific memory settings
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
      -Xms512m -Xmx2g \
-     -jar kuber-server/target/kuber-server-2.1.0.jar
+     -jar kuber-server/target/kuber-server-2.3.0.jar
 
 # With garbage collector tuning (for large heaps)
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
      -Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
-     -jar kuber-server/target/kuber-server-2.1.0.jar
+     -jar kuber-server/target/kuber-server-2.3.0.jar
 ```
 
 ### Method 2: Using Maven (Recommended for Development)
@@ -232,7 +232,7 @@ kuber:
       path: ./data/rocksdb
   
   secure:
-    folder: ./secure
+    folder: config/secure
 
 spring:
   security:
@@ -246,7 +246,7 @@ spring:
 Place security-sensitive files in the `secure` folder:
 
 ```
-./secure/
+./config/secure/
 ├── users.json              # User accounts with role assignments
 ├── roles.json              # RBAC role definitions (v1.7.3)
 ├── apikeys.json            # API keys
@@ -340,8 +340,8 @@ If files are missing at startup:
 
 Copy from `secure-sample/` for comprehensive examples:
 ```bash
-cp secure-sample/users.json.sample secure/users.json
-cp secure-sample/roles.json.sample secure/roles.json
+cp secure-sample/users.json.sample config/secure/users.json
+cp secure-sample/roles.json.sample config/secure/roles.json
 # Edit with your configuration
 ```
 
@@ -378,7 +378,7 @@ java -jar kuber-server.jar \
 | `--kuber.cache.value-cache-max-entries=10000` | 10000 | Max values per region |
 | `--kuber.persistence.type=lmdb` | lmdb | Persistence backend |
 | `--kuber.persistence.rocksdb.path=./data` | ./data/rocksdb | Data directory |
-| `--kuber.secure.folder=./secure` | ./secure | Secure config folder |
+| `--kuber.secure.folder=config/secure` | config/secure | Secure config folder |
 
 ### 5.3 Persistence Configuration
 
@@ -444,7 +444,7 @@ docker run -d \
   -e SPRING_SECURITY_USER_PASSWORD=secret \
   -p 8080:8080 \
   -p 6380:6380 \
-  kuber-server:2.1.0
+  kuber-server:2.3.0
 ```
 
 ---
@@ -453,7 +453,7 @@ docker run -d \
 
 ### 7.1 Create Configuration File
 
-Create `secure/request_response.json`:
+Create `config/request_response.json` (configurable via `kuber.messaging.request-response-config-file`):
 
 ```json
 {
@@ -597,7 +597,7 @@ Create `start-kuber.sh`:
 KUBER_HOME=/opt/kuber
 # Required: --add-opens for LMDB persistence on Java 9+
 JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -Xms4g -Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-KUBER_JAR="${KUBER_HOME}/kuber-server-2.1.0.jar"
+KUBER_JAR="${KUBER_HOME}/kuber-server-2.3.0.jar"
 CONFIG_DIR="${KUBER_HOME}/config"
 LOG_DIR="${KUBER_HOME}/logs"
 PID_FILE="${KUBER_HOME}/kuber.pid"
@@ -756,7 +756,7 @@ java -jar kuber-server.jar \
 
 ```bash
 java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-     -jar kuber-server-2.1.0.jar
+     -jar kuber-server-2.3.0.jar
 ```
 
 ### Typical Production Start
@@ -786,9 +786,11 @@ java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch
 | File | Purpose |
 |------|---------|
 | `application.yml` | Main configuration |
-| `secure/users.json` | User accounts |
-| `secure/apikeys.json` | API keys |
-| `secure/request_response.json` | Messaging configuration |
+| `config/secure/users.json` | User accounts |
+| `config/secure/apikeys.json` | API keys |
+| `config/request_response.json` | Messaging configuration |
+| `config/message_brokers.json` | Broker definitions with SSL |
+| `config/event_publishing.json` | Region event publishing routes |
 
 ---
 

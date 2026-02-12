@@ -1247,7 +1247,7 @@ def cleanup(client: KuberRestClient):
 def main():
     """Main function to run all examples."""
     parser = argparse.ArgumentParser(
-        description='Kuber Standalone Python Client - HTTP REST API Examples (v2.1.0)',
+        description='Kuber Standalone Python Client - HTTP REST API Examples (v2.3.0)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 v2.1.0: API Key Authentication ONLY
@@ -1285,7 +1285,7 @@ Environment variable:
     
     print(f"""
 ╔══════════════════════════════════════════════════════════════════════╗
-║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v2.1.0)          ║
+║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v2.3.0)          ║
 ║                                                                      ║
 ║     Connecting to: {protocol}://{args.host}:{args.port:<36}║
 ║     Authentication: API Key ({api_key[:12]}...{api_key[-4:]})                     ║

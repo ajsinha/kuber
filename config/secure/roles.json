@@ -1,0 +1,15 @@
+{
+  "roles" : [ {
+    "name" : "admin",
+    "displayName" : "System Administrator",
+    "description" : "Full system access including region management, user management, and all cache operations",
+    "region" : "*",
+    "permissions" : [ "ADMIN", "WRITE", "READ", "DELETE" ],
+    "systemRole" : true,
+    "active" : true,
+    "createdAt" : "2026-02-12T02:44:45.594807044Z",
+    "createdBy" : "system",
+    "modifiedAt" : null,
+    "modifiedBy" : null
+  } ]
+}

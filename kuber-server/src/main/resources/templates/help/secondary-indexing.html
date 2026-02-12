@@ -25,14 +25,14 @@
             <div class="col-lg-10 mx-auto">
                 <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v2.1.0)</h4>
+                        <h4 class="mb-0"><i class="fas fa-list-alt me-2"></i>Secondary Indexing (v2.2.0)</h4>
                     </div>
                     <div class="card-body">
                         
                         <!-- Introduction -->
                         <div class="alert alert-info">
                             <i class="fas fa-lightbulb me-2"></i>
-                            <strong>New in v2.1.0:</strong> Secondary indexes provide O(1) hash lookups, O(log n) range queries,
+                            <strong>New in v2.2.0:</strong> Secondary indexes provide O(1) hash lookups, O(log n) range queries,
                             and now <strong>TRIGRAM indexes for fast regex/pattern searches</strong> on JSON attributes - 
                             delivering <strong>100-1000x performance improvements</strong> over full table scans.
                         </div>
@@ -163,7 +163,7 @@
                             <div class="col-md-6">
                                 <div class="card border-warning mb-3">
                                     <div class="card-header bg-warning text-dark">
-                                        <strong>TRIGRAM Index</strong> <span class="badge bg-dark ms-2">v2.1.0</span>
+                                        <strong>TRIGRAM Index</strong> <span class="badge bg-dark ms-2">v2.2.0</span>
                                     </div>
                                     <div class="card-body">
                                         <p><strong>Best for:</strong> Regex, substring, pattern searches</p>
@@ -186,7 +186,7 @@
                             <div class="col-md-6">
                                 <div class="card border-info mb-3">
                                     <div class="card-header bg-info text-white">
-                                        <strong>PREFIX Index</strong> <span class="badge bg-light text-dark ms-2">v2.1.0</span>
+                                        <strong>PREFIX Index</strong> <span class="badge bg-light text-dark ms-2">v2.2.0</span>
                                     </div>
                                     <div class="card-body">
                                         <p><strong>Best for:</strong> Prefix/starts-with queries</p>
@@ -1032,7 +1032,7 @@ JINDEX REBUILDALL customers</code></pre>
                         </table>
                         
                         <!-- Off-Heap Storage -->
-                        <h5 class="mt-4"><i class="fas fa-hdd me-2 text-warning"></i>Off-Heap Storage <span class="badge bg-success">NEW in 2.1.0</span></h5>
+                        <h5 class="mt-4"><i class="fas fa-hdd me-2 text-warning"></i>Off-Heap Storage <span class="badge bg-success">NEW in 2.2.0</span></h5>
                         <p>
                             For large indexes or memory-constrained environments, Kuber supports <strong>off-heap storage</strong> 
                             that stores index data in direct memory (outside the JVM heap). This provides:
@@ -1143,7 +1143,7 @@ kuber.indexing.offheap-max-size=1073741824     # 1GB max per index</code></pre>
                         </div>
                         
                         <!-- File-Based Index Operations -->
-                        <h5 class="mt-4"><i class="fas fa-file-alt me-2 text-success"></i>File-Based Index Operations <span class="badge bg-success">NEW in 2.1.0</span></h5>
+                        <h5 class="mt-4"><i class="fas fa-file-alt me-2 text-success"></i>File-Based Index Operations <span class="badge bg-success">NEW in 2.2.0</span></h5>
                         <p>
                             Similar to the <code>kuber.shutdown</code> mechanism, you can trigger index operations by creating 
                             special files in the Kuber working directory. This is ideal for <strong>automation, scripting, 
@@ -1308,7 +1308,7 @@ echo "Pipeline complete: Data loaded and indexes created"</code></pre>
                         </div>
                         
                         <!-- Index Storage Options -->
-                        <h5 class="mt-5"><i class="fas fa-database me-2 text-info"></i>Index Storage Options <span class="badge bg-success">v2.1.0</span></h5>
+                        <h5 class="mt-5"><i class="fas fa-database me-2 text-info"></i>Index Storage Options <span class="badge bg-success">v2.2.0</span></h5>
                         <p>Secondary indexes can be stored in different backends to balance between speed and memory usage:</p>
                         
                         <div class="alert alert-warning">
@@ -1412,7 +1412,7 @@ kuber.indexing.disk-bloom-filter-enabled=true
 kuber.indexing.disk-reuse-on-startup=true</code></pre>
                         
                         <!-- Hybrid Query Strategy -->
-                        <h5 class="mt-5"><i class="fas fa-random me-2 text-purple"></i>Hybrid Query Strategy <span class="badge bg-success">v2.1.0</span></h5>
+                        <h5 class="mt-5"><i class="fas fa-random me-2 text-purple"></i>Hybrid Query Strategy <span class="badge bg-success">v2.2.0</span></h5>
                         <p>When no Kuber secondary index exists, the system can fall back to native database queries:</p>
                         
                         <pre class="bg-light p-3 rounded" style="font-family: monospace; font-size: 0.85rem;">
@@ -1495,7 +1495,7 @@ kuber.indexing.hybrid-query-threshold=10000</code></pre>
                         <!-- Architecture Diagram -->
                         <h5 class="mt-4"><i class="fas fa-sitemap me-2 text-secondary"></i>Architecture</h5>
                         <pre class="bg-dark text-light p-3 rounded"><code>┌─────────────────────────────────────────────────────────────────────┐
-│                         KUBER v2.1.0                                │
+│                         KUBER v2.3.0                                │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌────────────────┐  │

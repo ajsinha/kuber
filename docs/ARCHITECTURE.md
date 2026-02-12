@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 2.1.0**
+**Version 2.3.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -1010,7 +1010,7 @@ kuber:
 
 ## 8.5 Secondary Indexing Architecture (v1.9.0)
 
-Kuber v2.1.0 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
+Kuber v2.3.0 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
 
 ### 8.5.1 Hybrid Architecture
 
@@ -1340,7 +1340,7 @@ decoupled communication with the cache system.
 
 ### 10.5 Configuration
 
-Configuration stored in `request_response.json` in the secure folder:
+Configuration stored in `config/request_response.json` (configurable via `kuber.messaging.request-response-config-file`):
 
 ```json
 {
@@ -1391,7 +1391,7 @@ The entire Request/Response Messaging feature can be globally enabled or disable
 |--------|-----|-----------|
 | **Admin UI** | Admin → Messaging → Enable/Disable Service button | Yes |
 | **REST API** | `POST /api/v1/messaging/enable` or `/disable` | Yes |
-| **JSON Config** | Edit `request_response.json`: `"enabled": true/false` | Yes |
+| **JSON Config** | Edit `config/request_response.json`: `"enabled": true/false` | Yes |
 
 #### REST API Endpoints
 
@@ -1405,7 +1405,7 @@ GET  /api/v1/messaging/status   - Get service status (includes enabled state)
 
 - **Enable**: Activates message processing, connects all individually-enabled brokers
 - **Disable**: Disconnects all brokers, stops processing (messages queue at brokers)
-- Changes are persisted to `request_response.json` and survive server restarts
+- Changes are persisted to `config/request_response.json` and survive server restarts
 - Individual broker enable/disable still controls broker-level connections
 
 ### 10.7 Broker Control (v1.7.1)
@@ -1560,7 +1560,7 @@ API keys provide secure, revocable authentication for programmatic access:
 
 ### 13.4 User Configuration (v1.7.3)
 
-Users are configured in `secure/users.json`:
+Users are configured in `config/secure/users.json`:
 
 ```json
 {
@@ -1608,7 +1608,7 @@ Kuber implements enterprise-grade RBAC with region-specific permissions:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Roles are configured in `secure/roles.json`:
+Roles are configured in `config/secure/roles.json`:
 
 ```json
 {
@@ -1663,9 +1663,9 @@ Roles are configured in `secure/roles.json`:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  SecurityFileWatcher monitors:                                   │
-│  • secure/users.json                                             │
-│  • secure/roles.json                                             │
-│  • secure/apikeys.json                                           │
+│  • config/secure/users.json                                             │
+│  • config/secure/roles.json                                             │
+│  • config/secure/apikeys.json                                           │
 │                                                                  │
 │  Behavior:                                                       │
 │  ┌──────────────────────────────────────────────────────────┐   │

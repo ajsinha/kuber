@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v2.1.0 - Enterprise RBAC Role Management
+  ~ Kuber v2.2.0 - Enterprise RBAC Role Management
   -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
@@ -24,9 +24,9 @@
                 <p class="text-muted mb-0">Define roles with region-specific permissions</p>
             </div>
             <div class="col-auto">
-                <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#createRoleModal">
+                <a href="/admin/roles/add" class="btn btn-primary me-2">
                     <i class="fas fa-plus me-1"></i> Create Role
-                </button>
+                </a>
                 <form th:action="@{/admin/roles/reload}" method="post" class="d-inline">
                     <button type="submit" class="btn btn-outline-secondary">
                         <i class="fas fa-sync me-1"></i> Reload
@@ -81,20 +81,20 @@
         <!-- Roles Table -->
         <div class="card border-0 shadow-sm">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive" data-kuber-table="rolesTable" data-page-sizes="10,25,50,All" data-default-page-size="25">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4">Role Name</th>
-                                <th>Display Name</th>
-                                <th>Region</th>
+                                <th class="ps-4" data-sort="string">Role Name</th>
+                                <th data-sort="string">Display Name</th>
+                                <th data-sort="string">Region</th>
                                 <th>Permissions</th>
-                                <th>Status</th>
+                                <th data-sort="string">Status</th>
                                 <th class="text-end pe-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:each="role : ${roles}">
+                            <tr th:each="role : ${roles}" class="data-row">
                                 <td class="ps-4">
                                     <i th:class="'fas me-2 ' + (${role.admin} ? 'fa-crown text-warning' : 'fa-tag text-muted')"></i>
                                     <strong th:text="${role.name}">admin</strong>
@@ -172,60 +172,6 @@
 </main>
 
 <!-- Create Role Modal -->
-<div class="modal fade" id="createRoleModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form th:action="@{/admin/roles/create}" method="post">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Create New Role</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Role Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" required 
-                               pattern="[a-zA-Z0-9_-]+" placeholder="e.g., customers_readonly">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Display Name</label>
-                        <input type="text" name="displayName" class="form-control" placeholder="e.g., Customers Read Only">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea name="description" class="form-control" rows="2"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Region <span class="text-danger">*</span></label>
-                        <select name="region" class="form-select" required>
-                            <option value="">Select a region...</option>
-                            <option th:each="region : ${regions}" th:value="${region}" th:text="${region}">default</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Permissions</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="permissions" value="READ" id="permRead" checked>
-                            <label class="form-check-label" for="permRead"><span class="badge bg-success">READ</span></label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="permissions" value="WRITE" id="permWrite">
-                            <label class="form-check-label" for="permWrite"><span class="badge bg-warning text-dark">WRITE</span></label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="permissions" value="DELETE" id="permDelete">
-                            <label class="form-check-label" for="permDelete"><span class="badge bg-danger">DELETE</span></label>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus me-1"></i> Create Role</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 

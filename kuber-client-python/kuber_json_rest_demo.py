@@ -30,7 +30,7 @@
 #
 # Dependencies: None (uses only Python standard library)
 #
-# @version 2.1.0
+# @version 2.3.0
 
 import json
 import os
@@ -807,6 +807,51 @@ def demo_m_delete_json(client: KuberJsonRestClient, region: str, products_region
     print(f"  Region '{products_region}' size after cleanup: {prod_size}")
 
 
+def demo_n_slash_keys(client: KuberJsonRestClient, region: str):
+    """Demo n) Keys containing forward slashes."""
+    print_header("N) KEYS WITH FORWARD SLASHES (employee/EMP001)")
+
+    # Keys with slashes are common in hierarchical naming schemes:
+    # employee/EMP001, department/engineering/team-lead, etc.
+    # The client URL-encodes the '/' as '%2F' automatically.
+
+    slash_docs = [
+        ("employee/EMP001", {"name": "Alice Walker", "dept": "Engineering", "level": "L5"}),
+        ("employee/EMP002", {"name": "Bob Chen", "dept": "Marketing", "level": "L4"}),
+        ("department/eng/lead", {"name": "Carol Davis", "role": "Director", "reports": 42}),
+        ("config/app/v2.1/settings", {"theme": "dark", "locale": "en-US", "timeout": 30}),
+    ]
+
+    # Store
+    print("\n  Storing documents with slash keys...")
+    for key, doc in slash_docs:
+        success = client.json_set(key, doc, region)
+        status = "OK" if success else "FAIL"
+        print(f"    [{status}] {key}")
+
+    # Retrieve
+    print("\n  Retrieving documents by slash key...")
+    for key, original in slash_docs:
+        retrieved = client.json_get(key, region)
+        if retrieved:
+            match = "MATCH" if retrieved.get("name", retrieved.get("theme")) == original.get("name", original.get("theme")) else "MISMATCH"
+            print(f"    [{match}] {key} -> {json.dumps(retrieved, default=str)[:80]}...")
+        else:
+            print(f"    [FAIL] {key} -> NOT FOUND")
+
+    # JSONPath on slash key
+    print("\n  JSONPath on slash key 'employee/EMP001' ($.dept)...")
+    dept = client.json_get("employee/EMP001", region, path="$.dept")
+    print(f"    Department: {dept}")
+
+    # Delete
+    print("\n  Deleting slash-key documents...")
+    for key, _ in slash_docs:
+        success = client.json_delete(key, region)
+        status = "OK" if success else "FAIL"
+        print(f"    [{status}] Deleted {key}")
+
+
 # ============================================================================
 # MAIN
 # ============================================================================
@@ -833,8 +878,9 @@ def main():
 |   k) Store with TTL                 PUT  with ttl parameter          |
 |   l) Cross-region operations        Multiple regions                 |
 |   m) Delete JSON documents          DELETE /api/v1/json/{r}/{k}     |
+|   n) Keys with forward slashes      employee/EMP001 etc.            |
 |                                                                      |
-|   v2.1.0                                                             |
+|   v2.3.0                                                             |
 +======================================================================+
     """)
 
@@ -877,6 +923,7 @@ def main():
         demo_k_json_with_ttl(client, region)
         products_region = demo_l_cross_region(client)
         demo_m_delete_json(client, region, products_region)
+        demo_n_slash_keys(client, region)
 
         print_header("ALL DEMOS COMPLETED SUCCESSFULLY")
         print()

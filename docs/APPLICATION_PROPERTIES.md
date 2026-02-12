@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 2.1.0**
+**Version 2.3.0**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -28,9 +28,9 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `2.1.0` | Current application version (read-only) |
+| `kuber.version` | `2.3.0` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
-| `kuber.secure.folder` | `./secure` | Directory for sensitive configuration files (users.json, apikeys.json, request_response.json). Auto-created if missing |
+| `kuber.secure.folder` | `config/secure` | Directory for sensitive configuration files (users.json, apikeys.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
 | `server.port` | `8080` | HTTP port for REST API and Web UI |
 | `server.servlet.session.timeout` | `30m` | Web session timeout duration |
@@ -144,11 +144,11 @@ Data storage backend settings.
 
 ## Security Configuration
 
-> ⚠️ **v2.1.0+**: API Keys required for all programmatic access. Username/password only for Web UI.
+> ⚠️ **v2.2.0+**: API Keys required for all programmatic access. Username/password only for Web UI.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.secure.folder` | `./secure` | Directory for security files |
+| `kuber.secure.folder` | `config/secure` | Directory for security files |
 | `kuber.security.users-file` | `${kuber.secure.folder}/users.json` | User credentials file. **REQUIRED** - app fails without it |
 | `kuber.security.api-keys-file` | `${kuber.secure.folder}/apikeys.json` | API keys file (created automatically if missing) |
 | `kuber.security.session-timeout-minutes` | `30` | Web UI session timeout |
@@ -156,13 +156,12 @@ Data storage backend settings.
 
 ### Secure Folder Contents
 
-The secure folder contains sensitive configuration files:
+The config/secure folder contains sensitive configuration files:
 
 | File | Required | Description |
 |------|----------|-------------|
 | `users.json` | **Yes** | Web UI user credentials |
 | `apikeys.json` | No | API keys (auto-created) |
-| `request_response.json` | No | Message broker configuration (v1.7.1+) |
 
 ### users.json Format
 
@@ -306,28 +305,67 @@ Publish cache events to message brokers.
 |----------|---------|-------------|
 | `kuber.publishing.thread-pool-size` | `4` | Publisher thread pool size |
 | `kuber.publishing.queue-capacity` | `10000` | Event queue capacity |
+| `kuber.publishing.broker-config-file` | `config/message_brokers.json` | External JSON file for broker definitions (v2.2.0) |
+| `kuber.publishing.region-config-file` | `config/event_publishing.json` | External JSON file for region publishing config |
 
-### Broker Definition Pattern
+### Message Broker Definitions (External JSON Config)
 
-Define brokers centrally, then reference them from regions.
+Broker definitions are managed in `config/message_brokers.json`. Each broker specifies type, connection details, and optional SSL/TLS configuration.
 
-```properties
-# Define a Kafka broker
-kuber.publishing.brokers.kafka-prod.enabled=true
-kuber.publishing.brokers.kafka-prod.type=kafka
-kuber.publishing.brokers.kafka-prod.bootstrap-servers=kafka1:9092,kafka2:9092
-kuber.publishing.brokers.kafka-prod.partitions=6
-kuber.publishing.brokers.kafka-prod.replication-factor=3
+**Admin UI:** `/admin/brokers` — view brokers and edit JSON inline.
+
+```json
+{
+  "brokers": {
+    "kafka-prod": {
+      "enabled": true,
+      "type": "kafka",
+      "bootstrap-servers": "kafka1:9093,kafka2:9093",
+      "partitions": 6,
+      "ssl": {
+        "enabled": true,
+        "mode": "jks",
+        "trust-store-path": "/certs/truststore.jks",
+        "trust-store-password": "changeit"
+      }
+    }
+  }
+}
 ```
 
-### Region Destination Pattern
+### SSL/TLS Modes
 
-```properties
-# Configure region to publish to broker
-kuber.publishing.regions.customers.enabled=true
-kuber.publishing.regions.customers.destinations[0].broker=kafka-prod
-kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
+| Mode | Description | Required Fields |
+|------|-------------|-----------------|
+| `jks` | Server-side SSL with JKS/PKCS12 trust store | `trust-store-path`, `trust-store-password` |
+| `pem` | Server-side SSL with PEM CA certificate | `trust-cert-path` |
+| `sasl_ssl` | SASL authentication over SSL (Kafka) | `sasl-mechanism`, `sasl-jaas-config`, trust store or PEM |
+| `mtls_jks` | Mutual TLS with JKS/PKCS12 key store | `key-store-path`, `key-store-password`, trust store |
+| `mtls_pem` | Mutual TLS with PEM client cert + key | `trust-cert-path`, `key-cert-path`, `key-path` |
+
+### Region Event Publishing (External JSON Config)
+
+Region-to-broker mappings are managed in `config/event_publishing.json`.
+
+**Admin UI:** `/admin/event-publishing` — view regions and edit JSON inline.
+
+```json
+{
+  "regions": {
+    "trades": {
+      "enabled": true,
+      "destinations": [
+        { "broker": "kafka-prod", "topic": "kuber.trades.events" },
+        { "broker": "activemq-legacy", "topic": "TRADES.EVENTS.QUEUE" },
+        { "broker": "audit-files", "topic": "trades" }
+      ]
+    }
+  }
+}
 ```
+
+Regions from the JSON file override same-named regions in `application.properties`.
+Legacy per-region config in `application.properties` is still supported for backward compatibility.
 
 ### Supported Broker Types
 
@@ -343,17 +381,17 @@ kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
 
 ## Request/Response Messaging Configuration
 
-**New in v1.7.1** - Process cache operations via message brokers (Kafka, ActiveMQ, RabbitMQ, IBM MQ).
+**New in v1.7.1, updated in v2.2.0** - Process cache operations via message brokers (Kafka, ActiveMQ, RabbitMQ, IBM MQ).
 
-Configuration is stored in `request_response.json` in the secure folder (alongside `users.json` and `apikeys.json`). The configuration is **hot-reloadable** - changes are detected automatically without server restart.
+Configuration is stored in an external JSON file. The configuration is **hot-reloadable** — changes are detected automatically without server restart.
 
 ### Configuration File Location
 
-```
-${kuber.secure.folder}/request_response.json
-```
+| Property | Default | Description |
+|----------|---------|-------------|
+| `kuber.messaging.request-response-config-file` | `config/request_response.json` | Path to request/response messaging JSON config (relative to working directory or absolute) |
 
-Default: `./secure/request_response.json`
+A default config file is auto-created on first start if not found.
 
 ### Global Properties
 
@@ -667,10 +705,11 @@ A sample configuration file is provided at:
 kuber-server/src/main/resources/secure-sample/request_response.json.sample
 ```
 
-Copy this to your secure folder and customize:
+Copy this to your config folder and customize:
 
 ```bash
-cp secure-sample/request_response.json.sample ./secure/request_response.json
+mkdir -p config
+cp secure-sample/request_response.json.sample ./config/request_response.json
 ```
 
 ---
@@ -717,7 +756,7 @@ kuber.base.datadir=/var/kuber/data
 kuber.persistence.type=rocksdb
 
 # Security (create users.json in secure folder)
-kuber.secure.folder=/var/kuber/secure
+kuber.secure.folder=/var/kuber/config/secure
 
 # Cache tuning
 kuber.cache.max-memory-entries=1000000
@@ -729,7 +768,7 @@ kuber.backup.cron=0 0 2 * * *
 
 ### Enabling Request/Response Messaging
 
-1. Create `request_response.json` in your secure folder:
+1. Create `request_response.json` in your config folder (or customize path via `kuber.messaging.request-response-config-file`):
 
 ```json
 {

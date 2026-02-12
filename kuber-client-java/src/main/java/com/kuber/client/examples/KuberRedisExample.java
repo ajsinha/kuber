@@ -59,7 +59,7 @@ public class KuberRedisExample {
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v2.1.0)        ║
+            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v2.3.0)        ║
             ║                                                                      ║
             ║   Protocol: Redis RESP with Kuber Extensions (API Key Auth)          ║
             ╚══════════════════════════════════════════════════════════════════════╝

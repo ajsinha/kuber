@@ -22,6 +22,12 @@
     --kuber-bg-page: linear-gradient(180deg, #f0f4f8 0%, #e8eef4 100%);
 }
 
+/* Dark theme variables */
+[data-bs-theme="dark"] {
+    --kuber-bg-page: linear-gradient(180deg, #1a1d23 0%, #16191e 100%);
+    --kuber-gradient-subtle: linear-gradient(135deg, #1e2a38 0%, #1a2332 100%);
+}
+
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: var(--kuber-bg-page);
@@ -306,4 +312,397 @@ pre code {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* ============================================
+   Theme Toggle Button
+   ============================================ */
+#themeToggle {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s, transform 0.2s;
+    font-size: 1rem;
+}
+
+#themeToggle:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: scale(1.1);
+}
+
+/* ============================================
+   Dark Theme Overrides
+   ============================================ */
+[data-bs-theme="dark"] .navbar {
+    background: linear-gradient(135deg, #1a2332 0%, #0f1923 50%, #0a1018 100%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .card {
+    background-color: #1e2228;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .card-header {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .card-footer {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Tables */
+[data-bs-theme="dark"] .table-hover tbody tr:hover {
+    background-color: rgba(0, 121, 193, 0.1);
+}
+
+[data-bs-theme="dark"] .table-light {
+    --bs-table-bg: #252a30;
+    --bs-table-border-color: rgba(255, 255, 255, 0.08);
+    --bs-table-color: #c9d1d9;
+}
+
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-bg-type: rgba(255, 255, 255, 0.02);
+}
+
+[data-bs-theme="dark"] .table > :not(caption) > * > * {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Buttons */
+[data-bs-theme="dark"] .btn-primary {
+    background: linear-gradient(135deg, #0079c1 0%, #005a8e 100%);
+}
+
+[data-bs-theme="dark"] .btn-primary:hover {
+    background: linear-gradient(135deg, #0091e6 0%, #0079c1 100%);
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #8b949e;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #c9d1d9;
+}
+
+/* Forms */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: #1c2028;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #c9d1d9;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: #1c2028;
+    border-color: var(--kuber-primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 121, 193, 0.3);
+    color: #e6edf3;
+}
+
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: #6c757d;
+}
+
+[data-bs-theme="dark"] .input-group-text {
+    background-color: #252a30;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #8b949e;
+}
+
+/* Code */
+[data-bs-theme="dark"] code {
+    color: #f692ce;
+}
+
+[data-bs-theme="dark"] .bg-dark pre,
+[data-bs-theme="dark"] .bg-dark code {
+    color: #e6edf3;
+}
+
+[data-bs-theme="dark"] pre {
+    background-color: #161b22;
+    color: #c9d1d9;
+}
+
+/* JSON Viewer */
+[data-bs-theme="dark"] .json-key {
+    color: #79c0ff;
+}
+
+[data-bs-theme="dark"] .json-string {
+    color: #a5d6ff;
+}
+
+[data-bs-theme="dark"] .json-number {
+    color: #56d4dd;
+}
+
+[data-bs-theme="dark"] .json-boolean {
+    color: #56d4dd;
+}
+
+[data-bs-theme="dark"] .json-null {
+    color: #6e7681;
+}
+
+/* Alerts */
+[data-bs-theme="dark"] .alert-primary {
+    background-color: rgba(0, 121, 193, 0.15);
+    border-left: 4px solid var(--kuber-primary);
+    color: #79c0ff;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    background-color: rgba(13, 202, 240, 0.12);
+    border-left: 4px solid #0dcaf0;
+    color: #6edff6;
+}
+
+[data-bs-theme="dark"] .alert-success {
+    background-color: rgba(25, 135, 84, 0.12);
+    border-left: 4px solid #198754;
+    color: #75b798;
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: rgba(255, 193, 7, 0.12);
+    border-left: 4px solid #ffc107;
+    color: #ffda6a;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: rgba(220, 53, 69, 0.12);
+    border-left: 4px solid #dc3545;
+    color: #ea868f;
+}
+
+/* Footer */
+[data-bs-theme="dark"] .footer {
+    background-color: #161b22 !important;
+    border-top-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[data-bs-theme="dark"] .footer .text-muted {
+    color: #8b949e !important;
+}
+
+/* Sidebar */
+[data-bs-theme="dark"] .sidebar {
+    background: #161b22;
+    border-right-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .sidebar .nav-link {
+    color: #8b949e;
+}
+
+[data-bs-theme="dark"] .sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: #c9d1d9;
+}
+
+[data-bs-theme="dark"] .sidebar .nav-link.active {
+    background-color: rgba(0, 121, 193, 0.12);
+    color: var(--kuber-primary-light);
+}
+
+/* Loading Overlay */
+[data-bs-theme="dark"] .loading-overlay {
+    background: rgba(13, 17, 23, 0.85);
+}
+
+[data-bs-theme="dark"] .spinner {
+    border-color: #30363d;
+    border-top-color: var(--kuber-primary-light);
+}
+
+/* Scrollbars */
+[data-bs-theme="dark"] ::-webkit-scrollbar-track {
+    background: #161b22;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #30363d;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+}
+
+/* Badges */
+[data-bs-theme="dark"] .badge.bg-light {
+    background-color: #30363d !important;
+    color: #c9d1d9 !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-secondary {
+    background-color: #30363d !important;
+}
+
+/* Dropdown menus */
+[data-bs-theme="dark"] .dropdown-menu {
+    background-color: #1e2228;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .dropdown-item {
+    color: #c9d1d9;
+}
+
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #e6edf3;
+}
+
+[data-bs-theme="dark"] .dropdown-divider {
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Modals */
+[data-bs-theme="dark"] .modal-content {
+    background-color: #1e2228;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .modal-header {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .modal-footer {
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Breadcrumbs */
+[data-bs-theme="dark"] .breadcrumb {
+    background-color: transparent;
+}
+
+[data-bs-theme="dark"] .breadcrumb-item a {
+    color: var(--kuber-primary-light);
+}
+
+[data-bs-theme="dark"] .breadcrumb-item.active {
+    color: #8b949e;
+}
+
+/* Progress bars */
+[data-bs-theme="dark"] .progress {
+    background-color: #30363d;
+}
+
+/* bg-light override for dark mode */
+[data-bs-theme="dark"] .bg-light {
+    background-color: #252a30 !important;
+}
+
+/* Border colors */
+[data-bs-theme="dark"] .border-top,
+[data-bs-theme="dark"] .border-bottom,
+[data-bs-theme="dark"] .border-start,
+[data-bs-theme="dark"] .border-end,
+[data-bs-theme="dark"] .border {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* text-muted in dark mode */
+[data-bs-theme="dark"] .text-muted {
+    color: #8b949e !important;
+}
+
+/* Pagination */
+[data-bs-theme="dark"] .page-link {
+    background-color: #1e2228;
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #8b949e;
+}
+
+[data-bs-theme="dark"] .page-link:hover {
+    background-color: #30363d;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #c9d1d9;
+}
+
+[data-bs-theme="dark"] .page-item.active .page-link {
+    background-color: var(--kuber-primary);
+    border-color: var(--kuber-primary);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .page-item.disabled .page-link {
+    background-color: #161b22;
+    border-color: rgba(255, 255, 255, 0.06);
+    color: #484f58;
+}
+
+/* Card gradient backgrounds should keep their colors */
+[data-bs-theme="dark"] .card[style*="background: linear-gradient"] {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Help page hover-cards */
+[data-bs-theme="dark"] .hover-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Glossary cards */
+[data-bs-theme="dark"] .card.bg-light {
+    background-color: #252a30 !important;
+}
+
+/* Shadow adjustments */
+[data-bs-theme="dark"] .shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .shadow-lg {
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Stats card in dark */
+[data-bs-theme="dark"] .stats-card {
+    background-color: #1e2228;
+}
+
+/* Card headers with bg-white */
+[data-bs-theme="dark"] .card-header.bg-white,
+[data-bs-theme="dark"] .card-footer.bg-white {
+    background-color: #1e2228 !important;
+}
+
+/* CodeMirror dark override */
+[data-bs-theme="dark"] .CodeMirror {
+    background: #161b22;
+    color: #c9d1d9;
+}
+
+/* Monitoring page chart canvas area */
+[data-bs-theme="dark"] canvas {
+    filter: none;
+}
+
+/* Live logs terminal - already dark, no changes needed */
+
+/* Theme transition for smooth toggling */
+body,
+.card, .navbar, .footer, .sidebar,
+.form-control, .form-select,
+.btn, .table, .alert, .modal-content,
+.dropdown-menu, .page-link {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }

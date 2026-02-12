@@ -14,6 +14,7 @@ package com.kuber.server.controller;
 import com.kuber.server.cache.CacheMetricsService;
 import com.kuber.server.cache.CacheService;
 import com.kuber.server.cache.MemoryWatcherService;
+import com.kuber.server.monitoring.LogBufferService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,8 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
+import java.lang.management.ThreadMXBean;
+import java.lang.management.GarbageCollectorMXBean;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,6 +50,7 @@ public class MonitoringApiController {
     
     private final CacheService cacheService;
     private final CacheMetricsService metricsService;
+    private final LogBufferService logBufferService;
     
     @Autowired(required = false)
     private MemoryWatcherService memoryWatcherService;
@@ -628,5 +632,129 @@ public class MonitoringApiController {
             result.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(result);
         }
+    }
+    
+    // ==================== System Overview (Detailed) ====================
+    
+    /**
+     * Full system overview: JVM, OS, memory, threads, cache, GC - all in one call.
+     * Optimized for the monitoring dashboard to minimize AJAX calls.
+     * GET /api/monitoring/overview
+     */
+    @GetMapping("/overview")
+    public ResponseEntity<Map<String, Object>> getOverview() {
+        Map<String, Object> overview = new LinkedHashMap<>();
+        
+        Runtime runtime = Runtime.getRuntime();
+        MemoryMXBean memBean = ManagementFactory.getMemoryMXBean();
+        MemoryUsage heapUsage = memBean.getHeapMemoryUsage();
+        MemoryUsage nonHeapUsage = memBean.getNonHeapMemoryUsage();
+        RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
+        OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
+        ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        
+        // Uptime
+        Duration uptime = Duration.ofMillis(runtimeBean.getUptime());
+        overview.put("uptimeMs", runtimeBean.getUptime());
+        overview.put("uptime", formatDuration(uptime));
+        overview.put("startTime", runtimeBean.getStartTime());
+        
+        // JVM
+        Map<String, Object> jvm = new LinkedHashMap<>();
+        jvm.put("heapUsedMb", heapUsage.getUsed() / (1024 * 1024));
+        jvm.put("heapMaxMb", heapUsage.getMax() > 0 ? heapUsage.getMax() / (1024 * 1024) : -1);
+        jvm.put("heapCommittedMb", heapUsage.getCommitted() / (1024 * 1024));
+        jvm.put("heapUsedPercent", heapUsage.getMax() > 0 ?
+                (int) ((heapUsage.getUsed() * 100) / heapUsage.getMax()) : 0);
+        jvm.put("nonHeapUsedMb", nonHeapUsage.getUsed() / (1024 * 1024));
+        
+        // GC stats
+        long gcCount = 0, gcTime = 0;
+        for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
+            if (gc.getCollectionCount() >= 0) gcCount += gc.getCollectionCount();
+            if (gc.getCollectionTime() >= 0) gcTime += gc.getCollectionTime();
+        }
+        jvm.put("gcCount", gcCount);
+        jvm.put("gcTimeMs", gcTime);
+        jvm.put("javaVersion", System.getProperty("java.version"));
+        overview.put("jvm", jvm);
+        
+        // OS
+        Map<String, Object> os = new LinkedHashMap<>();
+        os.put("name", osBean.getName());
+        os.put("arch", osBean.getArch());
+        os.put("processors", osBean.getAvailableProcessors());
+        os.put("loadAverage", osBean.getSystemLoadAverage());
+        if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOs) {
+            os.put("cpuLoad", Math.round(sunOs.getCpuLoad() * 100));
+            os.put("processCpuLoad", Math.round(sunOs.getProcessCpuLoad() * 100));
+            os.put("totalPhysicalMemoryMb", sunOs.getTotalMemorySize() / (1024 * 1024));
+            os.put("freePhysicalMemoryMb", sunOs.getFreeMemorySize() / (1024 * 1024));
+        }
+        overview.put("os", os);
+        
+        // Threads
+        Map<String, Object> threads = new LinkedHashMap<>();
+        threads.put("total", threadBean.getThreadCount());
+        threads.put("daemon", threadBean.getDaemonThreadCount());
+        threads.put("peak", threadBean.getPeakThreadCount());
+        threads.put("totalStarted", threadBean.getTotalStartedThreadCount());
+        overview.put("threads", threads);
+        
+        // Cache summary
+        Map<String, Object> serverInfo = cacheService.getServerInfo();
+        Map<String, Object> cache = new LinkedHashMap<>();
+        cache.put("totalEntries", serverInfo.get("totalEntries"));
+        cache.put("valuesInMemory", serverInfo.get("valuesInMemory"));
+        cache.put("valuesOnDiskOnly", serverInfo.get("valuesOnDiskOnly"));
+        cache.put("regionCount", serverInfo.get("regionCount"));
+        cache.put("maxMemoryEntries", serverInfo.get("maxMemoryEntries"));
+        overview.put("cache", cache);
+        
+        // Global operation stats
+        overview.put("operations", metricsService.getGlobalStats());
+        
+        // Per-region sizes
+        Map<String, Long> regionSizes = new LinkedHashMap<>();
+        cacheService.getAllRegions().forEach(r -> {
+            regionSizes.put(r.getName(), cacheService.dbSize(r.getName()));
+        });
+        overview.put("regionSizes", regionSizes);
+        
+        overview.put("timestamp", System.currentTimeMillis());
+        
+        return ResponseEntity.ok(overview);
+    }
+    
+    // ==================== Live Logs ====================
+    
+    /**
+     * Get recent log entries for the live log viewer.
+     * GET /api/monitoring/logs?lines=200&level=INFO&search=keyword&afterId=0
+     */
+    @GetMapping("/logs")
+    public ResponseEntity<Map<String, Object>> getLogs(
+            @RequestParam(defaultValue = "200") int lines,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long afterId) {
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("entries", logBufferService.getEntries(lines, level, search, afterId));
+        result.put("latestId", logBufferService.getLatestId());
+        result.put("stats", logBufferService.getStats());
+        result.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Clear the log buffer.
+     * POST /api/monitoring/logs/clear
+     */
+    @PostMapping("/logs/clear")
+    public ResponseEntity<Map<String, String>> clearLogs() {
+        logBufferService.clear();
+        log.info("Log buffer cleared by admin");
+        return ResponseEntity.ok(Map.of("status", "cleared"));
     }
 }

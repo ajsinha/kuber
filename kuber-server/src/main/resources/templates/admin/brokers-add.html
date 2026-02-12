@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Add Broker')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/admin"><i class="fas fa-cog me-1"></i>Admin</a></li>
+                <li class="breadcrumb-item"><a href="/admin/brokers">Message Brokers</a></li>
+                <li class="breadcrumb-item active">Add Broker</li>
+            </ol>
+        </nav>
+
+        <h1 class="display-6 mb-4"><i class="fas fa-plus-circle me-3 text-primary"></i>Add Message Broker</h1>
+
+        <!-- Architecture Banner -->
+        <div class="alert alert-info border mb-4">
+            <i class="fas fa-project-diagram text-primary me-2"></i>
+            <strong>Broker Registry:</strong> Brokers defined here become available to both
+            <a href="/admin/event-publishing" class="alert-link">Event Publishing</a> (outbound events) and
+            <a href="/admin/messaging" class="alert-link">Request/Response Messaging</a> (bidirectional channels).
+            Define a broker <em>once</em> here, then reference it by name from either feature.
+        </div>
+
+        <div id="alertArea"></div>
+
+        <!-- Broker Identity -->
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-tag me-2"></i>Broker Identity</h5></div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Broker Name <span class="text-danger">*</span></label>
+                        <input type="text" id="brokerName" class="form-control" placeholder="e.g. kafka-prod" required>
+                        <div class="form-text">Unique identifier. Use lowercase with hyphens.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Broker Type <span class="text-danger">*</span></label>
+                        <select id="brokerType" class="form-select" onchange="showTypeFields()">
+                            <option value="kafka">Apache Kafka</option>
+                            <option value="activemq">Apache ActiveMQ</option>
+                            <option value="rabbitmq">RabbitMQ</option>
+                            <option value="ibmmq">IBM MQ</option>
+                            <option value="file">File (Local Disk)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Status</label>
+                        <div class="form-check form-switch mt-2">
+                            <input type="checkbox" id="brokerEnabled" class="form-check-input" checked>
+                            <label class="form-check-label" for="brokerEnabled">Enabled</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection Settings -->
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-plug me-2"></i>Connection Settings</h5></div>
+            <div class="card-body">
+
+                <!-- Kafka -->
+                <div id="kafkaFields">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Bootstrap Servers <span class="text-danger">*</span></label>
+                            <input type="text" id="kafkaServers" class="form-control" placeholder="kafka1:9092,kafka2:9092">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Partitions</label>
+                            <input type="number" id="kafkaPartitions" class="form-control" value="3" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Replication Factor</label>
+                            <input type="number" id="kafkaReplication" class="form-control" value="1" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Acks</label>
+                            <select id="kafkaAcks" class="form-select">
+                                <option value="1" selected>1</option>
+                                <option value="all">all</option>
+                                <option value="0">0</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Group ID</label>
+                            <input type="text" id="kafkaGroupId" class="form-control" placeholder="kuber-group">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Auto Offset Reset</label>
+                            <select id="kafkaOffsetReset" class="form-select">
+                                <option value="earliest" selected>earliest</option>
+                                <option value="latest">latest</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ActiveMQ -->
+                <div id="activemqFields" style="display:none">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Broker URL <span class="text-danger">*</span></label>
+                            <input type="text" id="amqUrl" class="form-control" placeholder="tcp://localhost:61616">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" id="amqUser" class="form-control" placeholder="admin">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" id="amqPass" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RabbitMQ -->
+                <div id="rabbitmqFields" style="display:none">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Host <span class="text-danger">*</span></label>
+                            <input type="text" id="rabbitHost" class="form-control" placeholder="rabbitmq.internal">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Port</label>
+                            <input type="number" id="rabbitPort" class="form-control" value="5672">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Virtual Host</label>
+                            <input type="text" id="rabbitVHost" class="form-control" value="/">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Username</label>
+                            <input type="text" id="rabbitUser" class="form-control" placeholder="guest">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Password</label>
+                            <input type="password" id="rabbitPass" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Exchange Type</label>
+                            <select id="rabbitExchange" class="form-select">
+                                <option value="topic" selected>topic</option>
+                                <option value="direct">direct</option>
+                                <option value="fanout">fanout</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" id="rabbitDurable" class="form-check-input" checked>
+                                <label class="form-check-label" for="rabbitDurable">Durable</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IBM MQ -->
+                <div id="ibmmqFields" style="display:none">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Host <span class="text-danger">*</span></label>
+                            <input type="text" id="ibmHost" class="form-control" placeholder="ibmmq.internal">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Port</label>
+                            <input type="number" id="ibmPort" class="form-control" value="1414">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Queue Manager <span class="text-danger">*</span></label>
+                            <input type="text" id="ibmQM" class="form-control" placeholder="QM1">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Channel</label>
+                            <input type="text" id="ibmChannel" class="form-control" placeholder="SYSTEM.DEF.SVRCONN">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" id="ibmUser" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" id="ibmPass" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File -->
+                <div id="fileFields" style="display:none">
+                    <div class="row mb-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Directory <span class="text-danger">*</span></label>
+                            <input type="text" id="fileDir" class="form-control" placeholder="./events/audit">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Max Size (MB)</label>
+                            <input type="number" id="fileMaxMb" class="form-control" value="100">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Rotation</label>
+                            <select id="fileRotation" class="form-select">
+                                <option value="daily" selected>daily</option>
+                                <option value="hourly">hourly</option>
+                                <option value="size">size-based</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Retention (days)</label>
+                            <input type="number" id="fileRetention" class="form-control" value="30">
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">Compress</label>
+                            <div class="form-check mt-2">
+                                <input type="checkbox" id="fileCompress" class="form-check-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SSL/TLS Configuration -->
+        <div class="card mb-4" id="sslCard">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-lock me-2"></i>SSL/TLS Configuration</h5>
+                <div class="form-check form-switch">
+                    <input type="checkbox" id="sslEnabled" class="form-check-input" onchange="toggleSslFields()">
+                    <label class="form-check-label text-white" for="sslEnabled">Enable SSL</label>
+                </div>
+            </div>
+            <div class="card-body" id="sslFields" style="display:none">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">SSL Mode <span class="text-danger">*</span></label>
+                        <select id="sslMode" class="form-select" onchange="showSslModeFields()">
+                            <option value="jks">JKS / PKCS12</option>
+                            <option value="pem">PEM Certificate</option>
+                            <option value="sasl_ssl">SASL_SSL (Kafka)</option>
+                            <option value="mtls_jks">Mutual TLS (JKS)</option>
+                            <option value="mtls_pem">Mutual TLS (PEM)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Protocol</label>
+                        <input type="text" id="sslProtocol" class="form-control" value="TLSv1.3">
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" id="sslHostVerify" class="form-check-input" checked>
+                            <label class="form-check-label" for="sslHostVerify">Hostname Verification</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JKS Trust Store -->
+                <div id="sslJksFields" class="row mb-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Trust Store Path</label>
+                        <input type="text" id="sslTrustPath" class="form-control" placeholder="/certs/truststore.jks">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Trust Store Password</label>
+                        <input type="password" id="sslTrustPass" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Trust Store Type</label>
+                        <select id="sslTrustType" class="form-select"><option>JKS</option><option>PKCS12</option></select>
+                    </div>
+                </div>
+
+                <!-- PEM Trust -->
+                <div id="sslPemTrustFields" class="row mb-3" style="display:none">
+                    <div class="col-md-6">
+                        <label class="form-label">CA Certificate Path (PEM)</label>
+                        <input type="text" id="sslTrustCertPath" class="form-control" placeholder="/certs/ca-cert.pem">
+                    </div>
+                </div>
+
+                <!-- Key Store (mTLS JKS) -->
+                <div id="sslKeyStoreFields" style="display:none">
+                    <h6 class="text-muted mt-3 mb-2"><i class="fas fa-key me-1"></i>Client Certificate (mTLS)</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Key Store Path</label>
+                            <input type="text" id="sslKeyStorePath" class="form-control" placeholder="/certs/client-keystore.jks">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Key Store Password</label>
+                            <input type="password" id="sslKeyStorePass" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Key Store Type</label>
+                            <select id="sslKeyStoreType" class="form-select"><option>JKS</option><option>PKCS12</option></select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Key Password</label>
+                            <input type="password" id="sslKeyPass" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PEM Client Cert (mTLS PEM) -->
+                <div id="sslPemKeyFields" style="display:none">
+                    <h6 class="text-muted mt-3 mb-2"><i class="fas fa-key me-1"></i>Client Certificate (mTLS)</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Client Certificate Path</label>
+                            <input type="text" id="sslKeyCertPath" class="form-control" placeholder="/certs/client-cert.pem">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Client Private Key Path</label>
+                            <input type="text" id="sslKeyPath" class="form-control" placeholder="/certs/client-key.pem">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SASL -->
+                <div id="sslSaslFields" style="display:none">
+                    <h6 class="text-muted mt-3 mb-2"><i class="fas fa-user-shield me-1"></i>SASL Authentication</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">SASL Mechanism</label>
+                            <select id="sslSaslMech" class="form-select">
+                                <option>SCRAM-SHA-512</option><option>SCRAM-SHA-256</option><option>PLAIN</option><option>OAUTHBEARER</option>
+                            </select>
+                        </div>
+                        <div class="col-md-9">
+                            <label class="form-label">JAAS Config</label>
+                            <input type="text" id="sslSaslJaas" class="form-control" placeholder='org.apache.kafka.common.security.scram.ScramLoginModule required username="user" password="pass";'>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cipher Suite -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Cipher Suite <span class="text-muted">(optional, IBM MQ)</span></label>
+                        <input type="text" id="sslCipher" class="form-control" placeholder="TLS_RSA_WITH_AES_256_CBC_SHA256">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between mb-4">
+            <a href="/admin/brokers" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Brokers</a>
+            <button class="btn btn-primary btn-lg" onclick="saveBroker()"><i class="fas fa-save me-1"></i>Save Broker</button>
+        </div>
+
+        <!-- Quick Reference -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-book me-2"></i>Quick Reference</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Connection Defaults</h6>
+                        <table class="table table-sm small">
+                            <thead class="table-light"><tr><th>Broker</th><th>Default Port</th><th>Protocol</th></tr></thead>
+                            <tbody>
+                                <tr><td>Kafka</td><td><code>9092</code> (plain) / <code>9093</code> (SSL)</td><td>TCP</td></tr>
+                                <tr><td>ActiveMQ</td><td><code>61616</code></td><td>OpenWire</td></tr>
+                                <tr><td>RabbitMQ</td><td><code>5672</code> (plain) / <code>5671</code> (SSL)</td><td>AMQP</td></tr>
+                                <tr><td>IBM MQ</td><td><code>1414</code></td><td>MQ</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Naming Convention</h6>
+                        <p class="text-muted small">Use lowercase with hyphens. Include environment and purpose:</p>
+                        <ul class="small text-muted mb-0">
+                            <li><code>prod-kafka</code> &mdash; production Kafka cluster</li>
+                            <li><code>dev-activemq</code> &mdash; development ActiveMQ</li>
+                            <li><code>staging-rabbit</code> &mdash; staging RabbitMQ</li>
+                            <li><code>audit-file</code> &mdash; local file for audit</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">After Creating</h6>
+                        <p class="text-muted small">Once saved, the broker is available for:</p>
+                        <ul class="small text-muted">
+                            <li><a href="/admin/event-publishing/add">Event Publishing</a> &mdash; route cache change events</li>
+                            <li><a href="/admin/messaging/add-channel">Messaging Channels</a> &mdash; request/response messaging</li>
+                        </ul>
+                        <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>Stored in <code>config/message_brokers.json</code>. Restart server to activate connections.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Relationships -->
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-link text-primary me-2"></i>
+            <strong>Related:</strong>
+            <a href="/admin/brokers" class="ms-2"><i class="fas fa-server me-1"></i>Broker Registry</a>
+            <a href="/admin/event-publishing" class="ms-3"><i class="fas fa-broadcast-tower me-1"></i>Event Publishing</a>
+            <a href="/admin/messaging" class="ms-3"><i class="fas fa-exchange-alt me-1"></i>Messaging</a>
+            <a href="/help/ssl-tls" class="ms-3"><i class="fas fa-lock me-1"></i>SSL/TLS Guide</a>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script>
+function showTypeFields() {
+    ['kafkaFields','activemqFields','rabbitmqFields','ibmmqFields','fileFields'].forEach(id =>
+        document.getElementById(id).style.display = 'none'
+    );
+    const t = document.getElementById('brokerType').value;
+    document.getElementById(t === 'kafka' ? 'kafkaFields' :
+        t === 'activemq' ? 'activemqFields' :
+        t === 'rabbitmq' ? 'rabbitmqFields' :
+        t === 'ibmmq' ? 'ibmmqFields' : 'fileFields').style.display = '';
+    // Hide SSL card for file type
+    document.getElementById('sslCard').style.display = t === 'file' ? 'none' : '';
+}
+
+function toggleSslFields() {
+    document.getElementById('sslFields').style.display = document.getElementById('sslEnabled').checked ? '' : 'none';
+    if (document.getElementById('sslEnabled').checked) showSslModeFields();
+}
+
+function showSslModeFields() {
+    const mode = document.getElementById('sslMode').value;
+    document.getElementById('sslJksFields').style.display = ['jks','sasl_ssl','mtls_jks'].includes(mode) ? '' : 'none';
+    document.getElementById('sslPemTrustFields').style.display = ['pem','mtls_pem'].includes(mode) ? '' : 'none';
+    document.getElementById('sslKeyStoreFields').style.display = mode === 'mtls_jks' ? '' : 'none';
+    document.getElementById('sslPemKeyFields').style.display = mode === 'mtls_pem' ? '' : 'none';
+    document.getElementById('sslSaslFields').style.display = mode === 'sasl_ssl' ? '' : 'none';
+}
+
+function val(id) { return document.getElementById(id).value.trim(); }
+function intVal(id, def) { return parseInt(document.getElementById(id).value) || def; }
+
+function saveBroker() {
+    const name = val('brokerName');
+    if (!name) { showAlert('danger', 'Broker name is required.'); return; }
+
+    const type = document.getElementById('brokerType').value;
+    const cfg = { enabled: document.getElementById('brokerEnabled').checked, type: type };
+
+    if (type === 'kafka') {
+        if (!val('kafkaServers')) { showAlert('danger', 'Bootstrap servers required.'); return; }
+        cfg['bootstrap-servers'] = val('kafkaServers');
+        cfg.partitions = intVal('kafkaPartitions', 3);
+        cfg['replication-factor'] = intVal('kafkaReplication', 1);
+        cfg.acks = val('kafkaAcks');
+        if (val('kafkaGroupId')) cfg['group-id'] = val('kafkaGroupId');
+        if (val('kafkaOffsetReset')) cfg['auto-offset-reset'] = val('kafkaOffsetReset');
+    } else if (type === 'activemq') {
+        if (!val('amqUrl')) { showAlert('danger', 'Broker URL required.'); return; }
+        cfg['broker-url'] = val('amqUrl');
+        if (val('amqUser')) cfg.username = val('amqUser');
+        if (val('amqPass')) cfg.password = val('amqPass');
+    } else if (type === 'rabbitmq') {
+        if (!val('rabbitHost')) { showAlert('danger', 'Host required.'); return; }
+        cfg.host = val('rabbitHost');
+        cfg.port = intVal('rabbitPort', 5672);
+        cfg['virtual-host'] = val('rabbitVHost') || '/';
+        if (val('rabbitUser')) cfg.username = val('rabbitUser');
+        if (val('rabbitPass')) cfg.password = val('rabbitPass');
+        cfg['exchange-type'] = document.getElementById('rabbitExchange').value;
+        cfg.durable = document.getElementById('rabbitDurable').checked;
+    } else if (type === 'ibmmq') {
+        if (!val('ibmHost')) { showAlert('danger', 'Host required.'); return; }
+        cfg.host = val('ibmHost');
+        cfg.port = intVal('ibmPort', 1414);
+        cfg['queue-manager'] = val('ibmQM');
+        if (val('ibmChannel')) cfg.channel = val('ibmChannel');
+        if (val('ibmUser')) cfg.username = val('ibmUser');
+        if (val('ibmPass')) cfg.password = val('ibmPass');
+    } else if (type === 'file') {
+        if (!val('fileDir')) { showAlert('danger', 'Directory required.'); return; }
+        cfg.directory = val('fileDir');
+        cfg['max-file-size-mb'] = intVal('fileMaxMb', 100);
+        cfg['rotation-policy'] = document.getElementById('fileRotation').value;
+        cfg['retention-days'] = intVal('fileRetention', 30);
+        cfg.compress = document.getElementById('fileCompress').checked;
+    }
+
+    // SSL
+    if (document.getElementById('sslEnabled').checked && type !== 'file') {
+        const mode = val('sslMode');
+        const ssl = { enabled: true, mode: mode, protocol: val('sslProtocol'), 'hostname-verification': document.getElementById('sslHostVerify').checked };
+        if (['jks','sasl_ssl','mtls_jks'].includes(mode)) {
+            ssl['trust-store-path'] = val('sslTrustPath');
+            ssl['trust-store-password'] = val('sslTrustPass');
+            ssl['trust-store-type'] = document.getElementById('sslTrustType').value;
+        }
+        if (['pem','mtls_pem'].includes(mode)) ssl['trust-cert-path'] = val('sslTrustCertPath');
+        if (mode === 'mtls_jks') {
+            ssl['key-store-path'] = val('sslKeyStorePath');
+            ssl['key-store-password'] = val('sslKeyStorePass');
+            ssl['key-store-type'] = document.getElementById('sslKeyStoreType').value;
+            ssl['key-password'] = val('sslKeyPass');
+        }
+        if (mode === 'mtls_pem') {
+            ssl['key-cert-path'] = val('sslKeyCertPath');
+            ssl['key-path'] = val('sslKeyPath');
+        }
+        if (mode === 'sasl_ssl') {
+            ssl['sasl-mechanism'] = document.getElementById('sslSaslMech').value;
+            ssl['sasl-jaas-config'] = val('sslSaslJaas');
+        }
+        if (val('sslCipher')) ssl['cipher-suite'] = val('sslCipher');
+        cfg.ssl = ssl;
+    }
+
+    fetch('/admin/api/config/brokers', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ name: name, config: cfg })
+    }).then(r => r.json()).then(d => {
+        if (d.error) { showAlert('danger', d.error); return; }
+        showAlert('success', 'Broker "' + name + '" created successfully.');
+        setTimeout(() => window.location.href = '/admin/brokers', 1500);
+    }).catch(e => showAlert('danger', 'Error: ' + e));
+}
+
+function showAlert(type, msg) {
+    document.getElementById('alertArea').innerHTML =
+        '<div class="alert alert-' + type + ' alert-dismissible fade show">' +
+        '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-triangle') + ' me-2"></i>' +
+        msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+    window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>

@@ -59,7 +59,46 @@
                     </tbody>
                 </table>
                 
+                <h3 class="mt-4">Monitoring &amp; Health Endpoints <span class="badge bg-info">v2.2.0</span></h3>
+                <table class="table table-striped">
+                    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Permission</th></tr></thead>
+                    <tbody>
+                        <tr><td>GET</td><td>/ping</td><td>Health check (returns "pong")</td><td><span class="badge bg-secondary">None</span></td></tr>
+                        <tr><td>GET</td><td>/health</td><td>Detailed health status</td><td><span class="badge bg-secondary">None</span></td></tr>
+                        <tr><td>GET</td><td>/api/monitoring/overview</td><td>Full system overview (JVM, OS, cache, threads)</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>GET</td><td>/api/monitoring/logs</td><td>Live log entries with filtering (?level=WARN&amp;search=keyword&amp;afterId=N)</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>POST</td><td>/api/monitoring/logs/clear</td><td>Clear log buffer</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>GET</td><td>/api/monitoring/metrics/current/{region}</td><td>Current metrics for a specific region</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>POST</td><td>/api/monitoring/stats/refresh</td><td>Refresh stats for all regions</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>POST</td><td>/api/monitoring/gc</td><td>Trigger garbage collection</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4">JSON Document Endpoints</h3>
+                <table class="table table-striped">
+                    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Permission</th></tr></thead>
+                    <tbody>
+                        <tr><td>POST</td><td>/api/json/{region}/store</td><td>Store JSON document with key</td><td><span class="badge bg-warning text-dark">WRITE</span></td></tr>
+                        <tr><td>GET</td><td>/api/json/{region}/get?key=X</td><td>Retrieve JSON document</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>GET</td><td>/api/json/{region}/get?key=X&amp;path=$.field</td><td>Retrieve value at JSONPath</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>POST</td><td>/api/json/{region}/search</td><td>Search JSON documents by field criteria</td><td><span class="badge bg-success">READ</span></td></tr>
+                        <tr><td>DELETE</td><td>/api/json/{region}/delete?key=X</td><td>Delete JSON document</td><td><span class="badge bg-danger">DELETE</span></td></tr>
+                        <tr><td>POST</td><td>/api/json/{region}/cross-region</td><td>Cross-region JSON operations</td><td><span class="badge bg-warning text-dark">WRITE</span></td></tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4">Export &amp; Backup Endpoints</h3>
+                <table class="table table-striped">
+                    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Permission</th></tr></thead>
+                    <tbody>
+                        <tr><td>GET</td><td>/api/export/region/{name}</td><td>Export region data as CSV</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>POST</td><td>/api/backup/trigger</td><td>Trigger manual backup</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                        <tr><td>POST</td><td>/api/backup/restore</td><td>Restore from backup</td><td><span class="badge bg-dark">ADMIN</span></td></tr>
+                    </tbody>
+                </table>
+                
                 <p class="mt-4">See <a href="/help/python-client">Python Client</a>, <a href="/help/java-client">Java Client</a>, or <a href="/help/csharp-client">C# Client</a> for complete examples. See <a href="/help/messaging">Messaging</a> for request/response documentation.</p>
+
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
                 </div>
@@ -67,7 +106,7 @@
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.1.0</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.3.0</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

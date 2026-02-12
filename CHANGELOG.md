@@ -2,6 +2,99 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.3.0] - 2026-02-12 - ADMIN UI OVERHAUL, SLASH KEY FIX & SECURITY CONFIG MOVE
+
+### 🚀 Admin UI - Modal Elimination
+
+- **All modals replaced**: Every modal dialog across the admin UI has been replaced with either standalone full-page forms or native browser confirm() dialogs
+- **Standalone creation pages**: New dedicated pages for `/admin/brokers/add`, `/admin/event-publishing/add`, `/admin/messaging/add-channel`, `/admin/users/add`, `/admin/roles/add`, `/admin/apikeys/add`
+- **Inline detail panels**: Index statistics and message details now display inline with collapsible panels instead of popup modals
+- **Confirmation dialogs**: Index drop and API key delete operations use native confirm() for consistent, accessible behavior
+
+### Messaging Admin Improvements
+
+- **Add Channel workflow**: The messaging page no longer creates brokers directly; instead, the new "Add Channel" page selects from existing brokers in `message_brokers.json` and configures request/response topics on them
+- **Unified broker management**: All broker creation flows through `/admin/brokers/add` with full SSL/TLS configuration
+
+### Slash Key Fix (Multi-Layer Defense)
+
+- **Root cause**: Cache keys containing `/` (e.g., `employee/EMP001`) encoded as `%2F` were rejected with HTTP 400 due to three independent layers blocking them
+- **Tomcat layer** (`TomcatConfig.java`): `EncodedSolidusHandling.PASSTHROUGH` prevents Tomcat from rejecting `%2F`; enhanced with 3-method fallback chain (AbstractHttp11Protocol setter → generic property → reflective call) for maximum compatibility across Tomcat versions
+- **Spring Security layer**: `StrictHttpFirewall.setAllowUrlEncodedSlash(true)` permits encoded slashes through the firewall
+- **Spring MVC layer** (`WebMvcConfig.java`): Switched from `PathPatternParser` to `AntPathMatcher` with `urlDecode=false` so `%2F` stays encoded during pattern matching; a `PathVariableDecodingInterceptor` transparently decodes all `@PathVariable` values before controllers receive them
+- **Catch-all endpoints** (`ApiController.java`): Added `GET/PUT/DELETE /json/{region}/**` wildcard endpoints as safety net — if `%2F` decodes to `/` despite PASSTHROUGH, the catch-all matches multi-segment paths and reconstructs the original key via `SlashKeyResolver`
+- **SlashKeyResolver utility**: New helper class extracts keys from `/**` wildcard matches using Spring's `HandlerMapping` attributes, URL-decodes the result, and handles both encoded and decoded slashes transparently
+
+### Admin UI - Glossary & Cross-References
+
+- **Architecture banners**: All add-pages (`brokers-add`, `event-publishing-add`, `messaging-add-channel`) now display architecture banners explaining how brokers, event publishing, and messaging relate to each other
+- **Quick Reference sections**: Each add-page includes inline terminology, defaults tables, naming conventions, and example configurations
+- **Page relationships**: Cross-links between Broker Registry, Event Publishing, and Messaging pages on every add-form so users can navigate the related configuration workflow
+- **Broker selection clarity**: Messaging add-channel page explicitly explains that channels reference brokers by name from the central registry — channels inherit connection settings, not define their own
+
+### Client Demo Updates
+
+- **Slash-key demo** (`demo n`): New demonstration in all three client libraries (Python, Java, C#) showing cache operations with keys containing forward slashes (`employee/EMP001`, `department/eng/lead`, `config/app/v2.1/settings`)
+- **Operations covered**: Store, retrieve, JSONPath query, and delete operations on slash-containing keys with proper URL encoding
+- **Version updated**: All client demos updated from v2.2.0 to v2.3.0
+
+### Security Config Relocation
+
+- **Moved** `secure/` folder to `config/secure/` — all security files (users.json, roles.json, apikeys.json) now live alongside other config files
+- **Updated** `kuber.secure.folder` default from `./secure` to `config/secure` in `application.properties` and `KuberProperties`
+- **Updated** all documentation, help pages, and sample commands to reflect the new path
+
+### Documentation & Help Pages
+
+- All help pages updated with version 2.3.0
+- Security and API keys help pages updated with new `config/secure/` paths
+- Architecture, startup guide, and README updated
+
+---
+
+## [2.2.0] - 2026-02-11 - MONITORING, LIVE LOGS & UI ENHANCEMENTS
+
+### 🚀 Real-Time Monitoring & Observability
+
+- **Monitoring Dashboard**: Live system metrics at `/admin/monitoring` with auto-refresh charts for CPU, heap memory, thread counts, cache operations, and hit/miss ratios
+- **Live Log Viewer**: Terminal-style log viewer at `/admin/logs` with level filtering (ERROR, WARN, INFO, DEBUG), text search, auto-scroll, and log download
+- **Log Buffer Service**: In-memory ring buffer capturing 2000 log entries with incremental polling via custom Logback appender
+- **System Overview API**: New `/api/monitoring/overview` endpoint aggregating JVM, OS, threads, GC, and cache stats in a single JSON response
+
+### UI Enhancements
+
+- **Unified Table Component (KuberTable)**: All data tables now feature client-side pagination, column sorting, text search, and configurable page sizes via a reusable JavaScript component
+- **Dark / Light Theme Toggle**: One-click theme switching in the navbar with localStorage persistence and OS preference detection; comprehensive dark mode across all pages including login, monitoring charts, and admin panels
+- **Regions Table View**: Regions page converted from cards to a sortable, searchable table with capacity bars
+
+### External Configuration Files
+
+- **Message Broker Definitions**: Broker configurations (Kafka, ActiveMQ, RabbitMQ, IBM MQ, File) moved to `config/message_brokers.json`; override path with `kuber.publishing.broker-config-file`
+- **Event Publishing Region Config**: Region event publishing configuration in `config/event_publishing.json`; override with `kuber.publishing.region-config-file`
+- **Request/Response Messaging Config**: Messaging broker configuration in `config/request_response.json`; override with `kuber.messaging.request-response-config-file`; hot-reload preserved
+- **Backward Compatible**: All JSON files are auto-created with defaults on first start if not present; `application.properties` entries still work as fallback
+
+### SSL/TLS Broker Security
+
+- **Five SSL modes** for all broker types: `jks` (JKS/PKCS12 trust store), `pem` (PEM CA certificate), `sasl_ssl` (SASL over SSL for Kafka), `mtls_jks` (mutual TLS with JKS key store), `mtls_pem` (mutual TLS with PEM client cert + key)
+- **Per-broker SSL config** in `message_brokers.json` with protocol, trust store, key store, PEM paths, SASL mechanism, JAAS config, hostname verification, and cipher suite fields
+- **Kafka SASL_SSL**: Supports PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, and OAUTHBEARER mechanisms
+
+### Admin UI - Messaging Management
+
+- **Message Brokers page** (`/admin/brokers`): Create, delete, enable/disable brokers via UI; full SSL/TLS configuration modal with all 5 modes; inline JSON editor for `message_brokers.json`
+- **Event Publishing page** (`/admin/event-publishing`): Create, delete, enable/disable regions via UI; destination management with broker selection; inline JSON editor for `event_publishing.json`
+- **Request/Response page** (`/admin/messaging`): Existing full CRUD for messaging brokers, topics, enable/disable
+- **Navigation submenu**: Admin dropdown groups Messaging pages under a header: Message Brokers, Event Publishing, Request/Response
+
+### Slash Key Support (v2.2.0)
+
+- **Tomcat PASSTHROUGH**: Encoded forward slashes (`%2F`) in cache key URLs no longer rejected by Tomcat connector
+- **Spring Security Firewall**: `StrictHttpFirewall` configured to allow URL-encoded slashes, fixing HTTP 400 for keys like `employee/EMP001`
+- Both layers (Tomcat + Spring Security) must be configured — previous fix only addressed one layer
+
+---
+
 ## [2.1.0] - 2026-02-04 - INDEX OPTIMIZATION & PERFORMANCE OVERHAUL
 
 ### 🚀 Major Index Performance Improvements
@@ -812,7 +905,7 @@ This is a complete overhaul of the authentication and authorization system.
 
 ### Configuration Files
 
-**users.json** (secure/users.json):
+**users.json** (config/secure/users.json):
 ```json
 {
   "users": [
@@ -828,7 +921,7 @@ This is a complete overhaul of the authentication and authorization system.
 }
 ```
 
-**roles.json** (secure/roles.json):
+**roles.json** (config/secure/roles.json):
 ```json
 {
   "roles": [
@@ -916,13 +1009,13 @@ RBAC is enforced at all application layers:
 ### Breaking Changes
 
 - `JsonUserDetailsService` replaced by `KuberUserService`
-- Security files moved to `secure/` folder
+- Security files moved to `config/secure/` folder
 - New configuration properties required
 
 ### Migration Guide
 
-1. Move `users.json` to `secure/users.json`
-2. Move `apikeys.json` to `secure/apikeys.json`
+1. Move `users.json` to `config/secure/users.json`
+2. Move `apikeys.json` to `config/secure/apikeys.json`
 3. Add roles to users in `users.json`
 4. Create `roles.json` with role definitions
 5. Update `application.properties` with new paths
@@ -1079,7 +1172,7 @@ All cache operations are supported via messaging:
 
 ### ⚠️ BREAKING CHANGE: Authentication Model
 
-**v2.1.0 enforces API Key authentication for ALL programmatic access.**
+**v1.6.5 enforces API Key authentication for ALL programmatic access.**
 
 | Access Method | Authentication | Description |
 |---------------|----------------|-------------|
@@ -1141,7 +1234,7 @@ client = KuberClient('localhost', 6380, username='admin', password='password')
 rest = KuberRestClient('localhost', 8080, username='admin', password='password')
 ```
 
-**After (v2.1.0):**
+**After (v1.6.5):**
 ```java
 // Java - API Key required
 KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key");
@@ -1183,7 +1276,7 @@ rest = KuberRestClient('localhost', 8080, api_key='kub_your_api_key')
 
 ### Added
 - **Secure Folder**: New `kuber.secure.folder` property for sensitive configuration files
-  - Default location: `./secure`
+  - Default location: `config/secure`
   - Automatically created if it doesn't exist
   - Centralized location for security-related files
 - **Startup Validation**: Application now validates required security files

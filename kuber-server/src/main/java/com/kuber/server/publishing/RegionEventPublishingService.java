@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *                        │    ▼        ▼         ▼         ▼         ▼
  *                        │  Kafka   ActiveMQ  RabbitMQ  IBM MQ     File
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
@@ -81,7 +81,8 @@ public class RegionEventPublishingService {
     private final Set<String> enabledRegions = ConcurrentHashMap.newKeySet();
     
     public RegionEventPublishingService(KuberProperties properties,
-                                        PublisherRegistry publisherRegistry) {
+                                        PublisherRegistry publisherRegistry,
+                                        EventPublishingConfigLoader configLoader) {
         this.properties = properties;
         this.publisherRegistry = publisherRegistry;
     }

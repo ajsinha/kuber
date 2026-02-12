@@ -111,6 +111,36 @@
             </div>
             
             <div class="col-lg-3 col-md-6">
+                <a th:href="@{/admin/brokers}" class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 hover-lift" style="background: linear-gradient(135deg, #0d9488 0%, #059669 100%);">
+                        <div class="card-body text-center py-4 text-white">
+                            <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex p-3 mb-3">
+                                <i class="fas fa-server fa-2x"></i>
+                            </div>
+                            <h5>Message Brokers</h5>
+                            <p class="mb-0 small opacity-75">Kafka, ActiveMQ, RabbitMQ, IBM MQ</p>
+                            <span class="badge bg-light text-dark mt-2">v2.2.0</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-lg-3 col-md-6">
+                <a th:href="@{/admin/event-publishing}" class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 hover-lift" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        <div class="card-body text-center py-4 text-white">
+                            <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex p-3 mb-3">
+                                <i class="fas fa-broadcast-tower fa-2x"></i>
+                            </div>
+                            <h5>Event Publishing</h5>
+                            <p class="mb-0 small opacity-75">Region-to-broker event routing</p>
+                            <span class="badge bg-light text-dark mt-2">v2.2.0</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-lg-3 col-md-6">
                 <a th:href="@{/admin/messaging}" class="text-decoration-none">
                     <div class="card border-0 shadow-sm h-100 hover-lift" style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);">
                         <div class="card-body text-center py-4 text-white">
@@ -118,8 +148,8 @@
                                 <i class="fas fa-exchange-alt fa-2x"></i>
                             </div>
                             <h5>Request/Response</h5>
-                            <p class="mb-0 small opacity-75">Manage message broker integrations</p>
-                            <span class="badge bg-light text-dark mt-2">NEW v1.7.1</span>
+                            <p class="mb-0 small opacity-75">Request/response messaging service</p>
+                            <span class="badge bg-light text-dark mt-2">v1.7.1</span>
                         </div>
                     </div>
                 </a>
@@ -134,7 +164,40 @@
                             </div>
                             <h5>Secondary Indexes</h5>
                             <p class="mb-0 small opacity-75">Manage hash &amp; btree indexes</p>
-                            <span class="badge bg-light text-dark mt-2">NEW v2.1.0</span>
+                            <span class="badge bg-light text-dark mt-2">NEW v2.2.0</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Monitoring & Logs Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-3 col-md-6">
+                <a th:href="@{/admin/monitoring}" class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 hover-lift" style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);">
+                        <div class="card-body text-center py-4 text-white">
+                            <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex p-3 mb-3">
+                                <i class="fas fa-heartbeat fa-2x"></i>
+                            </div>
+                            <h5>Monitoring</h5>
+                            <p class="mb-0 small opacity-75">Real-time system &amp; cache monitoring</p>
+                            <span class="badge bg-light text-dark mt-2">NEW v2.2.0</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-lg-3 col-md-6">
+                <a th:href="@{/admin/logs}" class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 hover-lift" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
+                        <div class="card-body text-center py-4 text-white">
+                            <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex p-3 mb-3">
+                                <i class="fas fa-scroll fa-2x"></i>
+                            </div>
+                            <h5>Live Logs</h5>
+                            <p class="mb-0 small opacity-75">Real-time log viewer with filtering</p>
+                            <span class="badge bg-light text-dark mt-2">NEW v2.2.0</span>
                         </div>
                     </div>
                 </a>

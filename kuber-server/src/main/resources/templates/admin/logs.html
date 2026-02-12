@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Live Logs')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/admin}">Admin</a></li>
+                <li class="breadcrumb-item active">Live Logs</li>
+            </ol>
+        </nav>
+        
+        <!-- Header & Controls -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-3">
+                <div class="row align-items-center g-2">
+                    <div class="col-auto">
+                        <h4 class="mb-0"><i class="fas fa-scroll me-2 text-dark"></i>Live Logs</h4>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <!-- Level Filter -->
+                            <div class="input-group input-group-sm" style="width:140px">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                                <select class="form-select form-select-sm" id="levelFilter">
+                                    <option value="ALL">All Levels</option>
+                                    <option value="TRACE">TRACE</option>
+                                    <option value="DEBUG">DEBUG</option>
+                                    <option value="INFO" selected>INFO+</option>
+                                    <option value="WARN">WARN+</option>
+                                    <option value="ERROR">ERROR</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Search -->
+                            <div class="input-group input-group-sm" style="width:220px">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="searchFilter" placeholder="Search logs...">
+                                <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('searchFilter').value='';resetPolling()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Max Lines -->
+                            <div class="input-group input-group-sm" style="width:130px">
+                                <span class="input-group-text">Lines</span>
+                                <select class="form-select form-select-sm" id="maxLines">
+                                    <option value="100">100</option>
+                                    <option value="200">200</option>
+                                    <option value="500" selected>500</option>
+                                    <option value="1000">1000</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Refresh rate -->
+                            <div class="input-group input-group-sm" style="width:130px">
+                                <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                <select class="form-select form-select-sm" id="pollInterval">
+                                    <option value="1000">1 sec</option>
+                                    <option value="2000" selected>2 sec</option>
+                                    <option value="5000">5 sec</option>
+                                    <option value="10000">10 sec</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Play/Pause -->
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="autoScroll" checked>
+                                <label class="form-check-label small" for="autoScroll">Auto-scroll</label>
+                            </div>
+                            
+                            <button class="btn btn-sm btn-outline-success" id="toggleBtn" onclick="togglePolling()">
+                                <i class="fas fa-pause" id="toggleIcon"></i>
+                            </button>
+                            
+                            <button class="btn btn-sm btn-outline-danger" onclick="clearLogs()" title="Clear buffer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            
+                            <button class="btn btn-sm btn-outline-secondary" onclick="downloadLogs()" title="Download visible logs">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Bar -->
+        <div class="d-flex align-items-center gap-3 mb-2 px-1">
+            <span class="badge bg-success" id="liveIndicator">
+                <i class="fas fa-circle me-1" style="font-size:0.5em;vertical-align:middle"></i>Live
+            </span>
+            <small class="text-muted">Buffer: <span id="bufferSize">0</span> / <span id="bufferMax">2000</span></small>
+            <small class="text-muted">Showing: <span id="visibleCount">0</span> entries</small>
+            <small class="text-muted">Total processed: <span id="totalProcessed">0</span></small>
+            <small class="text-muted ms-auto" id="lastPoll">-</small>
+        </div>
+        
+        <!-- Log Output -->
+        <div id="logContainer" class="border rounded" 
+             style="height:calc(100vh - 340px); overflow-y:auto; background:#1e1e2e; font-family:'JetBrains Mono','Fira Code','Consolas',monospace; font-size:12px; line-height:1.6">
+            <div id="logOutput" class="p-2">
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-spinner fa-spin fa-2x mb-3 d-block"></i>
+                    Connecting to log stream...
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
+<style>
+    #logOutput .log-line {
+        padding: 1px 8px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    #logOutput .log-line:hover {
+        background: rgba(255,255,255,0.05);
+    }
+    /* Level colors */
+    .log-ERROR { color: #f38ba8; }
+    .log-WARN  { color: #fab387; }
+    .log-INFO  { color: #a6e3a1; }
+    .log-DEBUG { color: #89b4fa; }
+    .log-TRACE { color: #6c7086; }
+    
+    .log-time  { color: #585b70; }
+    .log-thread { color: #7f849c; }
+    .log-logger { color: #b4befe; }
+    .log-msg   { color: #cdd6f4; }
+    .log-stack { color: #f38ba8; opacity: 0.8; font-size: 11px; }
+    
+    .log-level-badge {
+        display: inline-block;
+        width: 46px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 10px;
+        padding: 0 4px;
+        border-radius: 3px;
+        margin-right: 4px;
+    }
+    .badge-ERROR { background: rgba(243,139,168,0.2); color: #f38ba8; }
+    .badge-WARN  { background: rgba(250,179,135,0.2); color: #fab387; }
+    .badge-INFO  { background: rgba(166,227,161,0.15); color: #a6e3a1; }
+    .badge-DEBUG { background: rgba(137,180,250,0.15); color: #89b4fa; }
+    .badge-TRACE { background: rgba(108,112,134,0.15); color: #6c7086; }
+    
+    .highlight-match {
+        background: rgba(249,226,175,0.3);
+        color: #f9e2af;
+        padding: 0 2px;
+        border-radius: 2px;
+    }
+</style>
+
+<script>
+let pollTimer = null;
+let isPolling = true;
+let lastId = 0;
+let allEntries = [];
+
+function init() {
+    // Initial full load
+    fetchLogs(true);
+    startPolling();
+    
+    // Event listeners
+    document.getElementById('levelFilter').addEventListener('change', resetPolling);
+    document.getElementById('maxLines').addEventListener('change', resetPolling);
+    document.getElementById('pollInterval').addEventListener('change', function() {
+        if (isPolling) { stopPolling(); startPolling(); }
+    });
+    
+    let searchTimeout;
+    document.getElementById('searchFilter').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(resetPolling, 300);
+    });
+}
+
+function startPolling() {
+    stopPolling();
+    const interval = parseInt(document.getElementById('pollInterval').value);
+    pollTimer = setInterval(() => fetchLogs(false), interval);
+    isPolling = true;
+    document.getElementById('toggleIcon').className = 'fas fa-pause';
+    document.getElementById('toggleBtn').className = 'btn btn-sm btn-outline-success';
+    document.getElementById('liveIndicator').className = 'badge bg-success';
+    document.getElementById('liveIndicator').innerHTML = '<i class="fas fa-circle me-1" style="font-size:0.5em;vertical-align:middle"></i>Live';
+}
+
+function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    isPolling = false;
+    document.getElementById('toggleIcon').className = 'fas fa-play';
+    document.getElementById('toggleBtn').className = 'btn btn-sm btn-outline-warning';
+    document.getElementById('liveIndicator').className = 'badge bg-secondary';
+    document.getElementById('liveIndicator').innerHTML = '<i class="fas fa-pause me-1" style="font-size:0.5em;vertical-align:middle"></i>Paused';
+}
+
+function togglePolling() {
+    if (isPolling) stopPolling(); else { fetchLogs(false); startPolling(); }
+}
+
+function resetPolling() {
+    lastId = 0;
+    allEntries = [];
+    fetchLogs(true);
+}
+
+function fetchLogs(fullRefresh) {
+    const level = document.getElementById('levelFilter').value;
+    const search = document.getElementById('searchFilter').value;
+    const maxLines = document.getElementById('maxLines').value;
+    
+    let url = '/api/monitoring/logs?lines=' + maxLines;
+    if (level && level !== 'ALL') url += '&level=' + level;
+    if (search) url += '&search=' + encodeURIComponent(search);
+    if (!fullRefresh && lastId > 0) url += '&afterId=' + lastId;
+    
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('lastPoll').textContent = 'Last poll: ' + new Date().toLocaleTimeString();
+            
+            // Update stats
+            if (data.stats) {
+                document.getElementById('bufferSize').textContent = data.stats.bufferSize;
+                document.getElementById('bufferMax').textContent = data.stats.maxBufferSize;
+                document.getElementById('totalProcessed').textContent = numberFmt(data.stats.totalProcessed);
+            }
+            
+            const entries = data.entries || [];
+            
+            if (fullRefresh) {
+                allEntries = entries;
+                renderAll();
+            } else if (entries.length > 0) {
+                allEntries = allEntries.concat(entries);
+                // Trim to max lines
+                const max = parseInt(maxLines);
+                if (allEntries.length > max) {
+                    allEntries = allEntries.slice(allEntries.length - max);
+                }
+                appendEntries(entries);
+            }
+            
+            if (data.latestId) lastId = data.latestId;
+            document.getElementById('visibleCount').textContent = allEntries.length;
+        })
+        .catch(e => console.error('Log fetch error:', e));
+}
+
+function renderAll() {
+    const container = document.getElementById('logOutput');
+    if (allEntries.length === 0) {
+        container.innerHTML = '<div class="text-center py-5" style="color:#585b70"><i class="fas fa-inbox fa-2x mb-3 d-block"></i>No log entries matching filters</div>';
+        return;
+    }
+    container.innerHTML = allEntries.map(formatEntry).join('');
+    autoScroll();
+}
+
+function appendEntries(entries) {
+    const container = document.getElementById('logOutput');
+    // If it was showing the "no entries" message, clear it
+    if (container.querySelector('.fa-inbox') || container.querySelector('.fa-spinner')) {
+        container.innerHTML = '';
+    }
+    entries.forEach(entry => {
+        container.insertAdjacentHTML('beforeend', formatEntry(entry));
+    });
+    
+    // Trim DOM nodes if too many
+    const maxLines = parseInt(document.getElementById('maxLines').value);
+    while (container.children.length > maxLines) {
+        container.removeChild(container.firstChild);
+    }
+    
+    autoScroll();
+}
+
+function formatEntry(e) {
+    const search = document.getElementById('searchFilter').value;
+    const shortLogger = shortenLogger(e.logger);
+    let msg = escapeHtml(e.message);
+    
+    // Highlight search terms
+    if (search) {
+        const re = new RegExp('(' + escapeRegExp(search) + ')', 'gi');
+        msg = msg.replace(re, '<span class="highlight-match">$1</span>');
+    }
+    
+    let html = '<div class="log-line log-' + e.level + '">' +
+        '<span class="log-time">' + e.formattedTime + '</span> ' +
+        '<span class="log-level-badge badge-' + e.level + '">' + e.level + '</span> ' +
+        '<span class="log-thread">[' + escapeHtml(e.thread) + ']</span> ' +
+        '<span class="log-logger">' + escapeHtml(shortLogger) + '</span> - ' +
+        '<span class="log-msg">' + msg + '</span>';
+    
+    if (e.stackTrace) {
+        html += '\n<span class="log-stack">' + escapeHtml(e.stackTrace) + '</span>';
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+function shortenLogger(logger) {
+    if (!logger) return '';
+    // com.kuber.server.cache.CacheService -> c.k.s.c.CacheService
+    const parts = logger.split('.');
+    if (parts.length <= 2) return logger;
+    return parts.slice(0, -1).map(p => p[0]).join('.') + '.' + parts[parts.length - 1];
+}
+
+function autoScroll() {
+    if (!document.getElementById('autoScroll').checked) return;
+    const container = document.getElementById('logContainer');
+    container.scrollTop = container.scrollHeight;
+}
+
+function clearLogs() {
+    if (!confirm('Clear the log buffer? This cannot be undone.')) return;
+    fetch('/api/monitoring/logs/clear', { method: 'POST' })
+        .then(() => {
+            allEntries = [];
+            lastId = 0;
+            renderAll();
+        });
+}
+
+function downloadLogs() {
+    const text = allEntries.map(e => {
+        let line = e.formattedTime + ' ' + e.level.padEnd(5) + ' [' + e.thread + '] ' + e.logger + ' - ' + e.message;
+        if (e.stackTrace) line += '\n' + e.stackTrace;
+        return line;
+    }).join('\n');
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kuber-logs-' + new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-') + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function numberFmt(n) {
+    if (n == null) return '0';
+    return n.toLocaleString();
+}
+
+// Init on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+</script>
+
+</body>
+</html>

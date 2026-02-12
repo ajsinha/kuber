@@ -107,22 +107,22 @@
                 </h5>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive px-3 py-2" data-kuber-table="regionIndexTable" data-page-sizes="10,25,50,All" data-default-page-size="25">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Field</th>
-                                <th>Type</th>
-                                <th>Storage</th>
-                                <th>Entries</th>
-                                <th>Unique Values</th>
-                                <th>Memory</th>
-                                <th>Last Rebuilt</th>
+                                <th data-sort="string">Field</th>
+                                <th data-sort="string">Type</th>
+                                <th data-sort="string">Storage</th>
+                                <th data-sort="number">Entries</th>
+                                <th data-sort="number">Unique Values</th>
+                                <th data-sort="string">Memory</th>
+                                <th data-sort="date">Last Rebuilt</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:if="${indexes == null or #lists.isEmpty(indexes)}">
+                            <tr th:if="${indexes == null or #lists.isEmpty(indexes)}" class="empty-row">
                                 <td colspan="8" class="text-center text-muted py-4">
                                     <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                     No indexes configured for this region.
@@ -131,7 +131,7 @@
                                     </a>
                                 </td>
                             </tr>
-                            <tr th:each="idx : ${indexes}">
+                            <tr th:each="idx : ${indexes}" class="data-row">
                                 <td>
                                     <code th:text="${idx['field']}">field</code>
                                 </td>
@@ -211,27 +211,6 @@
 </main>
 
 <!-- Drop Index Confirmation Modal -->
-<div class="modal fade" id="dropIndexModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Drop Index</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to drop the index <strong id="dropIndexName"></strong>?</p>
-                <p class="text-danger mb-0">This action cannot be undone. The index will need to be recreated and rebuilt.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDropBtn">
-                    <i class="fas fa-trash me-1"></i> Drop Index
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Loading Overlay -->
 <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
      style="background: rgba(0,0,0,0.5); z-index: 9999;">
@@ -321,20 +300,8 @@
         rebuildRegionIndexes(getCurrentRegion());
     }
     
-    var pendingDrop = null;
-    
     function confirmDropIndex(region, field) {
-        pendingDrop = { region: region, field: field };
-        document.getElementById('dropIndexName').textContent = region + '.' + field;
-        new bootstrap.Modal(document.getElementById('dropIndexModal')).show();
-    }
-    
-    document.getElementById('confirmDropBtn').addEventListener('click', function() {
-        if (!pendingDrop) return;
-        
-        var region = pendingDrop.region;
-        var field = pendingDrop.field;
-        bootstrap.Modal.getInstance(document.getElementById('dropIndexModal')).hide();
+        if (!confirm('Drop index "' + region + '.' + field + '"?\n\nThis cannot be undone. The index will need to be recreated and rebuilt.')) return;
         
         showLoading();
         fetch('/api/admin/indexes/' + encodeURIComponent(region) + '/' + encodeURIComponent(field), {
@@ -354,9 +321,8 @@
         })
         .finally(function() {
             hideLoading();
-            pendingDrop = null;
         });
-    });
+    }
 </script>
 
 </body>

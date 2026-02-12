@@ -33,7 +33,7 @@ import java.util.*;
  * Controller for administrative operations.
  * Manages users, roles, and API keys with fine-grained RBAC.
  *
- * @version 2.1.0
+ * @version 2.3.0
  */
 @Controller
 @RequestMapping("/admin")
@@ -139,6 +139,12 @@ public class AdminController {
         return "admin/user-detail";
     }
     
+    @GetMapping("/users/add")
+    public String addUserPage(Model model) {
+        model.addAttribute("roles", roleService.getAllRoles());
+        return "admin/users-add";
+    }
+
     @PostMapping("/users/create")
     public String createUser(
             @RequestParam String userId,
@@ -282,6 +288,13 @@ public class AdminController {
         return "admin/roles";
     }
     
+    @GetMapping("/roles/add")
+    public String addRolePage(Model model) {
+        model.addAttribute("regions", cacheService.getRegionNames());
+        model.addAttribute("permissions", KuberPermission.values());
+        return "admin/roles-add";
+    }
+
     @PostMapping("/roles/create")
     public String createRole(
             @RequestParam String name,
@@ -373,6 +386,13 @@ public class AdminController {
         return "admin/apikeys";
     }
     
+    @GetMapping("/apikeys/add")
+    public String addApiKeyPage(Model model) {
+        model.addAttribute("users", userService.getAllUsers());
+        model.addAttribute("roles", roleService.getAllRoles());
+        return "admin/apikeys-add";
+    }
+
     @PostMapping("/apikeys/generate")
     public String generateApiKey(
             @RequestParam String name,
@@ -489,6 +509,21 @@ public class AdminController {
         }
         
         return "admin/stats";
+    }
+    
+    // ==================== Monitoring Dashboard ====================
+    
+    @GetMapping("/monitoring")
+    public String monitoringDashboard(Model model) {
+        model.addAttribute("serverInfo", cacheService.getServerInfo());
+        return "admin/monitoring";
+    }
+    
+    // ==================== Live Logs ====================
+    
+    @GetMapping("/logs")
+    public String viewLogs(Model model) {
+        return "admin/logs";
     }
     
     // ==================== LMDB Management ====================

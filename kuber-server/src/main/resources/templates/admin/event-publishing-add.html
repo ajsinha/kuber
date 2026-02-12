@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Add Region')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/admin"><i class="fas fa-cog me-1"></i>Admin</a></li>
+                <li class="breadcrumb-item"><a href="/admin/event-publishing">Event Publishing</a></li>
+                <li class="breadcrumb-item active">Add Region</li>
+            </ol>
+        </nav>
+
+        <h1 class="display-6 mb-4"><i class="fas fa-plus-circle me-3 text-primary"></i>Add Publishing Region</h1>
+
+        <!-- Architecture Banner -->
+        <div class="alert alert-info border mb-4">
+            <i class="fas fa-project-diagram text-primary me-2"></i>
+            <strong>Event Publishing:</strong> When a key in this region is created, updated, or deleted,
+            Kuber publishes a JSON event to every destination listed below. Each destination pairs a broker
+            from the <a href="/admin/brokers" class="alert-link">Broker Registry</a> with a topic name.
+            Multiple destinations allow fan-out to several broker/topic combinations.
+        </div>
+
+        <div id="alertArea"></div>
+
+        <!-- Region Identity -->
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-database me-2"></i>Region Settings</h5></div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Region Name <span class="text-danger">*</span></label>
+                        <input type="text" id="regionName" class="form-control" placeholder="e.g. customers, trades, orders">
+                        <div class="form-text">The cache region whose events will be published.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <div class="form-check form-switch mt-2">
+                            <input type="checkbox" id="regionEnabled" class="form-check-input" checked>
+                            <label class="form-check-label" for="regionEnabled">Enabled</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Destinations -->
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-route me-2"></i>Destinations</h5>
+                <button class="btn btn-sm btn-light" onclick="addDestination()"><i class="fas fa-plus me-1"></i>Add Destination</button>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Route events to one or more brokers. Each destination specifies a broker (from <a href="/admin/brokers">Message Brokers</a>) and a topic/queue name.</p>
+                <div id="destinationContainer"></div>
+                <div id="noBrokersAlert" class="alert alert-warning" style="display:none">
+                    <i class="fas fa-exclamation-triangle me-2"></i>No brokers configured.
+                    <a href="/admin/brokers/add" class="alert-link">Add a broker</a> first.
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between mb-4">
+            <a href="/admin/event-publishing" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Event Publishing</a>
+            <button class="btn btn-primary btn-lg" onclick="saveRegion()"><i class="fas fa-save me-1"></i>Save Region</button>
+        </div>
+
+        <!-- Quick Reference -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-book me-2"></i>Quick Reference</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Terminology</h6>
+                        <dl>
+                            <dt><i class="fas fa-database text-primary me-1"></i>Region</dt>
+                            <dd class="text-muted small mb-2">A cache region whose mutations trigger events. The region name must match an existing or future cache region.</dd>
+                            <dt><i class="fas fa-route text-success me-1"></i>Destination</dt>
+                            <dd class="text-muted small mb-2">A broker + topic pair. Events are published to ALL enabled destinations for a region.</dd>
+                            <dt><i class="fas fa-server text-info me-1"></i>Broker</dt>
+                            <dd class="text-muted small mb-2">Selected from the <a href="/admin/brokers">Broker Registry</a>. Connection details are managed centrally.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Event Types</h6>
+                        <table class="table table-sm small">
+                            <thead class="table-light"><tr><th>Event</th><th>Trigger</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>PUT</code></td><td>Key created or updated</td></tr>
+                                <tr><td><code>DELETE</code></td><td>Key explicitly deleted</td></tr>
+                                <tr><td><code>EXPIRE</code></td><td>Key removed by TTL expiration</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Topic Naming Tips</h6>
+                        <p class="text-muted small">Use descriptive, hierarchical names:</p>
+                        <ul class="small text-muted mb-2">
+                            <li><code>kuber.customers.events</code></li>
+                            <li><code>inventory-changes</code></li>
+                            <li><code>orders.audit-trail</code></li>
+                        </ul>
+                        <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>Stored in <code>config/event_publishing.json</code> (configurable).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Relationships -->
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-link text-primary me-2"></i>
+            <strong>Related:</strong>
+            <a href="/admin/event-publishing" class="ms-2"><i class="fas fa-broadcast-tower me-1"></i>Event Publishing</a>
+            <a href="/admin/brokers" class="ms-3"><i class="fas fa-server me-1"></i>Broker Registry</a>
+            <a href="/admin/messaging" class="ms-3"><i class="fas fa-exchange-alt me-1"></i>Messaging</a>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script th:inline="javascript">
+const brokerNames = /*[[${brokerNames}]]*/ [];
+
+let destCount = 0;
+
+function addDestination() {
+    if (brokerNames.length === 0) {
+        document.getElementById('noBrokersAlert').style.display = '';
+        return;
+    }
+    const id = destCount++;
+    const opts = brokerNames.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+    const html =
+        '<div class="card mb-3 dest-card" id="dest-' + id + '">' +
+        '  <div class="card-body">' +
+        '    <div class="row align-items-end">' +
+        '      <div class="col-md-5">' +
+        '        <label class="form-label">Broker <span class="text-danger">*</span></label>' +
+        '        <select class="form-select dest-broker"><option value="">Select a broker...</option>' + opts + '</select>' +
+        '      </div>' +
+        '      <div class="col-md-5">' +
+        '        <label class="form-label">Topic / Queue <span class="text-danger">*</span></label>' +
+        '        <input type="text" class="form-control dest-topic" placeholder="e.g. kuber.customers.events">' +
+        '      </div>' +
+        '      <div class="col-md-2">' +
+        '        <button class="btn btn-outline-danger w-100" onclick="document.getElementById(\'dest-' + id + '\').remove()"><i class="fas fa-trash me-1"></i>Remove</button>' +
+        '      </div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>';
+    document.getElementById('destinationContainer').insertAdjacentHTML('beforeend', html);
+}
+
+function saveRegion() {
+    const name = document.getElementById('regionName').value.trim();
+    if (!name) { showAlert('danger', 'Region name is required.'); return; }
+
+    const enabled = document.getElementById('regionEnabled').checked;
+    const destinations = [];
+    document.querySelectorAll('.dest-card').forEach(card => {
+        const broker = card.querySelector('.dest-broker').value;
+        const topic = card.querySelector('.dest-topic').value.trim();
+        if (broker && topic) destinations.push({ broker: broker, topic: topic });
+    });
+    if (destinations.length === 0) { showAlert('danger', 'Add at least one destination with a broker and topic.'); return; }
+
+    fetch('/admin/api/config/event-publishing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, config: { enabled: enabled, destinations: destinations } })
+    }).then(r => r.json()).then(d => {
+        if (d.error) { showAlert('danger', d.error); return; }
+        showAlert('success', 'Region "' + name + '" created successfully.');
+        setTimeout(() => window.location.href = '/admin/event-publishing', 1500);
+    }).catch(e => showAlert('danger', 'Error: ' + e));
+}
+
+function showAlert(type, msg) {
+    document.getElementById('alertArea').innerHTML =
+        '<div class="alert alert-' + type + ' alert-dismissible fade show">' +
+        '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-triangle') + ' me-2"></i>' +
+        msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+    window.scrollTo(0, 0);
+}
+
+// Auto-add one destination row on load
+document.addEventListener('DOMContentLoaded', function() { addDestination(); });
+</script>
+
+</body>
+</html>

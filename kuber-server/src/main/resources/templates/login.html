@@ -10,6 +10,13 @@
     <title th:text="(${appName} ?: 'Kuber') + ' - Login'">Kuber - Login</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.1/css/all.min.css}">
+    <script>
+        (function(){
+            var t = localStorage.getItem('kuber-theme');
+            if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-bs-theme', t);
+        })();
+    </script>
     <style>
         body {
             background: linear-gradient(135deg, #0079c1 0%, #005a8e 50%, #003366 100%);
@@ -51,6 +58,39 @@
         }
         .btn-login:hover {
             background: linear-gradient(135deg, #005a8e 0%, #004570 50%, #002244 100%);
+        }
+        /* Dark theme for login */
+        [data-bs-theme="dark"] body {
+            background: linear-gradient(135deg, #0a1018 0%, #0f1923 50%, #1a2332 100%);
+        }
+        [data-bs-theme="dark"] .login-card {
+            background: #1e2228;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        [data-bs-theme="dark"] .login-header {
+            background: linear-gradient(135deg, #1a2332 0%, #0f1923 50%, #0a1018 100%);
+        }
+        [data-bs-theme="dark"] .login-body {
+            color: #c9d1d9;
+        }
+        [data-bs-theme="dark"] .form-label {
+            color: #c9d1d9;
+        }
+        [data-bs-theme="dark"] .form-control {
+            background-color: #161b22;
+            border-color: rgba(255,255,255,0.12);
+            color: #c9d1d9;
+        }
+        [data-bs-theme="dark"] .input-group-text {
+            background-color: #252a30;
+            border-color: rgba(255,255,255,0.12);
+            color: #8b949e;
+        }
+        [data-bs-theme="dark"] .form-check-label {
+            color: #8b949e;
+        }
+        [data-bs-theme="dark"] hr {
+            border-color: rgba(255,255,255,0.08);
         }
     </style>
 </head>

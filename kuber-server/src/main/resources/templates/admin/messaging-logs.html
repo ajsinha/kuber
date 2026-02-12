@@ -159,20 +159,20 @@
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive px-3 py-2" data-kuber-table="messagingLogsTable" data-page-sizes="25,50,100,All" data-default-page-size="50">
                         <table class="table table-striped table-hover mb-0">
-                            <thead class="table-dark">
+                            <thead class="table-light">
                                 <tr>
-                                    <th style="width: 160px;">Timestamp</th>
-                                    <th style="width: 150px;">Message ID</th>
-                                    <th style="width: 100px;">Operation</th>
-                                    <th style="width: 80px;">Status</th>
-                                    <th style="width: 80px;">Time (ms)</th>
+                                    <th data-sort="date" style="width: 160px;">Timestamp</th>
+                                    <th data-sort="string" style="width: 150px;">Message ID</th>
+                                    <th data-sort="string" style="width: 100px;">Operation</th>
+                                    <th data-sort="string" style="width: 80px;">Status</th>
+                                    <th data-sort="number" style="width: 80px;">Time (ms)</th>
                                     <th>Details</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="msg, msgStat : ${messages}">
+                                <tr th:each="msg, msgStat : ${messages}" class="data-row">
                                     <td>
                                         <small th:text="${#temporals.format(msg.timestamp, 'yyyy-MM-dd HH:mm:ss')}">2025-01-01 12:00:00</small>
                                     </td>
@@ -314,27 +314,21 @@
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
 <!-- Message Details Modal -->
-<div class="modal fade" id="messageDetailsModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>Request/Response Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Inline Message Details Panel -->
+<div id="messageDetailsPanel" class="card mb-4" style="display:none">
+    <div class="card-header bg-dark text-white d-flex justify-content-between">
+        <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Request/Response Details</h5>
+        <button class="btn btn-sm btn-light" onclick="document.getElementById('messageDetailsPanel').style.display='none'"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-arrow-right me-2 text-primary"></i>Request</h6>
+                <pre id="requestJson" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow: auto;"></pre>
             </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-arrow-right me-2 text-primary"></i>Request</h6>
-                        <pre id="requestJson" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow: auto;"></pre>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-arrow-left me-2 text-success"></i>Response</h6>
-                        <pre id="responseJson" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow: auto;"></pre>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <div class="col-md-6">
+                <h6><i class="fas fa-arrow-left me-2 text-success"></i>Response</h6>
+                <pre id="responseJson" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow: auto;"></pre>
             </div>
         </div>
     </div>
@@ -379,7 +373,7 @@ function updateTopics() {
         });
 }
 
-// Show message details in modal
+// Show message details in inline panel
 function showMessageDetails(button) {
     try {
         const index = parseInt(button.getAttribute('data-index'));
@@ -396,8 +390,9 @@ function showMessageDetails(button) {
         document.getElementById('requestJson').textContent = requestJson;
         document.getElementById('responseJson').textContent = responseJson;
         
-        const modal = new bootstrap.Modal(document.getElementById('messageDetailsModal'));
-        modal.show();
+        var panel = document.getElementById('messageDetailsPanel');
+        panel.style.display = '';
+        panel.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
         console.error('Error showing message details:', error);
         alert('Error displaying message details: ' + error.message);

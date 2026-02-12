@@ -32,7 +32,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for RabbitMQ queues.
  * Supports pause/resume for backpressure control using basic.qos.</p>
  * 
- * @version 2.1.0
+ * @version 2.3.0
  */
 @Slf4j
 public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {

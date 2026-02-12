@@ -14,6 +14,7 @@ package com.kuber.server.publishing;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.config.KuberProperties.RabbitMqConfig;
 import com.kuber.server.config.KuberProperties.BrokerDefinition;
+import com.kuber.server.config.KuberProperties.BrokerSsl;
 import com.kuber.server.config.KuberProperties.DestinationConfig;
 import com.kuber.server.config.KuberProperties.RegionPublishingConfig;
 import com.rabbitmq.client.AMQP;
@@ -23,7 +24,12 @@ import com.rabbitmq.client.ConnectionFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.security.KeyStore;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,7 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
@@ -84,10 +90,12 @@ public class RabbitMqEventPublisher implements EventPublisher {
         final boolean durable;
         final boolean persistent;
         final int ttlSeconds;
+        final BrokerSsl ssl;
         
         DestinationBinding(String host, int port, String virtualHost, String username,
                           String password, String exchange, String exchangeType, String queue,
-                          String routingKey, boolean durable, boolean persistent, int ttlSeconds) {
+                          String routingKey, boolean durable, boolean persistent, int ttlSeconds,
+                          BrokerSsl ssl) {
             this.host = host;
             this.port = port;
             this.virtualHost = virtualHost;
@@ -100,6 +108,7 @@ public class RabbitMqEventPublisher implements EventPublisher {
             this.durable = durable;
             this.persistent = persistent;
             this.ttlSeconds = ttlSeconds;
+            this.ssl = ssl != null ? ssl : new BrokerSsl();
         }
         
         String connectionKey() {
@@ -167,7 +176,8 @@ public class RabbitMqEventPublisher implements EventPublisher {
                                 routingKey,
                                 broker.isDurable(),
                                 dest.getPersistent() != null ? dest.getPersistent() : broker.isPersistent(),
-                                dest.getTtlSeconds() > 0 ? dest.getTtlSeconds() : broker.getTtlSeconds()
+                                dest.getTtlSeconds() > 0 ? dest.getTtlSeconds() : broker.getTtlSeconds(),
+                                broker.getSsl()
                         ));
                         
                         log.info("RabbitMQ destination for region '{}': broker={}, exchange={}",
@@ -200,7 +210,8 @@ public class RabbitMqEventPublisher implements EventPublisher {
                         routingKey,
                         rmqConfig.isDurable(),
                         rmqConfig.isPersistent(),
-                        rmqConfig.getTtlSeconds()
+                        rmqConfig.getTtlSeconds(),
+                        null
                 ));
                 
                 log.info("RabbitMQ (legacy) for region '{}': host={}, exchange={}",
@@ -358,14 +369,67 @@ public class RabbitMqEventPublisher implements EventPublisher {
                 factory.setNetworkRecoveryInterval(5000);
                 factory.setConnectionTimeout(30000);
                 
-                log.info("Creating RabbitMQ connection to {}:{}/{}", 
-                        binding.host, binding.port, binding.virtualHost);
+                // Apply SSL/TLS if enabled
+                if (binding.ssl.isEnabled()) {
+                    applyRabbitSsl(factory, binding.ssl);
+                    log.info("RabbitMQ SSL/TLS enabled for {}:{}", binding.host, binding.port);
+                }
+                
+                log.info("Creating RabbitMQ connection to {}:{}/{}{}", 
+                        binding.host, binding.port, binding.virtualHost,
+                        binding.ssl.isEnabled() ? " [SSL]" : "");
                 return factory.newConnection();
                 
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create RabbitMQ connection", e);
             }
         });
+    }
+    
+    /**
+     * Apply SSL/TLS configuration to a RabbitMQ ConnectionFactory.
+     * Supports truststore-only (server verification) and mutual TLS (with keystore).
+     */
+    private void applyRabbitSsl(ConnectionFactory factory, BrokerSsl ssl) throws Exception {
+        String protocol = ssl.getProtocol().isBlank() ? "TLSv1.3" : ssl.getProtocol();
+        
+        TrustManagerFactory tmf = null;
+        if (!ssl.getTrustStorePath().isBlank()) {
+            java.security.KeyStore ts = java.security.KeyStore.getInstance(
+                    ssl.getTrustStoreType().isBlank() ? "JKS" : ssl.getTrustStoreType());
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(ssl.getTrustStorePath())) {
+                ts.load(fis, ssl.getTrustStorePassword().toCharArray());
+            }
+            tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(ts);
+        }
+        
+        KeyManagerFactory kmf = null;
+        if (!ssl.getKeyStorePath().isBlank()) {
+            java.security.KeyStore ks = java.security.KeyStore.getInstance(
+                    ssl.getKeyStoreType().isBlank() ? "JKS" : ssl.getKeyStoreType());
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(ssl.getKeyStorePath())) {
+                ks.load(fis, ssl.getKeyStorePassword().toCharArray());
+            }
+            kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            String keyPass = ssl.getKeyPassword().isBlank() ? ssl.getKeyStorePassword() : ssl.getKeyPassword();
+            kmf.init(ks, keyPass.toCharArray());
+        }
+        
+        SSLContext ctx = SSLContext.getInstance(protocol);
+        ctx.init(
+                kmf != null ? kmf.getKeyManagers() : null,
+                tmf != null ? tmf.getTrustManagers() : null,
+                null
+        );
+        
+        factory.useSslProtocol(ctx);
+        
+        // RabbitMQ Java client: hostname verification is OFF by default with useSslProtocol(ctx)
+        // Call enableHostnameVerification() to turn it on
+        if (ssl.isHostnameVerification()) {
+            factory.enableHostnameVerification();
+        }
     }
     
     @Override

@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * Represents a user in the Kuber system.
  * Implements Spring Security's UserDetails for authentication.
  * 
- * @version 2.1.0
+ * @version 2.3.0
  * @since 1.7.3
  */
 @Data

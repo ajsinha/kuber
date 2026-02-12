@@ -52,12 +52,18 @@ public class KuberProperties {
     private Secure secure = new Secure();
     
     /**
+     * Request/Response messaging configuration.
+     * @since 2.2.0
+     */
+    private Messaging messaging = new Messaging();
+    
+    /**
      * Application version.
      * Read from application.properties: kuber.version
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "2.1.0";
+    private String version = "2.3.0";
     
     /**
      * Unique node identifier
@@ -125,7 +131,7 @@ public class KuberProperties {
      * @since 1.7.9
      */
     private Prometheus prometheus = new Prometheus();
-    
+
     /**
      * JSON search configuration including parallel search settings.
      * @since 1.7.9
@@ -154,6 +160,22 @@ public class KuberProperties {
          * Default: ./secure
          */
         private String folder = "./secure";
+    }
+    
+    /**
+     * Request/Response Messaging configuration.
+     * @since 2.2.0
+     */
+    @Data
+    public static class Messaging {
+        /**
+         * Path to the request/response messaging configuration JSON file.
+         * Contains broker definitions, topic subscriptions, and service settings.
+         * The file is hot-reloaded when modified — changes take effect without restart.
+         * Default: config/request_response.json
+         * @since 2.2.0
+         */
+        private String requestResponseConfigFile = "config/request_response.json";
     }
     
     @Data
@@ -663,24 +685,24 @@ public class KuberProperties {
     public static class Security {
         /**
          * Path to users.json file for authentication.
-         * Default: secure/users.json
+         * Default: config/secure/users.json
          * @since 1.7.3 - Moved to secure folder, supports RBAC roles
          */
-        private String usersFile = "secure/users.json";
+        private String usersFile = "config/secure/users.json";
         
         /**
          * Path to roles.json file for RBAC role definitions.
-         * Default: secure/roles.json
+         * Default: config/secure/roles.json
          * @since 1.7.3
          */
-        private String rolesFile = "secure/roles.json";
+        private String rolesFile = "config/secure/roles.json";
         
         /**
          * Path to API keys JSON file.
-         * Default: secure/apikeys.json
+         * Default: config/secure/apikeys.json
          * @since 1.7.3 - Moved to secure folder
          */
-        private String apiKeysFile = "secure/apikeys.json";
+        private String apiKeysFile = "config/secure/apikeys.json";
         
         /**
          * Session timeout in minutes
@@ -934,6 +956,124 @@ public class KuberProperties {
         private int ttlSeconds = 86400;
         private boolean persistent = true;
         private boolean useTopic = false;
+        
+        // ---- SSL/TLS settings (v2.2.0) ----
+        private BrokerSsl ssl = new BrokerSsl();
+    }
+    
+    /**
+     * SSL/TLS configuration for message brokers.
+     * Used by Kafka, ActiveMQ, RabbitMQ, and IBM MQ publishers.
+     * @since 2.2.0
+     */
+    @Data
+    public static class BrokerSsl {
+        /**
+         * Enable SSL/TLS for this broker connection.
+         */
+        private boolean enabled = false;
+        
+        /**
+         * SSL mode hint — guides which fields are used:
+         * <ul>
+         *   <li>{@code jks} — JKS/PKCS12 trust store (and optionally key store)</li>
+         *   <li>{@code pem} — PEM certificate files for trust</li>
+         *   <li>{@code sasl_ssl} — SASL authentication over SSL (Kafka)</li>
+         *   <li>{@code mtls_pem} — Mutual TLS with PEM client certificate + key</li>
+         *   <li>{@code mtls_jks} — Mutual TLS with JKS/PKCS12 key store</li>
+         * </ul>
+         * Optional — if omitted, fields are used as-is.
+         */
+        private String mode = "";
+        
+        /**
+         * SSL/TLS protocol version (e.g., TLSv1.2, TLSv1.3).
+         */
+        private String protocol = "TLSv1.3";
+        
+        // ---- JKS / PKCS12 Trust Store ----
+        
+        /**
+         * Path to the trust store file (JKS, PKCS12, or PEM).
+         */
+        private String trustStorePath = "";
+        
+        /**
+         * Trust store password.
+         */
+        private String trustStorePassword = "";
+        
+        /**
+         * Trust store type: JKS, PKCS12, PEM.
+         */
+        private String trustStoreType = "JKS";
+        
+        // ---- JKS / PKCS12 Key Store (mTLS) ----
+        
+        /**
+         * Path to the key store file (for mutual TLS / client certificate auth).
+         */
+        private String keyStorePath = "";
+        
+        /**
+         * Key store password.
+         */
+        private String keyStorePassword = "";
+        
+        /**
+         * Key store type: JKS, PKCS12, PEM.
+         */
+        private String keyStoreType = "JKS";
+        
+        /**
+         * Key password (if different from key store password).
+         */
+        private String keyPassword = "";
+        
+        // ---- PEM Certificate Files ----
+        
+        /**
+         * Path to the CA / trust certificate PEM file.
+         * Used when mode is "pem" or "mtls_pem" instead of a JKS trust store.
+         */
+        private String trustCertPath = "";
+        
+        /**
+         * Path to the client certificate PEM file (for mTLS PEM mode).
+         */
+        private String keyCertPath = "";
+        
+        /**
+         * Path to the client private key PEM file (for mTLS PEM mode).
+         */
+        private String keyPath = "";
+        
+        // ---- SASL (Kafka) ----
+        
+        /**
+         * SASL mechanism: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, OAUTHBEARER.
+         * Used when mode is "sasl_ssl".
+         */
+        private String saslMechanism = "";
+        
+        /**
+         * Full JAAS configuration string for Kafka SASL.
+         * Example: {@code org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="pass";}
+         */
+        private String saslJaasConfig = "";
+        
+        // ---- General ----
+        
+        /**
+         * Whether to verify the broker's hostname against its certificate.
+         */
+        private boolean hostnameVerification = true;
+        
+        /**
+         * SSL cipher suite override (primarily for IBM MQ).
+         * Leave empty to use JVM defaults.
+         */
+        private String cipherSuite = "";
     }
     
     /**
@@ -1287,6 +1427,24 @@ public class KuberProperties {
          */
         @Min(100)
         private int queueCapacity = 10000;
+        
+        /**
+         * Path to external JSON file for region event publishing configuration.
+         * Regions defined in this file are merged into the publishing config,
+         * overriding any same-named regions from application.properties.
+         * Default: config/event_publishing.json
+         * @since 2.2.0
+         */
+        private String regionConfigFile = "config/event_publishing.json";
+        
+        /**
+         * Path to external JSON file for message broker definitions.
+         * Brokers defined in this file are merged into the publishing config,
+         * overriding any same-named brokers from application.properties.
+         * Default: config/message_brokers.json
+         * @since 2.2.0
+         */
+        private String brokerConfigFile = "config/message_brokers.json";
         
         /**
          * Centralized broker definitions.

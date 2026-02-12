@@ -29,7 +29,7 @@ package com.kuber.server.publishing;
  * 3. Register in PublisherRegistry
  * 4. Add Spring @Service annotation
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 public interface EventPublisher {
     

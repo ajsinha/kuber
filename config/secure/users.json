@@ -1,0 +1,14 @@
+{
+  "users" : [ {
+    "userId" : "admin",
+    "password" : "admin123",
+    "fullName" : "System Administrator",
+    "email" : "admin@localhost",
+    "roles" : [ "admin" ],
+    "enabled" : true,
+    "locked" : false,
+    "systemUser" : true,
+    "createdAt" : "2026-02-12T02:44:45.574097902Z",
+    "createdBy" : "system"
+  } ]
+}

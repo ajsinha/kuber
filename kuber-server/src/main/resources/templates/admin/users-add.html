@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Add User')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/admin"><i class="fas fa-cog me-1"></i>Admin</a></li>
+                <li class="breadcrumb-item"><a href="/admin/users">Users</a></li>
+                <li class="breadcrumb-item active">Add User</li>
+            </ol>
+        </nav>
+        <h1 class="display-6 mb-4"><i class="fas fa-user-plus me-3 text-primary"></i>Create New User</h1>
+        <form th:action="@{/admin/users/create}" method="post">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-id-card me-2"></i>User Details</h5></div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">User ID <span class="text-danger">*</span></label>
+                            <input type="text" name="userId" class="form-control" required pattern="[a-zA-Z0-9_-]+" title="Alphanumeric, underscore, hyphen only" placeholder="e.g. john_doe">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Password <span class="text-danger">*</span></label>
+                            <input type="password" name="password" class="form-control" required minlength="6">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                            <input type="text" name="fullName" class="form-control" required placeholder="e.g. John Doe">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control" placeholder="john.doe@example.com">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Role Assignment</h5></div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Select roles to assign to the new user. Hold Ctrl/Cmd to select multiple.</p>
+                    <select name="roles" class="form-select" multiple size="8">
+                        <option th:each="role : ${roles}" th:value="${role.name}"
+                                th:text="${role.displayName} + ' (' + ${role.region} + ')'"
+                                th:disabled="${role.name == 'admin'}">Role</option>
+                    </select>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mb-4">
+                <a href="/admin/users" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Users</a>
+                <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-user-plus me-1"></i>Create User</button>
+            </div>
+        </form>
+    </div>
+</main>
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

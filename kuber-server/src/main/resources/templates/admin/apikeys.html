@@ -26,9 +26,9 @@
                 </p>
             </div>
             <div class="col-auto">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateKeyModal">
+                <a href="/admin/apikeys/add" class="btn btn-primary">
                     <i class="fas fa-plus me-1"></i> Generate New Key
-                </button>
+                </a>
                 <form th:action="@{/admin/apikeys/reload}" method="post" class="d-inline ms-2">
                     <button type="submit" class="btn btn-outline-secondary">
                         <i class="fas fa-sync me-1"></i> Reload
@@ -109,47 +109,19 @@
         
         <!-- API Keys Table -->
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-0 py-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <div class="d-flex align-items-center">
-                            <label class="me-2 text-muted small">Show:</label>
-                            <select id="rowsPerPage" class="form-select form-select-sm" style="width: auto;" onchange="updateTable()">
-                                <option value="10" selected>10</option>
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="all">All</option>
-                            </select>
-                            <span class="ms-2 text-muted small">entries</span>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="input-group input-group-sm" style="max-width: 250px;">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                            <input type="text" id="tableSearch" class="form-control" 
-                                   placeholder="Search keys..." oninput="updateTable()">
-                        </div>
-                    </div>
-                    <div class="col-auto">
-                        <span id="tableInfo" class="text-muted small"></span>
-                    </div>
-                </div>
-            </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive px-3 py-2" data-kuber-table="apiKeysTable" data-page-sizes="10,25,50,All" data-default-page-size="10">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4" style="cursor: pointer;" onclick="sortTable(0)">
-                                    Name <i class="fas fa-sort ms-1 text-muted sort-icon"></i>
-                                </th>
-                                <th>Key ID</th>
+                                <th class="ps-4" data-sort="string">Name</th>
+                                <th data-sort="string">Key ID</th>
                                 <th>Key (Masked)</th>
-                                <th>User</th>
+                                <th data-sort="string">User</th>
                                 <th>Roles</th>
-                                <th>Status</th>
-                                <th>Created</th>
-                                <th>Last Used</th>
+                                <th data-sort="string">Status</th>
+                                <th data-sort="date">Created</th>
+                                <th data-sort="date">Last Used</th>
                                 <th class="text-end pe-4">Actions</th>
                             </tr>
                         </thead>
@@ -213,14 +185,44 @@
                     </table>
                 </div>
             </div>
-            <!-- Pagination -->
-            <div class="card-footer bg-white border-0">
-                <nav id="tablePagination" aria-label="Table navigation">
-                    <ul class="pagination pagination-sm justify-content-end mb-0"></ul>
-                </nav>
-            </div>
         </div>
         
+        <!-- Related Pages -->
+        <div class="alert alert-light border mb-4 mt-4">
+            <i class="fas fa-link text-primary me-2"></i>
+            <strong>Related:</strong>
+            <a href="/admin/users" class="ms-2"><i class="fas fa-users me-1"></i>Users</a> &mdash; manage login accounts for Web UI access.
+            <a href="/admin/roles" class="ms-3"><i class="fas fa-user-tag me-1"></i>Roles</a> &mdash; define permission sets assigned to keys and users.
+            <a href="/help/security" class="ms-3"><i class="fas fa-shield-alt me-1"></i>Security Guide</a>
+        </div>
+
+        <!-- Glossary -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-book me-2"></i>Glossary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <dt class="small"><i class="fas fa-key text-warning me-1"></i>API Key</dt>
+                        <dd class="text-muted small mb-2">A <code>kub_</code>-prefixed token for programmatic access. Required by all REST, Python, Java, and C# clients. Does <strong>not</strong> grant Web UI login.</dd>
+                    </div>
+                    <div class="col-md-3">
+                        <dt class="small"><i class="fas fa-user-tag text-info me-1"></i>Roles</dt>
+                        <dd class="text-muted small mb-2">Permission sets assigned to each key (e.g., <code>admin</code>, <code>reader</code>). A key inherits all permissions from its assigned roles.</dd>
+                    </div>
+                    <div class="col-md-3">
+                        <dt class="small"><i class="fas fa-clock text-danger me-1"></i>Expiration</dt>
+                        <dd class="text-muted small mb-2">Optional date after which the key is rejected. Expired keys return HTTP 401. Use for temporary access or rotation policies.</dd>
+                    </div>
+                    <div class="col-md-3">
+                        <dt class="small"><i class="fas fa-eye-slash text-secondary me-1"></i>Show Once</dt>
+                        <dd class="text-muted small mb-2">The full key is displayed only at creation time. Copy it immediately &mdash; it is stored hashed and cannot be recovered.</dd>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Usage Instructions -->
         <div class="card border-0 shadow-sm mt-4">
             <div class="card-header bg-info text-white">
@@ -276,255 +278,36 @@ String value = client.get("key");</code></pre>
 </main>
 
 <!-- Generate Key Modal -->
-<div class="modal fade" id="generateKeyModal" tabindex="-1" aria-labelledby="generateKeyModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form th:action="@{/admin/apikeys/generate}" method="post">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="generateKeyModalLabel">
-                        <i class="fas fa-key me-2"></i>Generate New API Key
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="keyName" class="form-label">Key Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="keyName" name="name" required
-                               placeholder="e.g., Production API, CI/CD Pipeline">
-                        <div class="form-text">A descriptive name to identify this key</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="keyUser" class="form-label">Associated User <span class="text-danger">*</span></label>
-                        <select class="form-select" id="keyUser" name="userId" required>
-                            <option value="">Select a user...</option>
-                            <option th:each="user : ${users}" th:value="${user.userId}" th:text="${user.userId + ' (' + user.fullName + ')'}">user</option>
-                        </select>
-                        <div class="form-text">The user account this key will act as</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Roles</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="roles" value="USER" id="roleUser" checked>
-                            <label class="form-check-label" for="roleUser">
-                                <span class="badge bg-secondary">USER</span> - Basic read/write access
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="roles" value="OPERATOR" id="roleOperator">
-                            <label class="form-check-label" for="roleOperator">
-                                <span class="badge bg-warning text-dark">OPERATOR</span> - Region management
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="roles" value="ADMIN" id="roleAdmin">
-                            <label class="form-check-label" for="roleAdmin">
-                                <span class="badge bg-danger">ADMIN</span> - Full administrative access
-                            </label>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="keyExpiration" class="form-label">Expiration (days)</label>
-                        <input type="number" class="form-control" id="keyExpiration" name="expirationDays" 
-                               min="1" max="3650" placeholder="Leave empty for no expiration">
-                        <div class="form-text">Optional: Number of days until the key expires</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-key me-1"></i> Generate Key
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteKeyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form id="deleteKeyForm" method="post">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Delete API Key</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to permanently delete the API key <strong id="deleteKeyName"></strong>?</p>
-                    <p class="text-danger mb-0"><i class="fas fa-warning me-1"></i> This action cannot be undone. Any applications using this key will lose access.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-1"></i> Delete Permanently
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<form id="hiddenDeleteForm" method="post" style="display:none">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+</form>
 
 <footer th:replace="~{layout :: footer}"></footer>
 
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
 <script th:inline="javascript">
-    // Table state
-    let currentPage = 1;
-    let sortColumn = -1;
-    let sortDirection = 'asc';
-    
     function copyToClipboard(inputId) {
         const input = document.getElementById(inputId);
         input.select();
         input.setSelectionRange(0, 99999);
         navigator.clipboard.writeText(input.value);
-        
-        // Show feedback
         const btn = input.nextElementSibling;
         const originalHtml = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
         btn.classList.remove('btn-outline-secondary');
         btn.classList.add('btn-success');
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-            btn.classList.remove('btn-success');
-            btn.classList.add('btn-outline-secondary');
-        }, 2000);
+        setTimeout(() => { btn.innerHTML = originalHtml; btn.classList.remove('btn-success'); btn.classList.add('btn-outline-secondary'); }, 2000);
     }
     
     function confirmDelete(btn) {
         const keyId = btn.dataset.keyid;
         const keyName = btn.dataset.keyname;
-        document.getElementById('deleteKeyName').textContent = keyName;
-        document.getElementById('deleteKeyForm').action = '/admin/apikeys/' + keyId + '/delete';
-        new bootstrap.Modal(document.getElementById('deleteKeyModal')).show();
+        if (!confirm('Delete API key "' + keyName + '"?\n\nThis cannot be undone. Any applications using this key will lose access.')) return;
+        const form = document.getElementById('hiddenDeleteForm');
+        form.action = '/admin/apikeys/' + keyId + '/delete';
+        form.submit();
     }
-    
-    function updateTable() {
-        const searchTerm = document.getElementById('tableSearch').value.toLowerCase();
-        const rowsPerPageSelect = document.getElementById('rowsPerPage');
-        const rowsPerPage = rowsPerPageSelect.value === 'all' ? Infinity : parseInt(rowsPerPageSelect.value);
-        
-        const rows = Array.from(document.querySelectorAll('.data-row'));
-        const emptyRow = document.querySelector('.empty-row');
-        
-        // Filter rows
-        let visibleRows = rows.filter(row => {
-            const name = (row.dataset.name || '').toLowerCase();
-            const keyid = (row.dataset.keyid || '').toLowerCase();
-            const text = row.textContent.toLowerCase();
-            const matches = name.includes(searchTerm) || keyid.includes(searchTerm) || text.includes(searchTerm);
-            return matches;
-        });
-        
-        // Sort rows
-        if (sortColumn >= 0) {
-            visibleRows.sort((a, b) => {
-                const aVal = a.children[sortColumn].textContent.trim().toLowerCase();
-                const bVal = b.children[sortColumn].textContent.trim().toLowerCase();
-                let result = aVal.localeCompare(bVal);
-                return sortDirection === 'desc' ? -result : result;
-            });
-        }
-        
-        // Calculate pagination
-        const totalPages = Math.ceil(visibleRows.length / rowsPerPage);
-        if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
-        
-        const startIndex = (currentPage - 1) * rowsPerPage;
-        const endIndex = startIndex + rowsPerPage;
-        
-        // Hide all rows first
-        rows.forEach(row => row.style.display = 'none');
-        if (emptyRow) emptyRow.style.display = 'none';
-        
-        // Show filtered and paginated rows
-        visibleRows.forEach((row, index) => {
-            if (index >= startIndex && index < endIndex) {
-                row.style.display = '';
-            }
-        });
-        
-        // Show empty message if no results
-        if (visibleRows.length === 0 && emptyRow) {
-            emptyRow.style.display = '';
-        }
-        
-        // Update info text
-        const infoText = visibleRows.length === 0 
-            ? 'No matching keys' 
-            : `Showing ${Math.min(startIndex + 1, visibleRows.length)}-${Math.min(endIndex, visibleRows.length)} of ${visibleRows.length}`;
-        document.getElementById('tableInfo').textContent = infoText;
-        
-        // Update pagination
-        updatePagination(totalPages);
-    }
-    
-    function updatePagination(totalPages) {
-        const pagination = document.querySelector('#tablePagination ul');
-        pagination.innerHTML = '';
-        
-        if (totalPages <= 1) return;
-        
-        // Previous button
-        const prevLi = document.createElement('li');
-        prevLi.className = 'page-item' + (currentPage === 1 ? ' disabled' : '');
-        prevLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">Previous</a>`;
-        pagination.appendChild(prevLi);
-        
-        // Page numbers
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                const li = document.createElement('li');
-                li.className = 'page-item' + (i === currentPage ? ' active' : '');
-                li.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>`;
-                pagination.appendChild(li);
-            } else if (i === currentPage - 3 || i === currentPage + 3) {
-                const li = document.createElement('li');
-                li.className = 'page-item disabled';
-                li.innerHTML = '<a class="page-link">...</a>';
-                pagination.appendChild(li);
-            }
-        }
-        
-        // Next button
-        const nextLi = document.createElement('li');
-        nextLi.className = 'page-item' + (currentPage === totalPages ? ' disabled' : '');
-        nextLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">Next</a>`;
-        pagination.appendChild(nextLi);
-    }
-    
-    function goToPage(page) {
-        currentPage = page;
-        updateTable();
-    }
-    
-    function sortTable(column) {
-        if (sortColumn === column) {
-            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            sortColumn = column;
-            sortDirection = 'asc';
-        }
-        
-        // Update sort icons
-        document.querySelectorAll('.sort-icon').forEach((icon, index) => {
-            if (index === column) {
-                icon.className = 'fas fa-sort-' + (sortDirection === 'asc' ? 'up' : 'down') + ' ms-1';
-            } else {
-                icon.className = 'fas fa-sort ms-1 text-muted';
-            }
-        });
-        
-        updateTable();
-    }
-    
-    // Initialize table
-    document.addEventListener('DOMContentLoaded', function() {
-        updateTable();
-    });
 </script>
 
 </body>

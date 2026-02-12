@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Generate API Key')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/admin"><i class="fas fa-cog me-1"></i>Admin</a></li>
+                <li class="breadcrumb-item"><a href="/admin/apikeys">API Keys</a></li>
+                <li class="breadcrumb-item active">Generate Key</li>
+            </ol>
+        </nav>
+        <h1 class="display-6 mb-4"><i class="fas fa-key me-3 text-primary"></i>Generate New API Key</h1>
+        <form th:action="@{/admin/apikeys/generate}" method="post">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-tag me-2"></i>Key Details</h5></div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Key Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required placeholder="e.g. Production API, CI/CD Pipeline">
+                            <div class="form-text">A descriptive name to identify this key</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Associated User <span class="text-danger">*</span></label>
+                            <select name="userId" class="form-select" required>
+                                <option value="">Select a user...</option>
+                                <option th:each="user : ${users}" th:value="${user.userId}" th:text="${user.userId + ' (' + user.fullName + ')'}">user</option>
+                            </select>
+                            <div class="form-text">The user account this key will act as</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Expiration (days)</label>
+                            <input type="number" name="expirationDays" class="form-control" min="1" max="3650" placeholder="No expiration">
+                            <div class="form-text">Leave empty for no expiration</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Roles</h5></div>
+                <div class="card-body">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="roles" value="USER" id="roleUser" checked>
+                        <label class="form-check-label" for="roleUser"><span class="badge bg-secondary">USER</span> Basic read/write access</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="roles" value="OPERATOR" id="roleOperator">
+                        <label class="form-check-label" for="roleOperator"><span class="badge bg-warning text-dark">OPERATOR</span> Region management</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="roles" value="ADMIN" id="roleAdmin">
+                        <label class="form-check-label" for="roleAdmin"><span class="badge bg-danger">ADMIN</span> Full administrative access</label>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mb-4">
+                <a href="/admin/apikeys" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to API Keys</a>
+                <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-key me-1"></i>Generate Key</button>
+            </div>
+        </form>
+    </div>
+</main>
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

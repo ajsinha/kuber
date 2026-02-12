@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.1.0</strong> - Publish cache events to Kafka and/or ActiveMQ for real-time integrations.
+                    <strong>Version 2.3.0</strong> - Publish cache events to Kafka and/or ActiveMQ for real-time integrations.
                 </div>
 
                 <!-- Overview -->
@@ -179,13 +179,13 @@
                         <p>Kuber v1.3.2 introduces a <strong>centralized configuration</strong> approach for managing event destinations:</p>
                         
                         <div class="alert alert-success">
-                            <h5><i class="fas fa-star me-2"></i>Recommended: Centralized Broker Definitions</h5>
+                            <h5><i class="fas fa-star me-2"></i>Recommended: External JSON Configuration (v2.2.0)</h5>
                             <ol>
-                                <li><strong>Define brokers once</strong> in <code>kuber.publishing.brokers.*</code></li>
-                                <li><strong>Reference brokers by name</strong> from region configurations</li>
-                                <li><strong>Specify topic/queue</strong> per region for each destination</li>
+                                <li><strong>Define brokers</strong> in <code>config/message_brokers.json</code> (with optional SSL/TLS)</li>
+                                <li><strong>Define region routing</strong> in <code>config/event_publishing.json</code></li>
+                                <li><strong>Manage via Admin UI</strong>: <a href="/admin/brokers">Brokers</a> | <a href="/admin/event-publishing">Event Publishing</a></li>
                             </ol>
-                            <p class="mb-0">This approach enables easy reuse of broker configurations across multiple regions.</p>
+                            <p class="mb-0">Both files support inline editing from the Admin UI. Legacy <code>application.properties</code> broker definitions are still supported.</p>
                         </div>
                         
                         <h5>Global Settings</h5>
@@ -196,11 +196,13 @@
                             <tbody>
                                 <tr><td><code>kuber.publishing.thread-pool-size</code></td><td>4</td><td>Threads for async publishing</td></tr>
                                 <tr><td><code>kuber.publishing.queue-capacity</code></td><td>10000</td><td>Max queued events</td></tr>
+                                <tr><td><code>kuber.publishing.broker-config-file</code></td><td>config/message_brokers.json</td><td>Broker definitions JSON file (v2.2.0)</td></tr>
+                                <tr><td><code>kuber.publishing.region-config-file</code></td><td>config/event_publishing.json</td><td>Region routing JSON file (v2.2.0)</td></tr>
                             </tbody>
                         </table>
 
                         <h5 class="mt-4">Broker Definition Properties</h5>
-                        <p>Define brokers under <code>kuber.publishing.brokers.{broker-name}.*</code></p>
+                        <p>Define brokers in <code>config/message_brokers.json</code> (or legacy <code>kuber.publishing.brokers.{broker-name}.*</code>)</p>
                         
                         <!-- Nav tabs for broker configs -->
                         <ul class="nav nav-tabs mt-3" id="brokerTabs" role="tablist">
@@ -303,8 +305,27 @@
                             </div>
                         </div>
                         
-                        <h5 class="mt-4">Region Destination Properties</h5>
-                        <p>Define region destinations under <code>kuber.publishing.regions.{region}.destinations[N].*</code></p>
+                        <h5 class="mt-4">Region Destination Configuration</h5>
+                        <div class="alert alert-info">
+                            <i class="fas fa-file-code me-2"></i>
+                            <strong>v2.2.0:</strong> Region publishing config is managed in <code>config/event_publishing.json</code> 
+                            (configurable via <code>kuber.publishing.region-config-file</code>). 
+                            Regions from the JSON file override same-named regions in <code>application.properties</code>.
+                        </div>
+                        <p>Each region defines a list of destinations in the JSON file:</p>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "regions": {
+    "trades": {
+      "enabled": true,
+      "destinations": [
+        { "broker": "kafka-prod", "topic": "kuber.trades.events" },
+        { "broker": "activemq-legacy", "topic": "TRADES.EVENTS.QUEUE" },
+        { "broker": "audit-files", "topic": "trades" }
+      ]
+    }
+  }
+}</code></pre>
+                        <p>Destination properties:</p>
                         <table class="table table-bordered table-sm">
                             <thead class="table-light"><tr><th>Property</th><th>Description</th></tr></thead>
                             <tbody>
@@ -435,85 +456,120 @@
                     </div>
                     <div class="card-body">
                         <h5><i class="fas fa-star text-warning me-2"></i>Example 1: Centralized Multi-Destination (Recommended)</h5>
-                        <p class="text-muted">Define brokers once, reference them from multiple regions with different topics.</p>
-                        <pre class="bg-dark text-white p-3 rounded"><code># ===== STEP 1: Define brokers centrally =====
-# Production Kafka cluster
-kuber.publishing.brokers.kafka-prod.enabled=true
-kuber.publishing.brokers.kafka-prod.type=kafka
-kuber.publishing.brokers.kafka-prod.bootstrap-servers=kafka1:9092,kafka2:9092,kafka3:9092
-kuber.publishing.brokers.kafka-prod.partitions=6
-kuber.publishing.brokers.kafka-prod.replication-factor=3
-
-# Audit file destination
-kuber.publishing.brokers.audit-files.enabled=true
-kuber.publishing.brokers.audit-files.type=file
-kuber.publishing.brokers.audit-files.directory=./log/kuber/audit
-kuber.publishing.brokers.audit-files.retention-days=365
-
-# ===== STEP 2: Configure regions to use brokers =====
-# Customers region → Kafka + File (audit)
-kuber.publishing.regions.customers.enabled=true
-kuber.publishing.regions.customers.destinations[0].broker=kafka-prod
-kuber.publishing.regions.customers.destinations[0].topic=kuber.customers.events
-kuber.publishing.regions.customers.destinations[1].broker=audit-files
-kuber.publishing.regions.customers.destinations[1].topic=customers
-
-# Orders region → Same Kafka cluster, different topic + audit
-kuber.publishing.regions.orders.enabled=true
-kuber.publishing.regions.orders.destinations[0].broker=kafka-prod
-kuber.publishing.regions.orders.destinations[0].topic=kuber.orders.events
-kuber.publishing.regions.orders.destinations[1].broker=audit-files
-kuber.publishing.regions.orders.destinations[1].topic=orders</code></pre>
+                        <p class="text-muted">Define brokers in <code>config/message_brokers.json</code>, configure regions in <code>config/event_publishing.json</code>.</p>
+                        <p><strong>Step 1 — Broker definitions</strong> (in <code>config/message_brokers.json</code>):</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "brokers": {
+    "kafka-prod": {
+      "enabled": true, "type": "kafka",
+      "bootstrap-servers": "kafka1:9092,kafka2:9092,kafka3:9092",
+      "partitions": 6, "replication-factor": 3,
+      "ssl": {
+        "enabled": true, "mode": "jks",
+        "trust-store-path": "/certs/truststore.jks",
+        "trust-store-password": "changeit"
+      }
+    },
+    "audit-files": {
+      "enabled": true, "type": "file",
+      "directory": "./log/kuber/audit", "retention-days": 365
+    }
+  }
+}</code></pre>
+                        <p><strong>Step 2 — Region config</strong> (in <code>config/event_publishing.json</code>):</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "regions": {
+    "customers": {
+      "enabled": true,
+      "destinations": [
+        { "broker": "kafka-prod", "topic": "kuber.customers.events" },
+        { "broker": "audit-files", "topic": "customers" }
+      ]
+    },
+    "orders": {
+      "enabled": true,
+      "destinations": [
+        { "broker": "kafka-prod", "topic": "kuber.orders.events" },
+        { "broker": "audit-files", "topic": "orders" }
+      ]
+    }
+  }
+}</code></pre>
 
                         <h5 class="mt-4"><i class="fas fa-star text-warning me-2"></i>Example 2: Enterprise Multi-System Integration</h5>
                         <p class="text-muted">Transactions published to IBM MQ (finance) + Kafka (analytics) + File (compliance).</p>
-                        <pre class="bg-dark text-white p-3 rounded"><code># Define all destination brokers
-kuber.publishing.brokers.ibm-finance.enabled=true
-kuber.publishing.brokers.ibm-finance.type=ibmmq
-kuber.publishing.brokers.ibm-finance.host=mq.finance.corp
-kuber.publishing.brokers.ibm-finance.port=1414
-kuber.publishing.brokers.ibm-finance.queue-manager=FINANCE.QM
-kuber.publishing.brokers.ibm-finance.channel=KUBER.SVRCONN
-kuber.publishing.brokers.ibm-finance.ssl-cipher-suite=TLS_RSA_WITH_AES_256_CBC_SHA256
-
-kuber.publishing.brokers.kafka-analytics.enabled=true
-kuber.publishing.brokers.kafka-analytics.type=kafka
-kuber.publishing.brokers.kafka-analytics.bootstrap-servers=kafka-analytics:9092
-kuber.publishing.brokers.kafka-analytics.partitions=12
-
-kuber.publishing.brokers.compliance-archive.enabled=true
-kuber.publishing.brokers.compliance-archive.type=file
-kuber.publishing.brokers.compliance-archive.directory=./archive/compliance/transactions
-kuber.publishing.brokers.compliance-archive.retention-days=2555
-
-# Transaction region publishes to all three
-kuber.publishing.regions.transactions.enabled=true
-kuber.publishing.regions.transactions.destinations[0].broker=ibm-finance
-kuber.publishing.regions.transactions.destinations[0].topic=KUBER.TXN.QUEUE
-kuber.publishing.regions.transactions.destinations[1].broker=kafka-analytics
-kuber.publishing.regions.transactions.destinations[1].topic=transactions-stream
-kuber.publishing.regions.transactions.destinations[2].broker=compliance-archive
-kuber.publishing.regions.transactions.destinations[2].topic=transactions</code></pre>
+                        <p><strong>Broker definitions</strong> (in <code>config/message_brokers.json</code>):</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "brokers": {
+    "ibm-finance": {
+      "enabled": true, "type": "ibmmq",
+      "host": "mq.finance.corp", "port": 1414,
+      "queue-manager": "FINANCE.QM", "channel": "KUBER.SVRCONN",
+      "ssl": {
+        "enabled": true, "mode": "jks",
+        "cipher-suite": "TLS_RSA_WITH_AES_256_CBC_SHA256",
+        "trust-store-path": "/certs/ibmmq-truststore.jks",
+        "trust-store-password": "changeit"
+      }
+    },
+    "kafka-analytics": {
+      "enabled": true, "type": "kafka",
+      "bootstrap-servers": "kafka-analytics:9092", "partitions": 12
+    },
+    "compliance-archive": {
+      "enabled": true, "type": "file",
+      "directory": "./archive/compliance/transactions", "retention-days": 2555
+    }
+  }
+}</code></pre>
+                        <p><strong>Region config</strong> (in <code>config/event_publishing.json</code>):</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "regions": {
+    "transactions": {
+      "enabled": true,
+      "destinations": [
+        { "broker": "ibm-finance", "topic": "KUBER.TXN.QUEUE" },
+        { "broker": "kafka-analytics", "topic": "transactions-stream" },
+        { "broker": "compliance-archive", "topic": "transactions" }
+      ]
+    }
+  }
+}</code></pre>
 
                         <h5 class="mt-4"><i class="fas fa-star text-warning me-2"></i>Example 3: RabbitMQ with Routing</h5>
                         <p class="text-muted">Orders published to RabbitMQ with topic exchange and queue binding.</p>
-                        <pre class="bg-dark text-white p-3 rounded"><code># RabbitMQ broker with topic exchange
-kuber.publishing.brokers.rabbitmq-main.enabled=true
-kuber.publishing.brokers.rabbitmq-main.type=rabbitmq
-kuber.publishing.brokers.rabbitmq-main.host=rabbitmq.internal
-kuber.publishing.brokers.rabbitmq-main.port=5672
-kuber.publishing.brokers.rabbitmq-main.virtual-host=/kuber
-kuber.publishing.brokers.rabbitmq-main.username=kuber_publisher
-kuber.publishing.brokers.rabbitmq-main.password=secret
-kuber.publishing.brokers.rabbitmq-main.exchange-type=topic
-kuber.publishing.brokers.rabbitmq-main.durable=true
-
-# Orders region with exchange, routing key, and queue
-kuber.publishing.regions.orders.enabled=true
-kuber.publishing.regions.orders.destinations[0].broker=rabbitmq-main
-kuber.publishing.regions.orders.destinations[0].topic=orders.exchange
-kuber.publishing.regions.orders.destinations[0].routing-key=orders.#
-kuber.publishing.regions.orders.destinations[0].queue=orders-events-queue</code></pre>
+                        <p><strong>Broker definition</strong> (in <code>config/message_brokers.json</code>):</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "brokers": {
+    "rabbitmq-main": {
+      "enabled": true, "type": "rabbitmq",
+      "host": "rabbitmq.internal", "port": 5671,
+      "virtual-host": "/kuber",
+      "username": "kuber_publisher", "password": "secret",
+      "exchange-type": "topic", "durable": true,
+      "ssl": {
+        "enabled": true, "mode": "pem",
+        "trust-cert-path": "/certs/ca-cert.pem"
+      }
+    }
+  }
+}</code></pre>
+                        <p><strong>Region config</strong> (in <code>config/event_publishing.json</code>):</p>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "regions": {
+    "orders": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "rabbitmq-main",
+          "topic": "orders.exchange",
+          "routing-key": "orders.#",
+          "queue": "orders-events-queue"
+        }
+      ]
+    }
+  }
+}</code></pre>
 
                         <div class="alert alert-secondary mt-4">
                             <h6><i class="fas fa-history me-2"></i>Legacy Configuration Examples</h6>
@@ -712,7 +768,7 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.1.0</p>
+                    <p class="text-muted small mb-0">Version 2.3.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

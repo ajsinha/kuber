@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - JSON Operations Demo (v2.1.0)
+ * Kuber REST API - JSON Operations Demo (v2.3.0)
  *
  * This standalone C# application demonstrates all JSON-related operations
  * using the Kuber REST API (HTTP/JSON protocol):
@@ -25,7 +25,7 @@
  *
  * Copyright (c) 2025-2030 Ashutosh Sinha. All Rights Reserved.
  *
- * @version 2.1.0
+ * @version 2.3.0
  */
 
 using System;
@@ -677,6 +677,44 @@ namespace Kuber.Examples
             Console.WriteLine($"  Region '{productsRegion}' size after cleanup: {await RegionSizeAsync(productsRegion)}");
         }
 
+        private async Task DemoN_SlashKeys(string region)
+        {
+            PrintHeader("N) KEYS WITH FORWARD SLASHES (employee/EMP001)");
+
+            var slashDocs = new (string key, string json)[]
+            {
+                ("employee/EMP001", "{\"name\":\"Alice Walker\",\"dept\":\"Engineering\",\"level\":\"L5\"}"),
+                ("employee/EMP002", "{\"name\":\"Bob Chen\",\"dept\":\"Marketing\",\"level\":\"L4\"}"),
+                ("department/eng/lead", "{\"name\":\"Carol Davis\",\"role\":\"Director\",\"reports\":42}"),
+                ("config/app/v2.1/settings", "{\"theme\":\"dark\",\"locale\":\"en-US\",\"timeout\":30}")
+            };
+
+            Console.WriteLine("\n  Storing documents with slash keys...");
+            foreach (var (key, json) in slashDocs)
+            {
+                var ok = await JsonSetAsync(region, key, json);
+                Console.WriteLine($"    [{(ok ? "OK" : "FAIL")}] {key}");
+            }
+
+            Console.WriteLine("\n  Retrieving documents by slash key...");
+            foreach (var (key, _) in slashDocs)
+            {
+                var result = await JsonGetAsync(region, key);
+                Console.WriteLine($"    [{(result != null ? "OK" : "FAIL")}] {key} -> {(result != null ? result[..Math.Min(80, result.Length)] + "..." : "NOT FOUND")}");
+            }
+
+            Console.WriteLine("\n  JSONPath on slash key 'employee/EMP001' ($.dept)...");
+            var dept = await JsonGetAsync(region, "employee/EMP001", "$.dept");
+            Console.WriteLine($"    Department: {dept}");
+
+            Console.WriteLine("\n  Deleting slash-key documents...");
+            foreach (var (key, _) in slashDocs)
+            {
+                var ok = await JsonDeleteAsync(region, key);
+                Console.WriteLine($"    [{(ok ? "OK" : "FAIL")}] Deleted {key}");
+            }
+        }
+
         // ==================== Main ====================
 
         public static async Task Main(string[] args)
@@ -701,8 +739,9 @@ namespace Kuber.Examples
             Console.WriteLine("|   k) Store with TTL                 PUT  with ttl parameter          |");
             Console.WriteLine("|   l) Cross-region operations        Multiple regions                 |");
             Console.WriteLine("|   m) Delete JSON documents          DELETE /api/v1/json/{r}/{k}     |");
+            Console.WriteLine("|   n) Keys with forward slashes      employee/EMP001 etc.            |");
             Console.WriteLine("|                                                                      |");
-            Console.WriteLine("|   v2.1.0                                                             |");
+            Console.WriteLine("|   v2.3.0                                                             |");
             Console.WriteLine("+======================================================================+");
             Console.WriteLine();
 
@@ -742,6 +781,7 @@ namespace Kuber.Examples
                 await demo.DemoK_JsonWithTtl(region);
                 var productsRegion = await demo.DemoL_CrossRegion();
                 await demo.DemoM_DeleteJson(region, productsRegion);
+                await demo.DemoN_SlashKeys(region);
 
                 PrintHeader("ALL DEMOS COMPLETED SUCCESSFULLY");
                 Console.WriteLine();

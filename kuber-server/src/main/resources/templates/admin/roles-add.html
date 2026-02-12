@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Add Role')}"></head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="~{layout :: navbar}"></nav>
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/admin"><i class="fas fa-cog me-1"></i>Admin</a></li>
+                <li class="breadcrumb-item"><a href="/admin/roles">Roles</a></li>
+                <li class="breadcrumb-item active">Add Role</li>
+            </ol>
+        </nav>
+        <h1 class="display-6 mb-4"><i class="fas fa-plus-circle me-3 text-primary"></i>Create New Role</h1>
+        <form th:action="@{/admin/roles/create}" method="post">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-tag me-2"></i>Role Details</h5></div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Role Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required pattern="[a-zA-Z0-9_-]+" placeholder="e.g. customers_readonly">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Display Name</label>
+                            <input type="text" name="displayName" class="form-control" placeholder="e.g. Customers Read Only">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="What this role provides access to"></textarea>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Region <span class="text-danger">*</span></label>
+                            <select name="region" class="form-select" required>
+                                <option value="">Select a region...</option>
+                                <option th:each="region : ${regions}" th:value="${region}" th:text="${region}">default</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white"><h5 class="mb-0"><i class="fas fa-lock me-2"></i>Permissions</h5></div>
+                <div class="card-body">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="permissions" value="READ" id="permRead" checked>
+                        <label class="form-check-label" for="permRead"><span class="badge bg-success">READ</span> View and retrieve cached data</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="permissions" value="WRITE" id="permWrite">
+                        <label class="form-check-label" for="permWrite"><span class="badge bg-warning text-dark">WRITE</span> Create and update cached data</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="permissions" value="DELETE" id="permDelete">
+                        <label class="form-check-label" for="permDelete"><span class="badge bg-danger">DELETE</span> Remove cached data</label>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mb-4">
+                <a href="/admin/roles" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Roles</a>
+                <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-plus me-1"></i>Create Role</button>
+            </div>
+        </form>
+    </div>
+</main>
+<footer th:replace="~{layout :: footer}"></footer>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+</body>
+</html>

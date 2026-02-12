@@ -112,7 +112,7 @@ AUTH APIKEY kub_your_api_key_here
 # Or directly with the key
 AUTH kub_your_api_key_here</code></pre>
                     
-                    <h4 class="mt-4">Python Client (v2.1.0)</h4>
+                    <h4 class="mt-4">Python Client (v2.2.0)</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient, KuberRestClient
 
 # Redis Protocol Client
@@ -130,7 +130,7 @@ r = redis.Redis(host='localhost', port=6380, decode_responses=True)
 r.execute_command('AUTH', 'kub_your_api_key_here')
 r.set('key', 'value')</code></pre>
                     
-                    <h4 class="mt-4">Java Client (v2.1.0)</h4>
+                    <h4 class="mt-4">Java Client (v2.2.0)</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code>// Redis Protocol Client
 KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key_here");
 client.set("key", "value");
@@ -256,7 +256,7 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
                     
                     <div class="alert alert-success">
                         <i class="fas fa-folder-open me-2"></i>
-                        <strong>v2.1.0 Secure Folder:</strong> Security files are stored in a dedicated secure folder.
+                        <strong>v2.2.0 Secure Folder:</strong> Security files are stored in a dedicated secure folder.
                     </div>
                     
                     <h4>File Locations</h4>
@@ -267,12 +267,12 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
                         <tbody>
                             <tr>
                                 <td><code>users.json</code></td>
-                                <td><code>./secure/users.json</code></td>
+                                <td><code>./config/secure/users.json</code></td>
                                 <td><code>kuber.security.users-file</code></td>
                             </tr>
                             <tr>
                                 <td><code>apikeys.json</code></td>
-                                <td><code>./secure/apikeys.json</code></td>
+                                <td><code>./config/secure/apikeys.json</code></td>
                                 <td><code>kuber.security.api-keys-file</code></td>
                             </tr>
                         </tbody>
@@ -281,7 +281,7 @@ try (Jedis jedis = new Jedis("localhost", 6380)) {
                     <h4 class="mt-4">Configuration</h4>
                     <pre class="bg-dark text-light p-3 rounded"><code># application.properties
 # Secure folder - created automatically if missing
-kuber.secure.folder=./secure
+kuber.secure.folder=config/secure
 
 # Security files (use ${kuber.secure.folder} for relative paths)
 kuber.security.users-file=${kuber.secure.folder}/users.json
@@ -338,7 +338,7 @@ kuber.security.api-keys-file=${kuber.secure.folder}/apikeys.json</code></pre>
                         <li><code>users.json.sample</code> - Example users configuration</li>
                         <li><code>apikeys.json.sample</code> - Example API keys configuration</li>
                     </ul>
-                    <p>Copy these to your <code>./secure</code> folder and rename (remove <code>.sample</code>).</p>
+                    <p>Copy these to your <code>config/secure</code> folder and rename (remove <code>.sample</code>).</p>
                 </section>
             </div>
         </div>

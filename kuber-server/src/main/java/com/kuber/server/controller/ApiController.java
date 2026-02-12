@@ -23,6 +23,8 @@ import com.kuber.server.replication.ReplicationManager;
 import com.kuber.server.search.ParallelJsonSearchService;
 import com.kuber.server.security.ApiKeyService;
 import com.kuber.server.security.AuthorizationService;
+import com.kuber.server.util.SlashKeyResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +41,7 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 2.1.0
+ * @version 2.3.0
  */
 @RestController
 @RequestMapping({"/api", "/api/v1"})
@@ -582,6 +584,71 @@ public class ApiController {
     public ResponseEntity<?> searchJsonAlt(@PathVariable String region,
                                             @RequestBody SearchRequest request) {
         return searchJson(region, request);
+    }
+    
+    // ==================== Slash-Key Fallback Endpoints ====================
+    //
+    // These /**-pattern endpoints handle cache keys that contain forward slashes
+    // (e.g. "employee/EMP001"). When clients URL-encode the slash as %2F, and the
+    // web container decodes it back to '/' before Spring's pattern matching, the
+    // standard {key} pattern fails (too many path segments). These catch-all patterns
+    // reassemble the full key from the remaining path, handling both encoded and
+    // decoded slashes transparently.
+    //
+    // Spring's AntPathMatcher prefers more-specific patterns, so simple keys still
+    // match the {key} endpoints above; these /** variants only activate when the
+    // decoded path has extra segments.
+    
+    @GetMapping("/json/{region}/**")
+    public ResponseEntity<?> getJsonSlashKey(@PathVariable String region,
+                                              @RequestParam(defaultValue = "$") String path,
+                                              HttpServletRequest request) {
+        String key = SlashKeyResolver.resolveKey(request);
+        if (key == null || key.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Key is required"));
+        }
+        return getJson(region, key, path);
+    }
+    
+    @PutMapping("/json/{region}/**")
+    public ResponseEntity<?> setJsonSlashKey(@PathVariable String region,
+                                              @RequestBody Map<String, Object> body,
+                                              HttpServletRequest request) {
+        String key = SlashKeyResolver.resolveKey(request);
+        if (key == null || key.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Key is required"));
+        }
+        if (!authorizationService.canWrite(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "WRITE permission denied for region: " + region));
+        }
+        Object value = body.get("value");
+        Long ttlValue = body.containsKey("ttl") ? ((Number) body.get("ttl")).longValue() : -1L;
+        JsonNode json = JsonUtils.parse(JsonUtils.toJson(value));
+        cacheService.jsonSet(region, key, "$", json, ttlValue);
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("status", "OK");
+        return ResponseEntity.ok(result);
+    }
+    
+    @DeleteMapping("/json/{region}/**")
+    public ResponseEntity<?> deleteJsonSlashKey(@PathVariable String region,
+                                                 @RequestParam(defaultValue = "$") String path,
+                                                 HttpServletRequest request) {
+        String key = SlashKeyResolver.resolveKey(request);
+        if (key == null || key.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Key is required"));
+        }
+        if (!authorizationService.canDelete(region)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "DELETE permission denied for region: " + region));
+        }
+        boolean deleted = cacheService.jsonDelete(region, key, path);
+        Map<String, Object> result = new HashMap<>();
+        result.put("key", key);
+        result.put("deleted", deleted);
+        return ResponseEntity.ok(result);
     }
     
     @DeleteMapping("/cache/{region}/{key}/json")

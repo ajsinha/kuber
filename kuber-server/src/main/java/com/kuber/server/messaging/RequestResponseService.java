@@ -50,13 +50,13 @@ import java.util.stream.Collectors;
  *   <li>API key authentication for all requests</li>
  * </ul>
  * 
- * @version 2.1.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
 public class RequestResponseService {
     
-    private static final String CONFIG_FILE = "request_response.json";
+    private static final String DEFAULT_CONFIG_FILE = "config/request_response.json";
     
     private final KuberProperties properties;
     private final CacheService cacheService;
@@ -67,6 +67,7 @@ public class RequestResponseService {
     // Configuration
     private MessagingConfig config;
     private File configFile;
+    private String configFileName; // just the filename for file watcher comparison
     
     // Broker adapters keyed by broker name
     private final Map<String, MessageBrokerAdapter> adapters = new ConcurrentHashMap<>();
@@ -113,12 +114,17 @@ public class RequestResponseService {
     
     @PostConstruct
     public void init() {
-        // Determine config file path - use secure folder
-        String secureDir = properties.getSecure().getFolder();
-        if (secureDir == null || secureDir.isEmpty()) {
-            secureDir = "./secure";
+        // Determine config file path from properties (v2.2.0)
+        String configPath = properties.getMessaging().getRequestResponseConfigFile();
+        if (configPath == null || configPath.isBlank()) {
+            configPath = DEFAULT_CONFIG_FILE;
         }
-        configFile = new File(secureDir, CONFIG_FILE);
+        
+        configFile = new File(configPath);
+        if (!configFile.isAbsolute()) {
+            configFile = new File(System.getProperty("user.dir"), configPath);
+        }
+        configFileName = configFile.getName();
         
         log.info("Request/Response messaging config file: {}", configFile.getAbsolutePath());
     }
@@ -1190,7 +1196,7 @@ public class RequestResponseService {
                         
                         for (WatchEvent<?> event : key.pollEvents()) {
                             Path changed = (Path) event.context();
-                            if (changed.toString().equals(CONFIG_FILE)) {
+                            if (changed.toString().equals(configFileName)) {
                                 log.info("Configuration file changed, reloading...");
                                 Thread.sleep(500); // Brief delay for file to be fully written
                                 reloadConfiguration();

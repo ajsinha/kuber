@@ -24,7 +24,7 @@ import java.util.Set;
  * 
  * Supports both on-heap (KeyIndex) and off-heap (OffHeapKeyIndex) implementations.
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 public interface KeyIndexInterface {
     

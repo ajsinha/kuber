@@ -18,6 +18,14 @@
     <link rel="stylesheet" th:href="@{/webjars/codemirror/5.65.16/lib/codemirror.css}">
     <!-- Custom CSS -->
     <link rel="stylesheet" th:href="@{/css/kuber.css}">
+    <!-- Theme initializer (before render to prevent flash) -->
+    <script>
+        (function(){
+            var t = localStorage.getItem('kuber-theme');
+            if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-bs-theme', t);
+        })();
+    </script>
 </head>
 <body>
 
@@ -80,6 +88,15 @@
                 </span>
             </div>
             
+            <!-- Theme Toggle -->
+            <div class="navbar-nav me-2">
+                <button id="themeToggle" class="btn btn-sm btn-outline-light border-0" 
+                        title="Toggle dark/light theme" onclick="KuberTheme.toggle()">
+                    <i class="fas fa-moon" id="themeIconMoon"></i>
+                    <i class="fas fa-sun d-none" id="themeIconSun"></i>
+                </button>
+            </div>
+            
             <!-- User Menu -->
             <ul class="navbar-nav">
                 <li class="nav-item dropdown">
@@ -110,8 +127,32 @@
                             </a>
                         </li>
                         <li sec:authorize="hasRole('ADMIN')">
+                            <h6 class="dropdown-header"><i class="fas fa-network-wired me-1"></i>Messaging</h6>
+                        </li>
+                        <li sec:authorize="hasRole('ADMIN')">
+                            <a class="dropdown-item" th:href="@{/admin/brokers}">
+                                <i class="fas fa-server me-2"></i> Message Brokers
+                            </a>
+                        </li>
+                        <li sec:authorize="hasRole('ADMIN')">
+                            <a class="dropdown-item" th:href="@{/admin/event-publishing}">
+                                <i class="fas fa-broadcast-tower me-2"></i> Event Publishing
+                            </a>
+                        </li>
+                        <li sec:authorize="hasRole('ADMIN')">
                             <a class="dropdown-item" th:href="@{/admin/messaging}">
-                                <i class="fas fa-exchange-alt me-2"></i> Messaging
+                                <i class="fas fa-exchange-alt me-2"></i> Request/Response
+                            </a>
+                        </li>
+                        <li sec:authorize="hasRole('ADMIN')"><hr class="dropdown-divider"></li>
+                        <li sec:authorize="hasRole('ADMIN')">
+                            <a class="dropdown-item" th:href="@{/admin/monitoring}">
+                                <i class="fas fa-heartbeat me-2"></i> Monitoring
+                            </a>
+                        </li>
+                        <li sec:authorize="hasRole('ADMIN')">
+                            <a class="dropdown-item" th:href="@{/admin/logs}">
+                                <i class="fas fa-scroll me-2"></i> Live Logs
                             </a>
                         </li>
                         <li sec:authorize="hasRole('ADMIN')"><hr class="dropdown-divider"></li>
@@ -155,7 +196,7 @@
             <div class="col-md-6">
                 <span class="text-muted">
                     <i class="fas fa-database me-1"></i>
-                    <strong th:text="${appName} ?: 'Kuber'">Kuber</strong> Distributed Cache v2.1.0
+                    <strong th:text="${appName} ?: 'Kuber'">Kuber</strong> Distributed Cache v2.3.0
                 </span>
             </div>
             <div class="col-md-6 text-end">

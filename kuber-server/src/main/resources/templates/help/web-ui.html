@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  ~ Patent Pending
+  -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Web UI Guide')}"></head>
 <body class="d-flex flex-column min-vh-100">
@@ -16,20 +21,128 @@
                 <h1 class="display-5 mb-4"><i class="fas fa-desktop text-info me-3"></i>Web UI Guide</h1>
 
                 <div class="alert alert-info mb-4">
-                    <i class="fas fa-info-circle me-2"></i>Access the Web UI at <a href="/">http://localhost:8080</a>
+                    <i class="fas fa-info-circle me-2"></i>Access the Web UI at <a href="/">http://localhost:8080</a>.
+                    Admin pages require the <code>ADMIN</code> role.
                 </div>
-                
-                <h3>Dashboard</h3>
-                <p>The dashboard shows server status, cache statistics, and region overview.</p>
-                
-                <h3 class="mt-4">Cache Browser</h3>
-                <p>Browse and search cache entries by region. Use glob patterns like <code>user:*</code> to filter keys.</p>
-                
-                <h3 class="mt-4">Region Management</h3>
-                <p>Create, configure, and delete regions. Set attribute mappings for JSON transformation.</p>
-                
-                <h3 class="mt-4">Query Interface</h3>
-                <p>Execute JSON searches and Generic Search &amp; Update API queries with a visual interface.</p>
+
+                <!-- Table of Contents -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-list me-2"></i>Contents</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>General</strong>
+                                <ul class="list-unstyled ms-3 mt-1">
+                                    <li><a href="#dashboard">Dashboard</a></li>
+                                    <li><a href="#cache-browser">Cache Browser</a></li>
+                                    <li><a href="#regions">Region Management</a></li>
+                                    <li><a href="#query">Query Interface</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Admin &mdash; Security</strong>
+                                <ul class="list-unstyled ms-3 mt-1">
+                                    <li><a href="#users">Users</a></li>
+                                    <li><a href="#roles">Roles</a></li>
+                                    <li><a href="#apikeys">API Keys</a></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Admin &mdash; Messaging</strong>
+                                <ul class="list-unstyled ms-3 mt-1">
+                                    <li><a href="#brokers">Message Brokers</a></li>
+                                    <li><a href="#event-publishing">Event Publishing</a></li>
+                                    <li><a href="#messaging">Request/Response</a></li>
+                                    <li><a href="#monitoring">Monitoring &amp; Logs</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- General Pages -->
+                <h2 id="dashboard" class="border-bottom pb-2 mt-5 mb-3"><i class="fas fa-tachometer-alt me-2 text-primary"></i>Dashboard</h2>
+                <p>The main dashboard at <code>/</code> shows server status, JVM metrics, cache hit/miss ratios, region counts, and a quick-stats overview. It auto-refreshes at a configurable interval.</p>
+
+                <h2 id="cache-browser" class="border-bottom pb-2 mt-5 mb-3"><i class="fas fa-search me-2 text-success"></i>Cache Browser</h2>
+                <p>Browse and search cache entries by region. Use glob patterns like <code>user:*</code> to filter keys.
+                   Click any key to view its full value. Supports JSON pretty-printing for document-type entries.</p>
+
+                <h2 id="regions" class="border-bottom pb-2 mt-5 mb-3"><i class="fas fa-database me-2 text-warning"></i>Region Management</h2>
+                <p>Create, configure, and delete regions. Set attribute mappings for JSON transformation, configure TTL policies, and manage persistence settings per region.</p>
+
+                <h2 id="query" class="border-bottom pb-2 mt-5 mb-3"><i class="fas fa-terminal me-2 text-secondary"></i>Query Interface</h2>
+                <p>Execute JSON searches, Generic Search &amp; Update API queries, and JSONPath expressions against any region with a visual interface showing formatted results.</p>
+
+                <hr class="my-5">
+
+                <!-- Admin - Security -->
+                <h2 class="mb-4"><i class="fas fa-shield-alt me-2 text-danger"></i>Admin &mdash; Security</h2>
+
+                <h3 id="users" class="mt-4"><i class="fas fa-users me-2"></i>Users <span class="badge bg-secondary">Admin</span></h3>
+                <p>Manage user accounts at <a href="/admin/users"><code>/admin/users</code></a>. Create new users on a standalone page, assign roles, enable/disable accounts, and reset passwords.
+                   User data is stored in <code>config/secure/users.json</code> and changes take effect immediately via hot-reload.</p>
+
+                <h3 id="roles" class="mt-4"><i class="fas fa-user-tag me-2"></i>Roles <span class="badge bg-secondary">Admin</span></h3>
+                <p>Define role-based access control at <a href="/admin/roles"><code>/admin/roles</code></a>. Each role specifies a set of permissions
+                   (e.g., <code>CACHE_READ</code>, <code>CACHE_WRITE</code>, <code>ADMIN</code>). Assign roles to users for fine-grained authorization.
+                   Stored in <code>config/secure/roles.json</code>.</p>
+
+                <h3 id="apikeys" class="mt-4"><i class="fas fa-key me-2"></i>API Keys <span class="badge bg-secondary">Admin</span></h3>
+                <p>Generate and manage API keys at <a href="/admin/apikeys"><code>/admin/apikeys</code></a>. API keys are required for all programmatic (non-browser) access.
+                   Each key has a display name, optional expiration, and assigned roles. The full key is shown only once at creation time.
+                   Stored in <code>config/secure/apikeys.json</code>.</p>
+
+                <hr class="my-5">
+
+                <!-- Admin - Messaging -->
+                <h2 class="mb-4"><i class="fas fa-server me-2 text-primary"></i>Admin &mdash; Messaging &amp; Publishing</h2>
+
+                <h3 id="brokers" class="mt-4"><i class="fas fa-server me-2"></i>Message Brokers <span class="badge bg-secondary">Admin</span></h3>
+                <p>Central broker management at <a href="/admin/brokers"><code>/admin/brokers</code></a>. This is the single place to define connection settings for all message brokers used by event publishing and request/response messaging.</p>
+                <p><strong>Add Broker</strong> (<a href="/admin/brokers/add"><code>/admin/brokers/add</code></a>) &mdash; a standalone form supporting:</p>
+                <ul>
+                    <li><strong>5 broker types:</strong> Apache Kafka, ActiveMQ, RabbitMQ, IBM MQ, File (local disk)</li>
+                    <li><strong>Type-specific connection fields</strong> with validation (bootstrap servers, broker URL, host/port, queue manager, etc.)</li>
+                    <li><strong>SSL/TLS configuration</strong> with 5 modes: JKS, PEM, SASL_SSL (Kafka), Mutual TLS JKS, Mutual TLS PEM</li>
+                    <li><strong>Inline JSON editor</strong> on the list page for direct <code>message_brokers.json</code> editing</li>
+                </ul>
+                <p>Brokers are stored in the external JSON file configured by <code>kuber.publishing.broker-config-file</code> (default: <code>config/message_brokers.json</code>).</p>
+
+                <h3 id="event-publishing" class="mt-4"><i class="fas fa-broadcast-tower me-2"></i>Event Publishing <span class="badge bg-secondary">Admin</span></h3>
+                <p>Configure which cache regions publish events and where, at <a href="/admin/event-publishing"><code>/admin/event-publishing</code></a>.</p>
+                <p><strong>Add Region</strong> (<a href="/admin/event-publishing/add"><code>/admin/event-publishing/add</code></a>) &mdash; a standalone form to:</p>
+                <ul>
+                    <li>Name the publishing region (matching a cache region)</li>
+                    <li>Add one or more destinations, each selecting a broker from the broker list and specifying a topic/queue</li>
+                    <li>Enable/disable per-region publishing</li>
+                </ul>
+                <p>Configuration is stored in the external JSON file configured by <code>kuber.publishing.event-config-file</code> (default: <code>config/event_publishing.json</code>).</p>
+
+                <h3 id="messaging" class="mt-4"><i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging <span class="badge bg-secondary">Admin</span></h3>
+                <p>Manage request/response channels at <a href="/admin/messaging"><code>/admin/messaging</code></a>. This page does <strong>not</strong> create brokers;
+                   instead, it connects existing brokers (from the <a href="/admin/brokers">Brokers</a> page) to request/response topics.</p>
+                <p><strong>Add Channel</strong> (<a href="/admin/messaging/add-channel"><code>/admin/messaging/add-channel</code></a>) &mdash; a standalone form to:</p>
+                <ul>
+                    <li>Select an existing broker (connection details are pulled automatically)</li>
+                    <li>Specify one or more request topics for Kuber to listen on</li>
+                    <li>Enable/disable the channel</li>
+                </ul>
+                <p>The messaging page also provides:</p>
+                <ul>
+                    <li><strong>Global service toggle</strong> &mdash; enable/disable all request/response processing</li>
+                    <li><strong>Per-broker controls</strong> &mdash; enable, disable, pause, resume individual brokers</li>
+                    <li><strong>Topic management</strong> &mdash; add/remove request topics on existing channels</li>
+                    <li><strong><a href="/admin/messaging/queue">Queue Status</a></strong> &mdash; view pending requests, drain queue</li>
+                    <li><strong><a href="/admin/messaging/logs">Message Logs</a></strong> &mdash; searchable log of processed messages by broker and topic</li>
+                </ul>
+                <p>Configuration is stored in <code>config/request_response.json</code>.</p>
+
+                <h3 id="monitoring" class="mt-4"><i class="fas fa-chart-line me-2"></i>Monitoring &amp; Logs <span class="badge bg-secondary">Admin</span></h3>
+                <p><strong>Monitoring Dashboard</strong> (<a href="/admin/monitoring"><code>/admin/monitoring</code></a>) &mdash; live charts for CPU, heap memory, thread counts, cache operations, and hit/miss ratios with configurable auto-refresh.</p>
+                <p><strong>Live Log Viewer</strong> (<a href="/admin/logs"><code>/admin/logs</code></a>) &mdash; terminal-style log viewer with level filtering (ERROR, WARN, INFO, DEBUG), text search, auto-scroll, and log download.</p>
+                <p><strong>Secondary Indexes</strong> (<a href="/admin/indexes"><code>/admin/indexes</code></a>) &mdash; manage hash, B-tree, trigram, and prefix indexes. View index statistics inline with expandable detail panels.</p>
+
                 <div class="mt-5 text-center">
                     <a href="/help" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-2"></i>Back to Help Index</a>
                 </div>
@@ -37,7 +150,7 @@
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.1.0</p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.3.0</p></div>
                 <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
             </div>
         </footer>

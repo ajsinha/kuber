@@ -36,7 +36,7 @@ import java.util.function.Function;
  * @param <K> the type of keys maintained by this cache
  * @param <V> the type of mapped values
  * 
- * @version 1.5.0
+ * @version 2.3.0
  * @since 1.5.0
  */
 @Slf4j

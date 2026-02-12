@@ -1,6 +1,6 @@
 # Kuber Client Usage Guide
 
-**Version 2.1.0**
+**Version 2.3.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -254,7 +254,7 @@ producer.send('ccs_cache_request', json.dumps(request).encode())
 <dependency>
     <groupId>com.kuber</groupId>
     <artifactId>kuber-client-java</artifactId>
-    <version>2.1.0</version>
+    <version>2.3.0</version>
 </dependency>
 ```
 

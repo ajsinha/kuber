@@ -246,27 +246,6 @@
 </main>
 
 <!-- Drop Index Confirmation Modal -->
-<div class="modal fade" id="dropIndexModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Drop Index</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to drop the index <strong id="dropIndexName"></strong>?</p>
-                <p class="text-danger mb-0">This action cannot be undone.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDropBtn">
-                    <i class="fas fa-trash me-1"></i> Drop Index
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Loading Overlay -->
 <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
      style="background: rgba(0,0,0,0.5); z-index: 9999;">
@@ -337,22 +316,10 @@
     }
     
     function confirmDropIndex(region, field) {
-        document.getElementById('dropIndexName').textContent = region + '.' + field;
-        new bootstrap.Modal(document.getElementById('dropIndexModal')).show();
-    }
-    
-    function confirmDropCurrentIndex() {
-        confirmDropIndex(getCurrentRegion(), getCurrentField());
-    }
-    
-    document.getElementById('confirmDropBtn').addEventListener('click', function() {
-        bootstrap.Modal.getInstance(document.getElementById('dropIndexModal')).hide();
-        
-        var currentRegion = getCurrentRegion();
-        var currentField = getCurrentField();
+        if (!confirm('Drop index "' + region + '.' + field + '"?\n\nThis cannot be undone.')) return;
         
         showLoading();
-        fetch('/api/admin/indexes/' + encodeURIComponent(currentRegion) + '/' + encodeURIComponent(currentField), {
+        fetch('/api/admin/indexes/' + encodeURIComponent(region) + '/' + encodeURIComponent(field), {
             method: 'DELETE'
         })
         .then(function(response) { return response.json(); })
@@ -360,7 +327,7 @@
             if (data.success) {
                 showToast('Index dropped successfully');
                 setTimeout(function() { 
-                    window.location.href = '/admin/indexes/region/' + encodeURIComponent(currentRegion);
+                    window.location.href = '/admin/indexes/region/' + encodeURIComponent(region);
                 }, 1000);
             } else {
                 showToast(data.error || 'Failed to drop index', 'danger');
@@ -372,7 +339,11 @@
         .finally(function() {
             hideLoading();
         });
-    });
+    }
+    
+    function confirmDropCurrentIndex() {
+        confirmDropIndex(getCurrentRegion(), getCurrentField());
+    }
 </script>
 
 </body>

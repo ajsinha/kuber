@@ -9,7 +9,7 @@
  * This allows health checks and monitoring tools to access these endpoints
  * without knowing the /api or /api/v1 prefix.
  *
- * @version 2.1.0
+ * @version 2.3.0
  */
 package com.kuber.server.controller;
 
@@ -30,7 +30,7 @@ import java.util.Map;
  * Root-level health and status endpoints accessible without /api prefix.
  * Mirrors ApiController's /ping, /info, /status, /health endpoints.
  *
- * @version 2.1.0
+ * @version 2.3.0
  */
 @RestController
 @RequiredArgsConstructor

@@ -29,6 +29,9 @@
                     <h5 class="alert-heading"><i class="fas fa-database me-2"></i>Welcome to <span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h5>
                     <p class="mb-2"><span th:text="${appName} ?: 'Kuber'">Kuber</span> is a high-performance, Redis-compatible distributed caching system with:</p>
                     <ul class="mb-0">
+                        <li><strong>Real-Time Monitoring (v2.2.0)</strong> - Live dashboard with CPU, memory, cache ops charts and system metrics</li>
+                        <li><strong>Live Log Viewer (v2.2.0)</strong> - Terminal-style log viewer with level filtering, text search, and auto-scroll</li>
+                        <li><strong>Dark / Light Theme (v2.2.0)</strong> - One-click theme toggle with OS preference detection and persistence</li>
                         <li><strong>Request/Response Messaging (v1.7.1)</strong> - Access cache via Kafka, RabbitMQ, IBM MQ, ActiveMQ with broker controls</li>
                         <li><strong>C# / .NET Client (v1.7.1)</strong> - Complete .NET client with async/await, Redis protocol, REST API, and messaging</li>
                         <li><strong>Dual Memory Management (v2.1.0)</strong> - Memory pressure eviction (heap) + count-based limits (20% or 10K per region)</li>
@@ -221,7 +224,7 @@
                     <div class="accordion-item">
                         <h2 class="accordion-header">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSession">
-                                <i class="fas fa-plug me-2 text-info"></i>Session Management <span class="badge bg-info ms-2">v2.1.0</span>
+                                <i class="fas fa-plug me-2 text-info"></i>Session Management <span class="badge bg-info ms-2">v2.2.0</span>
                             </button>
                         </h2>
                         <div id="collapseSession" class="accordion-collapse collapse" data-bs-parent="#featuresAccordion">
@@ -257,7 +260,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.1.0</p>
+                    <p class="text-muted small mb-0">Version 2.3.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

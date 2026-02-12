@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>System is shutting down</li>
  * </ul>
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service

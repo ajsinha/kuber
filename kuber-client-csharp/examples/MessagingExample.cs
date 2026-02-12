@@ -86,7 +86,7 @@ public static class MessagingExample
         {
             ["app:config:theme"] = "dark",
             ["app:config:lang"] = "en-US",
-            ["app:config:version"] = "2.1.0"
+            ["app:config:version"] = "2.3.0"
         });
         Console.WriteLine($"   Topic: kuber_request");
         Console.WriteLine($"   Message: {client.ToJson(msetRequest)}");

@@ -462,7 +462,7 @@
                 <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration</h5>
             </div>
             <div class="card-body">
-                <p>Configuration is stored in <code>request_response.json</code> in the secure folder:</p>
+                <p>Configuration is stored in <code>config/request_response.json</code> (configurable via <code>kuber.messaging.request-response-config-file</code>):</p>
                 
                 <pre class="bg-dark text-light p-3 rounded"><code>{
     "enabled": true,
@@ -560,7 +560,7 @@
                 
                 <div class="alert alert-warning mt-3">
                     <i class="fas fa-sync me-2"></i>
-                    <strong>Hot Reload:</strong> Changes to request_response.json are detected automatically. 
+                    <strong>Hot Reload:</strong> Changes to <code>config/request_response.json</code> are detected automatically. 
                     Broker connections and subscriptions update dynamically without restart.
                 </div>
             </div>
@@ -661,7 +661,7 @@
                             </tr>
                             <tr>
                                 <td><strong>JSON Config</strong></td>
-                                <td>Edit <code>request_response.json</code>: set <code>"enabled": true/false</code></td>
+                                <td>Edit <code>config/request_response.json</code>: set <code>"enabled": true/false</code></td>
                                 <td><i class="fas fa-check text-success"></i> Yes</td>
                             </tr>
                         </tbody>
@@ -782,7 +782,7 @@ GET  /api/v1/messaging/brokers/{name}/status   - Get detailed broker status</cod
             <div class="card-body">
                 <p>Manage messaging from the Admin UI:</p>
                 <ul>
-                    <li><a href="/admin/messaging"><strong>Broker Management</strong></a> - Add/remove brokers and topics</li>
+                    <li><a href="/admin/messaging"><strong>Broker Management</strong></a> - Add channels, manage topics, enable/disable brokers</li>
                     <li><a href="/admin/messaging/queue"><strong>Queue Status</strong></a> - View pending requests and drain queue</li>
                 </ul>
                 
@@ -801,7 +801,7 @@ GET  /api/v1/messaging/brokers/{name}/status   - Get detailed broker status</cod
         <!-- Test Clients -->
         <div class="card mb-4">
             <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="fas fa-vial me-2"></i>Test Clients (v2.1.0)</h5>
+                <h5 class="mb-0"><i class="fas fa-vial me-2"></i>Test Clients (v2.2.0)</h5>
             </div>
             <div class="card-body">
                 <p>

@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Provides lookup methods for the orchestration service
  * - Handles graceful shutdown
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
@@ -46,10 +46,14 @@ public class PublisherRegistry {
     /**
      * Constructor with auto-wired publishers.
      * Spring automatically injects all EventPublisher implementations.
+     * EventPublishingConfigLoader is injected to guarantee JSON region configs
+     * are loaded before publishers initialize.
      * 
      * @param publishers All available EventPublisher beans
+     * @param configLoader Ensures external region config is loaded first
      */
-    public PublisherRegistry(List<EventPublisher> publishers) {
+    public PublisherRegistry(List<EventPublisher> publishers,
+                             EventPublishingConfigLoader configLoader) {
         this.publishers = publishers != null ? publishers : Collections.emptyList();
     }
     

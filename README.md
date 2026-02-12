@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 2.1.0
+Version 2.3.0
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -13,8 +13,8 @@ Ashutosh Sinha | Email: ajsinha@gmail.com
 
 Kuber is a powerful, enterprise-grade distributed caching system that provides:
 
-- **Secondary Indexing (v2.1.0)**: O(1) hash and O(log n) B-tree indexes for 100-1000x faster JSON searches
-- **Hybrid Index Storage (v2.1.0)**: In-memory indexes for speed + RocksDB persistence for durability
+- **Secondary Indexing (v2.2.0)**: O(1) hash and O(log n) B-tree indexes for 100-1000x faster JSON searches
+- **Hybrid Index Storage (v2.2.0)**: In-memory indexes for speed + RocksDB persistence for durability
 - **Role-Based Access Control (v1.7.3)**: Enterprise RBAC with region-specific permissions (READ/WRITE/DELETE)
 - **Off-Heap Key Index (v1.3.2 - segmented, >2GB)**: Optional DRAM-based key storage outside Java heap - zero GC pressure
 - **Hybrid Memory Architecture (v1.2.1)**: All keys always in memory, values can overflow to disk (Aerospike-like)
@@ -145,7 +145,7 @@ kuber.cache.value-cache-max-percent=20
 kuber.cache.value-cache-max-entries=10000
 ```
 
-### Warm Objects (v2.1.0)
+### Warm Objects (v1.7.4)
 
 Kuber can maintain a minimum number of "warm" (in-memory) objects per region, ensuring frequently accessed data stays in memory for optimal read performance:
 
@@ -175,7 +175,7 @@ kuber.cache.region-warm-object-counts.session=10000
 - Works with eviction services (respects memory limits)
 - Falls back to default behavior if not configured
 
-### Prometheus Monitoring (v2.1.0)
+### Prometheus Monitoring (v1.7.6)
 
 Kuber integrates with Prometheus for comprehensive metrics monitoring:
 
@@ -210,7 +210,7 @@ scrape_configs:
 
 See [docs/PROMETHEUS.md](docs/PROMETHEUS.md) for full documentation including Grafana dashboards and alerting rules.
 
-### Generic Search API (v2.1.0)
+### Generic Search API (v1.7.9)
 
 Enhanced search API with multiple search modes and flexible JSON attribute querying:
 
@@ -266,7 +266,7 @@ Enhanced search API with multiple search modes and flexible JSON attribute query
 
 See [docs/GENERIC_SEARCH_API.md](docs/GENERIC_SEARCH_API.md) for complete documentation.
 
-### Generic Update API (v2.1.0)
+### Generic Update API (v1.8.0)
 
 Unified SET/UPDATE operation with intelligent JSON merging:
 
@@ -334,7 +334,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-2.1.0.jar
+        -jar kuber-server/target/kuber-server-2.3.0.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -361,7 +361,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
 
 ## Client Libraries
 
-Kuber provides client libraries for **Python**, **Java**, and **C#**, each supporting Redis protocol, REST API, and messaging patterns.
+Kuber provides client libraries for **Python**, **Java**, and **C#**, each supporting Redis protocol, REST API, messaging patterns.
 
 ### Python Client
 
@@ -577,7 +577,7 @@ Enable or disable the entire Request/Response Messaging feature:
 |--------|-----|-----------|
 | Admin UI | Admin → Messaging → Enable/Disable Service | Yes |
 | REST API | `POST /api/v1/messaging/enable` or `/disable` | Yes |
-| JSON Config | `request_response.json`: `"enabled": true/false` | Yes |
+| JSON Config | `config/request_response.json`: `"enabled": true/false` | Yes |
 
 When disabled globally, all brokers disconnect and messages queue at the broker until re-enabled.
 
@@ -595,7 +595,7 @@ Manage broker connections dynamically from the Admin UI:
 
 ### Configuration
 
-Create `secure/request_response.json`:
+Create `config/request_response.json` (or customize path via `kuber.messaging.request-response-config-file`):
 
 ```json
 {
@@ -619,7 +619,7 @@ Create `secure/request_response.json`:
 }
 ```
 
-### Test Clients (v2.1.0)
+### Test Clients (v2.2.0)
 
 Ready-to-use test clients are provided for all brokers in Python, Java, and C#:
 
@@ -658,7 +658,7 @@ python kafka_diagnostics.py --live --watch-only          # Live watch mode
 
 > **Note:** ActiveMQ Python client uses STOMP protocol on port 61613, not OpenWire on port 61616.
 
-### Request/Response Logging (v2.1.0)
+### Request/Response Logging (v1.7.9)
 
 All request/response pairs can be logged to files for debugging and auditing:
 
@@ -797,24 +797,51 @@ Comprehensive documentation accessible at `/help`:
 |---------|--------|
 | Getting Started | Overview, Quick Start, Configuration |
 | Operations | String, Hash, JSON, Key, TTL, Batch |
-| Client Libraries | Python, Java, C# with examples |
+| Client Libraries | Python, Java, C# — Redis, REST, Messaging |
 | Advanced | Regions, Search, Replication, Messaging |
 | Reference | REST API, Redis Protocol, Glossary |
 
-## Event Publishing (v1.2.8)
+## Event Publishing (v1.2.8, updated v2.2.0)
 
-Stream cache events to external systems for real-time integrations:
+Stream cache events to external systems for real-time integrations.
 
-```yaml
-kuber:
-  publishing:
-    kafka:
-      enabled: true
-      bootstrap-servers: kafka:9092
-      regions:
-        users: user-events
-        products: product-events
+**Configuration is managed via two JSON files** (both in `config/` by default):
+
+| File | Purpose | Admin UI |
+|------|---------|----------|
+| `config/message_brokers.json` | Broker definitions (connection, SSL) | `/admin/brokers` |
+| `config/event_publishing.json` | Region-to-broker routing | `/admin/event-publishing` |
+
+**Broker example** (`config/message_brokers.json`):
+```json
+{
+  "brokers": {
+    "kafka-prod": {
+      "enabled": true, "type": "kafka",
+      "bootstrap-servers": "kafka1:9093",
+      "ssl": { "enabled": true, "mode": "jks",
+               "trust-store-path": "/certs/truststore.jks",
+               "trust-store-password": "changeit" }
+    }
+  }
+}
 ```
+
+**Region routing** (`config/event_publishing.json`):
+```json
+{
+  "regions": {
+    "customers": {
+      "enabled": true,
+      "destinations": [
+        { "broker": "kafka-prod", "topic": "kuber.customers.events" }
+      ]
+    }
+  }
+}
+```
+
+**SSL/TLS modes:** `jks`, `pem`, `sasl_ssl`, `mtls_jks`, `mtls_pem` — see `/admin/brokers` for reference.
 
 ### Event Format
 
@@ -898,7 +925,7 @@ Kuber implements enterprise-grade RBAC with region-specific permissions:
 
 ### Configuration Files
 
-**users.json** (secure/users.json):
+**users.json** (config/secure/users.json):
 
 ```json
 {
@@ -923,7 +950,7 @@ Kuber implements enterprise-grade RBAC with region-specific permissions:
 }
 ```
 
-**roles.json** (secure/roles.json):
+**roles.json** (config/secure/roles.json):
 
 ```json
 {
@@ -1013,8 +1040,8 @@ If configuration files are missing at startup:
 Comprehensive examples available in `secure-sample/`:
 
 ```bash
-cp secure-sample/users.json.sample secure/users.json
-cp secure-sample/roles.json.sample secure/roles.json
+cp secure-sample/users.json.sample config/secure/users.json
+cp secure-sample/roles.json.sample config/secure/roles.json
 # Edit with your configuration
 ```
 
@@ -1030,7 +1057,7 @@ RBAC is enforced on:
 
 Users only see regions they have access to in the UI.
 
-### SSL/TLS Configuration (v2.1.0)
+### SSL/TLS Configuration (v2.2.0)
 
 Kuber supports SSL/TLS encryption for secure communications:
 

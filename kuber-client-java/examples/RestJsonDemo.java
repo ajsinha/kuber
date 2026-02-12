@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - JSON Operations Demo (v2.1.0)
+ * Kuber REST API - JSON Operations Demo (v2.3.0)
  *
  * This standalone Java application demonstrates all JSON-related operations
  * using the Kuber REST API (HTTP/JSON protocol):
@@ -25,7 +25,7 @@
  *
  * Copyright (c) 2025-2030 Ashutosh Sinha. All Rights Reserved.
  *
- * @version 2.1.0
+ * @version 2.3.0
  */
 
 import java.io.*;
@@ -772,6 +772,40 @@ public class RestJsonDemo {
 
     // ==================== Main ====================
 
+    private void demoN_SlashKeys(String region) throws IOException {
+        printHeader("N) KEYS WITH FORWARD SLASHES (employee/EMP001)");
+
+        String[][] slashDocs = {
+            {"employee/EMP001", "{\"name\":\"Alice Walker\",\"dept\":\"Engineering\",\"level\":\"L5\"}"},
+            {"employee/EMP002", "{\"name\":\"Bob Chen\",\"dept\":\"Marketing\",\"level\":\"L4\"}"},
+            {"department/eng/lead", "{\"name\":\"Carol Davis\",\"role\":\"Director\",\"reports\":42}"},
+            {"config/app/v2.1/settings", "{\"theme\":\"dark\",\"locale\":\"en-US\",\"timeout\":30}"}
+        };
+
+        System.out.println("\n  Storing documents with slash keys...");
+        for (String[] doc : slashDocs) {
+            boolean ok = jsonSet(doc[0], parseJson(doc[1]), region, -1);
+            System.out.println("    [" + (ok ? "OK" : "FAIL") + "] " + doc[0]);
+        }
+
+        System.out.println("\n  Retrieving documents by slash key...");
+        for (String[] doc : slashDocs) {
+            String result = jsonGet(doc[0], region, "$");
+            System.out.println("    [" + (result != null ? "OK" : "FAIL") + "] " + doc[0] +
+                " -> " + (result != null ? result.substring(0, Math.min(80, result.length())) + "..." : "NOT FOUND"));
+        }
+
+        System.out.println("\n  JSONPath on slash key 'employee/EMP001' ($.dept)...");
+        String dept = jsonGet("employee/EMP001", region, "$.dept");
+        System.out.println("    Department: " + dept);
+
+        System.out.println("\n  Deleting slash-key documents...");
+        for (String[] doc : slashDocs) {
+            boolean ok = jsonDelete(doc[0], region, "$");
+            System.out.println("    [" + (ok ? "OK" : "FAIL") + "] Deleted " + doc[0]);
+        }
+    }
+
     public static void main(String[] args) {
         String host = args.length > 0 ? args[0] : "localhost";
         int port = args.length > 1 ? Integer.parseInt(args[1]) : 8080;
@@ -793,8 +827,9 @@ public class RestJsonDemo {
         System.out.println("|   k) Store with TTL                 PUT  with ttl parameter          |");
         System.out.println("|   l) Cross-region operations        Multiple regions                 |");
         System.out.println("|   m) Delete JSON documents          DELETE /api/v1/json/{r}/{k}     |");
+        System.out.println("|   n) Keys with forward slashes      employee/EMP001 etc.            |");
         System.out.println("|                                                                      |");
-        System.out.println("|   v2.1.0                                                             |");
+        System.out.println("|   v2.3.0                                                             |");
         System.out.println("+======================================================================+");
         System.out.println();
 
@@ -833,6 +868,7 @@ public class RestJsonDemo {
             demo.demoK_JsonWithTtl(region);
             String productsRegion = demo.demoL_CrossRegion();
             demo.demoM_DeleteJson(region, productsRegion);
+            demo.demoN_SlashKeys(region);
 
             printHeader("ALL DEMOS COMPLETED SUCCESSFULLY");
             System.out.println();

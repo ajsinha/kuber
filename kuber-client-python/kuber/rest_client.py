@@ -123,6 +123,16 @@ class KuberRestClient:
             url = f"{url}?{query}"
         return url
     
+    @staticmethod
+    def _encode_path(value: str) -> str:
+        """URL-encode a path component (region name, key, field, etc.).
+        
+        Encodes all special characters including forward slash (/) so that
+        cache keys containing slashes (e.g. 'employee/EMP001') are transmitted
+        as 'employee%2FEMP001' — a single path segment, not two.
+        """
+        return urllib.parse.quote(value, safe='')
+    
     def _get_auth_header(self) -> Dict[str, str]:
         """Get authorization header (API Key)."""
         return {'X-API-Key': self.api_key}
@@ -219,7 +229,7 @@ class KuberRestClient:
     def get_region(self, name: str = None) -> Dict[str, Any]:
         """Get region information."""
         region = name or self._current_region
-        return self._get(f'/api/regions/{region}')
+        return self._get(f'/api/regions/{self._encode_path(region)}')
     
     def create_region(self, name: str, description: str = '') -> Dict[str, Any]:
         """Create a new region."""
@@ -230,13 +240,13 @@ class KuberRestClient:
     
     def delete_region(self, name: str) -> bool:
         """Delete a region."""
-        self._delete(f'/api/regions/{name}')
+        self._delete(f'/api/regions/{self._encode_path(name)}')
         return True
     
     def purge_region(self, name: str = None) -> bool:
         """Purge all entries in a region."""
         region = name or self._current_region
-        self._post(f'/api/regions/{region}/purge')
+        self._post(f'/api/regions/{self._encode_path(region)}/purge')
         return True
     
     # ==================== Key-Value Operations ====================
@@ -254,7 +264,7 @@ class KuberRestClient:
         """
         region = region or self._current_region
         try:
-            result = self._get(f'/api/cache/{region}/{key}')
+            result = self._get(f'/api/cache/{self._encode_path(region)}/{self._encode_path(key)}')
             return result.get('value') if isinstance(result, dict) else result
         except KuberRestException as e:
             if e.status_code == 404:
@@ -288,7 +298,7 @@ class KuberRestClient:
                 ttl = int(ttl.total_seconds())
             data['ttl'] = ttl
         
-        self._put(f'/api/cache/{region}/{key}', data)
+        self._put(f'/api/cache/{self._encode_path(region)}/{self._encode_path(key)}', data)
         return True
     
     def delete(self, key: str, region: str = None) -> bool:
@@ -304,7 +314,7 @@ class KuberRestClient:
         """
         region = region or self._current_region
         try:
-            self._delete(f'/api/cache/{region}/{key}')
+            self._delete(f'/api/cache/{self._encode_path(region)}/{self._encode_path(key)}')
             return True
         except KuberRestException as e:
             if e.status_code == 404:
@@ -315,7 +325,7 @@ class KuberRestClient:
         """Check if a key exists."""
         region = region or self._current_region
         try:
-            self._get(f'/api/cache/{region}/{key}/exists')
+            self._get(f'/api/cache/{self._encode_path(region)}/{self._encode_path(key)}/exists')
             return True
         except KuberRestException as e:
             if e.status_code == 404:
@@ -334,7 +344,7 @@ class KuberRestClient:
             Dictionary of key -> value mappings
         """
         region = region or self._current_region
-        result = self._post(f'/api/cache/{region}/mget', {'keys': keys})
+        result = self._post(f'/api/cache/{self._encode_path(region)}/mget', {'keys': keys})
         return result if isinstance(result, dict) else {}
     
     def mset(self, mapping: Dict[str, str], region: str = None) -> bool:
@@ -349,7 +359,7 @@ class KuberRestClient:
             True on success
         """
         region = region or self._current_region
-        self._post(f'/api/cache/{region}/mset', {'entries': mapping})
+        self._post(f'/api/cache/{self._encode_path(region)}/mset', {'entries': mapping})
         return True
     
     def keys(self, pattern: str = '*', region: str = None) -> List[str]:
@@ -364,7 +374,7 @@ class KuberRestClient:
             List of matching keys
         """
         region = region or self._current_region
-        result = self._get(f'/api/cache/{region}/keys', {'pattern': pattern})
+        result = self._get(f'/api/cache/{self._encode_path(region)}/keys', {'pattern': pattern})
         return result if isinstance(result, list) else []
     
     def keys_regex(self, pattern: str, region: str = None, limit: int = 1000) -> List[str]:
@@ -390,7 +400,7 @@ class KuberRestClient:
             keys = client.keys_regex(r'.*@.*\\.com$', limit=500)
         """
         region = region or self._current_region
-        result = self._get(f'/api/cache/{region}/keys/regex', {
+        result = self._get(f'/api/cache/{self._encode_path(region)}/keys/regex', {
             'pattern': pattern,
             'limit': str(limit)
         })
@@ -423,7 +433,7 @@ class KuberRestClient:
                 print(f"Key: {r['key']}, Value: {r['value']}")
         """
         region = region or self._current_region
-        result = self._get(f'/api/cache/{region}/ksearch', {
+        result = self._get(f'/api/cache/{self._encode_path(region)}/ksearch', {
             'pattern': pattern,
             'limit': str(limit)
         })
@@ -438,7 +448,7 @@ class KuberRestClient:
         """
         region = region or self._current_region
         try:
-            result = self._get(f'/api/cache/{region}/{key}/ttl')
+            result = self._get(f'/api/cache/{self._encode_path(region)}/{self._encode_path(key)}/ttl')
             return result.get('ttl', -2) if isinstance(result, dict) else -2
         except KuberRestException:
             return -2
@@ -447,7 +457,7 @@ class KuberRestClient:
         """Set expiration on a key."""
         region = region or self._current_region
         try:
-            self._post(f'/api/cache/{region}/{key}/expire', {'seconds': seconds})
+            self._post(f'/api/cache/{self._encode_path(region)}/{self._encode_path(key)}/expire', {'seconds': seconds})
             return True
         except KuberRestException:
             return False
@@ -455,7 +465,7 @@ class KuberRestClient:
     def dbsize(self, region: str = None) -> int:
         """Get number of entries in a region."""
         region = region or self._current_region
-        result = self._get(f'/api/cache/{region}/size')
+        result = self._get(f'/api/cache/{self._encode_path(region)}/size')
         return result.get('size', 0) if isinstance(result, dict) else 0
     
     # ==================== JSON Operations ====================
@@ -492,7 +502,7 @@ class KuberRestClient:
                 ttl = int(ttl.total_seconds())
             data['ttl'] = ttl
         
-        self._put(f'/api/json/{region}/{key}', data)
+        self._put(f'/api/json/{self._encode_path(region)}/{self._encode_path(key)}', data)
         return True
     
     def json_get(self, key: str, region: str = None, path: str = '$') -> Any:
@@ -510,7 +520,7 @@ class KuberRestClient:
         region = region or self._current_region
         try:
             params = {'path': path} if path != '$' else None
-            result = self._get(f'/api/json/{region}/{key}', params)
+            result = self._get(f'/api/json/{self._encode_path(region)}/{self._encode_path(key)}', params)
             return result.get('value') if isinstance(result, dict) else result
         except KuberRestException as e:
             if e.status_code == 404:
@@ -522,7 +532,7 @@ class KuberRestClient:
         region = region or self._current_region
         try:
             params = {'path': path} if path != '$' else None
-            self._delete(f'/api/json/{region}/{key}', params)
+            self._delete(f'/api/json/{self._encode_path(region)}/{self._encode_path(key)}', params)
             return True
         except KuberRestException:
             return False
@@ -540,7 +550,7 @@ class KuberRestClient:
             Dictionary of key -> value mappings
         """
         region = region or self._current_region
-        result = self._post(f'/api/json/{region}/mget', {
+        result = self._post(f'/api/json/{self._encode_path(region)}/mget', {
             'keys': keys,
             'path': path
         })
@@ -569,7 +579,7 @@ class KuberRestClient:
             List of matching documents with keys
         """
         region = region or self._current_region
-        result = self._post(f'/api/json/{region}/search', {
+        result = self._post(f'/api/json/{self._encode_path(region)}/search', {
             'query': query,
             'limit': limit
         })
@@ -593,7 +603,7 @@ class KuberRestClient:
             List of matching values
         """
         region = region or self._current_region
-        result = self._post(f'/api/json/{region}/query', {
+        result = self._post(f'/api/json/{self._encode_path(region)}/query', {
             'jsonpath': jsonpath,
             'limit': limit
         })
@@ -605,7 +615,7 @@ class KuberRestClient:
         """Get a hash field."""
         region = region or self._current_region
         try:
-            result = self._get(f'/api/hash/{region}/{key}/{field}')
+            result = self._get(f'/api/hash/{self._encode_path(region)}/{self._encode_path(key)}/{self._encode_path(field)}')
             return result.get('value') if isinstance(result, dict) else result
         except KuberRestException as e:
             if e.status_code == 404:
@@ -615,14 +625,14 @@ class KuberRestClient:
     def hset(self, key: str, field: str, value: str, region: str = None) -> bool:
         """Set a hash field."""
         region = region or self._current_region
-        self._put(f'/api/hash/{region}/{key}/{field}', {'value': value})
+        self._put(f'/api/hash/{self._encode_path(region)}/{self._encode_path(key)}/{self._encode_path(field)}', {'value': value})
         return True
     
     def hgetall(self, key: str, region: str = None) -> Dict[str, str]:
         """Get all hash fields and values."""
         region = region or self._current_region
         try:
-            result = self._get(f'/api/hash/{region}/{key}')
+            result = self._get(f'/api/hash/{self._encode_path(region)}/{self._encode_path(key)}')
             return result if isinstance(result, dict) else {}
         except KuberRestException as e:
             if e.status_code == 404:
@@ -633,7 +643,7 @@ class KuberRestClient:
         """Delete a hash field."""
         region = region or self._current_region
         try:
-            self._delete(f'/api/hash/{region}/{key}/{field}')
+            self._delete(f'/api/hash/{self._encode_path(region)}/{self._encode_path(key)}/{self._encode_path(field)}')
             return True
         except KuberRestException:
             return False
@@ -641,14 +651,14 @@ class KuberRestClient:
     def hmset(self, key: str, mapping: Dict[str, str], region: str = None) -> bool:
         """Set multiple hash fields."""
         region = region or self._current_region
-        self._post(f'/api/hash/{region}/{key}/mset', {'fields': mapping})
+        self._post(f'/api/hash/{self._encode_path(region)}/{self._encode_path(key)}/mset', {'fields': mapping})
         return True
     
     def hkeys(self, key: str, region: str = None) -> List[str]:
         """Get all hash fields."""
         region = region or self._current_region
         try:
-            result = self._get(f'/api/hash/{region}/{key}/keys')
+            result = self._get(f'/api/hash/{self._encode_path(region)}/{self._encode_path(key)}/keys')
             return result if isinstance(result, list) else []
         except KuberRestException:
             return []
@@ -671,7 +681,7 @@ class KuberRestClient:
             Import result with counts
         """
         region = region or self._current_region
-        return self._post(f'/api/bulk/{region}/import', {'entries': entries})
+        return self._post(f'/api/bulk/{self._encode_path(region)}/import', {'entries': entries})
     
     def bulk_export(self, region: str = None, pattern: str = '*') -> List[Dict[str, Any]]:
         """
@@ -685,7 +695,7 @@ class KuberRestClient:
             List of exported entries
         """
         region = region or self._current_region
-        return self._get(f'/api/bulk/{region}/export', {'pattern': pattern})
+        return self._get(f'/api/bulk/{self._encode_path(region)}/export', {'pattern': pattern})
 
 
 # Alias for convenience

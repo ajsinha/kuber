@@ -1,0 +1,113 @@
+{
+  "_comment": "Kuber Event Publishing - Region Configuration (v2.3.0)",
+  "_doc": "Regions reference broker names defined in config/message_brokers.json",
+
+  "regions": {
+
+    "trades": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "kafka-prod",
+          "topic": "kuber.trades.events"
+        },
+        {
+          "broker": "activemq-legacy",
+          "topic": "TRADES.EVENTS.QUEUE"
+        },
+        {
+          "broker": "audit-files",
+          "topic": "trades"
+        }
+      ]
+    },
+
+    "customers": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "kafka-prod",
+          "topic": "kuber.customers.events"
+        },
+        {
+          "broker": "audit-files",
+          "topic": "customers"
+        }
+      ]
+    },
+
+    "orders": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "kafka-analytics",
+          "topic": "orders-stream"
+        },
+        {
+          "broker": "rabbitmq-main",
+          "topic": "orders.events",
+          "routing-key": "orders.#",
+          "queue": "orders-events-queue"
+        },
+        {
+          "broker": "audit-files",
+          "topic": "orders"
+        }
+      ]
+    },
+
+    "products": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "kafka-prod",
+          "topic": "product-catalog-events"
+        },
+        {
+          "broker": "activemq-legacy",
+          "topic": "PRODUCT.UPDATES.QUEUE"
+        }
+      ]
+    },
+
+    "transactions": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "ibm-finance",
+          "topic": "KUBER.TRANSACTIONS.QUEUE"
+        },
+        {
+          "broker": "kafka-analytics",
+          "topic": "transactions-analytics"
+        },
+        {
+          "broker": "archive-files",
+          "topic": "transactions"
+        }
+      ]
+    },
+
+    "inventory": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "rabbitmq-main",
+          "topic": "inventory.exchange",
+          "routing-key": "inventory.*",
+          "queue": "warehouse-updates"
+        }
+      ]
+    },
+
+    "sessions": {
+      "enabled": true,
+      "destinations": [
+        {
+          "broker": "audit-files",
+          "topic": "sessions"
+        }
+      ]
+    }
+  }
+}

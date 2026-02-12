@@ -52,7 +52,7 @@ import java.util.*;
  * client.close();
  * </pre>
  * 
- * @version 2.1.0
+ * @version 2.3.0
  */
 @Slf4j
 public class KuberRestClient implements AutoCloseable {
@@ -121,6 +121,20 @@ public class KuberRestClient implements AutoCloseable {
     }
     
     // ==================== HTTP Methods ====================
+    
+    /**
+     * URL-encode a path component (region name, key, field, etc.).
+     * Encodes all special characters including '/' so that cache keys
+     * containing slashes (e.g. "employee/EMP001") are transmitted as
+     * "employee%2FEMP001" — a single path segment, not two.
+     */
+    private static String encodePath(String value) {
+        try {
+            return java.net.URLEncoder.encode(value, "UTF-8").replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return value;
+        }
+    }
     
     private JsonNode request(String method, String path) throws IOException {
         return request(method, path, null, null);
@@ -253,7 +267,7 @@ public class KuberRestClient implements AutoCloseable {
      * Get region information
      */
     public JsonNode getRegion(String name) throws IOException {
-        return request("GET", "/api/v1/regions/" + name);
+        return request("GET", "/api/v1/regions/" + encodePath(name));
     }
     
     /**
@@ -270,7 +284,7 @@ public class KuberRestClient implements AutoCloseable {
      * Delete a region
      */
     public void deleteRegion(String name) throws IOException {
-        request("DELETE", "/api/v1/regions/" + name);
+        request("DELETE", "/api/v1/regions/" + encodePath(name));
     }
     
     /**
@@ -300,7 +314,7 @@ public class KuberRestClient implements AutoCloseable {
      * </pre>
      */
     public void setAttributeMapping(String region, Map<String, String> mapping) throws IOException {
-        request("PUT", "/api/v1/regions/" + region + "/attributemapping", mapping);
+        request("PUT", "/api/v1/regions/" + encodePath(region) + "/attributemapping", mapping);
     }
     
     /**
@@ -312,7 +326,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public Map<String, String> getAttributeMapping(String region) throws IOException {
         try {
-            JsonNode result = request("GET", "/api/v1/regions/" + region + "/attributemapping");
+            JsonNode result = request("GET", "/api/v1/regions/" + encodePath(region) + "/attributemapping");
             if (result != null && !result.isNull()) {
                 return objectMapper.convertValue(result, new TypeReference<Map<String, String>>() {});
             }
@@ -329,7 +343,7 @@ public class KuberRestClient implements AutoCloseable {
      * @throws IOException if communication error occurs
      */
     public void clearAttributeMapping(String region) throws IOException {
-        request("DELETE", "/api/v1/regions/" + region + "/attributemapping");
+        request("DELETE", "/api/v1/regions/" + encodePath(region) + "/attributemapping");
     }
     
     // ==================== Cache Operations ====================
@@ -346,7 +360,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public String get(String key, String region) throws IOException {
         try {
-            JsonNode result = request("GET", "/api/v1/cache/" + region + "/" + key);
+            JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key));
             if (result != null && result.has("value")) {
                 return result.get("value").asText();
             }
@@ -379,7 +393,7 @@ public class KuberRestClient implements AutoCloseable {
         if (ttl != null) {
             body.put("ttl", ttl.getSeconds());
         }
-        request("PUT", "/api/v1/cache/" + region + "/" + key, body);
+        request("PUT", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key), body);
     }
     
     /**
@@ -394,7 +408,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public boolean delete(String key, String region) throws IOException {
         try {
-            request("DELETE", "/api/v1/cache/" + region + "/" + key);
+            request("DELETE", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key));
             return true;
         } catch (KuberRestException e) {
             return false;
@@ -413,7 +427,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public boolean exists(String key, String region) throws IOException {
         try {
-            JsonNode result = request("GET", "/api/v1/cache/" + region + "/" + key + "/exists");
+            JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/exists");
             return result != null && result.path("exists").asBoolean(false);
         } catch (KuberRestException e) {
             return false;
@@ -431,7 +445,7 @@ public class KuberRestClient implements AutoCloseable {
      * Get TTL of a key in specific region
      */
     public long ttl(String key, String region) throws IOException {
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/" + key + "/ttl");
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/ttl");
         return result != null ? result.path("ttl").asLong(-2) : -2;
     }
     
@@ -448,7 +462,7 @@ public class KuberRestClient implements AutoCloseable {
     public void expire(String key, long seconds, String region) throws IOException {
         Map<String, Object> body = new HashMap<>();
         body.put("seconds", seconds);
-        request("POST", "/api/v1/cache/" + region + "/" + key + "/expire", body);
+        request("POST", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/expire", body);
     }
     
     /**
@@ -464,7 +478,7 @@ public class KuberRestClient implements AutoCloseable {
     public List<String> mget(List<String> keys, String region) throws IOException {
         Map<String, Object> body = new HashMap<>();
         body.put("keys", keys);
-        JsonNode result = request("POST", "/api/v1/cache/" + region + "/mget", body);
+        JsonNode result = request("POST", "/api/v1/cache/" + encodePath(region) + "/mget", body);
         
         List<String> values = new ArrayList<>();
         if (result != null && result.has("values")) {
@@ -496,7 +510,7 @@ public class KuberRestClient implements AutoCloseable {
         
         Map<String, Object> body = new HashMap<>();
         body.put("entries", entryList);
-        request("POST", "/api/v1/cache/" + region + "/mset", body);
+        request("POST", "/api/v1/cache/" + encodePath(region) + "/mset", body);
     }
     
     /**
@@ -512,7 +526,7 @@ public class KuberRestClient implements AutoCloseable {
     public List<String> keys(String pattern, String region) throws IOException {
         Map<String, String> params = new HashMap<>();
         params.put("pattern", pattern);
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/keys", null, params);
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/keys", null, params);
         
         List<String> keyList = new ArrayList<>();
         if (result != null && result.has("keys")) {
@@ -560,7 +574,7 @@ public class KuberRestClient implements AutoCloseable {
      * @return List of matching keys
      */
     public List<String> keysRegex(String regexPattern, String region, int limit) throws IOException {
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/keys/regex?pattern=" + 
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/keys/regex?pattern=" + 
                 java.net.URLEncoder.encode(regexPattern, "UTF-8") + "&limit=" + limit);
         
         List<String> keyList = new ArrayList<>();
@@ -583,7 +597,7 @@ public class KuberRestClient implements AutoCloseable {
      * Get database size for specific region
      */
     public long dbSize(String region) throws IOException {
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/size");
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/size");
         return result != null ? result.path("size").asLong(0) : 0;
     }
     
@@ -616,7 +630,7 @@ public class KuberRestClient implements AutoCloseable {
      * @return List of maps with keys: key, value, type, ttl
      */
     public List<Map<String, Object>> ksearch(String regexPattern, String region, int limit) throws IOException {
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/ksearch?pattern=" + 
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/ksearch?pattern=" + 
                 java.net.URLEncoder.encode(regexPattern, "UTF-8") + "&limit=" + limit);
         if (result != null && result.isArray()) {
             List<Map<String, Object>> results = new ArrayList<>();
@@ -642,7 +656,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public String hget(String key, String field, String region) throws IOException {
         JsonNode result = request("GET", 
-                "/api/v1/cache/" + region + "/" + key + "/hash/" + field);
+                "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash/" + field);
         return result != null ? result.path("value").asText(null) : null;
     }
     
@@ -659,7 +673,7 @@ public class KuberRestClient implements AutoCloseable {
     public void hset(String key, String field, String value, String region) throws IOException {
         Map<String, String> body = new HashMap<>();
         body.put("value", value);
-        request("PUT", "/api/v1/cache/" + region + "/" + key + "/hash/" + field, body);
+        request("PUT", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash/" + field, body);
     }
     
     /**
@@ -675,7 +689,7 @@ public class KuberRestClient implements AutoCloseable {
     public void hmset(String key, Map<String, String> fields, String region) throws IOException {
         Map<String, Object> body = new HashMap<>();
         body.put("fields", fields);
-        request("PUT", "/api/v1/cache/" + region + "/" + key + "/hash", body);
+        request("PUT", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash", body);
     }
     
     /**
@@ -692,7 +706,7 @@ public class KuberRestClient implements AutoCloseable {
         Map<String, Object> body = new HashMap<>();
         body.put("fields", fields);
         JsonNode result = request("POST", 
-                "/api/v1/cache/" + region + "/" + key + "/hash/mget", body);
+                "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash/mget", body);
         
         List<String> values = new ArrayList<>();
         if (result != null && result.has("values")) {
@@ -714,7 +728,7 @@ public class KuberRestClient implements AutoCloseable {
      * Get all hash fields from specific region
      */
     public Map<String, String> hgetall(String key, String region) throws IOException {
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/" + key + "/hash");
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash");
         
         Map<String, String> fields = new LinkedHashMap<>();
         if (result != null && result.has("fields")) {
@@ -740,7 +754,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public boolean hdel(String key, String field, String region) throws IOException {
         try {
-            request("DELETE", "/api/v1/cache/" + region + "/" + key + "/hash/" + field);
+            request("DELETE", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash/" + field);
             return true;
         } catch (KuberRestException e) {
             return false;
@@ -758,7 +772,7 @@ public class KuberRestClient implements AutoCloseable {
      * Get hash keys from specific region
      */
     public List<String> hkeys(String key, String region) throws IOException {
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/" + key + "/hash/keys");
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/" + encodePath(key) + "/hash/keys");
         
         List<String> keys = new ArrayList<>();
         if (result != null && result.has("keys")) {
@@ -801,7 +815,7 @@ public class KuberRestClient implements AutoCloseable {
         if (ttl != null) {
             body.put("ttl", ttl.getSeconds());
         }
-        request("PUT", "/api/v1/json/" + region + "/" + key, body);
+        request("PUT", "/api/v1/json/" + encodePath(region) + "/" + encodePath(key), body);
     }
     
     /**
@@ -827,7 +841,7 @@ public class KuberRestClient implements AutoCloseable {
             params = new HashMap<>();
             params.put("path", path);
         }
-        JsonNode result = request("GET", "/api/v1/json/" + region + "/" + key, null, params);
+        JsonNode result = request("GET", "/api/v1/json/" + encodePath(region) + "/" + encodePath(key), null, params);
         return result != null ? result.get("value") : null;
     }
     
@@ -861,7 +875,7 @@ public class KuberRestClient implements AutoCloseable {
      */
     public boolean jsonDelete(String key, String region) throws IOException {
         try {
-            request("DELETE", "/api/v1/json/" + region + "/" + key);
+            request("DELETE", "/api/v1/json/" + encodePath(region) + "/" + encodePath(key));
             return true;
         } catch (KuberRestException e) {
             return false;
@@ -889,7 +903,7 @@ public class KuberRestClient implements AutoCloseable {
     public List<JsonNode> jsonSearch(String query, String region) throws IOException {
         Map<String, Object> body = new HashMap<>();
         body.put("query", query);
-        JsonNode result = request("POST", "/api/v1/json/" + region + "/search", body);
+        JsonNode result = request("POST", "/api/v1/json/" + encodePath(region) + "/search", body);
         
         List<JsonNode> results = new ArrayList<>();
         if (result != null && result.has("results")) {
@@ -1084,7 +1098,7 @@ public class KuberRestClient implements AutoCloseable {
     public JsonNode bulkImport(List<Map<String, Object>> entries, String region) throws IOException {
         Map<String, Object> body = new HashMap<>();
         body.put("entries", entries);
-        return request("POST", "/api/v1/cache/" + region + "/import", body);
+        return request("POST", "/api/v1/cache/" + encodePath(region) + "/import", body);
     }
     
     /**
@@ -1100,7 +1114,7 @@ public class KuberRestClient implements AutoCloseable {
     public List<JsonNode> bulkExport(String pattern, String region) throws IOException {
         Map<String, String> params = new HashMap<>();
         params.put("pattern", pattern);
-        JsonNode result = request("GET", "/api/v1/cache/" + region + "/export", null, params);
+        JsonNode result = request("GET", "/api/v1/cache/" + encodePath(region) + "/export", null, params);
         
         List<JsonNode> entries = new ArrayList<>();
         if (result != null && result.has("entries")) {

@@ -28,7 +28,7 @@ package com.kuber.server.factory;
  *         .build());
  * }</pre>
  * 
- * @version 1.5.0
+ * @version 2.3.0
  * @since 1.5.0
  */
 public interface CacheFactory {

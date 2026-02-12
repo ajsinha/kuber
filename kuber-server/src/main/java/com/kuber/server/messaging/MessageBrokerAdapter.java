@@ -28,7 +28,7 @@ import java.util.function.Consumer;
  *   <li>ibmmq - IBM MQ</li>
  * </ul>
  * 
- * @version 2.1.0
+ * @version 2.3.0
  */
 public interface MessageBrokerAdapter {
     

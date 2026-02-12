@@ -40,7 +40,7 @@ import java.time.format.DateTimeFormatter;
  * }
  * </pre>
  * 
- * @version 2.1.0
+ * @version 2.3.0
  */
 @Data
 @NoArgsConstructor

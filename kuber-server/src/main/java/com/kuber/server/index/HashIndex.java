@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Thread-safe implementation using ConcurrentHashMap.
  * 
- * @version 2.1.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 @Slf4j
@@ -101,7 +101,7 @@ public class HashIndex implements SecondaryIndex {
         
         Object normalizedValue = normalizeValue(fieldValue);
         Set<String> result = index.get(normalizedValue);
-        // v2.1.0: Return unmodifiable view instead of defensive copy to reduce GC
+        // v2.2.0: Return unmodifiable view instead of defensive copy to reduce GC
         return result != null ? Collections.unmodifiableSet(result) : Collections.emptySet();
     }
     

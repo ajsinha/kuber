@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 2.1.0</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 2.3.0</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -158,7 +158,7 @@
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
                             Multi-destination support with centralized broker configuration.
                         </p>
-                        <span class="badge bg-light text-dark">v2.1.0</span>
+                        <span class="badge bg-light text-dark">v1.3.2</span>
                     </div>
                 </div>
             </div>
@@ -207,6 +207,22 @@
                             Disk writes complete before key index updates.
                         </p>
                         <span class="badge bg-light text-dark">Updated in v1.5.0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);">
+                    <div class="card-body text-center p-4 text-white">
+                        <div class="rounded-circle bg-white bg-opacity-25 p-3 d-inline-block mb-3">
+                            <i class="fas fa-heartbeat fa-2x"></i>
+                        </div>
+                        <h5 class="card-title">Monitoring &amp; Live Logs</h5>
+                        <p class="card-text opacity-75">
+                            Real-time monitoring dashboard with charts for CPU, memory, cache operations, and hit rates.
+                            Live log viewer with level filtering, text search, and auto-scroll.
+                        </p>
+                        <span class="badge bg-light text-dark">NEW in v2.2.0</span>
                     </div>
                 </div>
             </div>
@@ -661,8 +677,24 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v2.1.0</span>
-                                    <span class="text-muted small">Current - Index Optimization &amp; Performance Overhaul</span>
+                                    <span class="badge bg-primary me-2">v2.2.0</span>
+                                    <span class="text-muted small">Current - Monitoring, Live Logs &amp; UI Enhancements</span>
+                                </h6>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Real-Time Monitoring Dashboard</strong>: Live system metrics at <code>/admin/monitoring</code> with auto-refresh charts for CPU, heap, threads, cache operations, and hit/miss ratios</li>
+                                    <li><strong>Live Log Viewer</strong>: Terminal-style log viewer at <code>/admin/logs</code> with level filtering, text search, auto-scroll, and log download</li>
+                                    <li><strong>Log Buffer Service</strong>: In-memory ring buffer capturing 2000 log entries with incremental polling and custom Logback appender</li>
+                                    <li><strong>Unified Table Component</strong>: All data tables now feature client-side pagination, column sorting, text search, and configurable page sizes via reusable KuberTable component</li>
+                                    <li><strong>Dark / Light Theme Toggle</strong>: One-click theme switching in the navbar with localStorage persistence and OS preference detection; comprehensive dark mode across all pages including login, monitoring charts, and admin panels</li>
+                                    <li><strong>Regions Table View</strong>: Regions page converted from cards to a sortable, searchable table with capacity bars</li>
+                                    <li><strong>System Overview API</strong>: New <code>/api/monitoring/overview</code> endpoint aggregating JVM, OS, threads, GC, and cache stats in a single call</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v2.1.0</span>
+                                    <span class="text-muted small">Index Optimization &amp; Performance Overhaul</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
                                 <ul class="small text-muted mb-0">
@@ -797,7 +829,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.1.0
+                                <strong>Version:</strong> 2.3.0
                             </li>
                         </ul>
                     </div>
@@ -856,7 +888,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.1.0
+                                <strong>Version:</strong> 2.3.0
                             </li>
                         </ul>
                     </div>

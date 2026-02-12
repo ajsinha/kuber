@@ -180,18 +180,18 @@
                         <p class="mb-0">No pending requests. Queue is empty.</p>
                     </div>
                     
-                    <div th:if="${!pendingRequests.isEmpty()}" class="table-responsive">
+                    <div th:if="${!pendingRequests.isEmpty()}" class="table-responsive px-3 py-2" data-kuber-table="pendingQueueTable" data-page-sizes="10,25,50,All" data-default-page-size="25">
                         <table class="table table-hover" id="pendingTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th>#</th>
-                                    <th>Request Topic</th>
-                                    <th>Receive Time</th>
-                                    <th>Waiting</th>
+                                    <th data-sort="number">#</th>
+                                    <th data-sort="string">Request Topic</th>
+                                    <th data-sort="date">Receive Time</th>
+                                    <th data-sort="string">Waiting</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="req : ${pendingRequests}">
+                                <tr th:each="req : ${pendingRequests}" class="data-row">
                                     <td th:text="${req.position + 1}">1</td>
                                     <td>
                                         <span class="badge bg-primary" th:text="${req.topic}">topic</span>
@@ -279,7 +279,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.1.0</p>
+                    <p class="text-muted small mb-0">Version 2.3.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

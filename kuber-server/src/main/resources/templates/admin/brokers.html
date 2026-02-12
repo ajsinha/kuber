@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<!--
+  ~ Copyright © 2025-2030, All Rights Reserved
+  ~ Ashutosh Sinha | Email: ajsinha@gmail.com
+  -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Message Brokers')}"></head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="flex-fill">
+    <div th:replace="~{layout :: alerts}"></div>
+    <div class="container-fluid py-4">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/admin"><i class="fas fa-cog me-1"></i>Admin</a></li>
+                <li class="breadcrumb-item active">Message Brokers</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-6"><i class="fas fa-server me-3 text-primary"></i>Message Brokers</h1>
+            <div>
+                <a href="/admin/brokers/add" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Add Broker</a>
+                <button class="btn btn-outline-secondary ms-2" onclick="toggleEditor()"><i class="fas fa-code me-1"></i>Edit JSON</button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3"><div class="card bg-primary text-white"><div class="card-body text-center"><i class="fas fa-server fa-2x mb-2"></i><h4 th:text="${brokerCount}">0</h4><p class="mb-0">Total Brokers</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-success text-white"><div class="card-body text-center"><i class="fas fa-check-circle fa-2x mb-2"></i><h4 th:text="${enabledCount}">0</h4><p class="mb-0">Enabled</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-info text-white"><div class="card-body text-center"><i class="fas fa-lock fa-2x mb-2"></i><h4 th:text="${sslCount}">0</h4><p class="mb-0">SSL/TLS</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-secondary text-white"><div class="card-body text-center"><i class="fas fa-file-code fa-2x mb-2"></i><p class="mb-0 small text-truncate" th:title="${configFile}" th:text="${configFile}">path</p></div></div></div>
+        </div>
+
+        <!-- Broker Table -->
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Configured Brokers</h5>
+                <span class="badge bg-light text-dark" th:text="${brokerCount}+' broker(s)'"></span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Name</th><th>Type</th><th>Status</th><th>Connection</th><th>SSL</th><th class="text-end">Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="b : ${brokers}">
+                                <td><strong th:text="${b.name}"></strong></td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${b.type=='kafka'} ? 'bg-warning text-dark' : (${b.type=='activemq'} ? 'bg-info' : (${b.type=='rabbitmq'} ? 'bg-success' : (${b.type=='ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
+                                          th:text="${b.type}"></span>
+                                </td>
+                                <td>
+                                    <span th:if="${b.enabled}" class="badge bg-success">Enabled</span>
+                                    <span th:unless="${b.enabled}" class="badge bg-secondary">Disabled</span>
+                                </td>
+                                <td class="text-muted small text-truncate" style="max-width:300px" th:text="${b.connection}"></td>
+                                <td>
+                                    <span th:if="${b.sslEnabled}" class="badge bg-success"><i class="fas fa-lock me-1"></i><span th:text="${b.sslMode != '' ? b.sslMode.toUpperCase() : 'ON'}"></span></span>
+                                    <span th:unless="${b.sslEnabled}" class="text-muted">Off</span>
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <button th:if="${b.enabled}" class="btn btn-sm btn-outline-warning" th:data-name="${b.name}" onclick="toggleBroker(this.dataset.name, false)" title="Disable"><i class="fas fa-pause"></i></button>
+                                    <button th:unless="${b.enabled}" class="btn btn-sm btn-outline-success" th:data-name="${b.name}" onclick="toggleBroker(this.dataset.name, true)" title="Enable"><i class="fas fa-play"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger ms-1" th:data-name="${b.name}" onclick="deleteBroker(this.dataset.name)" title="Delete"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(brokers)}">
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                    No brokers configured. <a href="/admin/brokers/add">Add a broker</a> to get started.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SSL Mode Reference -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>SSL/TLS Mode Reference</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light"><tr><th>Mode</th><th>Description</th><th>Required Fields</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>jks</code></td><td>Server-side SSL with JKS/PKCS12 trust store</td><td>trust-store-path, trust-store-password</td></tr>
+                        <tr><td><code>pem</code></td><td>Server-side SSL with PEM CA certificate</td><td>trust-cert-path</td></tr>
+                        <tr><td><code>sasl_ssl</code></td><td>SASL authentication over SSL (Kafka)</td><td>sasl-mechanism, sasl-jaas-config, trust store or PEM</td></tr>
+                        <tr><td><code>mtls_jks</code></td><td>Mutual TLS with JKS key + trust stores</td><td>key-store-path, key-store-password, trust store</td></tr>
+                        <tr><td><code>mtls_pem</code></td><td>Mutual TLS with PEM client cert + key</td><td>trust-cert-path, key-cert-path, key-path</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Related Pages -->
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-link text-primary me-2"></i>
+            <strong>Related:</strong>
+            <a href="/admin/event-publishing" class="ms-2"><i class="fas fa-broadcast-tower me-1"></i>Event Publishing</a> uses brokers to publish cache change events.
+            <a href="/admin/messaging" class="ms-3"><i class="fas fa-exchange-alt me-1"></i>Messaging</a> uses brokers for request/response channels.
+            <a href="/help/ssl-tls" class="ms-3"><i class="fas fa-lock me-1"></i>SSL/TLS Guide</a>
+        </div>
+
+        <!-- Glossary -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-book me-2"></i>Glossary &amp; Reference</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Broker Types</h6>
+                        <dl>
+                            <dt><i class="fas fa-stream text-dark me-1"></i>Apache Kafka</dt>
+                            <dd class="text-muted small mb-2">Distributed event streaming platform. Uses <strong>bootstrap servers</strong> for initial cluster discovery. Best for high-throughput, ordered event streams.</dd>
+                            <dt><i class="fas fa-bolt text-warning me-1"></i>ActiveMQ</dt>
+                            <dd class="text-muted small mb-2">JMS-compliant message broker. Uses <strong>broker URL</strong> (e.g., <code>tcp://host:61616</code>). Best for traditional point-to-point and pub/sub messaging.</dd>
+                            <dt><i class="fas fa-server text-info me-1"></i>RabbitMQ</dt>
+                            <dd class="text-muted small mb-2">AMQP message broker. Uses <strong>host/port</strong> with optional virtual host. Best for flexible routing, dead-letter queues, and priority messaging.</dd>
+                            <dt><i class="fas fa-industry text-primary me-1"></i>IBM MQ</dt>
+                            <dd class="text-muted small mb-2">Enterprise messaging. Uses <strong>queue manager</strong> + <strong>channel</strong> + <strong>conn_name</strong>. Best for mainframe integration and regulated industries.</dd>
+                            <dt><i class="fas fa-file-alt text-success me-1"></i>File</dt>
+                            <dd class="text-muted small mb-2">Writes events to local disk in JSONL format. Uses a <strong>directory</strong> path. Best for development, audit trails, and environments without a message broker.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">SSL/TLS Modes</h6>
+                        <dl>
+                            <dt>JKS / PKCS12</dt>
+                            <dd class="text-muted small mb-2">Java KeyStore trust store for server certificate verification. Provide <code>.jks</code> or <code>.p12</code> file + password.</dd>
+                            <dt>PEM</dt>
+                            <dd class="text-muted small mb-2">PEM CA certificate for server verification. Provide a <code>.pem</code> or <code>.crt</code> file containing the CA certificate chain.</dd>
+                            <dt>SASL_SSL (Kafka)</dt>
+                            <dd class="text-muted small mb-2">Kafka-specific: combines SSL transport with SASL authentication (PLAIN, SCRAM, OAUTHBEARER). Requires JAAS config.</dd>
+                            <dt>mTLS JKS</dt>
+                            <dd class="text-muted small mb-2">Mutual TLS with Java KeyStores. Both client and server authenticate. Requires key store (client cert) + trust store (server CA).</dd>
+                            <dt>mTLS PEM</dt>
+                            <dd class="text-muted small mb-2">Mutual TLS with PEM files. Client cert + key + CA cert. Common in Kubernetes and cloud environments.</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Concepts</h6>
+                        <dl>
+                            <dt><i class="fas fa-toggle-on text-success me-1"></i>Enabled</dt>
+                            <dd class="text-muted small mb-2">Broker connection is active. Disabled brokers are defined in config but not connected &mdash; no resources consumed.</dd>
+                            <dt><i class="fas fa-code text-dark me-1"></i>JSON Editor</dt>
+                            <dd class="text-muted small mb-2">Edit the raw <code>message_brokers.json</code> file directly. Advanced users can paste entire broker configs. Validates JSON before saving.</dd>
+                            <dt><i class="fas fa-file-code text-secondary me-1"></i>Config File</dt>
+                            <dd class="text-muted small mb-2">Brokers are stored in <code>config/message_brokers.json</code> (configurable via <code>kuber.publishing.broker-config-file</code>). Changes are hot-reloaded.</dd>
+                        </dl>
+                        <h6 class="text-primary border-bottom pb-2 mb-3 mt-3">Example Config</h6>
+                        <pre class="bg-dark text-light p-2 rounded small mb-0" style="font-size: 12px">{
+  "production-kafka": {
+    "type": "kafka",
+    "enabled": true,
+    "bootstrap_servers": "kafka1:9092,kafka2:9092"
+  },
+  "dev-activemq": {
+    "type": "activemq",
+    "enabled": false,
+    "broker_url": "tcp://localhost:61616"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON Editor (hidden by default) -->
+        <div id="jsonEditor" class="card mb-4" style="display:none">
+            <div class="card-header bg-dark text-white d-flex justify-content-between">
+                <h5 class="mb-0"><i class="fas fa-code me-2"></i>Edit message_brokers.json</h5>
+                <div>
+                    <button class="btn btn-sm btn-success" onclick="saveRawJson()"><i class="fas fa-save me-1"></i>Save</button>
+                    <button class="btn btn-sm btn-secondary ms-1" onclick="toggleEditor()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="card-body">
+                <textarea id="configContent" class="form-control font-monospace" rows="30" spellcheck="false" style="font-size:13px;tab-size:2"></textarea>
+                <div id="saveStatus" class="mt-2"></div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script>
+function deleteBroker(name) {
+    if (!confirm('Delete broker "' + name + '"? This cannot be undone.')) return;
+    fetch('/admin/api/config/brokers/' + encodeURIComponent(name), { method: 'DELETE' })
+        .then(r => r.json()).then(d => { if (d.error) alert(d.error); else location.reload(); })
+        .catch(e => alert('Error: ' + e));
+}
+
+function toggleBroker(name, enable) {
+    fetch('/admin/api/config/brokers/' + encodeURIComponent(name) + '/' + (enable ? 'enable' : 'disable'), { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.error) alert(d.error); else location.reload(); })
+        .catch(e => alert('Error: ' + e));
+}
+
+function toggleEditor() {
+    const el = document.getElementById('jsonEditor');
+    if (el.style.display === 'none') {
+        el.style.display = '';
+        fetch('/admin/api/config/brokers').then(r => r.text()).then(t => {
+            try { t = JSON.stringify(JSON.parse(t), null, 2); } catch(e) {}
+            document.getElementById('configContent').value = t;
+        });
+    } else { el.style.display = 'none'; }
+}
+
+function saveRawJson() {
+    const content = document.getElementById('configContent').value;
+    try { JSON.parse(content); } catch(e) {
+        document.getElementById('saveStatus').innerHTML = '<div class="alert alert-danger py-1">Invalid JSON: ' + e.message + '</div>';
+        return;
+    }
+    fetch('/admin/api/config/brokers-raw', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: content })
+        .then(r => r.json()).then(d => {
+            document.getElementById('saveStatus').innerHTML = '<div class="alert alert-success py-1"><i class="fas fa-check me-1"></i>' + d.message + '</div>';
+        }).catch(e => { document.getElementById('saveStatus').innerHTML = '<div class="alert alert-danger py-1">' + e + '</div>'; });
+}
+</script>
+
+</body>
+</html>

@@ -14,6 +14,7 @@ package com.kuber.server.publishing;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.config.KuberProperties.ActiveMqConfig;
 import com.kuber.server.config.KuberProperties.BrokerDefinition;
+import com.kuber.server.config.KuberProperties.BrokerSsl;
 import com.kuber.server.config.KuberProperties.DestinationConfig;
 import com.kuber.server.config.KuberProperties.RegionPublishingConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 1.5.0
+ * @version 2.3.0
  */
 @Slf4j
 @Service
@@ -77,9 +78,11 @@ public class ActiveMqEventPublisher implements EventPublisher {
         final boolean persistent;
         final String username;
         final String password;
+        final BrokerSsl ssl;
         
         DestinationBinding(String brokerUrl, String destination, boolean useTopic,
-                          int ttlSeconds, boolean persistent, String username, String password) {
+                          int ttlSeconds, boolean persistent, String username, String password,
+                          BrokerSsl ssl) {
             this.brokerUrl = brokerUrl;
             this.destination = destination;
             this.useTopic = useTopic;
@@ -87,6 +90,7 @@ public class ActiveMqEventPublisher implements EventPublisher {
             this.persistent = persistent;
             this.username = username;
             this.password = password;
+            this.ssl = ssl != null ? ssl : new BrokerSsl();
         }
     }
     
@@ -137,7 +141,8 @@ public class ActiveMqEventPublisher implements EventPublisher {
                                 dest.getTtlSeconds() > 0 ? dest.getTtlSeconds() : broker.getTtlSeconds(),
                                 dest.getPersistent() != null ? dest.getPersistent() : broker.isPersistent(),
                                 broker.getUsername(),
-                                broker.getPassword()
+                                broker.getPassword(),
+                                broker.getSsl()
                         ));
                         
                         log.info("ActiveMQ destination for region '{}': broker={}, dest={}",
@@ -161,7 +166,8 @@ public class ActiveMqEventPublisher implements EventPublisher {
                         amqConfig.getTtlSeconds(),
                         amqConfig.isPersistent(),
                         amqConfig.getUsername(),
-                        amqConfig.getPassword()
+                        amqConfig.getPassword(),
+                        null
                 ));
                 
                 log.info("ActiveMQ (legacy) for region '{}': broker={}, dest={}",
@@ -274,6 +280,21 @@ public class ActiveMqEventPublisher implements EventPublisher {
             connectionFactory.setTrustAllPackages(true);
             connectionFactory.setWatchTopicAdvisories(false);
             
+            // Apply SSL/TLS trust store and key store if enabled
+            if (binding.ssl.isEnabled()) {
+                if (!binding.ssl.getTrustStorePath().isBlank()) {
+                    System.setProperty("javax.net.ssl.trustStore", binding.ssl.getTrustStorePath());
+                    System.setProperty("javax.net.ssl.trustStorePassword", binding.ssl.getTrustStorePassword());
+                    System.setProperty("javax.net.ssl.trustStoreType", binding.ssl.getTrustStoreType());
+                }
+                if (!binding.ssl.getKeyStorePath().isBlank()) {
+                    System.setProperty("javax.net.ssl.keyStore", binding.ssl.getKeyStorePath());
+                    System.setProperty("javax.net.ssl.keyStorePassword", binding.ssl.getKeyStorePassword());
+                    System.setProperty("javax.net.ssl.keyStoreType", binding.ssl.getKeyStoreType());
+                }
+                log.info("ActiveMQ SSL/TLS enabled for broker: {}", url);
+            }
+            
             // Create pooled factory
             PooledConnectionFactory pooledFactory = new PooledConnectionFactory();
             pooledFactory.setConnectionFactory(connectionFactory);
@@ -281,7 +302,8 @@ public class ActiveMqEventPublisher implements EventPublisher {
             pooledFactory.setIdleTimeout(30000);
             pooledFactory.setMaximumActiveSessionPerConnection(100);
             
-            log.info("Created ActiveMQ connection pool for broker: {}", url);
+            log.info("Created ActiveMQ connection pool for broker: {}{}", url,
+                    binding.ssl.isEnabled() ? " [SSL]" : "");
             return pooledFactory;
         });
     }

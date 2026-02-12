@@ -85,8 +85,8 @@ private const string ResponseTopic = "ccs_cache_response";
   
   <ItemGroup>
     <!-- Choose the packages you need -->
-    <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
-    <PackageReference Include="Apache.NMS.ActiveMQ" Version="2.1.0" />
+    <PackageReference Include="Confluent.Kafka" Version="2.2.0" />
+    <PackageReference Include="Apache.NMS.ActiveMQ" Version="2.2.0" />
     <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
     <PackageReference Include="IBMMQDotnetClient" Version="9.3.4" />
   </ItemGroup>

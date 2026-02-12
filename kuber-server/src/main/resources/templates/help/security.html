@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v2.1.0 - Security & RBAC Help
+  ~ Kuber v2.3.0 - Security & RBAC Help
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Security & RBAC')}"></head>
@@ -372,8 +372,8 @@
         <div class="card-header"><h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration</h5></div>
         <div class="card-body">
             <h6>File Locations</h6>
-            <p>Security files are stored in the <code>secure/</code> folder:</p>
-            <pre class="bg-light p-3 rounded">secure/
+            <p>Security files are stored in the <code>config/secure/</code> folder:</p>
+            <pre class="bg-light p-3 rounded">config/secure/
 ├── users.json       # User accounts and role assignments
 ├── roles.json       # Role definitions and permissions
 └── apikeys.json     # API keys for programmatic access</pre>
@@ -466,8 +466,8 @@ kuber.security.auto-create-region-roles=true</code></pre>
                 <li><code>roles.json.sample</code> - Complete role definitions for multiple regions</li>
             </ul>
             <p>Copy and customize these files to create your configuration:</p>
-            <pre class="bg-dark text-light p-3 rounded"><code>cp secure-sample/users.json.sample secure/users.json
-cp secure-sample/roles.json.sample secure/roles.json
+            <pre class="bg-dark text-light p-3 rounded"><code>cp secure-sample/users.json.sample config/secure/users.json
+cp secure-sample/roles.json.sample config/secure/roles.json
 # Edit files with your users and roles</code></pre>
         </div>
     </div>
@@ -739,7 +739,7 @@ jedis.del("orders:order:123");</code></pre>
         </a>
     </div>
     
-    <p class="text-muted text-center mt-4"><small>Version 2.1.0</small></p>
+    <p class="text-muted text-center mt-4"><small>Version 2.3.0</small></p>
 </div>
 </main>
 
