@@ -40,7 +40,7 @@ import org.springframework.security.web.firewall.StrictHttpFirewall;
  *       the key from the remaining path segments.</li>
  * </ol>
  *
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Slf4j
 @Configuration

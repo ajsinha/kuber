@@ -36,7 +36,7 @@ import java.util.concurrent.*;
  *   <li><b>sorted</b>: If true, uses TreeMap/TreeSet (natural ordering)</li>
  * </ul>
  * 
- * @version 2.4.0
+ * @version 2.5.0
  * @since 1.5.0
  */
 @Slf4j

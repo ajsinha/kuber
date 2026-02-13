@@ -67,7 +67,7 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Slf4j
 @Service

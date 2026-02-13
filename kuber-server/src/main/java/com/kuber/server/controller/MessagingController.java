@@ -33,7 +33,7 @@ import java.util.*;
  *   <li>Queue status and statistics monitoring</li>
  * </ul>
  * 
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Controller
 @Slf4j
@@ -670,6 +670,47 @@ public class MessagingController {
         }
         
         return ResponseEntity.ok(status);
+    }
+    
+    /**
+     * Send a test request to a broker's request topic.
+     */
+    @PostMapping("/api/v1/messaging/test")
+    @ResponseBody
+    public ResponseEntity<?> sendTestRequest(@RequestBody Map<String, String> request) {
+        if (messagingService == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Messaging service not available"
+            ));
+        }
+        
+        String broker = request.get("broker");
+        String topic = request.get("topic");
+        String requestJson = request.get("request");
+        
+        if (broker == null || broker.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Broker/channel name is required"));
+        }
+        if (topic == null || topic.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Request topic is required"));
+        }
+        if (requestJson == null || requestJson.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Request JSON is required"));
+        }
+        
+        // Validate JSON
+        try {
+            new com.fasterxml.jackson.databind.ObjectMapper().readTree(requestJson);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid JSON: " + e.getMessage()));
+        }
+        
+        Map<String, Object> result = messagingService.publishTestRequest(broker, topic, requestJson);
+        if ((Boolean) result.getOrDefault("success", false)) {
+            return ResponseEntity.ok(result);
+        } else {
+            return ResponseEntity.badRequest().body(result);
+        }
     }
     
     // ==================== Request/Response Logs ====================

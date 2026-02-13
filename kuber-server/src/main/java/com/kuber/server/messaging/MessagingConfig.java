@@ -36,7 +36,7 @@ import java.util.Map;
  *   <li>ibmmq - IBM MQ</li>
  * </ul>
  * 
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Data
 @NoArgsConstructor

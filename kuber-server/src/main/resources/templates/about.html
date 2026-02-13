@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 2.4.0</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 2.5.0</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -156,9 +156,9 @@
                         <h5 class="card-title">Event Publishing</h5>
                         <p class="card-text opacity-75">
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
-                            Hot-refresh bindings at runtime. Complete coverage across all write paths including JSON ops, TTL expiry, and purge.
+                            Hot-refresh bindings at runtime. Publish query results and entire regions on demand.
                         </p>
-                        <span class="badge bg-light text-dark">Enhanced in v2.4.0</span>
+                        <span class="badge bg-light text-dark">Enhanced in v2.5.0</span>
                     </div>
                 </div>
             </div>
@@ -172,9 +172,9 @@
                         <h5 class="card-title">Request/Response Messaging</h5>
                         <p class="card-text opacity-75">
                             Access cache via message brokers (Kafka, RabbitMQ, IBM MQ, ActiveMQ).
-                            Async processing with backpressure control and hot-reload configuration.
+                            Async processing with backpressure control, hot-reload, and built-in test console.
                         </p>
-                        <span class="badge bg-light text-dark">NEW in v1.7.1</span>
+                        <span class="badge bg-light text-dark">Enhanced in v2.5.0</span>
                     </div>
                 </div>
             </div>
@@ -677,8 +677,23 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v2.4.0</span>
-                                    <span class="text-muted small">Current - Event Publishing Overhaul &amp; Internal Event Bus</span>
+                                    <span class="badge bg-primary me-2">v2.5.0</span>
+                                    <span class="text-muted small">Current - Publish As Events, Messaging Test Console &amp; Instant Serialization Fix</span>
+                                </h6>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Publish As Events &mdash; Query Page</strong>: "Publish As Events" button on <code>/cache/query</code> publishes all query result keys as <code>queryresult</code> events to configured brokers for the queried region</li>
+                                    <li><strong>Publish As Events &mdash; Cache Browser</strong>: Same button on <code>/cache?region=…</code> publishes all displayed entries to brokers</li>
+                                    <li><strong>Publish As Events &mdash; Region Detail</strong>: Button on <code>/regions/{name}</code> publishes the entire region's entries as events via <code>POST /api/publish/region/{region}</code></li>
+                                    <li><strong>Query Result Event Type</strong>: New <code>QUERY_RESULT</code> (<code>queryresult</code>) action type in <code>CachePublishingEvent</code> &mdash; structured like an INSERT event with key and payload</li>
+                                    <li><strong>Messaging Test Console</strong>: New "Test Request" section on <code>/admin/messaging</code> with channel/topic selection, 20 pre-built example templates covering all operations, JSON editor, and one-click publish to any connected request topic</li>
+                                    <li><strong>Instant Serialization Fix</strong>: Fixed <code>CachePublishingEvent</code> JSON serialization &mdash; registered <code>JavaTimeModule</code> on the internal <code>ObjectMapper</code> so <code>java.time.Instant</code> timestamps serialize as ISO-8601 strings instead of failing</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v2.4.0</span>
+                                    <span class="text-muted small">Event Publishing Overhaul &amp; Internal Event Bus</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
                                 <ul class="small text-muted mb-0">
@@ -844,7 +859,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.4.0
+                                <strong>Version:</strong> 2.5.0
                             </li>
                         </ul>
                     </div>
@@ -903,7 +918,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.4.0
+                                <strong>Version:</strong> 2.5.0
                             </li>
                         </ul>
                     </div>

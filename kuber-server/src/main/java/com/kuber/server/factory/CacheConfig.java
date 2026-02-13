@@ -23,7 +23,7 @@ import java.util.function.BiConsumer;
  * <p>Used by {@link CacheFactory} to configure cache instances with
  * consistent settings across different implementations.
  * 
- * @version 2.4.0
+ * @version 2.5.0
  * @since 1.5.0
  */
 @Data

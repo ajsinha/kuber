@@ -1,5 +1,5 @@
 {
-  "_comment": "Kuber Message Broker Definitions (v2.4.0)",
+  "_comment": "Kuber Message Broker Definitions (v2.5.0)",
   "_doc": "Broker configs loaded at startup. Referenced by event_publishing.json region destinations.",
 
   "brokers": {

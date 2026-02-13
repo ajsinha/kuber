@@ -37,7 +37,7 @@ import java.util.*;
  * Admin controller for CRUD management of external JSON configuration:
  * message brokers, event publishing regions, and request/response messaging.
  *
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Slf4j
 @Controller

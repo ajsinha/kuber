@@ -28,9 +28,9 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.4.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
-                    Events now fire for <strong>all</strong> write operations including JSON ops, TTL changes, renames, purges, and TTL expirations.
-                    Publisher bindings hot-refresh at runtime when configuration changes &mdash; no server restart required.
+                    <strong>Version 2.5.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
+                    Events fire for <strong>all</strong> write operations including JSON ops, TTL changes, renames, purges, and TTL expirations.
+                    New in v2.5.0: <strong>Publish As Events</strong> buttons on query, cache browser, and region detail pages let you publish results or entire regions on demand as <code>queryresult</code> events.
                 </div>
 
                 <!-- Overview -->
@@ -769,6 +769,60 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
                     </div>
                 </div>
 
+                <!-- Publish As Events (On-Demand) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>Publish As Events (On-Demand) <span class="badge bg-dark">NEW in v2.5.0</span></h4>
+                    </div>
+                    <div class="card-body">
+                        <p>In addition to automatic event publishing on write operations, you can manually publish cache entries as events from the Admin UI.
+                           Each entry is published as a <code>queryresult</code> event with the same structure as an <code>inserted</code> event.</p>
+                        
+                        <h5 class="mt-3">Available Locations</h5>
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr><th>Page</th><th>URL</th><th>Behavior</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Query Results</strong></td>
+                                    <td><code>/cache/query</code></td>
+                                    <td>Publishes all keys from the current query result set (keys, ksearch, jsearch)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Cache Browser</strong></td>
+                                    <td><code>/cache?region=…</code></td>
+                                    <td>Publishes all displayed keys in the current region view</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Region Detail</strong></td>
+                                    <td><code>/regions/{name}</code></td>
+                                    <td>Publishes <em>all</em> entries in the entire region via <code>POST /api/publish/region/{region}</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h5 class="mt-3">Query Result Event Format</h5>
+                        <pre class="bg-dark text-light p-3 rounded"><code>{
+  "key": "employee/E001",
+  "action": "queryresult",
+  "region": "employees",
+  "payload": {
+    "name": "Jane Doe",
+    "department": "Engineering"
+  },
+  "timestamp": "2026-02-13T14:30:00Z",
+  "nodeId": "kuber-node-1"
+}</code></pre>
+
+                        <div class="alert alert-light small mb-0 mt-3">
+                            <i class="fas fa-info-circle text-info me-1"></i>
+                            The <strong>Publish As Events</strong> button only appears when event publishing is configured and enabled for the region.
+                            For each key, the server fetches the current value (string or JSON), constructs a <code>queryresult</code> event, and enqueues it for async delivery to all configured brokers.
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Admin Dashboard -->
                 <div class="card mb-4">
                     <div class="card-header bg-dark text-white">
@@ -865,7 +919,7 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.4.0</p>
+                    <p class="text-muted small mb-0">Version 2.5.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

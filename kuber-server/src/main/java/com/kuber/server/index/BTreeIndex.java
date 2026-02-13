@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Thread-safe implementation using ConcurrentSkipListMap.
  * 
- * @version 2.4.0
+ * @version 2.5.0
  * @since 1.9.0
  */
 @Slf4j

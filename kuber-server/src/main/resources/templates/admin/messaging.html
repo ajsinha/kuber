@@ -578,12 +578,101 @@
             </div>
         </div>
 
+        <!-- Test Request Section -->
+        <div class="card border-0 shadow-sm mb-4" th:if="${serviceAvailable && config != null && !config.brokers.isEmpty()}">
+            <div class="card-header bg-warning text-dark py-3">
+                <h4 class="mb-0"><i class="fas fa-flask me-2"></i>Test Request</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Send a test cache request to a connected channel. Kuber will process it and publish the response to the corresponding response topic.
+                    Use a consumer (e.g. <code>kafka-console-consumer</code>, RabbitMQ Management UI, etc.) on the response topic to see results.
+                </p>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="testBroker" class="form-label fw-semibold"><i class="fas fa-server me-1"></i>Channel</label>
+                        <select id="testBroker" class="form-select" onchange="onTestBrokerChange()">
+                            <option value="">-- Select Channel --</option>
+                            <th:block th:each="entry : ${config.brokers}">
+                                <option th:if="${entry.value.enabled}" th:value="${entry.key}" 
+                                        th:text="${entry.key + ' (' + entry.value.type + ')'}"
+                                        th:data-topics="${#strings.listJoin(entry.value.requestTopics, ',')}">channel</option>
+                            </th:block>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="testTopic" class="form-label fw-semibold"><i class="fas fa-tag me-1"></i>Request Topic</label>
+                        <select id="testTopic" class="form-select" onchange="onTestTopicChange()">
+                            <option value="">-- Select Topic --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold"><i class="fas fa-reply me-1"></i>Response Topic</label>
+                        <input type="text" id="testResponseTopic" class="form-control" readonly placeholder="(auto-derived)">
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="testTemplate" class="form-label fw-semibold"><i class="fas fa-clipboard-list me-1"></i>Load Example</label>
+                        <select id="testTemplate" class="form-select" onchange="loadTestTemplate()">
+                            <option value="">-- Select Example --</option>
+                            <option value="ping">PING - Health Check</option>
+                            <option value="info">INFO - Server Info</option>
+                            <option value="regions">REGIONS - List Regions</option>
+                            <option value="set">SET - Store Value</option>
+                            <option value="get">GET - Retrieve Value</option>
+                            <option value="del">DELETE - Delete Key</option>
+                            <option value="keys">KEYS - List Keys</option>
+                            <option value="exists">EXISTS - Check Key</option>
+                            <option value="ttl">TTL - Get Time-To-Live</option>
+                            <option value="expire">EXPIRE - Set TTL</option>
+                            <option value="mget">MGET - Multi Get</option>
+                            <option value="mset">MSET - Multi Set</option>
+                            <option value="jset">JSET - Store JSON</option>
+                            <option value="jget">JGET - Get JSON</option>
+                            <option value="jupdate">JUPDATE - Merge JSON</option>
+                            <option value="jremove">JREMOVE - Remove JSON Attrs</option>
+                            <option value="jsearch">JSEARCH - Search JSON</option>
+                            <option value="hset">HSET - Set Hash Field</option>
+                            <option value="hget">HGET - Get Hash Field</option>
+                            <option value="hgetall">HGETALL - Get All Hash Fields</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="testRequestJson" class="form-label fw-semibold"><i class="fas fa-code me-1"></i>Request JSON</label>
+                    <textarea id="testRequestJson" class="form-control font-monospace" rows="12" 
+                              placeholder="Paste or compose a JSON request..."
+                              spellcheck="false" style="tab-size: 2;"></textarea>
+                    <div id="testJsonError" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
+                
+                <div class="d-flex align-items-center">
+                    <button id="testSendBtn" class="btn btn-warning" onclick="sendTestRequest()" disabled>
+                        <i class="fas fa-paper-plane me-1"></i> Send Test Request
+                    </button>
+                    <span id="testResultMsg" class="ms-3 small"></span>
+                </div>
+                
+                <div class="alert alert-light mt-3 small mb-0">
+                    <i class="fas fa-info-circle text-info me-1"></i>
+                    <strong>How it works:</strong> The test message is published to the selected request topic.
+                    Kuber's own consumer picks it up, authenticates via <code>api_key</code>, executes the operation,
+                    and publishes the response to the response topic (request topic with <code>_request</code> suffix replaced by <code>_response</code>).
+                    You need a valid API key &mdash; create one at <a href="/admin/apikeys">/admin/apikeys</a>.
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
         <footer class="py-4 mt-5 border-top">
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.4.0</p>
+                    <p class="text-muted small mb-0">Version 2.5.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">
@@ -771,6 +860,283 @@ function showToast(type, message) {
 setInterval(() => {
     fetch('/api/v1/messaging/status').then(r => r.json()).then(data => {});
 }, 10000);
+
+// ==================== Test Request ====================
+
+function onTestBrokerChange() {
+    const sel = document.getElementById('testBroker');
+    const topicSel = document.getElementById('testTopic');
+    topicSel.innerHTML = '<option value="">-- Select Topic --</option>';
+    document.getElementById('testResponseTopic').value = '';
+    document.getElementById('testSendBtn').disabled = true;
+    
+    if (!sel.value) return;
+    
+    const opt = sel.options[sel.selectedIndex];
+    const topics = opt.dataset.topics ? opt.dataset.topics.split(',') : [];
+    topics.forEach(t => {
+        if (t.trim()) {
+            const o = document.createElement('option');
+            o.value = t.trim();
+            o.textContent = t.trim();
+            topicSel.appendChild(o);
+        }
+    });
+    
+    if (topics.length === 1 && topics[0].trim()) {
+        topicSel.value = topics[0].trim();
+        onTestTopicChange();
+    }
+}
+
+function onTestTopicChange() {
+    const topic = document.getElementById('testTopic').value;
+    const respField = document.getElementById('testResponseTopic');
+    const sendBtn = document.getElementById('testSendBtn');
+    
+    if (!topic) {
+        respField.value = '';
+        sendBtn.disabled = true;
+        return;
+    }
+    
+    // Derive response topic
+    respField.value = topic.endsWith('_request') 
+        ? topic.substring(0, topic.length - '_request'.length) + '_response'
+        : topic + '_response';
+    sendBtn.disabled = false;
+}
+
+const testTemplates = {
+    ping: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-ping-001",
+        operation: "PING"
+    },
+    info: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-info-001",
+        operation: "INFO"
+    },
+    regions: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-regions-001",
+        operation: "REGIONS"
+    },
+    set: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-set-001",
+        operation: "SET",
+        region: "default",
+        key: "test:user:1001",
+        value: "{\"name\":\"John Doe\",\"email\":\"john@example.com\",\"age\":30}"
+    },
+    get: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-get-001",
+        operation: "GET",
+        region: "default",
+        key: "test:user:1001"
+    },
+    del: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-del-001",
+        operation: "DELETE",
+        region: "default",
+        key: "test:user:1001"
+    },
+    keys: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-keys-001",
+        operation: "KEYS",
+        region: "default",
+        pattern: "test:*"
+    },
+    exists: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-exists-001",
+        operation: "EXISTS",
+        region: "default",
+        key: "test:user:1001"
+    },
+    ttl: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-ttl-001",
+        operation: "TTL",
+        region: "default",
+        key: "test:user:1001"
+    },
+    expire: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-expire-001",
+        operation: "EXPIRE",
+        region: "default",
+        key: "test:user:1001",
+        ttl: 3600
+    },
+    mget: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-mget-001",
+        operation: "MGET",
+        region: "default",
+        keys: ["test:user:1001", "test:user:1002", "test:user:1003"]
+    },
+    mset: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-mset-001",
+        operation: "MSET",
+        region: "default",
+        entries: {
+            "test:user:1001": "{\"name\":\"John Doe\"}",
+            "test:user:1002": "{\"name\":\"Jane Smith\"}",
+            "test:user:1003": "{\"name\":\"Bob Wilson\"}"
+        }
+    },
+    jset: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-jset-001",
+        operation: "JSET",
+        region: "default",
+        key: "test:employee:E001",
+        value: {
+            name: "Alice Johnson",
+            department: "Engineering",
+            skills: ["Java", "Python", "Kafka"],
+            address: { city: "San Francisco", state: "CA" }
+        }
+    },
+    jget: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-jget-001",
+        operation: "JGET",
+        region: "default",
+        key: "test:employee:E001"
+    },
+    jupdate: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-jupdate-001",
+        operation: "JUPDATE",
+        region: "default",
+        key: "test:employee:E001",
+        value: {
+            title: "Senior Engineer",
+            skills: ["Java", "Python", "Kafka", "Go"]
+        }
+    },
+    jremove: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-jremove-001",
+        operation: "JREMOVE",
+        region: "default",
+        key: "test:employee:E001",
+        keys: ["address"]
+    },
+    jsearch: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-jsearch-001",
+        operation: "JSEARCH",
+        region: "default",
+        query: "$.department == 'Engineering'"
+    },
+    hset: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-hset-001",
+        operation: "HSET",
+        region: "default",
+        key: "test:config:app",
+        field: "max_connections",
+        value: "100"
+    },
+    hget: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-hget-001",
+        operation: "HGET",
+        region: "default",
+        key: "test:config:app",
+        field: "max_connections"
+    },
+    hgetall: {
+        api_key: "YOUR_API_KEY",
+        message_id: "test-hgetall-001",
+        operation: "HGETALL",
+        region: "default",
+        key: "test:config:app"
+    }
+};
+
+function loadTestTemplate() {
+    const sel = document.getElementById('testTemplate');
+    const textarea = document.getElementById('testRequestJson');
+    const errDiv = document.getElementById('testJsonError');
+    errDiv.style.display = 'none';
+    
+    if (!sel.value) return;
+    
+    const tpl = testTemplates[sel.value];
+    if (tpl) {
+        textarea.value = JSON.stringify(tpl, null, 2);
+    }
+}
+
+function sendTestRequest() {
+    const broker = document.getElementById('testBroker').value;
+    const topic = document.getElementById('testTopic').value;
+    const json = document.getElementById('testRequestJson').value.trim();
+    const errDiv = document.getElementById('testJsonError');
+    const resultMsg = document.getElementById('testResultMsg');
+    const btn = document.getElementById('testSendBtn');
+    
+    errDiv.style.display = 'none';
+    resultMsg.textContent = '';
+    
+    if (!broker || !topic) {
+        errDiv.textContent = 'Select a channel and topic first.';
+        errDiv.style.display = 'block';
+        return;
+    }
+    if (!json) {
+        errDiv.textContent = 'Request JSON cannot be empty.';
+        errDiv.style.display = 'block';
+        return;
+    }
+    
+    // Validate JSON
+    try {
+        JSON.parse(json);
+    } catch (e) {
+        errDiv.textContent = 'Invalid JSON: ' + e.message;
+        errDiv.style.display = 'block';
+        return;
+    }
+    
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sending...';
+    
+    fetch('/api/v1/messaging/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ broker: broker, topic: topic, request: json })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        if (data.success) {
+            resultMsg.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + data.message + 
+                '</span><br><small class="text-muted">Listen on: <code>' + data.responseTopic + '</code></small>';
+            showToast('success', 'Test request published successfully');
+        } else {
+            resultMsg.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>' + data.error + '</span>';
+            showToast('error', data.error);
+        }
+    })
+    .catch(err => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        resultMsg.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Request failed: ' + err.message + '</span>';
+    });
+}
 </script>
 
 </body>

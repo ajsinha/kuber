@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.5.0] - 2026-02-13 - PUBLISH AS EVENTS, MESSAGING TEST CONSOLE & SERIALIZATION FIX
+
+### 🚀 Publish As Events (On-Demand)
+
+- **Query Results page** (`/cache/query`): New "Publish As Events" button next to "Export CSV" publishes all query result keys as `queryresult` events to configured brokers for the queried region
+- **Cache Browser page** (`/cache?region=…`): Same button publishes all displayed entries in the region view
+- **Region Detail page** (`/regions/{name}`): Button in Quick Actions publishes the entire region's entries via `POST /api/publish/region/{region}`
+- **Query Result event type**: New `QUERY_RESULT` (`queryresult`) action in `CachePublishingEvent` — structured like an INSERT with key and payload
+- **API endpoints**: `POST /api/publish/query-results` (accepts `{region, keys[]}`) and `POST /api/publish/region/{region}` (fetches all keys server-side)
+
+### 🧪 Messaging Test Console
+
+- **Test Request section** on `/admin/messaging`: Channel dropdown (enabled channels only), request topic selector (auto-populated), auto-derived response topic display
+- **20 pre-built templates**: PING, INFO, REGIONS, GET, SET, DELETE, EXISTS, KEYS, TTL, EXPIRE, MGET, MSET, JSET, JGET, JUPDATE, JREMOVE, JSEARCH, HSET, HGET, HGETALL — each with correct JSON structure and placeholder `api_key`
+- **One-click publish**: Send button validates JSON, publishes to the selected request topic via `POST /api/v1/messaging/test`, shows spinner and success/error toast
+- **Backend**: `RequestResponseService.publishTestRequest()` publishes to request topic using the connected adapter; Kuber's own consumer picks it up for end-to-end testing
+
+### 🐛 Bug Fix - Instant Serialization
+
+- **Root cause**: `CachePublishingEvent.toJson()` used bare `new ObjectMapper()` without `JavaTimeModule` — failed to serialize `java.time.Instant` timestamp field
+- **Fix**: Registered `JavaTimeModule` and disabled `WRITE_DATES_AS_TIMESTAMPS` on the static `OBJECT_MAPPER`, producing ISO-8601 strings (e.g., `"2026-02-13T12:00:00Z"`)
+
+---
+
 ## [2.4.0] - 2026-02-12 - ADMIN UI OVERHAUL, SLASH KEY FIX & SECURITY CONFIG MOVE
 
 ### 🚀 Admin UI - Modal Elimination
@@ -36,7 +60,7 @@ All notable changes to this project are documented in this file.
 
 - **Slash-key demo** (`demo n`): New demonstration in all three client libraries (Python, Java, C#) showing cache operations with keys containing forward slashes (`employee/EMP001`, `department/eng/lead`, `config/app/v2.1/settings`)
 - **Operations covered**: Store, retrieve, JSONPath query, and delete operations on slash-containing keys with proper URL encoding
-- **Version updated**: All client demos updated from v2.2.0 to v2.4.0
+- **Version updated: All client demos updated from v2.2.0 to v2.4.0
 
 ### Security Config Relocation
 

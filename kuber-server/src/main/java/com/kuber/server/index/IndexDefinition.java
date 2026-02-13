@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Definition of a secondary index on a region.
  * 
- * @version 2.4.0
+ * @version 2.5.0
  * @since 1.9.0
  */
 @Data

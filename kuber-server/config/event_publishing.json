@@ -1,5 +1,5 @@
 {
-  "_comment": "Kuber Event Publishing - Region Configuration (v2.4.0)",
+  "_comment": "Kuber Event Publishing - Region Configuration (v2.5.0)",
   "_doc": "Regions reference broker names defined in config/message_brokers.json",
 
   "regions": {

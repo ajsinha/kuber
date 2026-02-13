@@ -59,7 +59,7 @@ import java.util.Map;
  * {@link PublisherRegistry}, and {@link RegionEventPublishingService} so that broker
  * configs are available when region configs and publishers reference them.
  *
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Slf4j
 @Component

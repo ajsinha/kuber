@@ -27,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.4.0</strong> - Monitor <span th:text="${appName} ?: 'Kuber'">Kuber</span> metrics with Prometheus and Grafana.
+                    <strong>Version 2.5.0</strong> - Monitor <span th:text="${appName} ?: 'Kuber'">Kuber</span> metrics with Prometheus and Grafana.
                 </div>
 
                 <!-- Overview -->
@@ -363,7 +363,7 @@ kuber_cache_set_latency_microseconds{application="kuber"}</code></pre>
 
 services:
   kuber:
-    image: kuber-cache:2.4.0
+    image: kuber-cache:2.5.0
     ports:
       - "8080:8080"
       - "6380:6380"
@@ -450,7 +450,7 @@ volumes:
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.4.0</p>
+                    <p class="text-muted small mb-0">Version 2.5.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

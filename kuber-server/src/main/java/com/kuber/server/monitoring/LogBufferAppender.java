@@ -5,7 +5,7 @@
  * Custom Logback appender that feeds log events into the LogBufferService.
  * This appender is registered programmatically at application startup.
  *
- * @version 2.4.0
+ * @version 2.5.0
  */
 package com.kuber.server.monitoring;
 
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * Logback appender that captures log events into the in-memory LogBufferService.
  * Automatically registered at startup to the root logger.
  *
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Component
 @RequiredArgsConstructor

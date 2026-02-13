@@ -20,7 +20,7 @@ import lombok.Data;
  * <p>Used by {@link CollectionsFactory} to configure collection instances with
  * consistent settings across different implementations.
  * 
- * @version 2.4.0
+ * @version 2.5.0
  * @since 1.5.0
  */
 @Data

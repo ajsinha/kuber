@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  *   <li>API key authentication for all requests</li>
  * </ul>
  * 
- * @version 2.4.0
+ * @version 2.5.0
  */
 @Slf4j
 @Service
@@ -1910,6 +1910,56 @@ public class RequestResponseService {
         }
         
         return status;
+    }
+    
+    /**
+     * Publish a test request message to a broker's request topic.
+     * The message will be consumed by Kuber's own listener, processed, and a response
+     * will be published to the corresponding response topic.
+     *
+     * @param brokerName the channel/broker name
+     * @param topic the request topic to publish to
+     * @param requestJson the JSON request message
+     * @return result map with success/error details
+     */
+    public Map<String, Object> publishTestRequest(String brokerName, String topic, String requestJson) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        MessageBrokerAdapter adapter = adapters.get(brokerName);
+        if (adapter == null) {
+            result.put("success", false);
+            result.put("error", "Channel '" + brokerName + "' is not connected");
+            return result;
+        }
+        
+        if (!adapter.isConnected()) {
+            result.put("success", false);
+            result.put("error", "Channel '" + brokerName + "' adapter exists but is not connected");
+            return result;
+        }
+        
+        String responseTopic = MessagingConfig.getResponseTopic(topic);
+        
+        try {
+            boolean published = adapter.publish(topic, requestJson);
+            if (published) {
+                result.put("success", true);
+                result.put("message", "Test request published to topic '" + topic + "'");
+                result.put("responseTopic", responseTopic);
+                log.info("🧪 Test request published to channel '{}', topic '{}', response expected on '{}'",
+                        brokerName, topic, responseTopic);
+            } else {
+                result.put("success", false);
+                result.put("error", "Adapter publish returned false for topic '" + topic + "'");
+            }
+        } catch (Exception e) {
+            log.error("Failed to publish test request to channel '{}', topic '{}': {}", 
+                    brokerName, topic, e.getMessage());
+            result.put("success", false);
+            result.put("error", "Publish failed: " + e.getMessage());
+        }
+        
+        return result;
     }
     
     // ==================== Inner Classes ====================
