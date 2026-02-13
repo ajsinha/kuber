@@ -65,7 +65,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/logout", "/error", "/help/**", "/help", "/about").permitAll()
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/favicon.ico", "/favicon.png").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/ping", "/health", "/info", "/status", "/stats").permitAll()
                 .requestMatchers("/api/ping", "/api/health", "/api/info", "/api/status", "/api/stats").permitAll()

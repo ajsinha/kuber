@@ -1,10 +1,10 @@
 {
   "regions" : {
-    "default" : {
+    "trades" : {
       "enabled" : true,
       "destinations" : [ {
         "broker" : "kafka-local",
-        "topic" : "defq"
+        "topic" : "trades_update"
       } ]
     }
   }
