@@ -135,11 +135,14 @@
                                 <i class="fas fa-list me-2 text-success"></i>
                                 Results
                             </h5>
-                            <!-- Export Button -->
+                            <!-- Export & Publish Buttons -->
                             <div th:if="${resultType != null && resultType != 'string' && resultType != 'json'}">
                                 <a id="exportBtn" class="btn btn-success btn-sm" href="#" onclick="exportResults(); return false;">
                                     <i class="fas fa-download me-1"></i> Export CSV
                                 </a>
+                                <button id="publishBtn" class="btn btn-warning btn-sm ms-2" onclick="publishAsEvents(); return false;" th:data-region="${queryRegion}">
+                                    <i class="fas fa-broadcast-tower me-1"></i> Publish As Events
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -530,6 +533,59 @@
         if (jsonQuery) url += '&jsonQuery=' + encodeURIComponent(jsonQuery);
         if (queryLimit) url += '&limit=' + queryLimit;
         window.location.href = url;
+    }
+    
+    function publishAsEvents() {
+        // Collect keys from whichever result table is visible
+        const keys = [];
+        document.querySelectorAll('.keys-data-row, .ksearch-data-row, .jsearch-data-row').forEach(row => {
+            const key = row.getAttribute('data-key');
+            if (key) keys.push(key);
+        });
+        
+        if (keys.length === 0) {
+            alert('No keys found in results to publish.');
+            return;
+        }
+        
+        if (!confirm('Publish ' + keys.length + ' result(s) as events to configured brokers for region "' + queryRegion + '"?')) {
+            return;
+        }
+        
+        const btn = document.getElementById('publishBtn');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Publishing...';
+        
+        fetch('/api/publish/query-results', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ region: queryRegion, keys: keys })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> Published ' + data.published;
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-warning');
+                    btn.disabled = false;
+                }, 3000);
+                return;
+            }
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        })
+        .catch(err => {
+            alert('Failed to publish events: ' + err.message);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        });
     }
     
     // Generic table pagination helper

@@ -26,6 +26,9 @@
                 <a th:href="@{/api/export/region/{region}(region=${currentRegion})}" class="btn btn-success me-2">
                     <i class="fas fa-download me-1"></i> Export CSV
                 </a>
+                <button id="publishBtn" class="btn btn-warning me-2" onclick="publishAsEvents()">
+                    <i class="fas fa-broadcast-tower me-1"></i> Publish As Events
+                </button>
                 <a th:href="@{/cache/insert(region=${currentRegion})}" class="btn btn-primary">
                     <i class="fas fa-plus me-1"></i> Insert Entry
                 </a>
@@ -188,7 +191,9 @@
 <footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
-<script>
+<script th:inline="javascript">
+    const currentRegion = /*[[${currentRegion}]]*/ 'default';
+    
     function changeRegion(region) {
         const limit = document.getElementById('limitInput').value;
         let url = '/cache?region=' + encodeURIComponent(region);
@@ -202,6 +207,58 @@
         let url = '/cache?region=' + encodeURIComponent(region);
         if (limit) url += '&limit=' + limit;
         window.location.href = url;
+    }
+    
+    function publishAsEvents() {
+        const keys = [];
+        document.querySelectorAll('.data-row').forEach(row => {
+            const key = row.getAttribute('data-key');
+            if (key) keys.push(key);
+        });
+        
+        if (keys.length === 0) {
+            alert('No entries found in region to publish.');
+            return;
+        }
+        
+        if (!confirm('Publish ' + keys.length + ' entry/entries as events to configured brokers for region "' + currentRegion + '"?')) {
+            return;
+        }
+        
+        const btn = document.getElementById('publishBtn');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Publishing...';
+        
+        fetch('/api/publish/query-results', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ region: currentRegion, keys: keys })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> Published ' + data.published;
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-warning');
+                    btn.disabled = false;
+                }, 3000);
+                return;
+            }
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        })
+        .catch(err => {
+            alert('Failed to publish events: ' + err.message);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        });
     }
 </script>
 

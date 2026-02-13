@@ -16,16 +16,21 @@ import com.kuber.core.model.CacheEntry;
 import com.kuber.core.model.CacheRegion;
 import com.kuber.core.util.JsonUtils;
 import com.kuber.server.cache.CacheService;
+import com.kuber.server.config.KuberProperties;
+import com.kuber.server.publishing.RegionEventPublishingService;
 import com.kuber.server.security.AuthorizationService;
 import com.kuber.server.security.KuberPermission;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +42,7 @@ import java.util.stream.Collectors;
  * 
  * @version 2.4.0
  */
+@Slf4j
 @Controller
 @RequestMapping("/cache")
 @RequiredArgsConstructor
@@ -47,6 +53,8 @@ public class CacheController {
     
     private final CacheService cacheService;
     private final AuthorizationService authorizationService;
+    private final RegionEventPublishingService publishingService;
+    private final KuberProperties properties;
     
     @ModelAttribute
     public void addCurrentPage(Model model) {
@@ -366,5 +374,87 @@ public class CacheController {
         private String value;
         private String valueType = "string";
         private long ttl = -1;
+    }
+    
+    /**
+     * Publish specified keys from a region as queryresult events to configured brokers.
+     * Called via AJAX from the Query page and Cache Browser "Publish As Events" button.
+     */
+    @PostMapping("/publish-as-events")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> publishAsEvents(@RequestBody PublishEventsRequest request) {
+        Map<String, Object> response = new HashMap<>();
+        String region = request.getRegion();
+        List<String> keys = request.getKeys();
+        
+        if (region == null || region.isBlank()) {
+            response.put("success", false);
+            response.put("message", "Region is required");
+            return ResponseEntity.badRequest().body(response);
+        }
+        
+        if (keys == null || keys.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "No keys provided");
+            return ResponseEntity.badRequest().body(response);
+        }
+        
+        // Check read permission
+        if (!authorizationService.canRead(region)) {
+            response.put("success", false);
+            response.put("message", "No READ permission for region '" + region + "'");
+            return ResponseEntity.status(403).body(response);
+        }
+        
+        // Check if publishing is configured for this region
+        if (!publishingService.isPublishingEnabled(region)) {
+            response.put("success", false);
+            response.put("message", "Event publishing is not configured or not enabled for region '" + region + "'");
+            return ResponseEntity.ok(response);
+        }
+        
+        String nodeId = properties.getNodeId();
+        int published = 0;
+        int skipped = 0;
+        
+        for (String key : keys) {
+            try {
+                // Try JSON first, fall back to string
+                JsonNode json = cacheService.jsonGet(region, key);
+                String value;
+                if (json != null) {
+                    value = JsonUtils.toJson(json);
+                } else {
+                    value = cacheService.get(region, key);
+                }
+                
+                if (value != null) {
+                    publishingService.publishQueryResult(region, key, value, nodeId);
+                    published++;
+                } else {
+                    skipped++;
+                }
+            } catch (Exception e) {
+                log.warn("Failed to publish query result for key '{}' in region '{}': {}", key, region, e.getMessage());
+                skipped++;
+            }
+        }
+        
+        response.put("success", true);
+        response.put("published", published);
+        response.put("skipped", skipped);
+        response.put("message", "Published " + published + " event(s) to configured brokers" + 
+                (skipped > 0 ? " (" + skipped + " skipped)" : ""));
+        
+        log.info("Publish As Events: region={}, requested={}, published={}, skipped={}", 
+                region, keys.size(), published, skipped);
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    @Data
+    public static class PublishEventsRequest {
+        private String region;
+        private List<String> keys;
     }
 }

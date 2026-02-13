@@ -19,6 +19,7 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.dto.GenericSearchRequest;
 import com.kuber.server.dto.GenericUpdateRequest;
+import com.kuber.server.publishing.RegionEventPublishingService;
 import com.kuber.server.replication.ReplicationManager;
 import com.kuber.server.search.ParallelJsonSearchService;
 import com.kuber.server.security.ApiKeyService;
@@ -56,6 +57,9 @@ public class ApiController {
     
     @Autowired(required = false)
     private ReplicationManager replicationManager;
+    
+    @Autowired(required = false)
+    private RegionEventPublishingService publishingService;
     
     // ==================== Server Info ====================
     
@@ -1659,6 +1663,86 @@ public class ApiController {
         response.put("success", result);
         
         return ResponseEntity.ok(response);
+    }
+    
+    // ==================== Publish As Events ====================
+    
+    /**
+     * Publish cache entries as query result events to configured brokers.
+     * Called from "Publish As Events" button on query page and cache browser.
+     * 
+     * @param request contains region and list of keys to publish
+     * @return count of published events and status
+     */
+    @PostMapping("/publish/query-results")
+    public ResponseEntity<Map<String, Object>> publishQueryResults(@RequestBody PublishRequest request) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        String region = request.getRegion();
+        List<String> keys = request.getKeys();
+        
+        if (region == null || region.isBlank()) {
+            result.put("error", "Region is required");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        if (keys == null || keys.isEmpty()) {
+            result.put("error", "No keys provided");
+            return ResponseEntity.badRequest().body(result);
+        }
+        
+        if (!authorizationService.canRead(region)) {
+            result.put("error", "No READ permission for region '" + region + "'");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(result);
+        }
+        
+        if (publishingService == null) {
+            result.put("error", "Event publishing service is not available");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
+        }
+        
+        if (!publishingService.isPublishingEnabled(region)) {
+            result.put("error", "Event publishing is not configured or enabled for region '" + region + "'");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+        }
+        
+        String nodeId = properties.getNodeId();
+        int published = 0;
+        int skipped = 0;
+        
+        for (String key : keys) {
+            try {
+                String value = cacheService.get(region, key);
+                if (value == null) {
+                    // Try JSON value
+                    JsonNode json = cacheService.jsonGet(region, key);
+                    if (json != null) {
+                        value = JsonUtils.toJson(json);
+                    }
+                }
+                
+                if (value != null) {
+                    publishingService.publishQueryResult(region, key, value, nodeId);
+                    published++;
+                } else {
+                    skipped++;
+                }
+            } catch (Exception e) {
+                skipped++;
+            }
+        }
+        
+        result.put("status", "ok");
+        result.put("region", region);
+        result.put("published", published);
+        result.put("skipped", skipped);
+        result.put("total", keys.size());
+        return ResponseEntity.ok(result);
+    }
+    
+    @Data
+    public static class PublishRequest {
+        private String region;
+        private List<String> keys;
     }
     
     // ==================== Request/Response DTOs ====================

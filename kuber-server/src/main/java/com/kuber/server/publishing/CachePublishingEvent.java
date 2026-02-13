@@ -94,7 +94,8 @@ public class CachePublishingEvent {
         INSERTED("inserted"),
         UPDATED("updated"),
         DELETED("deleted"),
-        EXPIRED("expired");
+        EXPIRED("expired"),
+        QUERY_RESULT("queryresult");
         
         private final String value;
         
@@ -158,6 +159,20 @@ public class CachePublishingEvent {
                 .action(Action.EXPIRED.getValue())
                 .region(region)
                 .payload(null)
+                .timestamp(Instant.now())
+                .nodeId(nodeId)
+                .build();
+    }
+    
+    /**
+     * Create an event for query result publishing.
+     */
+    public static CachePublishingEvent queryResult(String region, String key, String value, String nodeId) {
+        return CachePublishingEvent.builder()
+                .key(key)
+                .action(Action.QUERY_RESULT.getValue())
+                .region(region)
+                .payload(parsePayload(value))
                 .timestamp(Instant.now())
                 .nodeId(nodeId)
                 .build();

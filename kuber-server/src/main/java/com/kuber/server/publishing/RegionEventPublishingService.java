@@ -209,6 +209,24 @@ public class RegionEventPublishingService {
     }
     
     /**
+     * Publish a query result event for a key.
+     * Called when user triggers "Publish As Events" from query or cache browser UI.
+     * 
+     * @param region Region name
+     * @param key Cache key
+     * @param value The cache value
+     * @param nodeId The node ID where the operation occurred
+     */
+    public void publishQueryResult(String region, String key, String value, String nodeId) {
+        if (!isPublishingEnabled(region)) {
+            return;
+        }
+        
+        CachePublishingEvent event = CachePublishingEvent.queryResult(region, key, value, nodeId);
+        publishAsync(region, event);
+    }
+    
+    /**
      * Submit an event for async publishing to all configured destinations.
      */
     private void publishAsync(String region, CachePublishingEvent event) {
