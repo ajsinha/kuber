@@ -18,6 +18,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.config.KuberProperties.BrokerDefinition;
 import com.kuber.server.config.KuberProperties.RegionPublishingConfig;
+import com.kuber.server.event.EventPublisher;
+import com.kuber.server.publishing.RegionEventPublishingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +37,7 @@ import java.util.*;
  * Admin controller for CRUD management of external JSON configuration:
  * message brokers, event publishing regions, and request/response messaging.
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Controller
@@ -47,6 +49,8 @@ public class ConfigAdminController {
     private final KuberProperties properties;
     private final ObjectMapper objectMapper;
     private final CacheService cacheService;
+    private final RegionEventPublishingService publishingService;
+    private final EventPublisher eventPublisher;
 
     @ModelAttribute
     public void addCurrentPage(Model model) {
@@ -232,6 +236,7 @@ public class ConfigAdminController {
             info.put("name", entry.getKey());
             info.put("enabled", cfg.isEnabled());
             info.put("destinationCount", cfg.getDestinations() != null ? cfg.getDestinations().size() : 0);
+            info.put("publishedCount", publishingService.getRegionPublishedCount(entry.getKey()));
             List<Map<String, String>> dests = new ArrayList<>();
             if (cfg.getDestinations() != null) {
                 for (var dest : cfg.getDestinations()) {
@@ -247,10 +252,25 @@ public class ConfigAdminController {
             regionList.add(info);
         }
 
+        var stats = publishingService.getStats();
         model.addAttribute("regions", regionList);
         model.addAttribute("regionCount", regionList.size());
         model.addAttribute("enabledCount", regionList.stream().filter(r -> (boolean) r.get("enabled")).count());
         model.addAttribute("configFile", configPath);
+        
+        // Broker publishing stats
+        model.addAttribute("totalPublished", stats.totalEventsPublished());
+        model.addAttribute("totalErrors", stats.publishErrors());
+        model.addAttribute("totalDropped", stats.eventsDropped());
+        model.addAttribute("brokerQueueDepth", stats.queueSize());
+        model.addAttribute("brokerActiveThreads", stats.activeThreads());
+        
+        // Internal event bus stats
+        model.addAttribute("eventBusTotal", eventPublisher.getTotalEventsPublished());
+        model.addAttribute("eventBusChannels", eventPublisher.getActiveChannelCount());
+        model.addAttribute("eventBusSubscribers", eventPublisher.getTotalSubscriptions());
+        model.addAttribute("eventBusListeners", eventPublisher.getListenerCount());
+        
         return "admin/event-publishing";
     }
 
@@ -293,6 +313,7 @@ public class ConfigAdminController {
             regionsNode.remove(name);
             writeJsonFile(file, root);
             properties.getPublishing().getRegions().remove(name);
+            publishingService.refreshPublishing();
             log.info("Admin: deleted region '{}'", name);
             return ResponseEntity.ok(Map.of("status", "OK", "message", "Region '" + name + "' deleted"));
         } catch (Exception e) {
@@ -315,7 +336,26 @@ public class ConfigAdminController {
     @PutMapping("/api/config/event-publishing-raw")
     @ResponseBody
     public ResponseEntity<?> saveEventPublishingRawJson(@RequestBody String content) {
-        return saveJsonConfig(resolveConfigPath(properties.getPublishing().getRegionConfigFile()), content);
+        ResponseEntity<?> result = saveJsonConfig(resolveConfigPath(properties.getPublishing().getRegionConfigFile()), content);
+        // Reload regions from the saved JSON into in-memory properties and refresh publishers
+        try {
+            JsonNode root = objectMapper.readTree(content);
+            JsonNode regionsNode = root.get("regions");
+            if (regionsNode != null && regionsNode.isObject()) {
+                Map<String, RegionPublishingConfig> regions = properties.getPublishing().getRegions();
+                regions.clear();
+                var fields = regionsNode.fields();
+                while (fields.hasNext()) {
+                    var entry = fields.next();
+                    RegionPublishingConfig cfg = objectMapper.treeToValue(entry.getValue(), RegionPublishingConfig.class);
+                    regions.put(entry.getKey(), cfg);
+                }
+            }
+            publishingService.refreshPublishing();
+        } catch (Exception e) {
+            log.warn("Admin: raw JSON saved but could not sync to memory: {}", e.getMessage());
+        }
+        return result;
     }
 
     // ======================== Broker names API (for dropdowns) ========================
@@ -375,6 +415,7 @@ public class ConfigAdminController {
                 log.warn("Admin: region '{}' saved to file but could not sync to memory: {}", name, ex.getMessage());
             }
 
+            publishingService.refreshPublishing();
             log.info("Admin: created region '{}'", name);
             return ResponseEntity.ok(Map.of("status", "OK", "message", "Region '" + name + "' created."));
         } catch (Exception e) {
@@ -394,6 +435,7 @@ public class ConfigAdminController {
             writeJsonFile(file, root);
             BrokerDefinition def = properties.getPublishing().getBrokers().get(name);
             if (def != null) def.setEnabled(enabled);
+            publishingService.refreshPublishing();
             log.info("Admin: {} broker '{}'", enabled ? "enabled" : "disabled", name);
             return ResponseEntity.ok(Map.of("status", "OK", "message",
                     "Broker '" + name + "' " + (enabled ? "enabled" : "disabled")));
@@ -414,6 +456,7 @@ public class ConfigAdminController {
             writeJsonFile(file, root);
             RegionPublishingConfig cfg = properties.getPublishing().getRegions().get(name);
             if (cfg != null) cfg.setEnabled(enabled);
+            publishingService.refreshPublishing();
             log.info("Admin: {} region '{}'", enabled ? "enabled" : "disabled", name);
             return ResponseEntity.ok(Map.of("status", "OK", "message",
                     "Region '" + name + "' " + (enabled ? "enabled" : "disabled")));

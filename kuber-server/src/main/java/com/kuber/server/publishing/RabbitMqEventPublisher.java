@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Service
@@ -137,6 +137,9 @@ public class RabbitMqEventPublisher implements EventPublisher {
     @Override
     public void initialize() {
         log.info("Initializing RabbitMQ Event Publisher...");
+        
+        // Clear existing bindings for idempotent refresh
+        regionBindings.clear();
         
         Map<String, BrokerDefinition> brokers = properties.getPublishing().getBrokers();
         Map<String, RegionPublishingConfig> regions = properties.getPublishing().getRegions();
@@ -323,7 +326,7 @@ public class RabbitMqEventPublisher implements EventPublisher {
             );
             
             eventsPublished.incrementAndGet();
-            log.debug("Published event to RabbitMQ: exchange={}, routingKey={}, key={}",
+            log.info("Published event to RabbitMQ: exchange={}, routingKey={}, key={}",
                     binding.exchange, routingKey, event.getKey());
             
         } catch (Exception e) {

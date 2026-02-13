@@ -47,7 +47,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * 
  * This publisher only initializes for brokers where enabled=true.
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Service
@@ -116,6 +116,9 @@ public class FileEventPublisher implements EventPublisher {
     @Override
     public void initialize() {
         log.info("Initializing File Event Publisher...");
+        
+        // Clear existing bindings for idempotent refresh
+        regionBindings.clear();
         
         Map<String, BrokerDefinition> brokers = properties.getPublishing().getBrokers();
         Map<String, RegionPublishingConfig> regions = properties.getPublishing().getRegions();
@@ -235,7 +238,7 @@ public class FileEventPublisher implements EventPublisher {
             writerContext.write(jsonLine, binding);
             
             eventsPublished.incrementAndGet();
-            log.debug("Published event to file for region '{}', key={}, action={}",
+            log.info("Published event to file for region '{}', key={}, action={}",
                     region, event.getKey(), event.getAction());
             
         } catch (Exception e) {

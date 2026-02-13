@@ -38,7 +38,7 @@ import java.util.*;
  *   <li>Single-writer (serialized writes)</li>
  * </ul>
  * 
- * @version 2.3.0
+ * @version 2.4.0
  * @since 1.9.0
  */
 @Slf4j

@@ -1,11 +1,1 @@
-[ {
-  "keyId" : "key_0735135f",
-  "keyValue" : "kub_09ee288d6284c45339e691e6fb30d30d85d68438fa78cbcb930ae01b5067c527",
-  "name" : "ash",
-  "userId" : "admin",
-  "roles" : [ "USER", "OPERATOR", "ADMIN" ],
-  "createdAt" : "2026-02-12T02:45:18.210857387Z",
-  "lastUsedAt" : "2026-02-12T03:16:45.275947765Z",
-  "expiresAt" : null,
-  "active" : true
-} ]
+[ ]

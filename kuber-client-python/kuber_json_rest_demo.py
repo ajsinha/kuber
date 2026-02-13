@@ -30,7 +30,7 @@
 #
 # Dependencies: None (uses only Python standard library)
 #
-# @version 2.3.0
+# @version 2.4.0
 
 import json
 import os
@@ -880,7 +880,7 @@ def main():
 |   m) Delete JSON documents          DELETE /api/v1/json/{r}/{k}     |
 |   n) Keys with forward slashes      employee/EMP001 etc.            |
 |                                                                      |
-|   v2.3.0                                                             |
+|   v2.4.0                                                             |
 +======================================================================+
     """)
 

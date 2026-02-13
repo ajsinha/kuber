@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - JSON Operations Demo (v2.3.0)
+ * Kuber REST API - JSON Operations Demo (v2.4.0)
  *
  * This standalone Java application demonstrates all JSON-related operations
  * using the Kuber REST API (HTTP/JSON protocol):
@@ -25,7 +25,7 @@
  *
  * Copyright (c) 2025-2030 Ashutosh Sinha. All Rights Reserved.
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 
 import java.io.*;
@@ -829,7 +829,7 @@ public class RestJsonDemo {
         System.out.println("|   m) Delete JSON documents          DELETE /api/v1/json/{r}/{k}     |");
         System.out.println("|   n) Keys with forward slashes      employee/EMP001 etc.            |");
         System.out.println("|                                                                      |");
-        System.out.println("|   v2.3.0                                                             |");
+        System.out.println("|   v2.4.0                                                             |");
         System.out.println("+======================================================================+");
         System.out.println();
 

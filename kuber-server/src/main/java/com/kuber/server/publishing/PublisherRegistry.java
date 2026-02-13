@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Provides lookup methods for the orchestration service
  * - Handles graceful shutdown
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Service
@@ -102,6 +102,23 @@ public class PublisherRegistry {
                         publisher.getDisplayName(), e.getMessage());
             }
         }
+    }
+    
+    /**
+     * Refresh all publishers' region bindings.
+     * Called when publishing configuration changes at runtime.
+     */
+    public void refreshAll() {
+        log.info("Refreshing all publisher region bindings...");
+        for (EventPublisher publisher : publishers) {
+            try {
+                publisher.refreshBindings();
+                log.info("  ├─ {} refreshed", publisher.getDisplayName());
+            } catch (Exception e) {
+                log.warn("  ├─ {} refresh failed: {}", publisher.getDisplayName(), e.getMessage());
+            }
+        }
+        log.info("Publisher refresh complete");
     }
     
     /**

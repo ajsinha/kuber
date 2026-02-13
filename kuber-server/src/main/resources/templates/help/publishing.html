@@ -28,7 +28,9 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.3.0</strong> - Publish cache events to Kafka and/or ActiveMQ for real-time integrations.
+                    <strong>Version 2.4.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
+                    Events now fire for <strong>all</strong> write operations including JSON ops, TTL changes, renames, purges, and TTL expirations.
+                    Publisher bindings hot-refresh at runtime when configuration changes &mdash; no server restart required.
                 </div>
 
                 <!-- Overview -->
@@ -162,10 +164,52 @@
   "nodeId": "kuber-01"
 }</code></pre>
 
+                        <h5 class="mt-4">Expired Events <span class="badge bg-success">NEW in v2.4.0</span></h5>
+                        <pre class="bg-dark text-white p-3 rounded"><code>{
+  "key": "session:abc123",
+  "action": "expired",
+  "region": "sessions",
+  "timestamp": "2025-12-06T13:00:00Z",
+  "nodeId": "kuber-01"
+}</code></pre>
+
                         <div class="alert alert-info mt-3">
                             <i class="fas fa-lightbulb me-2"></i>
                             <strong>Note:</strong> The <code>payload</code> field contains the full value. If the value is valid JSON, 
                             it's included as a nested object. Otherwise, it's included as a string.
+                            Expired events do not include a payload since the entry has been removed.
+                        </div>
+                        
+                        <h5 class="mt-4">Covered Operations <span class="badge bg-success">v2.4.0</span></h5>
+                        <p>All cache write operations fire events to configured brokers:</p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6 class="text-success"><i class="fas fa-plus-circle me-1"></i>Insert / Update</h6>
+                                <ul class="small mb-3">
+                                    <li><code>SET</code>, <code>SETNX</code>, <code>SETEX</code>, <code>GETSET</code></li>
+                                    <li><code>MSET</code>, <code>INCR</code>, <code>DECR</code>, <code>APPEND</code></li>
+                                    <li><code>JSON.SET</code>, <code>JUPDATE</code> (merge)</li>
+                                    <li><code>JSON.REMOVE</code> (attribute removal)</li>
+                                    <li><code>HSET</code>, <code>EXPIRE</code>, <code>PERSIST</code></li>
+                                    <li><code>RENAME</code> (INSERT for new key)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-danger"><i class="fas fa-minus-circle me-1"></i>Delete</h6>
+                                <ul class="small mb-3">
+                                    <li><code>DEL</code> (single and multi-key)</li>
+                                    <li><code>HDEL</code>, <code>JSON.DEL</code></li>
+                                    <li><code>RENAME</code> (DELETE for old key)</li>
+                                    <li><code>PURGE</code> region (DELETE per key)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-warning"><i class="fas fa-clock me-1"></i>Expired</h6>
+                                <ul class="small mb-3">
+                                    <li>TTL expiration cleanup (automatic)</li>
+                                    <li>Fires <code>expired</code> action to brokers</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -176,16 +220,26 @@
                         <h4 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration</h4>
                     </div>
                     <div class="card-body">
-                        <p>Kuber v1.3.2 introduces a <strong>centralized configuration</strong> approach for managing event destinations:</p>
+                        <p>Kuber uses a <strong>centralized configuration</strong> approach for managing event destinations:</p>
                         
                         <div class="alert alert-success">
-                            <h5><i class="fas fa-star me-2"></i>Recommended: External JSON Configuration (v2.2.0)</h5>
+                            <h5><i class="fas fa-star me-2"></i>Recommended: External JSON Configuration</h5>
                             <ol>
                                 <li><strong>Define brokers</strong> in <code>config/message_brokers.json</code> (with optional SSL/TLS)</li>
                                 <li><strong>Define region routing</strong> in <code>config/event_publishing.json</code></li>
                                 <li><strong>Manage via Admin UI</strong>: <a href="/admin/brokers">Brokers</a> | <a href="/admin/event-publishing">Event Publishing</a></li>
                             </ol>
                             <p class="mb-0">Both files support inline editing from the Admin UI. Legacy <code>application.properties</code> broker definitions are still supported.</p>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <h5><i class="fas fa-sync-alt me-2"></i>Hot-Refresh (v2.4.0)</h5>
+                            <p class="mb-1">All configuration changes take effect <strong>immediately without server restart</strong>. The following Admin UI actions trigger a full publisher refresh:</p>
+                            <ul class="mb-0 small">
+                                <li>Enable/disable a region or broker</li>
+                                <li>Add or delete a region</li>
+                                <li>Save raw JSON configuration</li>
+                            </ul>
                         </div>
                         
                         <h5>Global Settings</h5>
@@ -715,6 +769,49 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
                     </div>
                 </div>
 
+                <!-- Admin Dashboard -->
+                <div class="card mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard <span class="badge bg-success">v2.4.0</span></h4>
+                    </div>
+                    <div class="card-body">
+                        <p>The <a href="/admin/event-publishing">Event Publishing</a> admin page provides real-time visibility into both the internal event bus and broker publishing queue:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-primary mb-3">
+                                    <div class="card-header bg-primary text-white"><i class="fas fa-bolt me-2"></i>Internal Event Bus</div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li><strong>Total Events Handled</strong> &mdash; Lifetime count of <code>CacheEvent</code> objects dispatched through the internal pub/sub bus</li>
+                                            <li><strong>Active Channels</strong> &mdash; Redis pub/sub channels with at least one subscriber</li>
+                                            <li><strong>Pub/Sub Subscribers</strong> &mdash; Total subscriber sessions (channel + pattern)</li>
+                                            <li><strong>Internal Listeners</strong> &mdash; Registered <code>CacheEventListener</code> instances</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-info mb-3">
+                                    <div class="card-header bg-info text-white"><i class="fas fa-broadcast-tower me-2"></i>Broker Publishing Queue</div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li><strong>Total Published</strong> &mdash; Lifetime count of messages successfully published to brokers</li>
+                                            <li><strong>Queue Depth</strong> &mdash; Current backlog of pending events in the async executor queue (highlighted when &gt; 0)</li>
+                                            <li><strong>Active Threads</strong> &mdash; Thread pool threads currently publishing events</li>
+                                            <li><strong>Errors / Dropped</strong> &mdash; Failed publishes and events dropped due to full queue (highlighted in red when &gt; 0)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="small text-muted mb-0">
+                            The region table also shows a <strong>per-region published count</strong> badge, so you can identify which regions are generating the most event traffic.
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Best Practices -->
                 <div class="card mb-4">
                     <div class="card-header bg-success text-white">
@@ -768,7 +865,7 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.3.0</p>
+                    <p class="text-muted small mb-0">Version 2.4.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

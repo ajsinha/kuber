@@ -19,7 +19,7 @@ package com.kuber.server.index;
  * <p>The disk-based storage uses RocksDB by default, but can be configured
  * to use LMDB or SQLite via {@code kuber.index.disk-backend} property.
  * 
- * @version 2.3.0
+ * @version 2.4.0
  * @since 1.8.0
  */
 public enum IndexStorageType {

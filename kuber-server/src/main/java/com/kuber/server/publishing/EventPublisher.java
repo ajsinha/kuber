@@ -29,7 +29,7 @@ package com.kuber.server.publishing;
  * 3. Register in PublisherRegistry
  * 4. Add Spring @Service annotation
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 public interface EventPublisher {
     
@@ -62,6 +62,16 @@ public interface EventPublisher {
      */
     default void onStartupOrchestration() {
         // Default: no action needed
+    }
+    
+    /**
+     * Refresh region bindings from current configuration.
+     * Called when publishing configuration changes at runtime (e.g., via Admin UI).
+     * Implementations should re-read properties and rebuild region-to-destination mappings.
+     */
+    default void refreshBindings() {
+        // Default: re-initialize (publishers that need smarter refresh can override)
+        initialize();
     }
     
     /**

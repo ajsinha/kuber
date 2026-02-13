@@ -70,7 +70,7 @@ public static class RestApiExample
             await client.MSetAsync(new Dictionary<string, string>
             {
                 ["config:app:name"] = "MyApp",
-                ["config:app:version"] = "2.3.0",
+                ["config:app:version"] = "2.4.0",
                 ["config:app:env"] = "production"
             });
             Console.WriteLine("  Set config:app:name, config:app:version, config:app:env");

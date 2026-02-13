@@ -253,4 +253,18 @@ public class CacheEvent implements Serializable {
                 .sourceNodeId(sourceNodeId)
                 .build();
     }
+    
+    /**
+     * Factory method for entry expired event
+     */
+    public static CacheEvent entryExpired(String region, String key, String sourceNodeId) {
+        return CacheEvent.builder()
+                .eventId(java.util.UUID.randomUUID().toString())
+                .eventType(EventType.ENTRY_EXPIRED)
+                .region(region)
+                .key(key)
+                .timestamp(Instant.now())
+                .sourceNodeId(sourceNodeId)
+                .build();
+    }
 }

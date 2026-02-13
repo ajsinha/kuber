@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * Simple user details service that reads users from a JSON file.
  * Uses cleartext password comparison for simplicity.
  * 
- * @version 2.3.0 - Added secure folder creation and required users.json validation
+ * @version 2.4.0 - Added secure folder creation and required users.json validation
  * @deprecated As of v1.7.3, replaced by {@link KuberUserService} which provides
  *             enterprise RBAC with region-specific permissions. This class is
  *             retained for backward compatibility but will be removed in a future version.

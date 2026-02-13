@@ -7,7 +7,7 @@
     "permissions" : [ "ADMIN", "WRITE", "READ", "DELETE" ],
     "systemRole" : true,
     "active" : true,
-    "createdAt" : "2026-02-12T02:44:45.594807044Z",
+    "createdAt" : "2026-02-13T17:33:41.795369644Z",
     "createdBy" : "system",
     "modifiedAt" : null,
     "modifiedBy" : null

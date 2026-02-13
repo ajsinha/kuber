@@ -33,7 +33,7 @@ import java.util.Set;
  * - "{region}_full" - Full access (read, write, delete) to a specific region
  * - Custom roles can have any name
  * 
- * @version 2.3.0
+ * @version 2.4.0
  * @since 1.7.3
  */
 @Data

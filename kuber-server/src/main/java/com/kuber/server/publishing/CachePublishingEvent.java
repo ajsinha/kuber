@@ -13,6 +13,8 @@ package com.kuber.server.publishing;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Builder;
 import lombok.Data;
 
@@ -44,14 +46,16 @@ import java.time.Instant;
  *   "nodeId": "kuber-01"
  * }
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Data
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CachePublishingEvent {
     
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     
     /**
      * The cache key that was modified
@@ -89,7 +93,8 @@ public class CachePublishingEvent {
     public enum Action {
         INSERTED("inserted"),
         UPDATED("updated"),
-        DELETED("deleted");
+        DELETED("deleted"),
+        EXPIRED("expired");
         
         private final String value;
         
@@ -137,6 +142,20 @@ public class CachePublishingEvent {
         return CachePublishingEvent.builder()
                 .key(key)
                 .action(Action.DELETED.getValue())
+                .region(region)
+                .payload(null)
+                .timestamp(Instant.now())
+                .nodeId(nodeId)
+                .build();
+    }
+    
+    /**
+     * Create an event for TTL expiration.
+     */
+    public static CachePublishingEvent expired(String region, String key, String nodeId) {
+        return CachePublishingEvent.builder()
+                .key(key)
+                .action(Action.EXPIRED.getValue())
                 .region(region)
                 .payload(null)
                 .timestamp(Instant.now())

@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Service
@@ -123,6 +123,9 @@ public class IbmMqEventPublisher implements EventPublisher {
     @Override
     public void initialize() {
         log.info("Initializing IBM MQ Event Publisher...");
+        
+        // Clear existing bindings for idempotent refresh
+        regionBindings.clear();
         
         Map<String, BrokerDefinition> brokers = properties.getPublishing().getBrokers();
         Map<String, RegionPublishingConfig> regions = properties.getPublishing().getRegions();
@@ -282,7 +285,7 @@ public class IbmMqEventPublisher implements EventPublisher {
             producer.send(message);
             eventsPublished.incrementAndGet();
             
-            log.debug("Published event to IBM MQ: queue={}, key={}, action={}",
+            log.info("Published event to IBM MQ: queue={}, key={}, action={}",
                     binding.queue, event.getKey(), event.getAction());
             
         } catch (Exception e) {

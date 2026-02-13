@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [2.3.0] - 2026-02-12 - ADMIN UI OVERHAUL, SLASH KEY FIX & SECURITY CONFIG MOVE
+## [2.4.0] - 2026-02-12 - ADMIN UI OVERHAUL, SLASH KEY FIX & SECURITY CONFIG MOVE
 
 ### 🚀 Admin UI - Modal Elimination
 
@@ -36,7 +36,7 @@ All notable changes to this project are documented in this file.
 
 - **Slash-key demo** (`demo n`): New demonstration in all three client libraries (Python, Java, C#) showing cache operations with keys containing forward slashes (`employee/EMP001`, `department/eng/lead`, `config/app/v2.1/settings`)
 - **Operations covered**: Store, retrieve, JSONPath query, and delete operations on slash-containing keys with proper URL encoding
-- **Version updated**: All client demos updated from v2.2.0 to v2.3.0
+- **Version updated**: All client demos updated from v2.2.0 to v2.4.0
 
 ### Security Config Relocation
 
@@ -46,9 +46,23 @@ All notable changes to this project are documented in this file.
 
 ### Documentation & Help Pages
 
-- All help pages updated with version 2.3.0
+- All help pages updated with version 2.4.0
 - Security and API keys help pages updated with new `config/secure/` paths
 - Architecture, startup guide, and README updated
+
+### 🔥 Event Publishing Overhaul
+
+- **Hot-Refresh Pipeline**: Runtime config changes (add/enable/disable region, broker toggle, raw JSON save) now immediately refresh all publisher bindings — no server restart needed. Implemented via `refreshPublishing()` → `PublisherRegistry.refreshAll()` → idempotent `initialize()` on all 5 publishers
+- **Complete Event Coverage**: All 14 write paths in `CacheService` now fire events to brokers:
+  - **Existing**: `set()`, `delete()`
+  - **Added**: `jsonSet()`, `jsonUpdate()`, `jsonRemoveAttributes()`, `jsonDelete()`, `expire()`, `persist()`, `rename()`, `purgeRegion()`, `cleanupExpiredEntries()`
+  - **Delegating** (inherit publishing): `setNx`, `setEx`, `getSet`, `mset`, `incr/decr`, `append`, `hset`, `hdel`
+- **Expired Event Type**: New `EXPIRED` action in `CachePublishingEvent` — TTL-expired entries now publish expiration events; new `entryExpired()` factory method in `CacheEvent`
+- **Per-Region Published Counts**: `ConcurrentHashMap<String, AtomicLong>` tracks publish counts per region; displayed as badge in Event Publishing admin table
+- **Info-Level Publish Logging**: All 5 publishers (Kafka, ActiveMQ, RabbitMQ, IBM MQ, File) upgraded from `log.debug` to `log.info` for successful publish messages
+- **Internal Event Bus Stats**: `EventPublisher` now tracks `totalEventsPublished` and `totalPubSubMessages` with `AtomicLong` counters; exposes `getActiveChannelCount()`, `getListenerCount()`, `getTotalSubscriptions()`
+- **Admin Dashboard Stat Panels**: Event Publishing page now shows dual panels — Internal Event Bus (total events, channels, subscribers, listeners) and Broker Publishing Queue (total published, queue depth, active threads, errors/dropped)
+- **Idempotent Publisher Init**: All 5 publisher `initialize()` methods now call `regionBindings.clear()` at start, making them safe for repeated invocation during hot-refresh
 
 ---
 

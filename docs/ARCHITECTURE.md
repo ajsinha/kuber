@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 2.3.0**
+**Version 2.4.0**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -1010,7 +1010,7 @@ kuber:
 
 ## 8.5 Secondary Indexing Architecture (v1.9.0)
 
-Kuber v2.3.0 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
+Kuber v2.4.0 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
 
 ### 8.5.1 Hybrid Architecture
 

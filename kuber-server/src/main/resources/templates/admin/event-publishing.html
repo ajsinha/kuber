@@ -30,9 +30,51 @@
 
         <!-- Summary Cards -->
         <div class="row mb-4">
-            <div class="col-md-4"><div class="card bg-primary text-white"><div class="card-body text-center"><i class="fas fa-database fa-2x mb-2"></i><h4 th:text="${regionCount}">0</h4><p class="mb-0">Regions</p></div></div></div>
-            <div class="col-md-4"><div class="card bg-success text-white"><div class="card-body text-center"><i class="fas fa-link fa-2x mb-2"></i><h4 th:text="${enabledCount}">0</h4><p class="mb-0">Connected</p></div></div></div>
-            <div class="col-md-4"><div class="card bg-secondary text-white"><div class="card-body text-center"><i class="fas fa-file-code fa-2x mb-2"></i><p class="mb-0 small text-truncate" th:title="${configFile}" th:text="${configFile}">path</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-primary text-white"><div class="card-body text-center"><i class="fas fa-database fa-2x mb-2"></i><h4 th:text="${regionCount}">0</h4><p class="mb-0">Regions</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-success text-white"><div class="card-body text-center"><i class="fas fa-link fa-2x mb-2"></i><h4 th:text="${enabledCount}">0</h4><p class="mb-0">Connected</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-info text-white"><div class="card-body text-center"><i class="fas fa-paper-plane fa-2x mb-2"></i><h4 th:text="${totalPublished}">0</h4><p class="mb-0">Broker Published</p></div></div></div>
+            <div class="col-md-3"><div class="card bg-secondary text-white"><div class="card-body text-center"><i class="fas fa-file-code fa-2x mb-2"></i><p class="mb-0 small text-truncate" th:title="${configFile}" th:text="${configFile}">path</p></div></div></div>
+        </div>
+
+        <!-- Internal Event Bus & Broker Queue Stats -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-dark text-white"><h6 class="mb-0"><i class="fas fa-bolt me-2"></i>Internal Event Bus</h6></div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><td class="text-muted">Total Events Handled</td><td class="text-end fw-bold" th:text="${eventBusTotal}">0</td></tr>
+                                <tr><td class="text-muted">Active Channels</td><td class="text-end" th:text="${eventBusChannels}">0</td></tr>
+                                <tr><td class="text-muted">Pub/Sub Subscribers</td><td class="text-end" th:text="${eventBusSubscribers}">0</td></tr>
+                                <tr><td class="text-muted">Internal Listeners</td><td class="text-end" th:text="${eventBusListeners}">0</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-dark text-white"><h6 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>Broker Publishing Queue</h6></div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><td class="text-muted">Total Published</td><td class="text-end fw-bold" th:text="${totalPublished}">0</td></tr>
+                                <tr><td class="text-muted">Queue Depth</td><td class="text-end"><span th:class="${brokerQueueDepth > 0} ? 'badge bg-warning text-dark' : ''" th:text="${brokerQueueDepth}">0</span></td></tr>
+                                <tr><td class="text-muted">Active Threads</td><td class="text-end" th:text="${brokerActiveThreads}">0</td></tr>
+                                <tr>
+                                    <td class="text-muted">Errors / Dropped</td>
+                                    <td class="text-end">
+                                        <span th:class="${totalErrors > 0} ? 'text-danger fw-bold' : ''" th:text="${totalErrors}">0</span>
+                                        <span class="text-muted mx-1">/</span>
+                                        <span th:class="${totalDropped > 0} ? 'text-danger fw-bold' : ''" th:text="${totalDropped}">0</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Region Table -->
@@ -45,7 +87,7 @@
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
-                            <tr><th>Region</th><th>Status</th><th>Destinations</th><th>Broker &rarr; Topic</th><th class="text-end">Actions</th></tr>
+                            <tr><th>Region</th><th>Status</th><th>Destinations</th><th>Broker &rarr; Topic</th><th class="text-center">Published</th><th class="text-end">Actions</th></tr>
                         </thead>
                         <tbody>
                             <tr th:each="r : ${regions}">
@@ -64,6 +106,10 @@
                                         <code class="small" th:text="${d.topic}"></code>
                                     </div>
                                 </td>
+                                <td class="text-center">
+                                    <span th:if="${r.publishedCount > 0}" class="badge bg-info" th:text="${r.publishedCount}">0</span>
+                                    <span th:if="${r.publishedCount == 0}" class="text-muted">0</span>
+                                </td>
                                 <td class="text-end text-nowrap">
                                     <button th:if="${r.enabled}" class="btn btn-sm btn-outline-danger" th:data-name="${r.name}" onclick="toggleRegion(this.dataset.name, false)" title="Disconnect - stop publishing events"><i class="fas fa-unlink me-1"></i>Disconnect</button>
                                     <button th:unless="${r.enabled}" class="btn btn-sm btn-outline-success" th:data-name="${r.name}" onclick="toggleRegion(this.dataset.name, true)" title="Connect - start publishing events"><i class="fas fa-plug me-1"></i>Connect</button>
@@ -71,7 +117,7 @@
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(regions)}">
-                                <td colspan="5" class="text-center text-muted py-4">
+                                <td colspan="6" class="text-center text-muted py-4">
                                     <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                     No regions configured. <a href="/admin/event-publishing/add">Add a region</a> to start publishing events.
                                 </td>

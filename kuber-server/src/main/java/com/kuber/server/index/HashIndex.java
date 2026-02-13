@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Thread-safe implementation using ConcurrentHashMap.
  * 
- * @version 2.3.0
+ * @version 2.4.0
  * @since 1.9.0
  */
 @Slf4j

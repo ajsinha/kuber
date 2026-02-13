@@ -44,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>ReadWriteLock protects against concurrent close/write races</li>
  * </ul>
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 public class RocksDbPersistenceStore extends AbstractPersistenceStore {

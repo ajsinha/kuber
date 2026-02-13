@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Event publisher for cache events and pub/sub functionality.
@@ -38,6 +39,10 @@ public class EventPublisher {
     
     // Event listeners for internal use
     private final List<CacheEventListener> eventListeners = new ArrayList<>();
+    
+    // Statistics
+    private final AtomicLong totalEventsPublished = new AtomicLong(0);
+    private final AtomicLong totalPubSubMessages = new AtomicLong(0);
     
     /**
      * Subscribe a session to a channel
@@ -89,6 +94,7 @@ public class EventPublisher {
      */
     public int publish(String channel, String message) {
         int count = 0;
+        totalPubSubMessages.incrementAndGet();
         
         // Send to direct channel subscribers
         Set<IoSession> subscribers = channelSubscribers.get(channel);
@@ -120,6 +126,7 @@ public class EventPublisher {
      * Publish a cache event
      */
     public void publish(CacheEvent event) {
+        totalEventsPublished.incrementAndGet();
         String channel = event.getChannel();
         String message = JsonUtils.toJson(event);
         
@@ -219,5 +226,40 @@ public class EventPublisher {
      */
     public interface CacheEventListener {
         void onEvent(CacheEvent event);
+    }
+    
+    /**
+     * Get total number of CacheEvent objects published through the internal event bus.
+     */
+    public long getTotalEventsPublished() {
+        return totalEventsPublished.get();
+    }
+    
+    /**
+     * Get total number of pub/sub messages dispatched (includes Redis channel + pattern subscribers).
+     */
+    public long getTotalPubSubMessages() {
+        return totalPubSubMessages.get();
+    }
+    
+    /**
+     * Get count of active channels with at least one subscriber.
+     */
+    public int getActiveChannelCount() {
+        return channelSubscribers.size();
+    }
+    
+    /**
+     * Get count of active patterns with at least one subscriber.
+     */
+    public int getActivePatternCount() {
+        return patternSubscribers.size();
+    }
+    
+    /**
+     * Get count of registered internal event listeners.
+     */
+    public int getListenerCount() {
+        return eventListeners.size();
     }
 }

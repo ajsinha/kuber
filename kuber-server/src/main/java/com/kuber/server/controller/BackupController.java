@@ -24,7 +24,7 @@ import java.util.Map;
 /**
  * REST API controller for backup and restore operations.
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @RestController
 @RequestMapping("/api/admin/backup")

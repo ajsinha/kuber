@@ -67,7 +67,7 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Service
@@ -749,8 +749,14 @@ public class CacheService {
             throw RegionException.notFound(name);
         }
         
-        // Clear KeyIndex for this region
+        // Collect keys BEFORE purging for broker event publishing
         KeyIndexInterface keyIndex = keyIndices.get(name);
+        Set<String> keysBeforePurge = null;
+        if (publishingService != null && keyIndex != null) {
+            keysBeforePurge = keyIndex.getAllKeys();
+        }
+        
+        // Clear KeyIndex for this region
         if (keyIndex != null) {
             keyIndex.clear();
         }
@@ -774,6 +780,14 @@ public class CacheService {
                 .timestamp(Instant.now())
                 .sourceNodeId(properties.getNodeId())
                 .build());
+        
+        // Publish DELETE events to brokers for each key that was purged
+        if (publishingService != null && keysBeforePurge != null && !keysBeforePurge.isEmpty()) {
+            for (String key : keysBeforePurge) {
+                publishingService.publishDelete(name, key, properties.getNodeId());
+            }
+            log.info("Published {} DELETE events for purged region '{}'", keysBeforePurge.size(), name);
+        }
         
         // Append to replication oplog (PRIMARY only)
         if (replicationOpLog != null && (replicationManager == null || replicationManager.isPrimary())) {
@@ -1305,6 +1319,15 @@ public class CacheService {
         entry.setUpdatedAt(Instant.now());
         
         putEntry(region, key, entry);
+        
+        String value = entry.getStringValue();
+        eventPublisher.publish(CacheEvent.entrySet(region, key, value, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ/RabbitMQ/IBM MQ/File)
+        if (publishingService != null) {
+            publishingService.publishUpdate(region, key, value, properties.getNodeId());
+        }
+        
         return true;
     }
     
@@ -1331,6 +1354,15 @@ public class CacheService {
         entry.setUpdatedAt(Instant.now());
         
         putEntry(region, key, entry);
+        
+        String value = entry.getStringValue();
+        eventPublisher.publish(CacheEvent.entrySet(region, key, value, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ/RabbitMQ/IBM MQ/File)
+        if (publishingService != null) {
+            publishingService.publishUpdate(region, key, value, properties.getNodeId());
+        }
+        
         return true;
     }
     
@@ -1535,8 +1567,16 @@ public class CacheService {
         entry.setKey(newKey);
         entry.setUpdatedAt(Instant.now());
         
-        delete(region, oldKey);
+        delete(region, oldKey); // Fires DELETE event for oldKey
         putEntry(region, newKey, entry);
+        
+        // Fire INSERT event for the new key
+        String value = entry.getStringValue();
+        eventPublisher.publish(CacheEvent.entrySet(region, newKey, value, properties.getNodeId()));
+        
+        if (publishingService != null) {
+            publishingService.publishInsert(region, newKey, value, properties.getNodeId());
+        }
         
         return true;
     }
@@ -1580,6 +1620,18 @@ public class CacheService {
                 .build();
         
         putEntry(region, key, entry);
+        
+        String jsonString = JsonUtils.toJson(finalValue);
+        eventPublisher.publish(CacheEvent.entrySet(region, key, jsonString, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ/RabbitMQ/IBM MQ/File)
+        if (publishingService != null) {
+            if (existing != null) {
+                publishingService.publishUpdate(region, key, jsonString, properties.getNodeId());
+            } else {
+                publishingService.publishInsert(region, key, jsonString, properties.getNodeId());
+            }
+        }
     }
     
     /**
@@ -1639,6 +1691,19 @@ public class CacheService {
                 .build();
         
         putEntry(region, key, entry);
+        
+        String jsonString = JsonUtils.toJson(finalValue);
+        eventPublisher.publish(CacheEvent.entrySet(region, key, jsonString, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ/RabbitMQ/IBM MQ/File)
+        if (publishingService != null) {
+            if (existing != null) {
+                publishingService.publishUpdate(region, key, jsonString, properties.getNodeId());
+            } else {
+                publishingService.publishInsert(region, key, jsonString, properties.getNodeId());
+            }
+        }
+        
         return finalValue;
     }
     
@@ -1752,6 +1817,14 @@ public class CacheService {
         
         putEntry(region, key, existing);
         
+        String jsonString = JsonUtils.toJson(updatedJson);
+        eventPublisher.publish(CacheEvent.entrySet(region, key, jsonString, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ/RabbitMQ/IBM MQ/File)
+        if (publishingService != null) {
+            publishingService.publishUpdate(region, key, jsonString, properties.getNodeId());
+        }
+        
         log.debug("JREMOVE: removed {} attribute(s) from key '{}'", removedCount, key);
         return updatedJson;
     }
@@ -1856,6 +1929,15 @@ public class CacheService {
         entry.setUpdatedAt(Instant.now());
         
         putEntry(region, key, entry);
+        
+        String jsonString = JsonUtils.toJson(updated);
+        eventPublisher.publish(CacheEvent.entrySet(region, key, jsonString, properties.getNodeId()));
+        
+        // Trigger async event publishing (Kafka/ActiveMQ/RabbitMQ/IBM MQ/File)
+        if (publishingService != null) {
+            publishingService.publishUpdate(region, key, jsonString, properties.getNodeId());
+        }
+        
         return true;
     }
     
@@ -3819,6 +3901,12 @@ public class CacheService {
                     persistenceStore.deleteEntry(regionName, key);
                 } catch (Exception e) {
                     log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
+                }
+                
+                // Fire EXPIRE events to internal event bus and brokers
+                eventPublisher.publish(CacheEvent.entryExpired(regionName, key, properties.getNodeId()));
+                if (publishingService != null) {
+                    publishingService.publishExpire(regionName, key, properties.getNodeId());
                 }
                 
                 recordStatistic(regionName, KuberConstants.STAT_EXPIRED);

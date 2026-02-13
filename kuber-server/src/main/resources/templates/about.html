@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 2.3.0</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 2.4.0</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -156,9 +156,9 @@
                         <h5 class="card-title">Event Publishing</h5>
                         <p class="card-text opacity-75">
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
-                            Multi-destination support with centralized broker configuration.
+                            Hot-refresh bindings at runtime. Complete coverage across all write paths including JSON ops, TTL expiry, and purge.
                         </p>
-                        <span class="badge bg-light text-dark">v1.3.2</span>
+                        <span class="badge bg-light text-dark">Enhanced in v2.4.0</span>
                     </div>
                 </div>
             </div>
@@ -222,7 +222,7 @@
                             Real-time monitoring dashboard with charts for CPU, memory, cache operations, and hit rates.
                             Live log viewer with level filtering, text search, and auto-scroll.
                         </p>
-                        <span class="badge bg-light text-dark">NEW in v2.2.0</span>
+                        <span class="badge bg-light text-dark">v2.2.0</span>
                     </div>
                 </div>
             </div>
@@ -677,8 +677,23 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v2.2.0</span>
-                                    <span class="text-muted small">Current - Monitoring, Live Logs &amp; UI Enhancements</span>
+                                    <span class="badge bg-primary me-2">v2.4.0</span>
+                                    <span class="text-muted small">Current - Event Publishing Overhaul &amp; Internal Event Bus</span>
+                                </h6>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Hot-Refresh Event Publishing</strong>: Runtime config changes (add/enable/disable region, broker toggle, raw JSON save) now immediately refresh all publisher bindings without server restart</li>
+                                    <li><strong>Complete Event Coverage</strong>: All 14 write paths now fire events to brokers &mdash; added publishing for <code>jsonSet</code>, <code>jsonUpdate</code>, <code>jsonRemoveAttributes</code>, <code>jsonDelete</code>, <code>expire</code>, <code>persist</code>, <code>rename</code>, <code>purgeRegion</code>, and <code>cleanupExpiredEntries</code></li>
+                                    <li><strong>Expired Event Type</strong>: New <code>EXPIRED</code> action type in <code>CachePublishingEvent</code> &mdash; TTL-expired entries now publish expiration events to configured brokers</li>
+                                    <li><strong>Internal Event Bus Stats</strong>: Event Publishing admin page now shows dual stat panels for Internal Event Bus (total events, active channels, pub/sub subscribers, listeners) and Broker Publishing Queue (queue depth, active threads, errors/dropped)</li>
+                                    <li><strong>Per-Region Published Counts</strong>: Region table on Event Publishing page displays per-region published message count with badge indicators</li>
+                                    <li><strong>Info-Level Publish Logging</strong>: All 5 publisher implementations (Kafka, ActiveMQ, RabbitMQ, IBM MQ, File) now log successful publishes at <code>INFO</code> level instead of <code>DEBUG</code></li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v2.2.0</span>
+                                    <span class="text-muted small">Monitoring, Live Logs &amp; UI Enhancements</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
                                 <ul class="small text-muted mb-0">
@@ -829,7 +844,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.3.0
+                                <strong>Version:</strong> 2.4.0
                             </li>
                         </ul>
                     </div>
@@ -888,7 +903,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.3.0
+                                <strong>Version:</strong> 2.4.0
                             </li>
                         </ul>
                     </div>

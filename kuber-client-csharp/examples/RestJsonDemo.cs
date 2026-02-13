@@ -1,5 +1,5 @@
 /*
- * Kuber REST API - JSON Operations Demo (v2.3.0)
+ * Kuber REST API - JSON Operations Demo (v2.4.0)
  *
  * This standalone C# application demonstrates all JSON-related operations
  * using the Kuber REST API (HTTP/JSON protocol):
@@ -25,7 +25,7 @@
  *
  * Copyright (c) 2025-2030 Ashutosh Sinha. All Rights Reserved.
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 
 using System;
@@ -741,7 +741,7 @@ namespace Kuber.Examples
             Console.WriteLine("|   m) Delete JSON documents          DELETE /api/v1/json/{r}/{k}     |");
             Console.WriteLine("|   n) Keys with forward slashes      employee/EMP001 etc.            |");
             Console.WriteLine("|                                                                      |");
-            Console.WriteLine("|   v2.3.0                                                             |");
+            Console.WriteLine("|   v2.4.0                                                             |");
             Console.WriteLine("+======================================================================+");
             Console.WriteLine();
 

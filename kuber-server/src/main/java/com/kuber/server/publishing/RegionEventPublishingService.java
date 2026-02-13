@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *                        │    ▼        ▼         ▼         ▼         ▼
  *                        │  Kafka   ActiveMQ  RabbitMQ  IBM MQ     File
  * 
- * @version 2.3.0
+ * @version 2.4.0
  */
 @Slf4j
 @Service
@@ -76,6 +76,9 @@ public class RegionEventPublishingService {
     private final AtomicLong totalEventsPublished = new AtomicLong(0);
     private final AtomicLong publishErrors = new AtomicLong(0);
     private final AtomicLong eventsDropped = new AtomicLong(0);
+    
+    // Per-region published event counts
+    private final ConcurrentHashMap<String, AtomicLong> regionPublishedCounts = new ConcurrentHashMap<>();
     
     // Track enabled regions
     private final Set<String> enabledRegions = ConcurrentHashMap.newKeySet();
@@ -189,6 +192,23 @@ public class RegionEventPublishingService {
     }
     
     /**
+     * Publish an expire event for a key.
+     * Called by CacheService when a key expires due to TTL.
+     * 
+     * @param region Region name
+     * @param key Cache key
+     * @param nodeId The node ID where the operation occurred
+     */
+    public void publishExpire(String region, String key, String nodeId) {
+        if (!isPublishingEnabled(region)) {
+            return;
+        }
+        
+        CachePublishingEvent event = CachePublishingEvent.expired(region, key, nodeId);
+        publishAsync(region, event);
+    }
+    
+    /**
      * Submit an event for async publishing to all configured destinations.
      */
     private void publishAsync(String region, CachePublishingEvent event) {
@@ -210,6 +230,9 @@ public class RegionEventPublishingService {
                     
                     if (!publishers.isEmpty()) {
                         totalEventsPublished.incrementAndGet();
+                        regionPublishedCounts
+                                .computeIfAbsent(region, k -> new AtomicLong(0))
+                                .incrementAndGet();
                     }
                     
                 } catch (Exception e) {
@@ -227,9 +250,38 @@ public class RegionEventPublishingService {
     
     /**
      * Check if publishing is enabled for a region.
+     * Reads live configuration to support runtime changes via Admin UI.
      */
     public boolean isPublishingEnabled(String region) {
-        return enabledRegions.contains(region) && publisherRegistry.hasPublishersForRegion(region);
+        RegionPublishingConfig config = properties.getPublishing().getRegions().get(region);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        return publisherRegistry.hasPublishersForRegion(region);
+    }
+    
+    /**
+     * Refresh publishing configuration at runtime.
+     * Called when publishing config changes via Admin UI (add/remove/enable/disable region).
+     * Re-reads enabled regions from properties and refreshes all publisher bindings.
+     */
+    public void refreshPublishing() {
+        log.info("Refreshing event publishing configuration...");
+        
+        // Refresh the enabledRegions set for stats tracking
+        enabledRegions.clear();
+        Map<String, RegionPublishingConfig> regionConfigs = properties.getPublishing().getRegions();
+        for (Map.Entry<String, RegionPublishingConfig> entry : regionConfigs.entrySet()) {
+            if (entry.getValue().isEnabled()) {
+                enabledRegions.add(entry.getKey());
+            }
+        }
+        
+        // Refresh all publisher bindings (re-reads config, rebuilds region mappings)
+        publisherRegistry.refreshAll();
+        
+        log.info("Event publishing refreshed: {} enabled region(s): {}",
+                enabledRegions.size(), enabledRegions.isEmpty() ? "none" : enabledRegions);
     }
     
     /**
@@ -238,6 +290,17 @@ public class RegionEventPublishingService {
      */
     public void executeStartupOrchestration() {
         publisherRegistry.executeStartupOrchestration();
+    }
+    
+    /**
+     * Get the number of events published for a specific region.
+     * 
+     * @param region Region name
+     * @return Number of events published for this region since startup
+     */
+    public long getRegionPublishedCount(String region) {
+        AtomicLong counter = regionPublishedCounts.get(region);
+        return counter != null ? counter.get() : 0;
     }
     
     /**

@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 2.3.0
+Version 2.4.0
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -22,7 +22,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
-- **Event Publishing (v1.2.8)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files
+- **Event Publishing (v1.2.8, v2.4.0)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files — hot-refresh, complete write coverage, TTL expiry events
 - **Request/Response Messaging (v1.7.1)**: Access cache via message brokers with async processing, backpressure, and broker controls
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
@@ -95,7 +95,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
 | Key Length Validation | Configurable max key length (default: 256 bytes) with logging |
-| Event Publishing (v1.2.8) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
+| Event Publishing (v2.4.0) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files; hot-refresh; all write ops; TTL expiry events |
 | Request/Response (v1.7.1) | Cache access via message brokers with backpressure and broker controls |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
@@ -334,7 +334,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-2.3.0.jar
+        -jar kuber-server/target/kuber-server-2.4.0.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -801,9 +801,15 @@ Comprehensive documentation accessible at `/help`:
 | Advanced | Regions, Search, Replication, Messaging |
 | Reference | REST API, Redis Protocol, Glossary |
 
-## Event Publishing (v1.2.8, updated v2.2.0)
+## Event Publishing (v1.2.8, updated v2.4.0)
 
 Stream cache events to external systems for real-time integrations.
+
+**v2.4.0 Highlights:**
+- **Hot-refresh**: Config changes via Admin UI take effect immediately — no restart needed
+- **Complete coverage**: All write operations fire events (SET, JSON.SET, JUPDATE, DEL, EXPIRE, PERSIST, RENAME, PURGE, TTL expiry)
+- **New `expired` action**: TTL-expired entries now publish expiration events to brokers
+- **Admin dashboard**: Dual stat panels for Internal Event Bus and Broker Publishing Queue (queue depth, active threads, errors/dropped)
 
 **Configuration is managed via two JSON files** (both in `config/` by default):
 
@@ -855,6 +861,8 @@ Stream cache events to external systems for real-time integrations.
   "nodeId": "kuber-01"
 }
 ```
+
+Actions: `inserted`, `updated`, `deleted`, `expired`. The `payload` field is `null` for `deleted` and `expired` actions.
 
 ## Autoload
 
