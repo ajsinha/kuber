@@ -1745,6 +1745,73 @@ public class ApiController {
         private List<String> keys;
     }
     
+    /**
+     * Publish ALL entries from a region as query result events to configured brokers.
+     * Called from "Publish As Events" button on region detail page.
+     */
+    @PostMapping("/publish/region/{region}")
+    public ResponseEntity<Map<String, Object>> publishRegion(@PathVariable String region) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (!authorizationService.canRead(region)) {
+            result.put("error", "No READ permission for region '" + region + "'");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(result);
+        }
+        
+        if (publishingService == null) {
+            result.put("error", "Event publishing service is not available");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
+        }
+        
+        if (!publishingService.isPublishingEnabled(region)) {
+            result.put("error", "Event publishing is not configured or enabled for region '" + region + "'");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+        }
+        
+        // Fetch all keys from the region
+        Set<String> keys = cacheService.keys(region, "*", Integer.MAX_VALUE);
+        if (keys == null || keys.isEmpty()) {
+            result.put("status", "ok");
+            result.put("region", region);
+            result.put("published", 0);
+            result.put("skipped", 0);
+            result.put("total", 0);
+            return ResponseEntity.ok(result);
+        }
+        
+        String nodeId = properties.getNodeId();
+        int published = 0;
+        int skipped = 0;
+        
+        for (String key : keys) {
+            try {
+                String value = cacheService.get(region, key);
+                if (value == null) {
+                    JsonNode json = cacheService.jsonGet(region, key);
+                    if (json != null) {
+                        value = JsonUtils.toJson(json);
+                    }
+                }
+                
+                if (value != null) {
+                    publishingService.publishQueryResult(region, key, value, nodeId);
+                    published++;
+                } else {
+                    skipped++;
+                }
+            } catch (Exception e) {
+                skipped++;
+            }
+        }
+        
+        result.put("status", "ok");
+        result.put("region", region);
+        result.put("published", published);
+        result.put("skipped", skipped);
+        result.put("total", keys.size());
+        return ResponseEntity.ok(result);
+    }
+    
     // ==================== Request/Response DTOs ====================
     
     @Data

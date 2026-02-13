@@ -203,6 +203,10 @@
                             <a th:href="@{/api/export/region/{name}(name=${region.name})}" class="btn btn-success">
                                 <i class="fas fa-download me-1"></i> Export as CSV
                             </a>
+                            <button id="publishBtn" class="btn btn-warning" onclick="publishAsEvents()" 
+                                    th:data-region="${region.name}" th:data-count="${entryCount}">
+                                <i class="fas fa-broadcast-tower me-1"></i> Publish As Events
+                            </button>
                             <a th:href="@{/cache/insert(region=${region.name})}" class="btn btn-outline-primary">
                                 <i class="fas fa-plus me-1"></i> Insert Entry
                             </a>
@@ -371,6 +375,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function publishAsEvents() {
+    const btn = document.getElementById('publishBtn');
+    const regionName = btn.dataset.region;
+    const entryCount = parseInt(btn.dataset.count) || 0;
+    
+    if (entryCount === 0) {
+        alert('Region "' + regionName + '" has no entries to publish.');
+        return;
+    }
+    
+    if (!confirm('Publish all ' + entryCount.toLocaleString() + ' entries from region "' + regionName + '" as events to configured brokers?')) {
+        return;
+    }
+    
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Publishing...';
+    
+    fetch('/api/publish/region/' + encodeURIComponent(regionName), {
+        method: 'POST'
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        } else {
+            btn.innerHTML = '<i class="fas fa-check me-1"></i> Published ' + data.published.toLocaleString();
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-success');
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-warning');
+                btn.disabled = false;
+            }, 3000);
+        }
+    })
+    .catch(err => {
+        alert('Failed to publish events: ' + err.message);
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    });
+}
 </script>
 
 </body>
