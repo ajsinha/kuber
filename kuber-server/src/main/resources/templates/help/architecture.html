@@ -519,21 +519,23 @@ kuber.cache.off-heap-key-index-max-size-mb=8192</pre>
                     
                     <h4 class="mt-4">Publishing Architecture</h4>
                     <pre class="bg-dark text-light p-3 rounded" style="font-size: 0.8rem;">
-CacheService.set() / delete()
-         │
-         │ Submit to async queue (non-blocking)
-         ▼
-┌─────────────────────────────┐
-│  Publishing Thread Pool     │ (configurable, default: 4 threads)
-└────────────┬────────────────┘
-             │
-             ▼
-      PublisherRegistry
-             │
-    ┌────┬───┴───┬────┬────┐
-    ▼    ▼       ▼    ▼    ▼
- Kafka  AMQ  RabbitMQ IBM  File
-                      MQ</pre>
+CacheService.set() / delete()     AutoloadService.processFile()
+         │                                 │
+         │ Submit to async queue           │ autoload_start / autoload_end
+         │ (non-blocking)                  │
+         ▼                                 ▼
+┌──────────────────────────────────────────────┐
+│  RegionEventPublishingService                │
+│  └── Publishing Thread Pool (default: 4)     │
+└────────────────────┬─────────────────────────┘
+                     │
+                     ▼
+              PublisherRegistry
+                     │
+            ┌────┬───┴───┬────┬────┐
+            ▼    ▼       ▼    ▼    ▼
+         Kafka  AMQ  RabbitMQ IBM  File
+                              MQ</pre>
                     
                     <h4 class="mt-4">Supported Publishers</h4>
                     <table class="table table-bordered">
@@ -1129,6 +1131,7 @@ Client          Protocol Handler       CacheService         KeyIndex         Val
     </div>
 </main>
 
+<footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
 </body>

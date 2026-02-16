@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [2.5.0] - 2026-02-13 - PUBLISH AS EVENTS, MESSAGING TEST CONSOLE & SERIALIZATION FIX
+## [2.5.0] - 2026-02-16 - PUBLISH AS EVENTS, AUTOLOAD EVENTS, MESSAGING TEST CONSOLE & SERIALIZATION FIX
 
 ### 🚀 Publish As Events (On-Demand)
 
@@ -11,6 +11,14 @@ All notable changes to this project are documented in this file.
 - **Region Detail page** (`/regions/{name}`): Button in Quick Actions publishes the entire region's entries via `POST /api/publish/region/{region}`
 - **Query Result event type**: New `QUERY_RESULT` (`queryresult`) action in `CachePublishingEvent` — structured like an INSERT with key and payload
 - **API endpoints**: `POST /api/publish/query-results` (accepts `{region, keys[]}`) and `POST /api/publish/region/{region}` (fetches all keys server-side)
+
+### 📦 Autoload Event Publishing
+
+- **Autoload lifecycle events**: When a region has event publishing configured, the autoload system now publishes `autoload_start` and `autoload_end` events to all configured brokers
+- **New action types**: `AUTOLOAD_START` (`autoload_start`) and `AUTOLOAD_END` (`autoload_end`) added to `CachePublishingEvent.Action` enum
+- **Rich metadata payload**: `autoload_start` includes `file` and `region`; `autoload_end` adds `records_loaded`, `errors`, `duration_ms`, and `status`
+- **All exit paths covered**: Events fire on success, validation errors (missing key_field), and exceptions — every `autoload_start` is always paired with an `autoload_end`
+- **Non-blocking**: Events published asynchronously via the existing `RegionEventPublishingService` thread pool; autoload processing is never delayed
 
 ### 🧪 Messaging Test Console
 

@@ -22,7 +22,7 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
-- **Event Publishing (v1.2.8, v2.5.0)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files — hot-refresh, complete write coverage, TTL expiry events, on-demand publish of query results and entire regions
+- **Event Publishing (v1.2.8, v2.5.0)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files — hot-refresh, complete write coverage, TTL expiry events, autoload lifecycle events, on-demand publish of query results and entire regions
 - **Request/Response Messaging (v1.7.1)**: Access cache via message brokers with async processing, backpressure, and broker controls
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
@@ -95,7 +95,7 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
 | Key Length Validation | Configurable max key length (default: 256 bytes) with logging |
-| Event Publishing (v2.5.0) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files; hot-refresh; all write ops; TTL expiry; on-demand publish from UI |
+| Event Publishing (v2.5.0) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files; hot-refresh; all write ops; TTL expiry; autoload lifecycle; on-demand publish from UI |
 | Request/Response (v1.7.1) | Cache access via message brokers with backpressure and broker controls |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
@@ -807,6 +807,7 @@ Stream cache events to external systems for real-time integrations.
 
 **v2.5.0 Highlights:**
 - **Publish As Events**: New UI buttons on query results, cache browser, and region detail pages to publish entries on demand as `queryresult` events
+- **Autoload event publishing**: Regions with event publishing configured now receive `autoload_start` and `autoload_end` events with file name, records loaded, errors, duration, and status
 - **Query Result event type**: New `queryresult` action in event payloads — structured like `inserted` with key and payload
 - **Messaging Test Console**: Built-in test section on `/admin/messaging` with 20 pre-built templates for all cache operations — send test requests directly to any connected broker channel
 - **Instant serialization fix**: `CachePublishingEvent` now correctly serializes `java.time.Instant` timestamps as ISO-8601 via `JavaTimeModule`
@@ -868,11 +869,19 @@ Stream cache events to external systems for real-time integrations.
 }
 ```
 
-Actions: `inserted`, `updated`, `deleted`, `expired`, `queryresult`. The `payload` field is `null` for `deleted` and `expired` actions.
+Actions: `inserted`, `updated`, `deleted`, `expired`, `queryresult`, `autoload_start`, `autoload_end`. The `payload` field is `null` for `deleted` and `expired` actions.
 
 ## Autoload
 
 Bulk import data from CSV, TXT, and JSON files:
+
+### Event Publishing (v2.5.0)
+
+When a region has event publishing configured, autoload publishes lifecycle events:
+- `autoload_start` — published when file processing begins (payload: `file`, `region`)
+- `autoload_end` — published when processing completes (payload: `file`, `region`, `records_loaded`, `errors`, `duration_ms`, `status`)
+
+Events are published to all brokers configured for the target region, enabling downstream systems to react to data loads.
 
 ### Metadata File Format
 

@@ -20,6 +20,7 @@ import com.kuber.server.cache.CacheService;
 import com.kuber.server.config.KuberProperties;
 import com.kuber.server.persistence.PersistenceOperationLock;
 import com.kuber.server.persistence.PersistenceOperationLock.OperationType;
+import com.kuber.server.publishing.RegionEventPublishingService;
 import jakarta.annotation.PreDestroy;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -170,15 +171,19 @@ public class AutoloadService {
     private final KuberProperties properties;
     private final ObjectMapper objectMapper;
     private final PersistenceOperationLock operationLock;
+    private final RegionEventPublishingService publishingService;
     
     public AutoloadService(CacheService cacheService, 
                            KuberProperties properties, 
                            ObjectMapper objectMapper,
-                           PersistenceOperationLock operationLock) {
+                           PersistenceOperationLock operationLock,
+                           @org.springframework.beans.factory.annotation.Autowired(required = false)
+                           RegionEventPublishingService publishingService) {
         this.cacheService = cacheService;
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.operationLock = operationLock;
+        this.publishingService = publishingService;
     }
     
     private ScheduledExecutorService scheduler;
@@ -410,6 +415,11 @@ public class AutoloadService {
             }
             lockAcquired = true;
             
+            // Publish autoload_start event if event publishing is configured for this region
+            if (publishingService != null) {
+                publishingService.publishAutoloadStart(regionName, fileName, properties.getNodeId());
+            }
+            
             // Parse attribute mapping if present
             Map<String, String> attributeMapping = null;
             if (Files.exists(attributeMappingPath)) {
@@ -425,6 +435,11 @@ public class AutoloadService {
                 moveToOutbox(dataFile, metadataPath, attributeMappingPath, "ERROR_NO_KEY_FIELD");
                 totalErrors.incrementAndGet();
                 addActivityLogEntry(fileName, metadata.getRegion(), 0, 1, startTime, "ERROR: Missing key_field");
+                if (publishingService != null) {
+                    long durationMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
+                    publishingService.publishAutoloadEnd(regionName, fileName, 
+                            0, 1, durationMs, "ERROR: Missing key_field", properties.getNodeId());
+                }
                 return;
             }
             
@@ -473,6 +488,13 @@ public class AutoloadService {
             // Add to activity log
             addActivityLogEntry(fileName, metadata.getRegion(), result.getLoaded(), result.getErrors(), startTime, "SUCCESS");
             
+            // Publish autoload_end event if event publishing is configured for this region
+            if (publishingService != null) {
+                long durationMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
+                publishingService.publishAutoloadEnd(regionName, fileName, 
+                        result.getLoaded(), result.getErrors(), durationMs, "SUCCESS", properties.getNodeId());
+            }
+            
         } catch (Exception e) {
             log.error("Failed to process file: {}", fileName, e);
             try {
@@ -483,6 +505,13 @@ public class AutoloadService {
             totalErrors.incrementAndGet();
             lastActivityMessage = "Error processing: " + fileName + " - " + e.getMessage();
             addActivityLogEntry(fileName, "unknown", 0, 1, startTime, "ERROR: " + e.getMessage());
+            
+            // Publish autoload_end event with error status
+            if (publishingService != null) {
+                long durationMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
+                publishingService.publishAutoloadEnd(regionName, fileName, 
+                        0, 1, durationMs, "ERROR: " + e.getMessage(), properties.getNodeId());
+            }
         } finally {
             // Release region lock
             if (lockAcquired) {

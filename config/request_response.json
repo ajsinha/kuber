@@ -22,7 +22,7 @@
       "connName" : null,
       "connectionSummary" : "kafka://localhost:9092",
       "display_name" : "Kafka Local",
-      "request_topics" : [ "customer_request" ]
+      "request_topics" : [ "default_request" ]
     }
   },
   "max_queue_depth" : 100,

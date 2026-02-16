@@ -227,6 +227,47 @@ public class RegionEventPublishingService {
     }
     
     /**
+     * Publish an autoload_start event when a file begins loading into a region.
+     * 
+     * @param region Region being loaded
+     * @param fileName Source data file name
+     * @param nodeId The node ID
+     */
+    public void publishAutoloadStart(String region, String fileName, String nodeId) {
+        if (!isPublishingEnabled(region)) {
+            return;
+        }
+        
+        CachePublishingEvent event = CachePublishingEvent.autoloadStart(region, fileName, nodeId);
+        publishAsync(region, event);
+        log.info("Published autoload_start event for region '{}', file '{}'", region, fileName);
+    }
+    
+    /**
+     * Publish an autoload_end event when a file finishes loading into a region.
+     * 
+     * @param region Region that was loaded
+     * @param fileName Source data file name
+     * @param recordsLoaded Number of records successfully loaded
+     * @param errors Number of errors encountered
+     * @param durationMs Processing duration in milliseconds
+     * @param status Outcome status (e.g. "SUCCESS", "ERROR")
+     * @param nodeId The node ID
+     */
+    public void publishAutoloadEnd(String region, String fileName, int recordsLoaded, 
+            int errors, long durationMs, String status, String nodeId) {
+        if (!isPublishingEnabled(region)) {
+            return;
+        }
+        
+        CachePublishingEvent event = CachePublishingEvent.autoloadEnd(
+                region, fileName, recordsLoaded, errors, durationMs, status, nodeId);
+        publishAsync(region, event);
+        log.info("Published autoload_end event for region '{}', file '{}': {} records, {} errors, {}ms, status={}",
+                region, fileName, recordsLoaded, errors, durationMs, status);
+    }
+    
+    /**
      * Submit an event for async publishing to all configured destinations.
      */
     private void publishAsync(String region, CachePublishingEvent event) {

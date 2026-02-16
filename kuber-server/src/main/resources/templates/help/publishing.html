@@ -30,7 +30,8 @@
                     <i class="fas fa-info-circle me-2"></i>
                     <strong>Version 2.5.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
                     Events fire for <strong>all</strong> write operations including JSON ops, TTL changes, renames, purges, and TTL expirations.
-                    New in v2.5.0: <strong>Publish As Events</strong> buttons on query, cache browser, and region detail pages let you publish results or entire regions on demand as <code>queryresult</code> events.
+                    New in v2.5.0: <strong>Publish As Events</strong> buttons on query, cache browser, and region detail pages;
+                    <strong>Autoload events</strong> (<code>autoload_start</code> / <code>autoload_end</code>) for regions with event publishing configured.
                 </div>
 
                 <!-- Overview -->
@@ -173,17 +174,55 @@
   "nodeId": "kuber-01"
 }</code></pre>
 
+                        <h5 class="mt-4">Autoload Events <span class="badge bg-success">NEW in v2.5.0</span></h5>
+                        <p>When a region has event publishing configured, the autoload system publishes start/end lifecycle events:</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-play text-success me-2"></i>autoload_start</h6>
+                                <pre class="bg-dark text-white p-3 rounded"><code>{
+  "key": "employees.csv",
+  "action": "autoload_start",
+  "region": "employees",
+  "payload": {
+    "file": "employees.csv",
+    "region": "employees"
+  },
+  "timestamp": "2026-02-16T10:00:00Z",
+  "nodeId": "kuber-01"
+}</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-stop text-info me-2"></i>autoload_end</h6>
+                                <pre class="bg-dark text-white p-3 rounded"><code>{
+  "key": "employees.csv",
+  "action": "autoload_end",
+  "region": "employees",
+  "payload": {
+    "file": "employees.csv",
+    "region": "employees",
+    "records_loaded": 5000,
+    "errors": 0,
+    "duration_ms": 1234,
+    "status": "SUCCESS"
+  },
+  "timestamp": "2026-02-16T10:00:01Z",
+  "nodeId": "kuber-01"
+}</code></pre>
+                            </div>
+                        </div>
+
                         <div class="alert alert-info mt-3">
                             <i class="fas fa-lightbulb me-2"></i>
                             <strong>Note:</strong> The <code>payload</code> field contains the full value. If the value is valid JSON, 
                             it's included as a nested object. Otherwise, it's included as a string.
                             Expired events do not include a payload since the entry has been removed.
+                            Autoload events include file metadata and processing statistics in the payload.
                         </div>
                         
                         <h5 class="mt-4">Covered Operations <span class="badge bg-success">v2.4.0</span></h5>
                         <p>All cache write operations fire events to configured brokers:</p>
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <h6 class="text-success"><i class="fas fa-plus-circle me-1"></i>Insert / Update</h6>
                                 <ul class="small mb-3">
                                     <li><code>SET</code>, <code>SETNX</code>, <code>SETEX</code>, <code>GETSET</code></li>
@@ -194,7 +233,7 @@
                                     <li><code>RENAME</code> (INSERT for new key)</li>
                                 </ul>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <h6 class="text-danger"><i class="fas fa-minus-circle me-1"></i>Delete</h6>
                                 <ul class="small mb-3">
                                     <li><code>DEL</code> (single and multi-key)</li>
@@ -203,11 +242,18 @@
                                     <li><code>PURGE</code> region (DELETE per key)</li>
                                 </ul>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <h6 class="text-warning"><i class="fas fa-clock me-1"></i>Expired</h6>
                                 <ul class="small mb-3">
                                     <li>TTL expiration cleanup (automatic)</li>
                                     <li>Fires <code>expired</code> action to brokers</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-info"><i class="fas fa-file-import me-1"></i>Autoload <span class="badge bg-success">v2.5.0</span></h6>
+                                <ul class="small mb-3">
+                                    <li><code>autoload_start</code> when file processing begins</li>
+                                    <li><code>autoload_end</code> with records, errors, duration, status</li>
                                 </ul>
                             </div>
                         </div>
@@ -933,6 +979,7 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
     </div>
 </main>
 
+<footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
 </body>

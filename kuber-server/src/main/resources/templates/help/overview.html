@@ -46,7 +46,7 @@
                         <li><strong>High Performance</strong> - O(1) key existence checks via KeyIndex, sub-millisecond operations</li>
                         <li><strong>Replication</strong> - Primary/Secondary architecture with ZooKeeper coordination</li>
                         <li><strong>Autoload</strong> - Bulk data import from CSV, TXT, and JSON files</li>
-                        <li><strong>Event Publishing (v2.5.0)</strong> - Stream events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files with hot-refresh and complete write coverage</li>
+                        <li><strong>Event Publishing (v2.5.0)</strong> - Stream events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files with hot-refresh, complete write coverage, autoload lifecycle events, and on-demand publish from UI</li>
                         <li><strong>API Key Authentication</strong> - Secure programmatic access with multiple auth methods</li>
                     </ul>
                 </div>
@@ -274,6 +274,7 @@
     </div>
 </main>
 
+<footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 
 </body>

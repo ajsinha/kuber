@@ -192,6 +192,8 @@
 
 <footer th:replace="~{layout :: footer}"></footer>
 
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
 <script>
 function deleteBroker(name) {
     if (!confirm('Delete broker "' + name + '"? This cannot be undone.')) return;

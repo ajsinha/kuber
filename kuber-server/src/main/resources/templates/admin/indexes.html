@@ -267,6 +267,8 @@
 </div>
 
 <script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+<th:block th:replace="~{layout :: scripts}"></th:block>
+
 <script>
     function showLoading() {
         document.getElementById('loadingOverlay').classList.remove('d-none');

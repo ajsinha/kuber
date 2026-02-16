@@ -287,6 +287,32 @@ INFO  AutoloadService - File moved to outbox: customers.csv</code></pre>
                     </tbody>
                 </table>
                 
+                <h3 class="mt-4"><i class="fas fa-broadcast-tower me-2"></i>Event Publishing Integration <span class="badge bg-success">NEW in v2.5.0</span></h3>
+                <p>When a region has <a href="/help/publishing">event publishing</a> configured, the autoload system automatically publishes lifecycle events to all configured brokers:</p>
+                
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr><th>Event</th><th>When</th><th>Payload</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>autoload_start</code></td>
+                            <td>File processing begins (after metadata parsed, lock acquired)</td>
+                            <td><code>file</code>, <code>region</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>autoload_end</code></td>
+                            <td>File processing completes (success or error)</td>
+                            <td><code>file</code>, <code>region</code>, <code>records_loaded</code>, <code>errors</code>, <code>duration_ms</code>, <code>status</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="small text-muted">
+                    Events are published asynchronously and never block autoload processing.
+                    If event publishing is not configured for the target region, no events are emitted.
+                    See <a href="/help/publishing">Event Publishing</a> for broker configuration details.
+                </p>
+                
                 <h3 class="mt-4"><i class="fas fa-exclamation-circle me-2"></i>Troubleshooting</h3>
                 
                 <div class="accordion" id="troubleshootingAccordion">
@@ -405,6 +431,7 @@ INFO  AutoloadService - File moved to outbox: customers.csv</code></pre>
         </footer>
     </div>
 </main>
+<footer th:replace="~{layout :: footer}"></footer>
 <th:block th:replace="~{layout :: scripts}"></th:block>
 </body>
 </html>

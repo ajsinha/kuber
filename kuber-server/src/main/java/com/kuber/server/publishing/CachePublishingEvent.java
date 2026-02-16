@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Event model for cache operations that are published to Kafka/ActiveMQ.
@@ -95,7 +96,9 @@ public class CachePublishingEvent {
         UPDATED("updated"),
         DELETED("deleted"),
         EXPIRED("expired"),
-        QUERY_RESULT("queryresult");
+        QUERY_RESULT("queryresult"),
+        AUTOLOAD_START("autoload_start"),
+        AUTOLOAD_END("autoload_end");
         
         private final String value;
         
@@ -173,6 +176,59 @@ public class CachePublishingEvent {
                 .action(Action.QUERY_RESULT.getValue())
                 .region(region)
                 .payload(parsePayload(value))
+                .timestamp(Instant.now())
+                .nodeId(nodeId)
+                .build();
+    }
+    
+    /**
+     * Create an event for autoload start.
+     * 
+     * @param region Region being loaded
+     * @param fileName Source file name
+     * @param nodeId Node ID
+     * @return autoload_start event with file metadata in payload
+     */
+    public static CachePublishingEvent autoloadStart(String region, String fileName, String nodeId) {
+        Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        meta.put("file", fileName);
+        meta.put("region", region);
+        return CachePublishingEvent.builder()
+                .key(fileName)
+                .action(Action.AUTOLOAD_START.getValue())
+                .region(region)
+                .payload(meta)
+                .timestamp(Instant.now())
+                .nodeId(nodeId)
+                .build();
+    }
+    
+    /**
+     * Create an event for autoload end.
+     * 
+     * @param region Region that was loaded
+     * @param fileName Source file name
+     * @param recordsLoaded Number of records loaded
+     * @param errors Number of errors
+     * @param durationMs Processing duration in milliseconds
+     * @param status Outcome status (e.g. "SUCCESS", "ERROR")
+     * @param nodeId Node ID
+     * @return autoload_end event with result metadata in payload
+     */
+    public static CachePublishingEvent autoloadEnd(String region, String fileName, 
+            int recordsLoaded, int errors, long durationMs, String status, String nodeId) {
+        Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        meta.put("file", fileName);
+        meta.put("region", region);
+        meta.put("records_loaded", recordsLoaded);
+        meta.put("errors", errors);
+        meta.put("duration_ms", durationMs);
+        meta.put("status", status);
+        return CachePublishingEvent.builder()
+                .key(fileName)
+                .action(Action.AUTOLOAD_END.getValue())
+                .region(region)
+                .payload(meta)
                 .timestamp(Instant.now())
                 .nodeId(nodeId)
                 .build();

@@ -4,10 +4,10 @@
     "displayName" : "System Administrator",
     "description" : "Full system access including region management, user management, and all cache operations",
     "region" : "*",
-    "permissions" : [ "ADMIN", "WRITE", "READ", "DELETE" ],
+    "permissions" : [ "WRITE", "DELETE", "ADMIN", "READ" ],
     "systemRole" : true,
     "active" : true,
-    "createdAt" : "2026-02-13T17:33:41.795369644Z",
+    "createdAt" : "2026-02-16T23:37:30.970774366Z",
     "createdBy" : "system",
     "modifiedAt" : null,
     "modifiedBy" : null
