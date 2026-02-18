@@ -53,7 +53,7 @@ import java.util.Set;
  * Queue<Task> queue = factory.createQueue("taskQueue");
  * }</pre>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  * @since 1.5.0
  */
 public interface CollectionsFactory {

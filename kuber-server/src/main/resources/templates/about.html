@@ -24,7 +24,7 @@
                     JSON document support, and enterprise-grade features.
                 </p>
                 <div class="mt-4">
-                    <span class="badge bg-primary fs-6 me-2">Version 2.5.0</span>
+                    <span class="badge bg-primary fs-6 me-2">Version 2.6.0</span>
                     <span class="badge bg-success fs-6 me-2">Production Ready</span>
                     <span class="badge bg-info fs-6">Patent Pending</span>
                 </div>
@@ -158,7 +158,7 @@
                             Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files. 
                             Hot-refresh bindings at runtime. Publish query results and entire regions on demand.
                         </p>
-                        <span class="badge bg-light text-dark">Enhanced in v2.5.0</span>
+                        <span class="badge bg-light text-dark">Enhanced in v2.6.0</span>
                     </div>
                 </div>
             </div>
@@ -174,7 +174,7 @@
                             Access cache via message brokers (Kafka, RabbitMQ, IBM MQ, ActiveMQ).
                             Async processing with backpressure control, hot-reload, and built-in test console.
                         </p>
-                        <span class="badge bg-light text-dark">Enhanced in v2.5.0</span>
+                        <span class="badge bg-light text-dark">Enhanced in v2.6.0</span>
                     </div>
                 </div>
             </div>
@@ -677,8 +677,22 @@
                         <div class="timeline">
                             <div class="mb-4">
                                 <h6 class="mb-1">
-                                    <span class="badge bg-primary me-2">v2.5.0</span>
-                                    <span class="text-muted small">Current - Publish As Events, Autoload Events, Messaging Test Console &amp; Serialization Fix</span>
+                                    <span class="badge bg-primary me-2">v2.6.0</span>
+                                    <span class="text-muted small">Current - Expired Event Payload Enhancement &amp; Admin UI Fix</span>
+                                </h6>
+                                <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Expired Events with Payload</strong>: When a cache entry expires due to TTL, the published <code>expired</code> event now includes the full value in the <code>payload</code> field &mdash; mimicking the structure of <code>inserted</code> and <code>updated</code> events for downstream consumers</li>
+                                    <li><strong>Immediate Caffeine Eviction Publishing</strong>: The Caffeine removal listener now publishes <code>expired</code> events immediately when entries are evicted from memory, with full value payload &mdash; no longer waits for the periodic cleanup task</li>
+                                    <li><strong>Disk-Only Value Capture</strong>: Cleanup task reads values from persistence for cold (disk-only) entries before deletion, so all expired events carry the payload</li>
+                                    <li><strong>Deduplication</strong>: Composite-key tracking prevents double-publishing between Caffeine listener and cleanup task</li>
+                                    <li><strong>Admin UI Bootstrap Fix</strong>: Fixed missing Bootstrap JS on 8 admin pages and 29 help pages &mdash; the "admin" dropdown link in the top-right navbar now works on all pages</li>
+                                </ul>
+                            </div>
+                            <div class="mb-4">
+                                <h6 class="mb-1">
+                                    <span class="badge bg-secondary me-2">v2.5.0</span>
+                                    <span class="text-muted small">Publish As Events, Autoload Events, Messaging Test Console &amp; Serialization Fix</span>
                                 </h6>
                                 <p class="small text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>February 2026</p>
                                 <ul class="small text-muted mb-0">
@@ -860,7 +874,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.5.0
+                                <strong>Version:</strong> 2.6.0
                             </li>
                         </ul>
                     </div>
@@ -919,7 +933,7 @@
                             </li>
                             <li class="mb-0">
                                 <i class="fas fa-code-branch fa-fw text-primary me-2"></i>
-                                <strong>Version:</strong> 2.5.0
+                                <strong>Version:</strong> 2.6.0
                             </li>
                         </ul>
                     </div>

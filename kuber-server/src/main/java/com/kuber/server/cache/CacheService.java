@@ -67,7 +67,7 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Slf4j
 @Service
@@ -109,6 +109,10 @@ public class CacheService {
     
     // v2.2.0: Eviction counters per region (for periodic summary logging)
     private final Map<String, AtomicLong> evictionCounters = new ConcurrentHashMap<>();
+    
+    // v2.6.0: Track keys whose expired events were already published by the Caffeine listener
+    // Prevents double-publishing when cleanupExpiredEntries() runs after Caffeine eviction
+    private final Set<String> recentlyPublishedExpired = ConcurrentHashMap.newKeySet();
     
     // Initialization state - prevents operations before recovery is complete
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -432,7 +436,19 @@ public class CacheService {
                                 // v2.2.0: Increment eviction counter for periodic summary logging
                                 evictionCounters.computeIfAbsent(regionName, k -> new AtomicLong(0)).incrementAndGet();
                             } else if (cause == CacheConfig.RemovalCause.EXPIRED) {
-                                // Entry expired - will be cleaned up by expiration service
+                                // v2.6.0: Publish expired event immediately with payload
+                                // The value is available here before Caffeine discards it.
+                                // cleanupExpiredEntries() handles keyIndex/persistence cleanup;
+                                // we publish here for immediate notification with the full value.
+                                if (value instanceof CacheEntry cacheEntry) {
+                                    String entryValue = cacheEntry.getStringValue();
+                                    String compositeKey = regionName + "|" + (String) key;
+                                    recentlyPublishedExpired.add(compositeKey);
+                                    eventPublisher.publish(CacheEvent.entryExpired(regionName, (String) key, properties.getNodeId()));
+                                    if (publishingService != null) {
+                                        publishingService.publishExpire(regionName, (String) key, entryValue, properties.getNodeId());
+                                    }
+                                }
                                 recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
                             }
                         }
@@ -3872,24 +3888,39 @@ public class CacheService {
             CacheProxy<String, CacheEntry> valueCache = entry.getValue();
             KeyIndexInterface keyIndex = keyIndices.get(regionName);
             
-            List<String> expiredKeys = new ArrayList<>();
+            // Collect expired keys with their values (for event publishing with payload)
+            Map<String, String> expiredKeyValues = new LinkedHashMap<>();
             
-            // Check value cache for expired entries
+            // Check value cache for expired entries - capture value before eviction
             valueCache.asMap().forEach((key, cacheEntry) -> {
                 if (cacheEntry.isExpired()) {
-                    expiredKeys.add(key);
+                    expiredKeyValues.put(key, cacheEntry.getStringValue());
                 }
             });
             
             // Also check KeyIndex for expired entries (cold values on disk only)
             if (keyIndex != null) {
-                expiredKeys.addAll(keyIndex.findExpiredKeys());
+                for (String key : keyIndex.findExpiredKeys()) {
+                    if (!expiredKeyValues.containsKey(key)) {
+                        // Disk-only entry: try to read value from persistence before deleting
+                        String diskValue = null;
+                        try {
+                            CacheEntry diskEntry = persistenceStore.loadEntry(regionName, key);
+                            if (diskEntry != null) {
+                                diskValue = diskEntry.getStringValue();
+                            }
+                        } catch (Exception e) {
+                            log.debug("Could not read value for expired disk-only key '{}': {}", key, e.getMessage());
+                        }
+                        expiredKeyValues.put(key, diskValue);
+                    }
+                }
             }
             
-            // Remove duplicates
-            Set<String> uniqueExpiredKeys = new HashSet<>(expiredKeys);
-            
-            for (String key : uniqueExpiredKeys) {
+            for (Map.Entry<String, String> kvEntry : expiredKeyValues.entrySet()) {
+                String key = kvEntry.getKey();
+                String expiredValue = kvEntry.getValue();
+                
                 // HYBRID: Remove from both KeyIndex and value cache
                 if (keyIndex != null) {
                     keyIndex.remove(key);
@@ -3903,20 +3934,30 @@ public class CacheService {
                     log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
                 }
                 
-                // Fire EXPIRE events to internal event bus and brokers
-                eventPublisher.publish(CacheEvent.entryExpired(regionName, key, properties.getNodeId()));
-                if (publishingService != null) {
-                    publishingService.publishExpire(regionName, key, properties.getNodeId());
+                // v2.6.0: Publish expired event with payload (skip if Caffeine listener already published)
+                String compositeKey = regionName + "|" + key;
+                if (recentlyPublishedExpired.remove(compositeKey)) {
+                    // Already published by Caffeine removal listener with full value — skip
+                    log.debug("Expired event already published for key '{}' in region '{}'", key, regionName);
+                } else {
+                    // Publish with value payload (mimics insert/update event structure)
+                    eventPublisher.publish(CacheEvent.entryExpired(regionName, key, properties.getNodeId()));
+                    if (publishingService != null) {
+                        publishingService.publishExpire(regionName, key, expiredValue, properties.getNodeId());
+                    }
                 }
                 
                 recordStatistic(regionName, KuberConstants.STAT_EXPIRED);
             }
             
-            if (!uniqueExpiredKeys.isEmpty()) {
+            if (!expiredKeyValues.isEmpty()) {
                 log.info("Cleaned up {} expired entries from region '{}' (removed from index and cache)", 
-                        uniqueExpiredKeys.size(), regionName);
+                        expiredKeyValues.size(), regionName);
             }
         }
+        
+        // Clear any stale entries from the dedup set (safety net)
+        recentlyPublishedExpired.clear();
     }
     
     // ==================== Eviction Summary Logging (v2.2.0) ====================

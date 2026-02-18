@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  *   <li>Statistics and monitoring endpoints</li>
  * </ul>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  * @since 1.9.0
  */
 @Controller

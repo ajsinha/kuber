@@ -6,6 +6,13 @@
         "broker" : "kafka-local",
         "topic" : "default_events_topic"
       } ]
+    },
+    "customer" : {
+      "enabled" : true,
+      "destinations" : [ {
+        "broker" : "kafka-local",
+        "topic" : "customer_updates"
+      } ]
     }
   }
 }

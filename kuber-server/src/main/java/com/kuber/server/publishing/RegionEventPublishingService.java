@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *                        │    ▼        ▼         ▼         ▼         ▼
  *                        │  Kafka   ActiveMQ  RabbitMQ  IBM MQ     File
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Slf4j
 @Service
@@ -192,7 +192,7 @@ public class RegionEventPublishingService {
     }
     
     /**
-     * Publish an expire event for a key.
+     * Publish an expire event for a key (without payload).
      * Called by CacheService when a key expires due to TTL.
      * 
      * @param region Region name
@@ -205,6 +205,24 @@ public class RegionEventPublishingService {
         }
         
         CachePublishingEvent event = CachePublishingEvent.expired(region, key, nodeId);
+        publishAsync(region, event);
+    }
+    
+    /**
+     * Publish an expire event for a key with the last known value (mimics insert/update).
+     * Called when the value is available at the time of eviction.
+     * 
+     * @param region Region name
+     * @param key Cache key
+     * @param value The value at time of expiration
+     * @param nodeId The node ID where the operation occurred
+     */
+    public void publishExpire(String region, String key, String value, String nodeId) {
+        if (!isPublishingEnabled(region)) {
+            return;
+        }
+        
+        CachePublishingEvent event = CachePublishingEvent.expired(region, key, value, nodeId);
         publishAsync(region, event);
     }
     

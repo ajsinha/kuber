@@ -28,7 +28,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.5.0</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
+                    <strong>Version 2.6.0</strong> - Deep dive into <span th:text="${appName} ?: 'Kuber'">Kuber</span>'s 
                     architecture and operational mechanics.
                 </div>
 
@@ -1220,7 +1220,7 @@ kuber:
                 <section id="event-publishing" class="mb-5">
                     <div class="card shadow-sm">
                         <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
-                            <h2 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>9. Event Publishing (v2.5.0)</h2>
+                            <h2 class="mb-0"><i class="fas fa-broadcast-tower me-2"></i>9. Event Publishing (v2.6.0)</h2>
                         </div>
                         <div class="card-body">
                             <p>Kuber can publish cache events (insert, update, delete) to external messaging systems asynchronously via a pluggable publisher architecture.</p>
@@ -1286,7 +1286,7 @@ CacheService.set() / delete()
                             <h2 class="mb-0"><i class="fas fa-plug me-2"></i>10. Session &amp; Connection Management (v2.2.0)</h2>
                         </div>
                         <div class="card-body">
-                            <p>Kuber v2.5.0 introduces comprehensive session management via the CLIENT command, allowing runtime control of connection timeouts and keepalive behavior.</p>
+                            <p>Kuber v2.6.0 introduces comprehensive session management via the CLIENT command, allowing runtime control of connection timeouts and keepalive behavior.</p>
                             
                             <h4>10.1 Session Attributes</h4>
                             <p>Each Redis protocol session maintains the following attributes:</p>
@@ -1378,7 +1378,7 @@ threading.Thread(target=keepalive, daemon=True).start()</pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.5.0</p>
+                    <p class="text-muted small mb-0">Version 2.6.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

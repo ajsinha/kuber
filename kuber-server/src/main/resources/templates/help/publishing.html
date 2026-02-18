@@ -28,10 +28,10 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.5.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
+                    <strong>Version 2.6.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
                     Events fire for <strong>all</strong> write operations including JSON ops, TTL changes, renames, purges, and TTL expirations.
-                    New in v2.5.0: <strong>Publish As Events</strong> buttons on query, cache browser, and region detail pages;
-                    <strong>Autoload events</strong> (<code>autoload_start</code> / <code>autoload_end</code>) for regions with event publishing configured.
+                    New in v2.6.0: <strong>Expired events now include the full value payload</strong> &mdash; matching <code>inserted</code> / <code>updated</code> event structure.
+                    v2.5.0: Publish As Events buttons, autoload events (<code>autoload_start</code> / <code>autoload_end</code>).
                 </div>
 
                 <!-- Overview -->
@@ -165,14 +165,26 @@
   "nodeId": "kuber-01"
 }</code></pre>
 
-                        <h5 class="mt-4">Expired Events <span class="badge bg-success">NEW in v2.4.0</span></h5>
+                        <h5 class="mt-4">Expired Events <span class="badge bg-success">Enhanced in v2.6.0</span></h5>
+                        <p>When a cache entry expires due to TTL, the event now includes the full value in the <code>payload</code> field &mdash; matching the structure of <code>inserted</code> and <code>updated</code> events so downstream consumers can react to the expired data.</p>
                         <pre class="bg-dark text-white p-3 rounded"><code>{
   "key": "session:abc123",
   "action": "expired",
   "region": "sessions",
+  "payload": {
+    "user": "jsmith",
+    "role": "admin",
+    "ip": "10.0.1.42"
+  },
   "timestamp": "2025-12-06T13:00:00Z",
   "nodeId": "kuber-01"
 }</code></pre>
+                        <div class="alert alert-warning mt-2 small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>v2.6.0:</strong> Expired events previously had <code>"payload": null</code>. They now carry the last known value.
+                            For entries in memory, the value is captured immediately by the Caffeine eviction listener.
+                            For disk-only entries, the value is read from persistence before deletion.
+                        </div>
 
                         <h5 class="mt-4">Autoload Events <span class="badge bg-success">NEW in v2.5.0</span></h5>
                         <p>When a region has event publishing configured, the autoload system publishes start/end lifecycle events:</p>
@@ -215,7 +227,7 @@
                             <i class="fas fa-lightbulb me-2"></i>
                             <strong>Note:</strong> The <code>payload</code> field contains the full value. If the value is valid JSON, 
                             it's included as a nested object. Otherwise, it's included as a string.
-                            Expired events do not include a payload since the entry has been removed.
+                            As of v2.6.0, expired events also include the payload with the last known value before eviction.
                             Autoload events include file metadata and processing statistics in the payload.
                         </div>
                         
@@ -243,10 +255,11 @@
                                 </ul>
                             </div>
                             <div class="col-md-3">
-                                <h6 class="text-warning"><i class="fas fa-clock me-1"></i>Expired</h6>
+                                <h6 class="text-warning"><i class="fas fa-clock me-1"></i>Expired <span class="badge bg-success">v2.6.0</span></h6>
                                 <ul class="small mb-3">
                                     <li>TTL expiration cleanup (automatic)</li>
-                                    <li>Fires <code>expired</code> action to brokers</li>
+                                    <li>Fires <code>expired</code> action with full value payload</li>
+                                    <li>Immediate publish from Caffeine eviction listener</li>
                                 </ul>
                             </div>
                             <div class="col-md-3">
@@ -965,7 +978,7 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.5.0</p>
+                    <p class="text-muted small mb-0">Version 2.6.0</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">

@@ -43,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * }
  * </pre>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Slf4j
 public class KuberClient implements AutoCloseable {

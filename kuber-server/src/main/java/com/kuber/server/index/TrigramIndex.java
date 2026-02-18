@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
  *   <li>Apply the full regex only to candidates (much smaller set than full scan)</li>
  * </ol>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  * @since 1.9.0
  */
 @Slf4j

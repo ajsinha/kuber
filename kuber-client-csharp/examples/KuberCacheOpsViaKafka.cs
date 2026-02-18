@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Kuber Comprehensive Cache Operations via Kafka (v2.5.0)
+ * Kuber Comprehensive Cache Operations via Kafka (v2.6.0)
  *
  * Demonstrates every cache operation through Kafka request/response messaging:
  *   - String operations:  SET, GET, DELETE, EXISTS, KEYS, TTL, EXPIRE, MGET, MSET
@@ -271,7 +271,7 @@ public class KuberCacheOpsViaKafka
         Section("HSET - Set hash fields for config:app");
         var fields = new (string field, string value)[]
         {
-            ("version", "2.5.0"),
+            ("version", "2.6.0"),
             ("max_connections", "500"),
             ("log_level", "INFO"),
             ("feature_flags", "{\"dark_mode\":true,\"beta_api\":false}")
@@ -319,7 +319,7 @@ public class KuberCacheOpsViaKafka
     private void Start()
     {
         Console.WriteLine("╔═══════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  Kuber Cache Operations via Kafka — Comprehensive Demo (v2.5.0)       ║");
+        Console.WriteLine("║  Kuber Cache Operations via Kafka — Comprehensive Demo (v2.6.0)       ║");
         Console.WriteLine($"║  Region:   {Region,-57}  ║");
         Console.WriteLine($"║  Request:  {RequestTopic,-55}  ║");
         Console.WriteLine($"║  Response: {ResponseTopic,-55}  ║");

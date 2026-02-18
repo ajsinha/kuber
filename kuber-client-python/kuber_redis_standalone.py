@@ -1657,7 +1657,7 @@ Examples:
             print_section("ALL EXAMPLES COMPLETED SUCCESSFULLY")
             print("""
     This standalone client demonstrated:
-    ✓ API Key authentication (v2.5.0)
+    ✓ API Key authentication (v2.6.0)
     ✓ Basic string operations (GET, SET, INCR, DECR, APPEND)
     ✓ Multi-key operations (MGET, MSET)
     ✓ Key pattern search (KEYS with wildcards, SCAN)

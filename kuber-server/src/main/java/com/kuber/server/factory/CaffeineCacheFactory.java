@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Removal listeners</li>
  * </ul>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  * @since 1.5.0
  */
 @Slf4j

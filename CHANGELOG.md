@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.6.0] - 2026-02-18 - EXPIRED EVENT ENHANCEMENT & BOOTSTRAP JS FIX
+
+### 🚀 Expired Event Publishing with Payload
+
+- **Expired events now include payload**: When a cache entry expires due to TTL, the published `expired` event now includes the full value in the `payload` field — mimicking the structure of `inserted` and `updated` events. Previously, expired events had `payload: null`
+- **Immediate Caffeine eviction publishing**: When Caffeine evicts an expired entry from memory, the expired event is published immediately via the removal listener with the full `CacheEntry` value — no longer waits for the periodic cleanup task
+- **Disk-only entry value capture**: The cleanup task now reads the value from persistence for cold (disk-only) entries before deletion, so even entries not in memory get full-payload expired events
+- **Deduplication**: A composite-key tracking set prevents double-publishing when both the Caffeine listener and cleanup task encounter the same expired key
+- **New overloaded methods**: `CachePublishingEvent.expired(region, key, value, nodeId)` and `RegionEventPublishingService.publishExpire(region, key, value, nodeId)` accept the entry value for inclusion in the event payload
+
+### 🐛 Bug Fix - Bootstrap JS Missing on Admin Pages
+
+- **Root cause**: 8 admin pages (`brokers`, `brokers-add`, `event-publishing`, `event-publishing-add`, `indexes`, `create-index`, `index-create`, `messaging-add-channel`) and 29 help pages included the footer fragment but not the scripts fragment (`layout :: scripts`), so Bootstrap JS never loaded — the "admin" user dropdown link in the top-right navbar fell through to `href="#"` instead of toggling the dropdown
+- **Fix**: Added `<th:block th:replace="~{layout :: scripts}">` to all affected pages and also added missing footer fragments to 4 pages (`messaging`, `messaging-queue`, `index-stats`, `region-indexes`)
+
+---
+
 ## [2.5.0] - 2026-02-16 - PUBLISH AS EVENTS, AUTOLOAD EVENTS, MESSAGING TEST CONSOLE & SERIALIZATION FIX
 
 ### 🚀 Publish As Events (On-Demand)

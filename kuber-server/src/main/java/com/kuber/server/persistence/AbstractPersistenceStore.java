@@ -52,7 +52,7 @@ import java.util.regex.Pattern;
  * This ensures writes to the same region are always sequential while allowing
  * parallel writes across different regions.
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Slf4j
 public abstract class AbstractPersistenceStore implements PersistenceStore {

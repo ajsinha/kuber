@@ -52,7 +52,7 @@ import java.util.*;
  * client.close();
  * </pre>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Slf4j
 public class KuberRestClient implements AutoCloseable {

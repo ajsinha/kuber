@@ -37,7 +37,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for Kafka topics.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Slf4j
 public class KafkaBrokerAdapter implements MessageBrokerAdapter {

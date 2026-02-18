@@ -47,7 +47,7 @@ import java.util.Map;
  *   "nodeId": "kuber-01"
  * }
  * 
- * @version 2.5.0
+ * @version 2.6.0
  */
 @Data
 @Builder
@@ -154,7 +154,7 @@ public class CachePublishingEvent {
     }
     
     /**
-     * Create an event for TTL expiration.
+     * Create an event for TTL expiration (without payload).
      */
     public static CachePublishingEvent expired(String region, String key, String nodeId) {
         return CachePublishingEvent.builder()
@@ -162,6 +162,27 @@ public class CachePublishingEvent {
                 .action(Action.EXPIRED.getValue())
                 .region(region)
                 .payload(null)
+                .timestamp(Instant.now())
+                .nodeId(nodeId)
+                .build();
+    }
+    
+    /**
+     * Create an event for TTL expiration with payload (mimics insert/update).
+     * Includes the last known value before the entry was evicted.
+     * 
+     * @param region Region name
+     * @param key Cache key
+     * @param value The value at time of expiration (may be null for disk-only entries)
+     * @param nodeId Node ID
+     * @return expired event with payload
+     */
+    public static CachePublishingEvent expired(String region, String key, String value, String nodeId) {
+        return CachePublishingEvent.builder()
+                .key(key)
+                .action(Action.EXPIRED.getValue())
+                .region(region)
+                .payload(parsePayload(value))
                 .timestamp(Instant.now())
                 .nodeId(nodeId)
                 .build();

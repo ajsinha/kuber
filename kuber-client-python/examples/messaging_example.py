@@ -549,7 +549,7 @@ def interactive_demo():
         entries={
             "app:config:theme": "dark",
             "app:config:lang": "en-US",
-            "app:config:version": "2.5.0"
+            "app:config:version": "2.6.0"
         }
     )
     print(f"   Topic: kuber_request")
@@ -593,7 +593,7 @@ if __name__ == "__main__":
     print("""
 ╔══════════════════════════════════════════════════════════════════════╗
 ║          KUBER REQUEST/RESPONSE MESSAGING - PYTHON CLIENT            ║
-║                         Version 2.5.0                                ║
+║                         Version 2.6.0                                ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """)
     
