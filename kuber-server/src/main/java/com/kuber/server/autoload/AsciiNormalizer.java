@@ -53,7 +53,7 @@ import java.util.regex.Pattern;
  * "Price: €100"      → "Price: EUR100"
  * </pre>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.7.9
  */
 @Slf4j

@@ -31,7 +31,7 @@ import java.util.*;
  * <p>Supports hot-reloading when configuration file changes and
  * auto-saves when indexes are created or removed via the UI/API.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.9.0
  */
 @Component

@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for RabbitMQ queues.
  * Supports pause/resume for backpressure control using basic.qos.</p>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
@@ -97,7 +97,7 @@ public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
                     factory.setRequestedHeartbeat(Integer.parseInt(config.getConnection().get("requested_heartbeat")));
                 }
                 
-                // v2.6.3: Enable automatic recovery for resilience
+                // v2.6.4: Enable automatic recovery for resilience
                 factory.setAutomaticRecoveryEnabled(true);
                 factory.setNetworkRecoveryInterval(5000);
                 
@@ -275,7 +275,7 @@ public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean publish(String responseTopic, String message) {
-        // v2.6.3: Try to recover if connection was lost
+        // v2.6.4: Try to recover if connection was lost
         if (!connected.get() || channel == null || !channel.isOpen()) {
             log.warn("[{}] RabbitMQ connection lost — attempting recovery...", brokerName);
             if (!recoverConnection()) {

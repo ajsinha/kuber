@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service
@@ -292,7 +292,7 @@ public class RabbitMqEventPublisher implements EventPublisher {
         try {
             Channel channel = getOrCreateChannel(binding);
             
-            // v2.6.3: If channel is null or closed, try to recover
+            // v2.6.4: If channel is null or closed, try to recover
             if (channel == null || !channel.isOpen()) {
                 log.warn("RabbitMQ channel unavailable for {} — attempting recovery", binding.channelKey());
                 channels.remove(binding.channelKey());
@@ -344,7 +344,7 @@ public class RabbitMqEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Failed to publish event to RabbitMQ for region '{}', key '{}': {}",
                     region, event.getKey(), e.getMessage());
-            // v2.6.3: Invalidate channel/connection for recovery on next attempt
+            // v2.6.4: Invalidate channel/connection for recovery on next attempt
             channels.remove(binding.channelKey());
             connections.remove(binding.connectionKey());
         }

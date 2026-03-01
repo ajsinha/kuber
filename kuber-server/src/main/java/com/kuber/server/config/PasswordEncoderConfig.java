@@ -18,7 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * Password encoder configuration.
  * Separated from SecurityConfig to avoid circular dependency with KuberUserService.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Configuration
 public class PasswordEncoderConfig {

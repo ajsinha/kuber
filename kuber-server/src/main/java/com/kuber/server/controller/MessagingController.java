@@ -31,7 +31,7 @@ import java.util.*;
  *   <li>Queue status and statistics monitoring</li>
  * </ul>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Controller
 @Slf4j

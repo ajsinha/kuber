@@ -1,6 +1,6 @@
 # Generic Update API
 
-**Version 2.6.3**
+**Version 2.6.4**
 
 The Generic Update API provides a unified SET/UPDATE operation via REST API with intelligent handling of JSON data merging.
 

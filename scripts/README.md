@@ -1,6 +1,6 @@
 # Kuber Scripts
 
-**Version 2.6.3**
+**Version 2.6.4**
 
 This folder contains utility scripts for managing the Kuber cache server.
 

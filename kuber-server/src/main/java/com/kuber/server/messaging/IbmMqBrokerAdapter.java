@@ -29,7 +29,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for IBM MQ queues.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 public class IbmMqBrokerAdapter implements MessageBrokerAdapter {
@@ -245,7 +245,7 @@ public class IbmMqBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean publish(String responseTopic, String message) {
-        // v2.6.3: Try to recover if connection was lost
+        // v2.6.4: Try to recover if connection was lost
         if (!connected.get() || session == null) {
             log.warn("[{}] IBM MQ connection lost — attempting recovery...", brokerName);
             if (!recoverConnection()) {

@@ -28,7 +28,7 @@ import java.util.Set;
  * - Region creation/deletion requires admin permission
  * - User/role management requires admin permission
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.7.3
  */
 @Slf4j

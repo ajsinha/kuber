@@ -28,7 +28,7 @@ import java.util.*;
  *   <li>Single-writer model (writes are serialized)</li>
  * </ul>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.9.0
  */
 @Slf4j

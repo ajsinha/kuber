@@ -31,7 +31,7 @@ import java.util.*;
  * Controller for administrative operations.
  * Manages users, roles, and API keys with fine-grained RBAC.
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Controller
 @RequestMapping("/admin")

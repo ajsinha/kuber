@@ -33,7 +33,7 @@ import java.util.Map;
  * 
  * <p>All endpoints require API key authentication via X-API-Key header.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @RestController
 @RequestMapping("/api/admin")

@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service
@@ -300,7 +300,7 @@ public class IbmMqEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Failed to publish event to IBM MQ for region '{}', key '{}': {}",
                     region, event.getKey(), e.getMessage());
-            // v2.6.3: Invalidate factory for recovery on next attempt
+            // v2.6.4: Invalidate factory for recovery on next attempt
             connectionFactories.remove(binding.connectionKey());
         } finally {
             closeQuietly(producer);
@@ -340,7 +340,7 @@ public class IbmMqEventPublisher implements EventPublisher {
                         factory.setSSLCipherSuite(binding.sslCipherSuite);
                     }
                     
-                    // v2.6.3: Verify connectivity
+                    // v2.6.4: Verify connectivity
                     Connection testConn = (binding.username != null && !binding.username.isBlank()) 
                             ? factory.createConnection(binding.username, binding.password)
                             : factory.createConnection();

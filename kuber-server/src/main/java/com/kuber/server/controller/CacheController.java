@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  * Controller for cache query and modification operations.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Controller

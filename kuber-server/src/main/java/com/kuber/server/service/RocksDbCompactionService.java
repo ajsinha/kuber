@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Compaction removes deleted/expired entries from SST files, reclaiming disk space
  * that would otherwise accumulate over time.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service

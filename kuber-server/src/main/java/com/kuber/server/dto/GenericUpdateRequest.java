@@ -63,7 +63,7 @@ import lombok.Data;
  * {"apiKey": "kub_xxx", "region": "counters", "key": "hits", "value": 42}
  * </pre>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Data
 public class GenericUpdateRequest {

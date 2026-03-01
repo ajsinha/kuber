@@ -65,7 +65,7 @@ import java.util.stream.Collectors;
  * - GET (key doesn't exist): O(1) - immediate return, no disk I/O
  * - DBSIZE: O(1) from index.size()
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service
@@ -108,7 +108,7 @@ public class CacheService {
     // v2.2.0: Eviction counters per region (for periodic summary logging)
     private final Map<String, AtomicLong> evictionCounters = new ConcurrentHashMap<>();
     
-    // v2.6.3: Track keys whose expired events were already published by the Caffeine listener
+    // v2.6.4: Track keys whose expired events were already published by the Caffeine listener
     // Prevents double-publishing when cleanupExpiredEntries() runs after Caffeine eviction
     private final Set<String> recentlyPublishedExpired = ConcurrentHashMap.newKeySet();
     
@@ -434,7 +434,7 @@ public class CacheService {
                                 // v2.2.0: Increment eviction counter for periodic summary logging
                                 evictionCounters.computeIfAbsent(regionName, k -> new AtomicLong(0)).incrementAndGet();
                             } else if (cause == CacheConfig.RemovalCause.EXPIRED) {
-                                // v2.6.3: Publish expired event immediately with payload
+                                // v2.6.4: Publish expired event immediately with payload
                                 // The value is available here before Caffeine discards it.
                                 // cleanupExpiredEntries() handles keyIndex/persistence cleanup;
                                 // we publish here for immediate notification with the full value.
@@ -3932,7 +3932,7 @@ public class CacheService {
                     log.warn("Failed to delete expired entry '{}' from persistence store: {}", key, e.getMessage());
                 }
                 
-                // v2.6.3: Publish expired event with payload (skip if Caffeine listener already published)
+                // v2.6.4: Publish expired event with payload (skip if Caffeine listener already published)
                 String compositeKey = regionName + "|" + key;
                 if (recentlyPublishedExpired.remove(compositeKey)) {
                     // Already published by Caffeine removal listener with full value — skip

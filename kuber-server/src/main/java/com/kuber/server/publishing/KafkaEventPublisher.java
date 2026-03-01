@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service
@@ -292,7 +292,7 @@ public class KafkaEventPublisher implements EventPublisher {
         try {
             KafkaProducer<String, String> producer = getOrCreateProducer(binding);
             
-            // v2.6.3: If producer is null (creation failed) or was previously broken, try to recreate
+            // v2.6.4: If producer is null (creation failed) or was previously broken, try to recreate
             if (producer == null) {
                 log.warn("Kafka producer is null for {} — attempting recovery", binding.bootstrapServers);
                 producers.remove(binding.bootstrapServers);  // clear so getOrCreate retries
@@ -314,7 +314,7 @@ public class KafkaEventPublisher implements EventPublisher {
                     errors.incrementAndGet();
                     log.error("Failed to publish event to Kafka topic '{}' for key '{}': {}",
                             binding.topic, key, exception.getMessage());
-                    // v2.6.3: Invalidate producer so next publish triggers recovery
+                    // v2.6.4: Invalidate producer so next publish triggers recovery
                     producers.remove(binding.bootstrapServers);
                 } else {
                     eventsPublished.incrementAndGet();
@@ -327,7 +327,7 @@ public class KafkaEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Error publishing to Kafka topic '{}', key '{}': {}",
                     binding.topic, event.getKey(), e.getMessage());
-            // v2.6.3: Invalidate producer for recovery on next attempt
+            // v2.6.4: Invalidate producer for recovery on next attempt
             producers.remove(binding.bootstrapServers);
         }
     }
@@ -354,7 +354,7 @@ public class KafkaEventPublisher implements EventPublisher {
                     props.put(ProducerConfig.RETRIES_CONFIG, 3);
                     props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
                     props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10000);
-                    // v2.6.3: Reconnect settings for resilience
+                    // v2.6.4: Reconnect settings for resilience
                     props.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 1000);
                     props.put(ProducerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 10000);
                     props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);

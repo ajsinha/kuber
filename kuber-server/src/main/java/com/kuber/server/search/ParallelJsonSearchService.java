@@ -55,7 +55,7 @@ import java.util.regex.PatternSyntaxException;
  *   <li>Without index: O(n) parallel scan - ~8x speedup with 8 threads</li>
  * </ul>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.7.9
  */
 @Service

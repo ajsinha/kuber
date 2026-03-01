@@ -31,7 +31,7 @@ import java.util.function.Function;
  * @param <K> the type of keys maintained by this cache
  * @param <V> the type of mapped values
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.5.0
  */
 public interface CacheProxy<K, V> {

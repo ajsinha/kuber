@@ -41,7 +41,7 @@ import java.util.Properties;
  * conditionally in MongoConfig only when kuber.persistence.type=mongodb.
  * 
  * @author Ashutosh Sinha
- * @version 2.6.3
+ * @version 2.6.4
  */
 @SpringBootApplication(exclude = {
     MongoAutoConfiguration.class,
@@ -51,7 +51,7 @@ import java.util.Properties;
 @EnableScheduling
 public class KuberApplication {
     
-    private static final String DEFAULT_VERSION = "2.6.3";
+    private static final String DEFAULT_VERSION = "2.6.4";
     
     public static void main(String[] args) {
         // Allow %2F in URLs - must be set before Tomcat initializes

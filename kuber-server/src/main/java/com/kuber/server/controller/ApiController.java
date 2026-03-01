@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  * REST API controller for programmatic cache access.
  * Enforces RBAC permissions for all operations.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @RestController
 @RequestMapping({"/api", "/api/v1"})

@@ -62,7 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Message brokers receive requests before cache is ready</li>
  * </ul>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Service
 @Slf4j

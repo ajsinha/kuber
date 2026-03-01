@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service
@@ -266,7 +266,7 @@ public class ActiveMqEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Failed to publish event to ActiveMQ for region '{}', key '{}': {}",
                     region, event.getKey(), e.getMessage());
-            // v2.6.3: Invalidate factory for recovery on next attempt
+            // v2.6.4: Invalidate factory for recovery on next attempt
             connectionFactories.remove(binding.brokerUrl);
         } finally {
             closeQuietly(producer);
@@ -320,7 +320,7 @@ public class ActiveMqEventPublisher implements EventPublisher {
                     pooledFactory.setMaxConnections(10);
                     pooledFactory.setIdleTimeout(30000);
                     pooledFactory.setMaximumActiveSessionPerConnection(100);
-                    // v2.6.3: Enable reconnect on exception
+                    // v2.6.4: Enable reconnect on exception
                     pooledFactory.setReconnectOnException(true);
                     
                     // Verify connectivity by creating a test connection

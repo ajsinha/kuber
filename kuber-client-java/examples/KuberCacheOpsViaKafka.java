@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Kuber Comprehensive Cache Operations via Kafka (v2.6.3)
+ * Kuber Comprehensive Cache Operations via Kafka (v2.6.4)
  *
  * Demonstrates every cache operation through Kafka request/response messaging:
  *   - String operations:  SET, GET, DELETE, EXISTS, KEYS, TTL, EXPIRE, MGET, MSET
@@ -27,7 +27,7 @@
  *       <version>2.17.0</version>
  *   </dependency>
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 package com.kuber.client.examples;
 
@@ -388,7 +388,7 @@ public class KuberCacheOpsViaKafka {
         // HSET - set a field in a hash
         section("HSET - Set hash fields for config:app");
         for (String[] kv : new String[][] {
-            {"version", "2.6.3"},
+            {"version", "2.6.4"},
             {"max_connections", "500"},
             {"log_level", "INFO"},
             {"feature_flags", "{\"dark_mode\":true,\"beta_api\":false}"}
@@ -445,7 +445,7 @@ public class KuberCacheOpsViaKafka {
 
     private void start() {
         System.out.println("╔═══════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║  Kuber Cache Operations via Kafka — Comprehensive Demo (v2.6.3)       ║");
+        System.out.println("║  Kuber Cache Operations via Kafka — Comprehensive Demo (v2.6.4)       ║");
         System.out.println("║  Region: " + padRight(REGION, 57) + "  ║");
         System.out.println("║  Request:  " + padRight(REQUEST_TOPIC, 55) + "  ║");
         System.out.println("║  Response: " + padRight(RESPONSE_TOPIC, 55) + "  ║");

@@ -5,7 +5,7 @@
  * In-memory ring buffer for recent log entries.
  * Used by the monitoring UI to display live logs.
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 package com.kuber.server.monitoring;
 
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * Entries are added by the LogBufferAppender (Logback appender).
  * The monitoring UI polls this service for live log display.
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Service
 public class LogBufferService {

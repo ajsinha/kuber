@@ -61,7 +61,7 @@ import java.util.function.Consumer;
  *   └── TTL    : Native Aerospike record expiration
  * </pre>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.9.0
  */
 @Slf4j

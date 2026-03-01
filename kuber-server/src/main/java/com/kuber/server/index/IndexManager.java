@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Without index (full scan): O(n)</li>
  * </ul>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.9.0
  */
 @Service

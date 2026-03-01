@@ -45,7 +45,7 @@ import java.util.Map;
  *   "nodeId": "kuber-01"
  * }
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Data
 @Builder

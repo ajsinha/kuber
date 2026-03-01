@@ -37,7 +37,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
  * - Admin role required for /admin/** paths
  * - RBAC checks performed by AuthorizationService for cache operations
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Configuration
 @EnableWebSecurity

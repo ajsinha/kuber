@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.6.4] - 2026-02-28 - GITIGNORE OVERHAUL
+
+### 🔧 Build & Repository
+
+- **Comprehensive `.gitignore`**: Replaced minimal gitignore with full multi-language coverage — Java (Maven/Gradle), Python (venv/dist), Rust (Cargo), C#/.NET, plus shared IDE (IntelliJ), OS (macOS/Windows/Linux), and secrets (`.env`, `*.pem`, `*.key`) patterns
+
 ## [2.6.3] - 2026-02-28 - HELP CARD CONSOLIDATION, GLOSSARY & COMPILATION FIX
 
 ### 📚 Help Card Consolidation (37 → 24 pages)

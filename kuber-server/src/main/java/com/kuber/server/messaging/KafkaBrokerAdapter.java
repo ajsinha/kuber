@@ -35,7 +35,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for Kafka topics.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 public class KafkaBrokerAdapter implements MessageBrokerAdapter {
@@ -401,7 +401,7 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
         log.info("[{}] connected.get() = {}", brokerName, connected.get());
         log.info("[{}] producer = {}", brokerName, producer != null ? "NOT NULL" : "NULL");
         
-        // v2.6.3: Try to recover if connection was lost
+        // v2.6.4: Try to recover if connection was lost
         if (!connected.get() || producer == null) {
             log.warn("[{}] Connection lost — attempting recovery...", brokerName);
             if (!recoverConnection()) {

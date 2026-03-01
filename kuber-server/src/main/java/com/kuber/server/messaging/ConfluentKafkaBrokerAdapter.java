@@ -37,8 +37,8 @@ import java.util.function.Consumer;
  * 
  * <p>Broker type: {@code confluent-kafka}</p>
  * 
- * @version 2.6.3
- * @since 2.6.3
+ * @version 2.6.4
+ * @since 2.6.4
  */
 @Slf4j
 public class ConfluentKafkaBrokerAdapter implements MessageBrokerAdapter {
@@ -291,7 +291,7 @@ public class ConfluentKafkaBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean publish(String responseTopic, String message) {
-        // v2.6.3: Try to recover if connection was lost
+        // v2.6.4: Try to recover if connection was lost
         if (!connected.get() || producer == null) {
             log.warn("[{}] Connection lost — attempting recovery...", brokerName);
             if (!recoverConnection()) {

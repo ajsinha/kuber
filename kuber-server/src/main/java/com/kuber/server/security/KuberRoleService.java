@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * Service for managing Kuber roles.
  * Loads roles from JSON file and provides role lookup and management.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.7.3
  */
 @Slf4j

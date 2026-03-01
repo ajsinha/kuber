@@ -56,7 +56,7 @@ import java.util.Map;
  * {@link RegionEventPublishingService} so that region configs are available when
  * publishers read them. Spring guarantees this via constructor injection ordering.
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Component

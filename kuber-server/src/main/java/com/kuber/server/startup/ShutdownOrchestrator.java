@@ -69,7 +69,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>WAL is synced before closing each region</li>
  * </ul>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Service
 @Slf4j

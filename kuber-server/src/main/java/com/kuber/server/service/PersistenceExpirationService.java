@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Uses PersistenceOperationLock to ensure cleanup does not run concurrently
  * with compaction, autoload, or region loading operations.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Service

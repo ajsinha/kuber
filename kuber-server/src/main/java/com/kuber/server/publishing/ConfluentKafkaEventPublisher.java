@@ -46,8 +46,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * <p>Broker type: {@code confluent-kafka}</p>
  * 
- * @version 2.6.3
- * @since 2.6.3
+ * @version 2.6.4
+ * @since 2.6.4
  */
 @Slf4j
 @Service

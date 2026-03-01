@@ -41,7 +41,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * 
  * <p>Also tracks which regions are currently loading to block queries to those regions.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Component
 @Slf4j

@@ -2,7 +2,7 @@
 
 Java client library for [Kuber Distributed Cache](https://github.com/ashutosh/kuber).
 
-**v2.6.3**: API Key Authentication Required - All programmatic access now requires an API key.
+**v2.6.4**: API Key Authentication Required - All programmatic access now requires an API key.
 
 ## Installation
 
@@ -12,14 +12,14 @@ Java client library for [Kuber Distributed Cache](https://github.com/ashutosh/ku
 <dependency>
     <groupId>com.kuber</groupId>
     <artifactId>kuber-client</artifactId>
-    <version>2.6.3</version>
+    <version>2.6.4</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'com.kuber:kuber-client:2.6.3'
+implementation 'com.kuber:kuber-client:2.6.4'
 ```
 
 ## Quick Start
@@ -27,7 +27,7 @@ implementation 'com.kuber:kuber-client:2.6.3'
 ```java
 import com.kuber.client.KuberClient;
 
-// v2.6.3: API key authentication required
+// v2.6.4: API key authentication required
 // Generate API keys in Web UI: Admin → API Keys
 try (KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key")) {
     // String operations

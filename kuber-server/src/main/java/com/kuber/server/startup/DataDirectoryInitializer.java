@@ -38,7 +38,7 @@ import java.util.List;
  * <p>This component runs with @Order(0) to ensure directories exist
  * before other startup components run.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Component
 @Slf4j

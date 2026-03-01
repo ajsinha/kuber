@@ -61,7 +61,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "2.6.3";
+    private String version = "2.6.4";
     
     /**
      * Unique node identifier
@@ -924,7 +924,7 @@ public class KuberProperties {
         private int batchSize = 16384;
         private int lingerMs = 5;
         
-        // ---- Confluent Kafka settings (v2.6.3) ----
+        // ---- Confluent Kafka settings (v2.6.4) ----
         private String apiKey = "";
         private String apiSecret = "";
         private String schemaRegistryUrl = "";

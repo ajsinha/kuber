@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 /**
  * Interface for secondary index implementations.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.9.0
  */
 public interface SecondaryIndex {

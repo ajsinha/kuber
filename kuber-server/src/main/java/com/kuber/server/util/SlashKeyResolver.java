@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
  * <p>This utility handles both cases by extracting the key portion from the
  * {@code /**} wildcard match, which naturally concatenates across path segments.
  *
- * @version 2.6.3
+ * @version 2.6.4
  */
 public final class SlashKeyResolver {
 

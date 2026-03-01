@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
  *     collections-implementation: DEFAULT  # DEFAULT, CUSTOM
  * }</pre>
  * 
- * @version 2.6.3
+ * @version 2.6.4
  * @since 1.5.0
  */
 @Slf4j

@@ -59,7 +59,7 @@ import java.util.Map;
  * {@code @PathVariable} value before the controller method is invoked.
  * Normal (unencoded) path variables pass through unchanged.
  *
- * @version 2.6.3
+ * @version 2.6.4
  * @see TomcatConfig
  * @see SecurityConfig
  */

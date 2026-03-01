@@ -35,7 +35,7 @@ public class GlobalControllerAdvice {
     @Value("${server.app.github:https://github.com/ajsinha/kuber}")
     private String appGithub;
     
-    @Value("${kuber.version:2.6.3}")
+    @Value("${kuber.version:2.6.4}")
     private String appVersion;
     
     @ModelAttribute("appName")

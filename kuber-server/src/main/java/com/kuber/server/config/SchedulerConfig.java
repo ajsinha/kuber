@@ -25,7 +25,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
  * continues running during shutdown, causing scheduled tasks to execute
  * even after shutdown has been initiated.
  * 
- * @version 2.6.3
+ * @version 2.6.4
  */
 @Slf4j
 @Configuration

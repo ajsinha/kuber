@@ -56,7 +56,7 @@ public class KuberRestExample {
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - HTTP REST API (v2.6.3)                         ║
+            ║   KUBER JAVA CLIENT - HTTP REST API (v2.6.4)                         ║
             ║                                                                      ║
             ║   Protocol: HTTP REST (API Key Authentication)                       ║
             ╚══════════════════════════════════════════════════════════════════════╝
