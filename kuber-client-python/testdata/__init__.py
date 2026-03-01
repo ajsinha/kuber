@@ -11,10 +11,9 @@ Generators:
 
 Copyright © 2025-2030, All Rights Reserved
 Ashutosh Sinha | Email: ajsinha@gmail.com
-Patent Pending
 """
 
 from .trade_generator import TradeGenerator, generate_trades
 
 __all__ = ['TradeGenerator', 'generate_trades']
-__version__ = '2.6.0'
+__version__ = '2.6.2'

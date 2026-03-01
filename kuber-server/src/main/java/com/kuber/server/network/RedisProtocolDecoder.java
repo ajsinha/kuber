@@ -30,7 +30,7 @@ import java.util.List;
  * 
  * <p>Inline format: COMMAND arg1 arg2\r\n
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 public class RedisProtocolDecoder extends CumulativeProtocolDecoder {

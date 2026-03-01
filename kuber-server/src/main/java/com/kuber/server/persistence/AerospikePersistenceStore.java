@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.persistence;
 
@@ -63,7 +61,7 @@ import java.util.function.Consumer;
  *   └── TTL    : Native Aerospike record expiration
  * </pre>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  * @since 1.9.0
  */
 @Slf4j

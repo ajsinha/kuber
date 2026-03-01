@@ -2,7 +2,6 @@
 <!--
   ~ Copyright © 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Messaging Admin')}"></head>
@@ -243,7 +242,7 @@
                                     <!-- Broker Type -->
                                     <td>
                                         <span class="badge" 
-                                              th:classappend="${entry.value.type == 'kafka'} ? 'bg-warning text-dark' : (${entry.value.type == 'rabbitmq'} ? 'bg-success' : (${entry.value.type == 'activemq'} ? 'bg-info' : (${entry.value.type == 'ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
+                                              th:classappend="${entry.value.type == 'kafka' or entry.value.type == 'confluent-kafka'} ? 'bg-warning text-dark' : (${entry.value.type == 'rabbitmq'} ? 'bg-success' : (${entry.value.type == 'activemq'} ? 'bg-info' : (${entry.value.type == 'ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
                                               th:text="${entry.value.type}">kafka</span>
                                     </td>
                                     <!-- Connection Status -->
@@ -672,14 +671,12 @@
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.6.0</p>
+                    <p class="text-muted small mb-0">Version 2.6.3</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">
-                        Copyright &copy; 2025-2030, All Rights Reserved<br>
-                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
-                        <span class="badge bg-warning text-dark">Patent Pending</span>
-                    </p>
+                        Copyright &copy; <span th:text="${appCopyright} ?: '2025-2030'">2025-2030</span>, All Rights Reserved<br>
+                        <span th:text="${appAuthor} ?: 'Ashutosh Sinha'">Ashutosh Sinha</span> | <a th:href="'mailto:' + ${appEmail}" href="mailto:ajsinha@gmail.com"><span th:text="${appEmail} ?: 'ajsinha@gmail.com'">ajsinha@gmail.com</span></a><br></p>
                 </div>
             </div>
         </footer>

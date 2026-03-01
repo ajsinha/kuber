@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.messaging;
 
@@ -37,7 +35,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for Kafka topics.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 public class KafkaBrokerAdapter implements MessageBrokerAdapter {
@@ -77,82 +75,117 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean connect() {
-        try {
-            String bootstrapServers = config.getBootstrapServers();
-            if (bootstrapServers == null || bootstrapServers.isEmpty()) {
-                log.error("[{}] Kafka bootstrap_servers not configured", brokerName);
-                return false;
-            }
-            
-            log.info("[{}] Checking Kafka broker availability at: {}", brokerName, bootstrapServers);
-            
-            // FIRST: Check if broker is actually reachable before creating consumer/producer
-            // This prevents continuous reconnection attempts and log spam
-            if (!isBrokerAvailable(bootstrapServers)) {
-                log.error("[{}] ❌ Kafka broker is NOT AVAILABLE at: {}", brokerName, bootstrapServers);
-                log.error("[{}] ❌ Connection NOT established. To fix:", brokerName);
-                log.error("[{}]    1. Start Kafka broker at {}", brokerName, bootstrapServers);
-                log.error("[{}]    2. Or disable this broker in request_response.json", brokerName);
-                log.error("[{}]    3. Or update bootstrap_servers to correct address", brokerName);
-                return false;
-            }
-            
-            log.info("[{}] ✓ Broker is available, connecting to Kafka at: {}", brokerName, bootstrapServers);
-            
-            // Consumer properties
-            Properties consumerProps = new Properties();
-            consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-            consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, config.getGroupId());
-            consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-            consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, config.getAutoOffsetReset());
-            consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-            consumerProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
-            consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
-            
-            // Add any additional connection properties
-            for (String key : config.getConnection().keySet()) {
-                if (key.startsWith("consumer.")) {
-                    consumerProps.put(key.substring(9), config.getConnection().get(key));
-                }
-            }
-            
-            consumer = new KafkaConsumer<>(consumerProps);
-            log.info("[{}] Consumer created with group_id: {}", brokerName, config.getGroupId());
-            
-            // Producer properties
-            Properties producerProps = new Properties();
-            producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-            producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            producerProps.put(ProducerConfig.ACKS_CONFIG, "all");  // Changed from "1" to "all" for stronger guarantees
-            producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-            producerProps.put(ProducerConfig.LINGER_MS_CONFIG, 0);  // Don't batch, send immediately
-            producerProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 0);  // Don't batch
-            
-            // Add any additional connection properties
-            for (String key : config.getConnection().keySet()) {
-                if (key.startsWith("producer.")) {
-                    producerProps.put(key.substring(9), config.getConnection().get(key));
-                }
-            }
-            
-            producer = new KafkaProducer<>(producerProps);
-            log.info("[{}] Producer created with acks=all", brokerName);
-            
-            connected.set(true);
-            log.info("[{}] ✅ Connected to Kafka at {}", brokerName, bootstrapServers);
-            
-            // Test publish to verify producer works
-            testPublish();
-            
-            return true;
-            
-        } catch (Exception e) {
-            log.error("[{}] ❌ Failed to connect to Kafka: {}", brokerName, e.getMessage(), e);
-            errors.incrementAndGet();
+        String bootstrapServers = config.getBootstrapServers();
+        if (bootstrapServers == null || bootstrapServers.isEmpty()) {
+            log.error("[{}] Kafka bootstrap_servers not configured", brokerName);
             return false;
         }
+        
+        int maxRetries = 5;
+        long retryDelayMs = 3000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                log.info("[{}] Checking Kafka broker availability at: {} (attempt {}/{})", 
+                        brokerName, bootstrapServers, attempt, maxRetries);
+                
+                if (!isBrokerAvailable(bootstrapServers)) {
+                    if (attempt < maxRetries) {
+                        log.warn("[{}] Kafka broker not available at {} — retrying in {}ms (attempt {}/{})",
+                                brokerName, bootstrapServers, retryDelayMs, attempt, maxRetries);
+                        Thread.sleep(retryDelayMs);
+                        retryDelayMs = Math.min(retryDelayMs * 2, 15000); // exponential backoff, cap at 15s
+                        continue;
+                    }
+                    log.error("[{}] ❌ Kafka broker is NOT AVAILABLE at: {} after {} attempts", brokerName, bootstrapServers, maxRetries);
+                    log.error("[{}] ❌ Connection NOT established. To fix:", brokerName);
+                    log.error("[{}]    1. Start Kafka broker at {}", brokerName, bootstrapServers);
+                    log.error("[{}]    2. Or disable this broker in request_response.json", brokerName);
+                    log.error("[{}]    3. Or update bootstrap_servers to correct address", brokerName);
+                    return false;
+                }
+                
+                log.info("[{}] ✓ Broker is available, connecting to Kafka at: {}", brokerName, bootstrapServers);
+                
+                // Consumer properties
+                Properties consumerProps = new Properties();
+                consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+                consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, config.getGroupId());
+                consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+                consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+                consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, config.getAutoOffsetReset());
+                consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+                consumerProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
+                consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
+                // Reconnect settings for consumer resilience
+                consumerProps.put(ConsumerConfig.RECONNECT_BACKOFF_MS_CONFIG, "1000");
+                consumerProps.put(ConsumerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, "10000");
+                consumerProps.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "30000");
+                
+                // Add any additional connection properties
+                for (String key : config.getConnection().keySet()) {
+                    if (key.startsWith("consumer.")) {
+                        consumerProps.put(key.substring(9), config.getConnection().get(key));
+                    }
+                }
+                
+                consumer = new KafkaConsumer<>(consumerProps);
+                log.info("[{}] Consumer created with group_id: {}", brokerName, config.getGroupId());
+                
+                // Producer properties
+                Properties producerProps = new Properties();
+                producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+                producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
+                producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+                producerProps.put(ProducerConfig.LINGER_MS_CONFIG, 0);
+                producerProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 0);
+                // Reconnect settings for producer resilience
+                producerProps.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 1000);
+                producerProps.put(ProducerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 10000);
+                producerProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
+                producerProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 30000);
+                
+                // Add any additional connection properties
+                for (String key : config.getConnection().keySet()) {
+                    if (key.startsWith("producer.")) {
+                        producerProps.put(key.substring(9), config.getConnection().get(key));
+                    }
+                }
+                
+                producer = new KafkaProducer<>(producerProps);
+                log.info("[{}] Producer created with acks=all", brokerName);
+                
+                connected.set(true);
+                log.info("[{}] ✅ Connected to Kafka at {} (attempt {})", brokerName, bootstrapServers, attempt);
+                
+                // Test publish to verify producer works
+                testPublish();
+                
+                return true;
+                
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                log.error("[{}] ❌ Connection interrupted", brokerName);
+                return false;
+            } catch (Exception e) {
+                if (attempt < maxRetries) {
+                    log.warn("[{}] Connection attempt {}/{} failed: {} — retrying in {}ms",
+                            brokerName, attempt, maxRetries, e.getMessage(), retryDelayMs);
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    retryDelayMs = Math.min(retryDelayMs * 2, 15000);
+                } else {
+                    log.error("[{}] ❌ Failed to connect to Kafka after {} attempts: {}", brokerName, maxRetries, e.getMessage(), e);
+                    errors.incrementAndGet();
+                    return false;
+                }
+            }
+        }
+        return false;
     }
     
     /**
@@ -368,14 +401,13 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
         log.info("[{}] connected.get() = {}", brokerName, connected.get());
         log.info("[{}] producer = {}", brokerName, producer != null ? "NOT NULL" : "NULL");
         
-        if (!connected.get()) {
-            log.error("[{}] ❌ PUBLISH ABORTED - connected=false", brokerName);
-            return false;
-        }
-        
-        if (producer == null) {
-            log.error("[{}] ❌ PUBLISH ABORTED - producer is NULL", brokerName);
-            return false;
+        // v2.6.3: Try to recover if connection was lost
+        if (!connected.get() || producer == null) {
+            log.warn("[{}] Connection lost — attempting recovery...", brokerName);
+            if (!recoverConnection()) {
+                log.error("[{}] ❌ PUBLISH ABORTED - recovery failed", brokerName);
+                return false;
+            }
         }
         
         try {
@@ -413,17 +445,94 @@ public class KafkaBrokerAdapter implements MessageBrokerAdapter {
             log.error("[{}] ❌ TIMEOUT waiting for Kafka ack after 5 seconds", brokerName);
             log.error("[{}] ❌ This usually means Kafka broker is not responding", brokerName);
             errors.incrementAndGet();
+            markDisconnectedForRecovery();
             return false;
         } catch (java.util.concurrent.ExecutionException e) {
             log.error("[{}] ❌ EXECUTION EXCEPTION during publish: {}", brokerName, e.getMessage());
             log.error("[{}] ❌ Cause: {}", brokerName, e.getCause() != null ? e.getCause().getMessage() : "unknown");
             errors.incrementAndGet();
+            markDisconnectedForRecovery();
             return false;
         } catch (Exception e) {
             log.error("[{}] ❌ UNEXPECTED EXCEPTION during publish: {} - {}", brokerName, e.getClass().getSimpleName(), e.getMessage(), e);
             errors.incrementAndGet();
+            markDisconnectedForRecovery();
             return false;
         }
+    }
+    
+    /**
+     * Mark connection as broken so the next publish attempt triggers recovery.
+     */
+    private void markDisconnectedForRecovery() {
+        connected.set(false);
+        log.warn("[{}] Marked as disconnected — next operation will attempt recovery", brokerName);
+    }
+    
+    /**
+     * Attempt to recover a broken Kafka connection by recreating the producer.
+     * The consumer thread handles its own reconnection via Kafka's built-in retry.
+     * 
+     * @return true if recovery succeeded
+     */
+    private boolean recoverConnection() {
+        String bootstrapServers = config.getBootstrapServers();
+        log.info("[{}] Attempting Kafka connection recovery to {}", brokerName, bootstrapServers);
+        
+        // Close old producer if it exists
+        if (producer != null) {
+            try { producer.close(Duration.ofSeconds(3)); } catch (Exception ignored) {}
+            producer = null;
+        }
+        
+        int maxRetries = 3;
+        long retryDelayMs = 2000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                if (!isBrokerAvailable(bootstrapServers)) {
+                    log.warn("[{}] Broker not available during recovery (attempt {}/{})", brokerName, attempt, maxRetries);
+                    if (attempt < maxRetries) {
+                        Thread.sleep(retryDelayMs);
+                        retryDelayMs *= 2;
+                        continue;
+                    }
+                    return false;
+                }
+                
+                Properties producerProps = new Properties();
+                producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+                producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
+                producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+                producerProps.put(ProducerConfig.LINGER_MS_CONFIG, 0);
+                producerProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 0);
+                producerProps.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 1000);
+                producerProps.put(ProducerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 10000);
+                
+                producer = new KafkaProducer<>(producerProps);
+                connected.set(true);
+                log.info("[{}] ✅ Connection recovered successfully (attempt {})", brokerName, attempt);
+                return true;
+                
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return false;
+            } catch (Exception e) {
+                log.warn("[{}] Recovery attempt {}/{} failed: {}", brokerName, attempt, maxRetries, e.getMessage());
+                if (attempt < maxRetries) {
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    retryDelayMs *= 2;
+                }
+            }
+        }
+        
+        log.error("[{}] ❌ Connection recovery failed after {} attempts", brokerName, maxRetries);
+        return false;
     }
     
     @Override

@@ -100,7 +100,7 @@
                                 <td>
                                     <div th:each="d : ${r.destinations}" class="mb-1">
                                         <span class="badge"
-                                              th:classappend="${d.brokerType=='kafka'} ? 'bg-warning text-dark' : (${d.brokerType=='activemq'} ? 'bg-info' : (${d.brokerType=='rabbitmq'} ? 'bg-success' : (${d.brokerType=='ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
+                                              th:classappend="${d.brokerType=='kafka' or d.brokerType=='confluent-kafka'} ? 'bg-warning text-dark' : (${d.brokerType=='activemq'} ? 'bg-info' : (${d.brokerType=='rabbitmq'} ? 'bg-success' : (${d.brokerType=='ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
                                               th:text="${d.broker}"></span>
                                         <i class="fas fa-arrow-right mx-1 text-muted small"></i>
                                         <code class="small" th:text="${d.topic}"></code>

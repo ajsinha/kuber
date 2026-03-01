@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.messaging;
 
@@ -32,7 +30,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for RabbitMQ queues.
  * Supports pause/resume for backpressure control using basic.qos.</p>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
@@ -71,44 +69,69 @@ public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean connect() {
-        try {
-            ConnectionFactory factory = new ConnectionFactory();
-            
-            factory.setHost(config.getHost());
-            factory.setPort(config.getPort());
-            factory.setVirtualHost(config.getVirtualHost());
-            
-            String username = config.getUsername();
-            String password = config.getPassword();
-            if (username != null && !username.isEmpty()) {
-                factory.setUsername(username);
-                factory.setPassword(password);
+        int maxRetries = 5;
+        long retryDelayMs = 3000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                ConnectionFactory factory = new ConnectionFactory();
+                
+                factory.setHost(config.getHost());
+                factory.setPort(config.getPort());
+                factory.setVirtualHost(config.getVirtualHost());
+                
+                String username = config.getUsername();
+                String password = config.getPassword();
+                if (username != null && !username.isEmpty()) {
+                    factory.setUsername(username);
+                    factory.setPassword(password);
+                }
+                
+                // Additional connection properties
+                if (config.getConnection().containsKey("connection_timeout")) {
+                    factory.setConnectionTimeout(Integer.parseInt(config.getConnection().get("connection_timeout")));
+                } else {
+                    factory.setConnectionTimeout(10000);
+                }
+                if (config.getConnection().containsKey("requested_heartbeat")) {
+                    factory.setRequestedHeartbeat(Integer.parseInt(config.getConnection().get("requested_heartbeat")));
+                }
+                
+                // v2.6.3: Enable automatic recovery for resilience
+                factory.setAutomaticRecoveryEnabled(true);
+                factory.setNetworkRecoveryInterval(5000);
+                
+                log.info("[{}] Connecting to RabbitMQ at {}:{}{} (attempt {}/{})", 
+                        brokerName, config.getHost(), config.getPort(), config.getVirtualHost(), attempt, maxRetries);
+                
+                connection = factory.newConnection();
+                channel = connection.createChannel();
+                
+                // Set prefetch count for backpressure control
+                channel.basicQos(10);
+                
+                connected.set(true);
+                log.info("[{}] ✅ Connected to RabbitMQ at {}:{}{} (attempt {})", 
+                        brokerName, config.getHost(), config.getPort(), config.getVirtualHost(), attempt);
+                return true;
+                
+            } catch (Exception e) {
+                if (attempt < maxRetries) {
+                    log.warn("[{}] RabbitMQ connection attempt {}/{} failed: {} — retrying in {}ms",
+                            brokerName, attempt, maxRetries, e.getMessage(), retryDelayMs);
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    retryDelayMs = Math.min(retryDelayMs * 2, 15000);
+                } else {
+                    log.error("[{}] ❌ Failed to connect to RabbitMQ after {} attempts: {}", brokerName, maxRetries, e.getMessage(), e);
+                    errors.incrementAndGet();
+                    return false;
+                }
             }
-            
-            // Additional connection properties
-            if (config.getConnection().containsKey("connection_timeout")) {
-                factory.setConnectionTimeout(Integer.parseInt(config.getConnection().get("connection_timeout")));
-            }
-            if (config.getConnection().containsKey("requested_heartbeat")) {
-                factory.setRequestedHeartbeat(Integer.parseInt(config.getConnection().get("requested_heartbeat")));
-            }
-            
-            connection = factory.newConnection();
-            channel = connection.createChannel();
-            
-            // Set prefetch count for backpressure control
-            channel.basicQos(10);
-            
-            connected.set(true);
-            log.info("[{}] Connected to RabbitMQ at {}:{}{}", 
-                    brokerName, config.getHost(), config.getPort(), config.getVirtualHost());
-            return true;
-            
-        } catch (Exception e) {
-            log.error("[{}] Failed to connect to RabbitMQ: {}", brokerName, e.getMessage(), e);
-            errors.incrementAndGet();
-            return false;
         }
+        return false;
     }
     
     @Override
@@ -252,9 +275,13 @@ public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean publish(String responseTopic, String message) {
-        if (!connected.get() || channel == null) {
-            log.error("[{}] Cannot publish - not connected", brokerName);
-            return false;
+        // v2.6.3: Try to recover if connection was lost
+        if (!connected.get() || channel == null || !channel.isOpen()) {
+            log.warn("[{}] RabbitMQ connection lost — attempting recovery...", brokerName);
+            if (!recoverConnection()) {
+                log.error("[{}] ❌ Cannot publish - recovery failed", brokerName);
+                return false;
+            }
         }
         
         try {
@@ -277,8 +304,75 @@ public class RabbitMqBrokerAdapter implements MessageBrokerAdapter {
         } catch (Exception e) {
             log.error("[{}] Failed to publish to {}: {}", brokerName, responseTopic, e.getMessage());
             errors.incrementAndGet();
+            markDisconnectedForRecovery();
             return false;
         }
+    }
+    
+    /**
+     * Mark connection as broken so the next operation triggers recovery.
+     */
+    private void markDisconnectedForRecovery() {
+        connected.set(false);
+        log.warn("[{}] Marked as disconnected — next operation will attempt recovery", brokerName);
+    }
+    
+    /**
+     * Attempt to recover a broken RabbitMQ connection by recreating the channel.
+     */
+    private boolean recoverConnection() {
+        log.info("[{}] Attempting RabbitMQ connection recovery...", brokerName);
+        
+        // Close old channel/connection
+        if (channel != null) {
+            try { channel.close(); } catch (Exception ignored) {}
+            channel = null;
+        }
+        if (connection != null) {
+            try { connection.close(); } catch (Exception ignored) {}
+            connection = null;
+        }
+        
+        int maxRetries = 3;
+        long retryDelayMs = 2000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                ConnectionFactory factory = new ConnectionFactory();
+                factory.setHost(config.getHost());
+                factory.setPort(config.getPort());
+                factory.setVirtualHost(config.getVirtualHost());
+                factory.setConnectionTimeout(10000);
+                factory.setAutomaticRecoveryEnabled(true);
+                factory.setNetworkRecoveryInterval(5000);
+                
+                String username = config.getUsername();
+                if (username != null && !username.isEmpty()) {
+                    factory.setUsername(username);
+                    factory.setPassword(config.getPassword());
+                }
+                
+                connection = factory.newConnection();
+                channel = connection.createChannel();
+                channel.basicQos(10);
+                connected.set(true);
+                log.info("[{}] ✅ Connection recovered successfully (attempt {})", brokerName, attempt);
+                return true;
+                
+            } catch (Exception e) {
+                log.warn("[{}] Recovery attempt {}/{} failed: {}", brokerName, attempt, maxRetries, e.getMessage());
+                if (attempt < maxRetries) {
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    retryDelayMs *= 2;
+                }
+            }
+        }
+        
+        log.error("[{}] ❌ Connection recovery failed after retries", brokerName);
+        return false;
     }
     
     @Override

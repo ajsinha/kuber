@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.search;
 
@@ -57,7 +55,7 @@ import java.util.regex.PatternSyntaxException;
  *   <li>Without index: O(n) parallel scan - ~8x speedup with 8 threads</li>
  * </ul>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  * @since 1.7.9
  */
 @Service

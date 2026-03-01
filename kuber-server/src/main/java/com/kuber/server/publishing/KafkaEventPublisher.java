@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.publishing;
 
@@ -52,7 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Service
@@ -227,7 +225,13 @@ public class KafkaEventPublisher implements EventPublisher {
             String bootstrapServers = serverEntry.getKey();
             List<DestinationBinding> bindings = serverEntry.getValue();
             
-            try (AdminClient adminClient = createAdminClient(bootstrapServers)) {
+            AdminClient adminClient = createAdminClient(bootstrapServers);
+            if (adminClient == null) {
+                log.error("Skipping topic creation for {} — AdminClient unavailable", bootstrapServers);
+                continue;
+            }
+            
+            try (adminClient) {
                 Set<String> existingTopics = adminClient.listTopics().names().get(30, TimeUnit.SECONDS);
                 
                 List<NewTopic> topicsToCreate = new ArrayList<>();
@@ -287,6 +291,19 @@ public class KafkaEventPublisher implements EventPublisher {
     private void publishToDestination(CachePublishingEvent event, DestinationBinding binding) {
         try {
             KafkaProducer<String, String> producer = getOrCreateProducer(binding);
+            
+            // v2.6.3: If producer is null (creation failed) or was previously broken, try to recreate
+            if (producer == null) {
+                log.warn("Kafka producer is null for {} — attempting recovery", binding.bootstrapServers);
+                producers.remove(binding.bootstrapServers);  // clear so getOrCreate retries
+                producer = getOrCreateProducer(binding);
+                if (producer == null) {
+                    errors.incrementAndGet();
+                    log.error("Failed to recover Kafka producer for {} — event dropped", binding.bootstrapServers);
+                    return;
+                }
+            }
+            
             String key = event.getKey();
             String value = event.toJson();
             
@@ -297,6 +314,8 @@ public class KafkaEventPublisher implements EventPublisher {
                     errors.incrementAndGet();
                     log.error("Failed to publish event to Kafka topic '{}' for key '{}': {}",
                             binding.topic, key, exception.getMessage());
+                    // v2.6.3: Invalidate producer so next publish triggers recovery
+                    producers.remove(binding.bootstrapServers);
                 } else {
                     eventsPublished.incrementAndGet();
                     log.info("Published event to Kafka: topic={}, partition={}, offset={}, key={}",
@@ -308,6 +327,8 @@ public class KafkaEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Error publishing to Kafka topic '{}', key '{}': {}",
                     binding.topic, event.getKey(), e.getMessage());
+            // v2.6.3: Invalidate producer for recovery on next attempt
+            producers.remove(binding.bootstrapServers);
         }
     }
     
@@ -318,32 +339,86 @@ public class KafkaEventPublisher implements EventPublisher {
     
     private KafkaProducer<String, String> getOrCreateProducer(DestinationBinding binding) {
         return producers.computeIfAbsent(binding.bootstrapServers, servers -> {
-            Properties props = new Properties();
-            props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, servers);
-            props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            props.put(ProducerConfig.ACKS_CONFIG, binding.acks);
-            props.put(ProducerConfig.BATCH_SIZE_CONFIG, binding.batchSize);
-            props.put(ProducerConfig.LINGER_MS_CONFIG, binding.lingerMs);
-            props.put(ProducerConfig.RETRIES_CONFIG, 3);
-            props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
-            props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 5000);
+            int maxRetries = 3;
+            long retryDelayMs = 2000;
             
-            // Apply SSL/TLS settings if enabled
-            applyKafkaSslConfig(props, binding.ssl);
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    Properties props = new Properties();
+                    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, servers);
+                    props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                    props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                    props.put(ProducerConfig.ACKS_CONFIG, binding.acks);
+                    props.put(ProducerConfig.BATCH_SIZE_CONFIG, binding.batchSize);
+                    props.put(ProducerConfig.LINGER_MS_CONFIG, binding.lingerMs);
+                    props.put(ProducerConfig.RETRIES_CONFIG, 3);
+                    props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
+                    props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10000);
+                    // v2.6.3: Reconnect settings for resilience
+                    props.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 1000);
+                    props.put(ProducerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 10000);
+                    props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
+                    props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 30000);
+                    
+                    // Apply SSL/TLS settings if enabled
+                    applyKafkaSslConfig(props, binding.ssl);
+                    
+                    log.info("Creating Kafka producer for bootstrap servers: {}{} (attempt {}/{})", servers,
+                            binding.ssl.isEnabled() ? " [SSL]" : "", attempt, maxRetries);
+                    KafkaProducer<String, String> p = new KafkaProducer<>(props);
+                    log.info("✅ Kafka producer created for {}", servers);
+                    return p;
+                    
+                } catch (Exception e) {
+                    log.warn("Failed to create Kafka producer for {} (attempt {}/{}): {}", 
+                            servers, attempt, maxRetries, e.getMessage());
+                    if (attempt < maxRetries) {
+                        try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        retryDelayMs *= 2;
+                    }
+                }
+            }
             
-            log.info("Creating Kafka producer for bootstrap servers: {}{}", servers,
-                    binding.ssl.isEnabled() ? " [SSL]" : "");
-            return new KafkaProducer<>(props);
+            log.error("❌ Failed to create Kafka producer for {} after retries", servers);
+            return null;
         });
     }
     
     private AdminClient createAdminClient(String bootstrapServers) {
-        Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
-        props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000);
-        return AdminClient.create(props);
+        int maxRetries = 3;
+        long retryDelayMs = 2000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                Properties props = new Properties();
+                props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+                props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
+                props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 30000);
+                props.put(AdminClientConfig.RECONNECT_BACKOFF_MS_CONFIG, 1000);
+                props.put(AdminClientConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 10000);
+                AdminClient client = AdminClient.create(props);
+                // Verify connectivity by fetching cluster ID
+                client.describeCluster().clusterId().get(10, TimeUnit.SECONDS);
+                log.info("AdminClient connected to {} (attempt {})", bootstrapServers, attempt);
+                return client;
+            } catch (Exception e) {
+                log.warn("AdminClient connection to {} failed (attempt {}/{}): {}", 
+                        bootstrapServers, attempt, maxRetries, e.getMessage());
+                if (attempt < maxRetries) {
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                    retryDelayMs *= 2;
+                }
+            }
+        }
+        
+        log.error("❌ Failed to create AdminClient for {} after retries", bootstrapServers);
+        return null;
     }
     
     /**

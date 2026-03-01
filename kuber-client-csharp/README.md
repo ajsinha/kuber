@@ -2,7 +2,7 @@
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-2.6.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.6.3-blue.svg)](CHANGELOG.md)
 
 Official .NET client library for Kuber Distributed Cache.
 
@@ -203,7 +203,7 @@ dotnet run -- messaging --examples
 ## Requirements
 
 - .NET 8.0 or later
-- Kuber Server 2.6.0 or later
+- Kuber Server 2.6.3 or later
 
 ## Dependencies
 
@@ -218,4 +218,3 @@ Optional (for messaging):
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com  
-Patent Pending

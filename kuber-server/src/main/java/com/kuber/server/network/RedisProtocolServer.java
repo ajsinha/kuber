@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.network;
 
@@ -36,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * after the cache service has been initialized and data has been recovered from
  * persistence. This prevents clients from connecting before the cache is ready.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Component

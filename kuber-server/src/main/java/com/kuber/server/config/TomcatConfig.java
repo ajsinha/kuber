@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.config;
 
@@ -40,7 +38,7 @@ import org.springframework.security.web.firewall.StrictHttpFirewall;
  *       the key from the remaining path segments.</li>
  * </ol>
  *
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Configuration

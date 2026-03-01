@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.persistence;
 
@@ -52,7 +50,7 @@ import java.util.regex.Pattern;
  * This ensures writes to the same region are always sequential while allowing
  * parallel writes across different regions.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 public abstract class AbstractPersistenceStore implements PersistenceStore {

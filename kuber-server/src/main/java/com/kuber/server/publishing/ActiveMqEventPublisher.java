@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.publishing;
 
@@ -46,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Service
@@ -217,6 +215,17 @@ public class ActiveMqEventPublisher implements EventPublisher {
         
         try {
             PooledConnectionFactory factory = getOrCreateConnectionFactory(binding);
+            if (factory == null) {
+                log.warn("ActiveMQ connection factory is null for {} — attempting recovery", binding.brokerUrl);
+                connectionFactories.remove(binding.brokerUrl);
+                factory = getOrCreateConnectionFactory(binding);
+                if (factory == null) {
+                    errors.incrementAndGet();
+                    log.error("Failed to recover ActiveMQ connection factory for {} — event dropped", binding.brokerUrl);
+                    return;
+                }
+            }
+            
             connection = factory.createConnection();
             session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             
@@ -257,6 +266,8 @@ public class ActiveMqEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Failed to publish event to ActiveMQ for region '{}', key '{}': {}",
                     region, event.getKey(), e.getMessage());
+            // v2.6.3: Invalidate factory for recovery on next attempt
+            connectionFactories.remove(binding.brokerUrl);
         } finally {
             closeQuietly(producer);
             closeQuietly(session);
@@ -271,43 +282,70 @@ public class ActiveMqEventPublisher implements EventPublisher {
     
     private PooledConnectionFactory getOrCreateConnectionFactory(DestinationBinding binding) {
         return connectionFactories.computeIfAbsent(binding.brokerUrl, url -> {
-            ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(url);
+            int maxRetries = 3;
+            long retryDelayMs = 2000;
             
-            // Set credentials if provided
-            if (binding.username != null && !binding.username.isBlank()) {
-                connectionFactory.setUserName(binding.username);
-                connectionFactory.setPassword(binding.password);
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(url);
+                    
+                    // Set credentials if provided
+                    if (binding.username != null && !binding.username.isBlank()) {
+                        connectionFactory.setUserName(binding.username);
+                        connectionFactory.setPassword(binding.password);
+                    }
+                    
+                    // Configure connection factory
+                    connectionFactory.setTrustAllPackages(true);
+                    connectionFactory.setWatchTopicAdvisories(false);
+                    
+                    // Apply SSL/TLS trust store and key store if enabled
+                    if (binding.ssl.isEnabled()) {
+                        if (!binding.ssl.getTrustStorePath().isBlank()) {
+                            System.setProperty("javax.net.ssl.trustStore", binding.ssl.getTrustStorePath());
+                            System.setProperty("javax.net.ssl.trustStorePassword", binding.ssl.getTrustStorePassword());
+                            System.setProperty("javax.net.ssl.trustStoreType", binding.ssl.getTrustStoreType());
+                        }
+                        if (!binding.ssl.getKeyStorePath().isBlank()) {
+                            System.setProperty("javax.net.ssl.keyStore", binding.ssl.getKeyStorePath());
+                            System.setProperty("javax.net.ssl.keyStorePassword", binding.ssl.getKeyStorePassword());
+                            System.setProperty("javax.net.ssl.keyStoreType", binding.ssl.getKeyStoreType());
+                        }
+                        log.info("ActiveMQ SSL/TLS enabled for broker: {}", url);
+                    }
+                    
+                    // Create pooled factory
+                    PooledConnectionFactory pooledFactory = new PooledConnectionFactory();
+                    pooledFactory.setConnectionFactory(connectionFactory);
+                    pooledFactory.setMaxConnections(10);
+                    pooledFactory.setIdleTimeout(30000);
+                    pooledFactory.setMaximumActiveSessionPerConnection(100);
+                    // v2.6.3: Enable reconnect on exception
+                    pooledFactory.setReconnectOnException(true);
+                    
+                    // Verify connectivity by creating a test connection
+                    javax.jms.Connection testConn = pooledFactory.createConnection();
+                    testConn.close();
+                    
+                    log.info("✅ Created ActiveMQ connection pool for broker: {}{} (attempt {})", url,
+                            binding.ssl.isEnabled() ? " [SSL]" : "", attempt);
+                    return pooledFactory;
+                    
+                } catch (Exception e) {
+                    log.warn("Failed to create ActiveMQ connection pool for {} (attempt {}/{}): {}",
+                            url, attempt, maxRetries, e.getMessage());
+                    if (attempt < maxRetries) {
+                        try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        retryDelayMs *= 2;
+                    }
+                }
             }
             
-            // Configure connection factory
-            connectionFactory.setTrustAllPackages(true);
-            connectionFactory.setWatchTopicAdvisories(false);
-            
-            // Apply SSL/TLS trust store and key store if enabled
-            if (binding.ssl.isEnabled()) {
-                if (!binding.ssl.getTrustStorePath().isBlank()) {
-                    System.setProperty("javax.net.ssl.trustStore", binding.ssl.getTrustStorePath());
-                    System.setProperty("javax.net.ssl.trustStorePassword", binding.ssl.getTrustStorePassword());
-                    System.setProperty("javax.net.ssl.trustStoreType", binding.ssl.getTrustStoreType());
-                }
-                if (!binding.ssl.getKeyStorePath().isBlank()) {
-                    System.setProperty("javax.net.ssl.keyStore", binding.ssl.getKeyStorePath());
-                    System.setProperty("javax.net.ssl.keyStorePassword", binding.ssl.getKeyStorePassword());
-                    System.setProperty("javax.net.ssl.keyStoreType", binding.ssl.getKeyStoreType());
-                }
-                log.info("ActiveMQ SSL/TLS enabled for broker: {}", url);
-            }
-            
-            // Create pooled factory
-            PooledConnectionFactory pooledFactory = new PooledConnectionFactory();
-            pooledFactory.setConnectionFactory(connectionFactory);
-            pooledFactory.setMaxConnections(10);
-            pooledFactory.setIdleTimeout(30000);
-            pooledFactory.setMaximumActiveSessionPerConnection(100);
-            
-            log.info("Created ActiveMQ connection pool for broker: {}{}", url,
-                    binding.ssl.isEnabled() ? " [SSL]" : "");
-            return pooledFactory;
+            log.error("❌ Failed to create ActiveMQ connection pool for {} after retries", url);
+            return null;
         });
     }
     

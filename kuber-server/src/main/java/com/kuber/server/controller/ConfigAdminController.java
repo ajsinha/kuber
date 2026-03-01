@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.controller;
 
@@ -37,7 +35,7 @@ import java.util.*;
  * Admin controller for CRUD management of external JSON configuration:
  * message brokers, event publishing regions, and request/response messaging.
  *
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Controller

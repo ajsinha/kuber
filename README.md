@@ -2,7 +2,7 @@
 
 **High-Performance Distributed Cache with Redis Protocol Support**
 
-Version 2.6.0
+Version 2.6.3
 
 Copyright (c) 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
@@ -22,8 +22,8 @@ Kuber is a powerful, enterprise-grade distributed caching system that provides:
 - **Region-Based Organization**: Logical isolation with dedicated database per region
 - **JSON Document Support**: Store and query JSON documents with JSONPath
 - **Multi-Backend Persistence**: RocksDB (default), LMDB, MongoDB, SQLite, PostgreSQL
-- **Event Publishing (v1.2.8, v2.6.0)**: Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files — hot-refresh, complete write coverage, TTL expiry events, autoload lifecycle events, on-demand publish of query results and entire regions
-- **Request/Response Messaging (v1.7.1)**: Access cache via message brokers with async processing, backpressure, and broker controls
+- **Event Publishing (v1.2.8, v2.6.3)**: Stream cache events to Kafka, Confluent Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files — hot-refresh, complete write coverage, TTL expiry events, autoload lifecycle events, on-demand publish of query results and entire regions
+- **Request/Response Messaging (v1.7.1)**: Access cache via message brokers (Kafka, Confluent Kafka, RabbitMQ, ActiveMQ, IBM MQ) with async processing, backpressure, and broker controls
 - **Concurrent Region Processing (v1.3.2)**: Parallel startup compaction and data loading
 - **Region Isolation**: Each region gets its own database instance for better concurrency
 - **Smart Memory Management**: Global and per-region memory limits with intelligent allocation
@@ -95,8 +95,8 @@ Kuber uses an Aerospike-inspired hybrid storage model where **all keys are alway
 | Region Isolation | Separate database instance per region (RocksDB/LMDB/SQLite) |
 | Concurrent Processing (v1.3.0) | Parallel startup compaction and data loading across regions |
 | Key Length Validation | Configurable max key length (default: 256 bytes) with logging |
-| Event Publishing (v2.6.0) | Stream to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files; hot-refresh; all write ops; TTL expiry; autoload lifecycle; on-demand publish from UI |
-| Request/Response (v1.7.1) | Cache access via message brokers with backpressure and broker controls |
+| Event Publishing (v2.6.3) | Stream to Kafka, Confluent Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files; hot-refresh; all write ops; TTL expiry; autoload lifecycle; on-demand publish from UI |
+| Request/Response (v1.7.1) | Cache access via Kafka, Confluent Kafka, RabbitMQ, ActiveMQ, IBM MQ with backpressure and broker controls |
 | API Key Auth (v1.2.5) | Secure programmatic access with revocable keys |
 | Smart Memory Management | Global cap and per-region limits with proportional allocation |
 | Automatic Compaction | Pre-startup compaction before Spring + cron schedule (default: 2 AM daily) |
@@ -334,7 +334,7 @@ See [docs/GENERIC_UPDATE_API.md](docs/GENERIC_UPDATE_API.md) for complete docume
    # Required JVM options for LMDB persistence support on Java 9+
    java --add-opens=java.base/java.nio=ALL-UNNAMED \
         --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
-        -jar kuber-server/target/kuber-server-2.6.0.jar
+        -jar kuber-server/target/kuber-server-2.6.3.jar
    ```
    
    Or use the startup script which includes all required JVM options:
@@ -527,6 +527,7 @@ Access cache operations via message brokers for decoupled, asynchronous architec
 | Broker | Status | Features |
 |--------|--------|----------|
 | Apache Kafka | ✓ | High throughput, partitioning, consumer groups |
+| Confluent Kafka | ✓ | Confluent Cloud/Platform, SASL_SSL API key auth, Schema Registry ready |
 | Apache ActiveMQ | ✓ | JMS support, durable subscriptions |
 | RabbitMQ | ✓ | AMQP, flexible routing, acknowledgments |
 | IBM MQ | ✓ | Enterprise messaging, SSL/TLS |
@@ -612,6 +613,18 @@ Create `config/request_response.json` (or customize path via `kuber.messaging.re
       "connection": {
         "bootstrap_servers": "kafka:9092",
         "group_id": "kuber-processor"
+      },
+      "request_topics": ["ccs_cache_request"]
+    },
+    "confluent_cloud": {
+      "enabled": true,
+      "type": "confluent-kafka",
+      "display_name": "Confluent Cloud",
+      "connection": {
+        "bootstrap_servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+        "group_id": "kuber-processor",
+        "api_key": "YOUR_API_KEY",
+        "api_secret": "YOUR_API_SECRET"
       },
       "request_topics": ["ccs_cache_request"]
     }
@@ -801,9 +814,18 @@ Comprehensive documentation accessible at `/help`:
 | Advanced | Regions, Search, Replication, Messaging |
 | Reference | REST API, Redis Protocol, Glossary |
 
-## Event Publishing (v1.2.8, updated v2.6.0)
+## Event Publishing (v1.2.8, updated v2.6.3)
 
 Stream cache events to external systems for real-time integrations.
+
+**v2.6.3 Highlights:**
+- **Confluent Kafka support**: New `confluent-kafka` broker type for Confluent Cloud and Confluent Platform — SASL_SSL with API key/secret, both for messaging and event publishing
+- **Full PubSub resilience**: RabbitMQ, ActiveMQ, and IBM MQ now have startup retry (5 attempts, exponential backoff) and publish recovery (3 attempts) across all adapters and event publishers
+- **Schema Registry ready**: Confluent Kafka config supports Schema Registry URL and credentials
+
+**v2.6.1 Highlights:**
+- **Kafka connection resilience**: Startup retry (5 attempts with exponential backoff), publish auto-recovery, reconnect backoff settings on all Kafka clients
+- **Externalized branding**: Author, email, copyright, GitHub URL from `application.properties` via Thymeleaf
 
 **v2.6.0 Highlights:**
 - **Expired events with payload**: TTL-expired entries now publish `expired` events with the full value in the `payload` field — mimicking the structure of `inserted` and `updated` events for downstream consumers
@@ -840,6 +862,13 @@ Stream cache events to external systems for real-time integrations.
       "ssl": { "enabled": true, "mode": "jks",
                "trust-store-path": "/certs/truststore.jks",
                "trust-store-password": "changeit" }
+    },
+    "confluent-cloud": {
+      "enabled": true, "type": "confluent-kafka",
+      "bootstrap-servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+      "api-key": "YOUR_API_KEY",
+      "api-secret": "YOUR_API_SECRET",
+      "partitions": 6, "replication-factor": 3
     }
   }
 }
@@ -859,7 +888,7 @@ Stream cache events to external systems for real-time integrations.
 }
 ```
 
-**SSL/TLS modes:** `jks`, `pem`, `sasl_ssl`, `mtls_jks`, `mtls_pem` — see `/admin/brokers` for reference.
+**SSL/TLS modes:** `jks`, `pem`, `sasl_ssl`, `mtls_jks`, `mtls_pem` — see `/admin/brokers` for reference. Confluent Kafka (`confluent-kafka` type) uses built-in SASL_SSL with API key/secret — no manual SSL configuration needed.
 
 ### Event Format
 
@@ -874,13 +903,13 @@ Stream cache events to external systems for real-time integrations.
 }
 ```
 
-Actions: `inserted`, `updated`, `deleted`, `expired`, `queryresult`, `autoload_start`, `autoload_end`. The `payload` field is `null` for `deleted` actions. As of v2.6.0, `expired` events include the last known value in the payload.
+Actions: `inserted`, `updated`, `deleted`, `expired`, `queryresult`, `autoload_start`, `autoload_end`. The `payload` field is `null` for `deleted` actions. As of v2.6.3, `expired` events include the last known value in the payload.
 
 ## Autoload
 
 Bulk import data from CSV, TXT, and JSON files:
 
-### Event Publishing (v2.6.0)
+### Event Publishing (v2.6.3)
 
 When a region has event publishing configured, autoload publishes lifecycle events:
 - `autoload_start` — published when file processing begins (payload: `file`, `region`)
@@ -1187,7 +1216,6 @@ Copyright © 2025-2030, All Rights Reserved
 
 This software is proprietary and confidential. Unauthorized copying, distribution, modification, or use is strictly prohibited without explicit written permission from the copyright holder.
 
-**Patent Pending**: Certain architectural patterns and implementations are subject to patent applications.
 
 ## Support
 

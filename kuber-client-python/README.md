@@ -2,7 +2,7 @@
 
 Python client library for [Kuber Distributed Cache](https://github.com/ashutosh/kuber).
 
-**v2.6.0**: API Key Authentication Required - All programmatic access now requires an API key.
+**v2.6.3**: API Key Authentication Required - All programmatic access now requires an API key.
 
 ## Installation
 

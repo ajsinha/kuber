@@ -8,8 +8,6 @@ Legal Notice: This module and the associated software architecture are proprieta
 and confidential. Unauthorized copying, distribution, modification, or use is
 strictly prohibited without explicit written permission from the copyright holder.
 
-Patent Pending: Certain architectural patterns and implementations described in
-this module may be subject to patent applications.
 
 ================================================================================
 KUBER STANDALONE PYTHON CLIENT - REDIS PROTOCOL
@@ -1657,7 +1655,7 @@ Examples:
             print_section("ALL EXAMPLES COMPLETED SUCCESSFULLY")
             print("""
     This standalone client demonstrated:
-    ✓ API Key authentication (v2.6.0)
+    ✓ API Key authentication (v2.6.2)
     ✓ Basic string operations (GET, SET, INCR, DECR, APPEND)
     ✓ Multi-key operations (MGET, MSET)
     ✓ Key pattern search (KEYS with wildcards, SCAN)

@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.messaging;
 
@@ -31,7 +29,7 @@ import java.util.function.Consumer;
  * <p>Implements message consumption and publishing for IBM MQ queues.
  * Supports pause/resume for backpressure control.</p>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 public class IbmMqBrokerAdapter implements MessageBrokerAdapter {
@@ -70,49 +68,68 @@ public class IbmMqBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean connect() {
-        try {
-            String queueManager = config.getQueueManager();
-            String channel = config.getChannel();
-            String connName = config.getConnName();
-            
-            if (queueManager == null || queueManager.isEmpty()) {
-                log.error("[{}] IBM MQ queue_manager not configured", brokerName);
-                return false;
-            }
-            
-            MQConnectionFactory factory = new MQConnectionFactory();
-            factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
-            factory.setQueueManager(queueManager);
-            
-            if (channel != null && !channel.isEmpty()) {
-                factory.setChannel(channel);
-            }
-            if (connName != null && !connName.isEmpty()) {
-                factory.setConnectionNameList(connName);
-            }
-            
-            // Set credentials if provided
-            String username = config.getUsername();
-            String password = config.getPassword();
-            
-            if (username != null && !username.isEmpty()) {
-                connection = factory.createConnection(username, password);
-            } else {
-                connection = factory.createConnection();
-            }
-            
-            connection.start();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            
-            connected.set(true);
-            log.info("[{}] Connected to IBM MQ queue manager: {}", brokerName, queueManager);
-            return true;
-            
-        } catch (Exception e) {
-            log.error("[{}] Failed to connect to IBM MQ: {}", brokerName, e.getMessage(), e);
-            errors.incrementAndGet();
+        String queueManager = config.getQueueManager();
+        String channel = config.getChannel();
+        String connName = config.getConnName();
+        
+        if (queueManager == null || queueManager.isEmpty()) {
+            log.error("[{}] IBM MQ queue_manager not configured", brokerName);
             return false;
         }
+        
+        int maxRetries = 5;
+        long retryDelayMs = 3000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                MQConnectionFactory factory = new MQConnectionFactory();
+                factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+                factory.setQueueManager(queueManager);
+                
+                if (channel != null && !channel.isEmpty()) {
+                    factory.setChannel(channel);
+                }
+                if (connName != null && !connName.isEmpty()) {
+                    factory.setConnectionNameList(connName);
+                }
+                
+                log.info("[{}] Connecting to IBM MQ queue manager: {} (attempt {}/{})", 
+                        brokerName, queueManager, attempt, maxRetries);
+                
+                // Set credentials if provided
+                String username = config.getUsername();
+                String password = config.getPassword();
+                
+                if (username != null && !username.isEmpty()) {
+                    connection = factory.createConnection(username, password);
+                } else {
+                    connection = factory.createConnection();
+                }
+                
+                connection.start();
+                session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+                
+                connected.set(true);
+                log.info("[{}] ✅ Connected to IBM MQ queue manager: {} (attempt {})", brokerName, queueManager, attempt);
+                return true;
+                
+            } catch (Exception e) {
+                if (attempt < maxRetries) {
+                    log.warn("[{}] IBM MQ connection attempt {}/{} failed: {} — retrying in {}ms",
+                            brokerName, attempt, maxRetries, e.getMessage(), retryDelayMs);
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    retryDelayMs = Math.min(retryDelayMs * 2, 15000);
+                } else {
+                    log.error("[{}] ❌ Failed to connect to IBM MQ after {} attempts: {}", brokerName, maxRetries, e.getMessage(), e);
+                    errors.incrementAndGet();
+                    return false;
+                }
+            }
+        }
+        return false;
     }
     
     @Override
@@ -228,9 +245,13 @@ public class IbmMqBrokerAdapter implements MessageBrokerAdapter {
     
     @Override
     public boolean publish(String responseTopic, String message) {
+        // v2.6.3: Try to recover if connection was lost
         if (!connected.get() || session == null) {
-            log.error("[{}] Cannot publish - not connected", brokerName);
-            return false;
+            log.warn("[{}] IBM MQ connection lost — attempting recovery...", brokerName);
+            if (!recoverConnection()) {
+                log.error("[{}] ❌ Cannot publish - recovery failed", brokerName);
+                return false;
+            }
         }
         
         try {
@@ -251,8 +272,77 @@ public class IbmMqBrokerAdapter implements MessageBrokerAdapter {
         } catch (Exception e) {
             log.error("[{}] Failed to publish to {}: {}", brokerName, responseTopic, e.getMessage());
             errors.incrementAndGet();
+            markDisconnectedForRecovery();
             return false;
         }
+    }
+    
+    /**
+     * Mark connection as broken so the next operation triggers recovery.
+     */
+    private void markDisconnectedForRecovery() {
+        connected.set(false);
+        log.warn("[{}] Marked as disconnected — next operation will attempt recovery", brokerName);
+    }
+    
+    /**
+     * Attempt to recover a broken IBM MQ connection.
+     */
+    private boolean recoverConnection() {
+        log.info("[{}] Attempting IBM MQ connection recovery...", brokerName);
+        
+        // Close old resources
+        if (session != null) {
+            try { session.close(); } catch (Exception ignored) {}
+            session = null;
+        }
+        if (connection != null) {
+            try { connection.close(); } catch (Exception ignored) {}
+            connection = null;
+        }
+        
+        int maxRetries = 3;
+        long retryDelayMs = 2000;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                MQConnectionFactory factory = new MQConnectionFactory();
+                factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+                factory.setQueueManager(config.getQueueManager());
+                if (config.getChannel() != null && !config.getChannel().isEmpty()) {
+                    factory.setChannel(config.getChannel());
+                }
+                if (config.getConnName() != null && !config.getConnName().isEmpty()) {
+                    factory.setConnectionNameList(config.getConnName());
+                }
+                
+                String username = config.getUsername();
+                if (username != null && !username.isEmpty()) {
+                    connection = factory.createConnection(username, config.getPassword());
+                } else {
+                    connection = factory.createConnection();
+                }
+                
+                connection.start();
+                session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+                connected.set(true);
+                log.info("[{}] ✅ Connection recovered successfully (attempt {})", brokerName, attempt);
+                return true;
+                
+            } catch (Exception e) {
+                log.warn("[{}] Recovery attempt {}/{} failed: {}", brokerName, attempt, maxRetries, e.getMessage());
+                if (attempt < maxRetries) {
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    retryDelayMs *= 2;
+                }
+            }
+        }
+        
+        log.error("[{}] ❌ Connection recovery failed after retries", brokerName);
+        return false;
     }
     
     @Override

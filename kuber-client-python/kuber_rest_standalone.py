@@ -8,8 +8,6 @@ Legal Notice: This module and the associated software architecture are proprieta
 and confidential. Unauthorized copying, distribution, modification, or use is
 strictly prohibited without explicit written permission from the copyright holder.
 
-Patent Pending: Certain architectural patterns and implementations described in
-this module may be subject to patent applications.
 
 ================================================================================
 KUBER STANDALONE PYTHON CLIENT - HTTP REST API
@@ -1247,7 +1245,7 @@ def cleanup(client: KuberRestClient):
 def main():
     """Main function to run all examples."""
     parser = argparse.ArgumentParser(
-        description='Kuber Standalone Python Client - HTTP REST API Examples (v2.6.0)',
+        description='Kuber Standalone Python Client - HTTP REST API Examples (v2.6.2)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 v2.1.0: API Key Authentication ONLY
@@ -1285,7 +1283,7 @@ Environment variable:
     
     print(f"""
 ╔══════════════════════════════════════════════════════════════════════╗
-║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v2.6.0)          ║
+║     KUBER STANDALONE PYTHON CLIENT - HTTP REST API (v2.6.2)          ║
 ║                                                                      ║
 ║     Connecting to: {protocol}://{args.host}:{args.port:<36}║
 ║     Authentication: API Key ({api_key[:12]}...{api_key[-4:]})                     ║

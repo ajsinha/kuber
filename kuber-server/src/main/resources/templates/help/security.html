@@ -2,10 +2,10 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v2.6.0 - Security & RBAC Help
+  ~ Kuber v2.6.3 - Security & RBAC Help
   -->
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{layout :: head('Security & RBAC')}"></head>
+<head th:replace="~{layout :: head('Security & Authentication')}"></head>
 <body class="d-flex flex-column min-vh-100">
 <nav th:replace="~{layout :: navbar}"></nav>
 
@@ -15,11 +15,11 @@
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/help"><i class="fas fa-book me-1"></i>Help</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Security &amp; RBAC</li>
+            <li class="breadcrumb-item active" aria-current="page">Security &amp; Authentication</li>
         </ol>
     </nav>
     
-    <h1 class="mb-4"><i class="fas fa-shield-alt text-primary me-2"></i>Security &amp; Role-Based Access Control</h1>
+    <h1 class="mb-4"><i class="fas fa-shield-alt text-primary me-2"></i>Security &amp; Authentication</h1>
     
     <div class="alert alert-info">
         <i class="fas fa-info-circle me-2"></i>
@@ -47,7 +47,9 @@
                         <li><a href="#config">Configuration</a></li>
                         <li><a href="#hot-reload">Hot Reload &amp; Defaults</a></li>
                         <li><a href="#examples">Practical Examples</a></li>
-                        <li><a href="#api-auth">API Authentication</a></li>
+                        <li><a href="#api-auth">API Key Authentication</a></li>
+                        <li><a href="#api-key-mgmt">Key Management &amp; Best Practices</a></li>
+                        <li><a href="#api-key-storage">API Key Storage &amp; Config</a></li>
                         <li><a href="#errors">Error Messages</a></li>
                     </ul>
                 </div>
@@ -545,58 +547,197 @@ cp secure-sample/roles.json.sample config/secure/roles.json
         </div>
     </div>
 
-    <!-- API Authentication -->
+    <!-- API Key Authentication (merged from apikeys.html) -->
     <div class="card mb-4" id="api-auth">
-        <div class="card-header"><h5 class="mb-0"><i class="fas fa-plug me-2"></i>API Authentication</h5></div>
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-key me-2"></i>API Key Authentication</h5></div>
         <div class="card-body">
-            <h6>Redis Protocol (AUTH Command)</h6>
-            <pre class="bg-dark text-light p-3 rounded"><code># Using API Key
-redis-cli -p 6380
-> AUTH api_key_here
-OK
-
-# Using username/password (Redis 6+ ACL style)
-> AUTH username password
-OK</code></pre>
-
-            <h6 class="mt-4">REST API (HTTP)</h6>
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>API Key in Header:</strong></p>
-                    <pre class="bg-dark text-light p-3 rounded"><code>curl -H "X-API-Key: your_api_key" \
-     http://localhost:8080/api/cache/default/keys</code></pre>
-                </div>
-                <div class="col-md-6">
-                    <p><strong>HTTP Basic Auth:</strong></p>
-                    <pre class="bg-dark text-light p-3 rounded"><code>curl -u username:password \
-     http://localhost:8080/api/cache/default/keys</code></pre>
-                </div>
+            <div class="alert alert-warning mb-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>v2.1.0: API Key Required for All Programmatic Access</strong><br>
+                All client applications (Java, Python, CLI) must use API keys. Username/password is only for Web UI.
             </div>
 
-            <h6 class="mt-4">Python Client Example</h6>
-            <pre class="bg-dark text-light p-3 rounded"><code>from kuber_client import KuberClient
+            <p>API keys offer an alternative to username/password authentication for applications, CI/CD pipelines, microservices, scripts, and third-party integrations.</p>
 
-# Connect with API key
-client = KuberClient(host='localhost', port=6380, api_key='your_api_key')
+            <h6>API Key Format</h6>
+            <pre class="bg-dark text-light p-3 rounded"><code>kub_[64 hexadecimal characters]
+Example: kub_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2</code></pre>
 
-# Or with username/password
-client = KuberClient(host='localhost', port=6380, 
-                     username='developer', password='dev123')
+            <h6 class="mt-4">Generating API Keys</h6>
+            <ol>
+                <li>Log in as an administrator</li>
+                <li>Navigate to <strong>Admin → API Keys</strong></li>
+                <li>Click <strong>"Generate New Key"</strong> and fill in: Name, Associated User, Roles, Expiration (optional)</li>
+                <li><strong>Important:</strong> Copy the key immediately — it won't be shown again!</li>
+            </ol>
 
-# Operations are now authorized based on user's roles
-client.set('orders', 'order:123', '{"status": "pending"}')  # Requires WRITE
-result = client.get('orders', 'order:123')                  # Requires READ
-client.delete('orders', 'order:123')                        # Requires DELETE</code></pre>
+            <h6 class="mt-4">REST API — Three Ways to Authenticate</h6>
+            <p><strong>1. X-API-Key Header (Recommended):</strong></p>
+            <pre class="bg-dark text-light p-3 rounded"><code>curl -H "X-API-Key: kub_your_api_key_here" \
+     http://localhost:8080/api/cache/default/mykey</code></pre>
+            <p><strong>2. Authorization Header:</strong></p>
+            <pre class="bg-dark text-light p-3 rounded"><code>curl -H "Authorization: ApiKey kub_your_api_key_here" \
+     http://localhost:8080/api/cache/default/mykey</code></pre>
+            <p><strong>3. Query Parameter:</strong></p>
+            <pre class="bg-dark text-light p-3 rounded"><code>curl "http://localhost:8080/api/cache/default/mykey?api_key=kub_your_api_key_here"</code></pre>
+            <div class="alert alert-info">
+                <i class="fas fa-lightbulb me-2"></i>
+                The X-API-Key header is recommended as it keeps the key out of URLs and server logs.
+            </div>
 
-            <h6 class="mt-4">Java Client Example</h6>
-            <pre class="bg-dark text-light p-3 rounded"><code>// Using Jedis with API key authentication
-Jedis jedis = new Jedis("localhost", 6380);
-jedis.auth("your_api_key");
+            <h6 class="mt-4">Redis Protocol</h6>
+            <pre class="bg-dark text-light p-3 rounded"><code># Using APIKEY keyword
+AUTH APIKEY kub_your_api_key_here
 
-// Operations authorized based on API key's user roles
-jedis.set("orders:order:123", "{\"status\": \"pending\"}");
-String value = jedis.get("orders:order:123");
-jedis.del("orders:order:123");</code></pre>
+# Or directly with the key
+AUTH kub_your_api_key_here
+
+# Or username/password (Redis 6+ ACL style)
+AUTH username password</code></pre>
+
+            <h6 class="mt-4">Python Client</h6>
+            <pre class="bg-dark text-light p-3 rounded"><code>from kuber import KuberClient, KuberRestClient
+
+# Redis Protocol Client
+client = KuberClient('localhost', 6380, api_key='kub_your_api_key_here')
+client.set('key', 'value')
+value = client.get('key')
+
+# REST API Client
+rest_client = KuberRestClient('localhost', 8080, api_key='kub_your_api_key_here')
+rest_client.set('key', 'value')
+
+# Using redis-py
+import redis
+r = redis.Redis(host='localhost', port=6380, decode_responses=True)
+r.execute_command('AUTH', 'kub_your_api_key_here')
+r.set('key', 'value')</code></pre>
+
+            <h6 class="mt-4">Java Client</h6>
+            <pre class="bg-dark text-light p-3 rounded"><code>// Redis Protocol Client
+KuberClient client = new KuberClient("localhost", 6380, "kub_your_api_key_here");
+client.set("key", "value");
+String value = client.get("key");
+
+// REST API Client
+KuberRestClient restClient = new KuberRestClient("localhost", 8080, "kub_your_api_key_here");
+restClient.set("key", "value");
+
+// Using Jedis
+try (Jedis jedis = new Jedis("localhost", 6380)) {
+    jedis.auth("kub_your_api_key_here");
+    jedis.set("key", "value");
+}</code></pre>
+        </div>
+    </div>
+
+    <!-- Key Management & Best Practices -->
+    <div class="card mb-4" id="api-key-mgmt">
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Key Management &amp; Best Practices</h5></div>
+        <div class="card-body">
+            <h6>Key States</h6>
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>State</th><th>Description</th><th>Can Authenticate</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><span class="badge bg-success">Active</span></td><td>Key is enabled and not expired</td><td>Yes</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark">Expired</span></td><td>Key has passed its expiration date</td><td>No</td></tr>
+                    <tr><td><span class="badge bg-secondary">Disabled</span></td><td>Key has been manually disabled</td><td>No</td></tr>
+                    <tr><td><span class="badge bg-danger">Revoked</span></td><td>Key has been permanently revoked</td><td>No</td></tr>
+                </tbody>
+            </table>
+
+            <h6 class="mt-3">Roles and Permissions</h6>
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>Role</th><th>Permissions</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><span class="badge bg-secondary">USER</span></td><td>Read and write cache entries, execute searches</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark">OPERATOR</span></td><td>USER permissions + create/delete regions, view statistics</td></tr>
+                    <tr><td><span class="badge bg-danger">ADMIN</span></td><td>Full access including user and API key management</td></tr>
+                </tbody>
+            </table>
+
+            <h6 class="mt-4">Best Practices</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card border-success mb-3">
+                        <div class="card-header bg-success text-white"><i class="fas fa-check me-2"></i>Do</div>
+                        <div class="card-body py-2">
+                            <ul class="mb-0 small">
+                                <li>Use environment variables to store keys</li>
+                                <li>Create separate keys for each application</li>
+                                <li>Set expiration dates for temporary access</li>
+                                <li>Revoke keys immediately if compromised</li>
+                                <li>Use the minimum required roles</li>
+                                <li>Monitor key usage via last-used timestamps</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-danger mb-3">
+                        <div class="card-header bg-danger text-white"><i class="fas fa-times me-2"></i>Don't</div>
+                        <div class="card-body py-2">
+                            <ul class="mb-0 small">
+                                <li>Commit keys to version control</li>
+                                <li>Share keys between applications</li>
+                                <li>Use ADMIN role unless necessary</li>
+                                <li>Include keys in URLs (use headers instead)</li>
+                                <li>Log or display full key values</li>
+                                <li>Use keys without expiration for sensitive access</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Storage & Configuration -->
+    <div class="card mb-4" id="api-key-storage">
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-folder-open me-2"></i>API Key Storage &amp; Configuration</h5></div>
+        <div class="card-body">
+            <div class="alert alert-success mb-3">
+                <i class="fas fa-folder-open me-2"></i>
+                <strong>v2.2.0 Secure Folder:</strong> Security files are stored in a dedicated secure folder.
+            </div>
+
+            <h6>File Locations</h6>
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr><th>File</th><th>Default Path</th><th>Configuration Property</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>users.json</code></td><td><code>./config/secure/users.json</code></td><td><code>kuber.security.users-file</code></td></tr>
+                    <tr><td><code>apikeys.json</code></td><td><code>./config/secure/apikeys.json</code></td><td><code>kuber.security.api-keys-file</code></td></tr>
+                </tbody>
+            </table>
+
+            <h6 class="mt-3">apikeys.json</h6>
+            <pre class="bg-dark text-light p-3 rounded"><code>{
+  "keys": [
+    {
+      "keyId": "key_abc12345",
+      "keyValue": "kub_a1b2c3d4e5f6...",
+      "name": "Production API",
+      "userId": "admin",
+      "roles": ["USER", "OPERATOR"],
+      "createdAt": "2025-12-05T10:00:00Z",
+      "lastUsedAt": "2025-12-05T15:30:00Z",
+      "expiresAt": null,
+      "enabled": true
+    }
+  ]
+}</code></pre>
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-lock me-2"></i>
+                <strong>Security:</strong> Ensure proper file system permissions on the secure folder.
+                Only the Kuber server process should have read/write access.
+            </div>
+            <p>Sample configuration files are provided in <code>src/main/resources/secure-sample/</code>. Copy to <code>config/secure</code> and rename (remove <code>.sample</code>).</p>
         </div>
     </div>
 
@@ -731,15 +872,15 @@ jedis.del("orders:order:123");</code></pre>
 
     <!-- Navigation -->
     <div class="d-flex justify-content-between mt-4">
-        <a th:href="@{/help/apikeys}" class="btn btn-outline-primary">
-            <i class="fas fa-arrow-left me-1"></i> API Keys
+        <a th:href="@{/help}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-1"></i> Help Index
         </a>
-        <a th:href="@{/help/quickstart}" class="btn btn-outline-primary">
-            Quick Start <i class="fas fa-arrow-right ms-1"></i>
+        <a th:href="@{/help/ssl-tls}" class="btn btn-outline-primary">
+            SSL/TLS Configuration <i class="fas fa-arrow-right ms-1"></i>
         </a>
     </div>
     
-    <p class="text-muted text-center mt-4"><small>Version 2.6.0</small></p>
+    <p class="text-muted text-center mt-4"><small>Version 2.6.3</small></p>
 </div>
 </main>
 

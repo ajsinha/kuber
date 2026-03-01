@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.startup;
 
@@ -40,7 +38,7 @@ import java.util.List;
  * <p>This component runs with @Order(0) to ensure directories exist
  * before other startup components run.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Component
 @Slf4j

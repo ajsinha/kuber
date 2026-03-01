@@ -1,0 +1,30 @@
+# Kuber Secondary Index Configuration
+# This file is auto-managed by Kuber. Manual edits are supported.
+# Changes are detected and applied automatically.
+#
+# Documentation: /help/secondary-indexing
+
+indexing:
+  enabled: true
+  storage: hybrid           # memory, rocksdb, or hybrid
+  rebuild-on-startup: true  # Rebuild indexes from data on startup
+  rebuild-threads: 4        # Parallel threads for rebuild
+  max-memory-per-region-mb: 256
+  max-indexes-per-region: 20
+  persistence:
+    enabled: true
+    sync-interval-seconds: 30
+
+# Define indexes per region
+# Example:
+# regions:
+#   customers:
+#     indexes:
+#       - field: status
+#         type: hash
+#         description: "Customer status for filtering"
+#       - field: age
+#         type: btree
+#         description: "Age for range queries"
+
+regions: {}

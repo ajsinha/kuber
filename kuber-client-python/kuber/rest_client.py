@@ -5,8 +5,6 @@
 # and confidential. Unauthorized copying, distribution, modification, or use is
 # strictly prohibited without explicit written permission from the copyright holder.
 #
-# Patent Pending: Certain architectural patterns and implementations described in
-# this module may be subject to patent applications.
 
 """
 Kuber REST Client - HTTP REST API Client Implementation

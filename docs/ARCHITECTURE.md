@@ -1,11 +1,10 @@
 # Kuber Distributed Cache - Architecture Document
 
-**Version 2.6.0**
+**Version 2.6.3**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
 
-**Patent Pending**: Certain architectural patterns and implementations described in this document may be subject to patent applications.
 
 ---
 
@@ -41,7 +40,7 @@ Kuber is an enterprise-grade distributed caching system designed for high-perfor
 | **Region Isolation** | Logical namespaces for multi-tenant data organization |
 | **High Availability** | Primary/Secondary replication via ZooKeeper |
 | **Mandatory Security** | All clients must authenticate with username/password or API key |
-| **Event Publishing** | Stream cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
+| **Event Publishing** | Stream cache events to Kafka, Confluent Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files |
 | **Request/Response** | Access cache via message brokers with async processing and backpressure |
 | **Extensibility** | Modular design allowing custom persistence, publishers, and protocol handlers |
 
@@ -154,6 +153,7 @@ kuber/
 │   │   ├── EventPublisher.java   # Publisher interface
 │   │   ├── PublisherRegistry.java # Central publisher registry
 │   │   ├── KafkaEventPublisher.java
+│   │   ├── ConfluentKafkaEventPublisher.java
 │   │   ├── RabbitMqEventPublisher.java
 │   │   ├── IbmMqEventPublisher.java
 │   │   ├── ActiveMqEventPublisher.java
@@ -1010,7 +1010,7 @@ kuber:
 
 ## 8.5 Secondary Indexing Architecture (v1.9.0)
 
-Kuber v2.6.0 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
+Kuber v2.6.3 introduces a **hybrid secondary indexing system** that dramatically improves JSON search performance from O(n) full table scans to O(1) hash lookups or O(log n) range queries.
 
 ### 8.5.1 Hybrid Architecture
 
@@ -1258,13 +1258,13 @@ decoupled communication with the cache system.
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        MESSAGE BROKER LAYER                                  │
-├────────────────┬────────────────┬────────────────┬────────────────────────────┤
-│     Kafka      │   RabbitMQ     │    ActiveMQ    │         IBM MQ            │
-│  (Topics)      │   (Queues)     │   (Queues)     │        (Queues)           │
-└───────┬────────┴───────┬────────┴───────┬────────┴────────────┬──────────────┘
-        │                │                │                      │
-        │ request_topic  │ request_queue  │ request_queue        │ REQUEST.QUEUE
-        ▼                ▼                ▼                      ▼
+├────────────────┬────────────────┬────────────────┬──────────────┬─────────────┤
+│     Kafka      │Confluent Kafka │   RabbitMQ     │    ActiveMQ  │    IBM MQ   │
+│  (Topics)      │  (SASL_SSL)    │   (Queues)     │   (Queues)   │   (Queues)  │
+└───────┬────────┴───────┬────────┴───────┬────────┴──────┬───────┴──────┬──────┘
+        │                │                │               │              │
+        │ request_topic  │ request_topic  │ request_queue │request_queue │REQUEST.Q
+        ▼                ▼                ▼               ▼              ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     REQUEST RESPONSE SERVICE                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -1293,6 +1293,7 @@ decoupled communication with the cache system.
 |-----------|-------------|
 | **MessageBrokerAdapter** | Interface for broker-specific implementations |
 | **KafkaBrokerAdapter** | Apache Kafka consumer/producer |
+| **ConfluentKafkaBrokerAdapter** | Confluent Cloud/Platform Kafka with SASL_SSL API key auth |
 | **ActiveMqBrokerAdapter** | Apache ActiveMQ JMS client |
 | **RabbitMqBrokerAdapter** | RabbitMQ AMQP client |
 | **IbmMqBrokerAdapter** | IBM MQ JMS client |
@@ -2258,6 +2259,7 @@ Kuber can publish cache events to external messaging systems for real-time integ
 | Publisher | Type | Features |
 |-----------|------|----------|
 | **Apache Kafka** | kafka | High throughput streaming, configurable retention, auto topic creation |
+| **Confluent Kafka** | confluent-kafka | Confluent Cloud/Platform, SASL_SSL API key/secret auth, Schema Registry ready, auto topic creation |
 | **Apache ActiveMQ** | activemq | Enterprise JMS messaging, configurable TTL, queue/topic support |
 | **RabbitMQ** | rabbitmq | AMQP messaging, flexible routing, exchange types, auto recovery |
 | **IBM MQ** | ibmmq | Enterprise messaging, SSL/TLS support, queue manager integration |
@@ -2316,10 +2318,10 @@ CacheService.set() / delete()
              ▼
       PublisherRegistry
              │
-    ┌────┬───┴───┬────┬────┐
-    ▼    ▼       ▼    ▼    ▼
- Kafka  AMQ  RabbitMQ IBM  File
-                      MQ
+    ┌────┬───┴───┬─────────┬────┬────┐
+    ▼    ▼       ▼         ▼    ▼    ▼
+ Kafka  CKafka  AMQ  RabbitMQ IBM  File
+                              MQ
 ```
 
 ### Key Design Principles

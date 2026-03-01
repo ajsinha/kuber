@@ -7,8 +7,6 @@
   ~ and confidential. Unauthorized copying, distribution, modification, or use is
   ~ strictly prohibited without explicit written permission from the copyright holder.
   ~
-  ~ Patent Pending: Certain architectural patterns and implementations described in
-  ~ this module may be subject to patent applications.
   -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -17,7 +15,7 @@
 
     <groupId>com.kuber</groupId>
     <artifactId>kuber-parent</artifactId>
-    <version>2.6.0</version>
+    <version>2.6.3</version>
     <packaging>pom</packaging>
 
     <name>Kuber Distributed Cache</name>

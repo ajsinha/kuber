@@ -2,7 +2,6 @@
 """
 Copyright © 2025-2030, All Rights Reserved
 Ashutosh Sinha | Email: ajsinha@gmail.com
-Patent Pending
 
 Kuber Request/Response Messaging Example
 
@@ -549,7 +548,7 @@ def interactive_demo():
         entries={
             "app:config:theme": "dark",
             "app:config:lang": "en-US",
-            "app:config:version": "2.6.0"
+            "app:config:version": "2.6.2"
         }
     )
     print(f"   Topic: kuber_request")
@@ -593,7 +592,7 @@ if __name__ == "__main__":
     print("""
 ╔══════════════════════════════════════════════════════════════════════╗
 ║          KUBER REQUEST/RESPONSE MESSAGING - PYTHON CLIENT            ║
-║                         Version 2.6.0                                ║
+║                         Version 2.6.2                                ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """)
     

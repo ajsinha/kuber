@@ -47,6 +47,21 @@
       "password" : null,
       "display_name" : "Example Kafka",
       "request_topics" : [ "ccs_cache_request" ]
+    },
+    "confluent_kafka_example" : {
+      "enabled" : false,
+      "type" : "confluent-kafka",
+      "connection" : {
+        "bootstrap_servers" : "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+        "group_id" : "kuber-request-processor",
+        "api_key" : "YOUR_CONFLUENT_API_KEY",
+        "api_secret" : "YOUR_CONFLUENT_API_SECRET"
+      },
+      "bootstrapServers" : "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+      "autoOffsetReset" : "earliest",
+      "connectionSummary" : "confluent-kafka://pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+      "display_name" : "Example Confluent Cloud Kafka",
+      "request_topics" : [ "ccs_cache_request" ]
     }
   },
   "max_queue_depth" : 100,

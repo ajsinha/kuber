@@ -2,7 +2,6 @@
 <!--
   ~ Copyright © 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('C# Client')}"></head>
@@ -306,7 +305,7 @@ foreach (var region in regions)
                 <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Request/Response Messaging</h5>
             </div>
             <div class="card-body">
-                <p>Build cache operation requests for message broker integration (Kafka, RabbitMQ, ActiveMQ, IBM MQ).</p>
+                <p>Build cache operation requests for message broker integration (Kafka, Confluent Kafka, RabbitMQ, ActiveMQ, IBM MQ).</p>
                 
                 <h6>Building Requests</h6>
                 <pre class="bg-light p-3 rounded"><code class="language-csharp">using Kuber.Client;

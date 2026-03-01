@@ -464,7 +464,6 @@ This software and documentation do not constitute professional advice of any kin
 
 ### PATENT NOTICE
 
-Patent Pending: Certain architectural patterns and implementations described in this paper may be subject to patent applications, including but not limited to: the hybrid memory architecture with in-memory key index and tiered value storage, the multi-protocol access layer combining Redis RESP, REST HTTP/JSON, and message broker channels, the region-isolated persistence model with pluggable backends, and the integrated broker-based cache access with structured event publishing.
 
 ### TRADEMARK NOTICE
 

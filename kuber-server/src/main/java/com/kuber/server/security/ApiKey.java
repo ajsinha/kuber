@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.security;
 
@@ -25,7 +23,7 @@ import java.util.List;
  * API keys can be used by REST clients, Python clients, and Java clients
  * as an alternative to username/password authentication.
  *
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Data
 @Builder

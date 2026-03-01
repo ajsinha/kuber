@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Test client for Kuber's IBM MQ-based Request/Response messaging.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 public class IbmMqRequestResponseTest {
     

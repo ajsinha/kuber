@@ -2,6 +2,75 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.6.3] - 2026-02-28 - HELP CARD CONSOLIDATION, GLOSSARY & COMPILATION FIX
+
+### 📚 Help Card Consolidation (37 → 24 pages)
+
+- **7 merges executed**: Overview+QuickStart, Architecture+Internals, Config+Properties, Security+APIKeys, Key+String+Batch+Search ops, Hash+TTL ops, Aerospike→Persistence
+- **13 redirect pages**: Backward-compatible redirects with meta-refresh for all absorbed pages
+- **Help index updated**: Card titles and descriptions reflect merged structure
+
+### 📖 Glossary Accuracy
+
+- **5 new broker entries**: ActiveMQ, Confluent Kafka, IBM MQ, Kafka, RabbitMQ — all with version badges, descriptions, and messaging/broker tags
+- **Port number fix**: Corrected Redis port from 6379 to 6380 in Configuration Guide quick reference
+
+### 🔧 Branding Externalization Verified
+
+- **All rendered branding** (author, email, copyright, GitHub, version) uses Thymeleaf expressions (`${appAuthor}`, `${appEmail}`, `${appCopyright}`, `${appGithub}`, `${appVersion}`) sourced from `application.properties` via `GlobalControllerAdvice`
+- **Zero hardcoded branding** in any rendered HTML content
+
+### 🐛 Bug Fix
+
+- **ConfluentKafkaBrokerAdapter**: Removed unreachable `catch (InterruptedException)` blocks in `connect()` and `attemptReconnect()` methods that caused compilation errors — `Thread.sleep()` calls already had inline try-catch handlers
+
+## [2.6.2] - 2026-02-28 - CONFLUENT KAFKA, FULL PUBSUB RESILIENCE & PATENT CLEANUP
+
+### 🌐 Confluent Kafka Support (New)
+
+- **New broker type `confluent-kafka`**: Full support for Confluent Cloud and Confluent Platform Kafka clusters, distinct from self-managed Kafka (`kafka` type)
+- **SASL_SSL authentication**: Uses API key/secret via SASL PLAIN mechanism over SSL — no manual JAAS config needed; just provide `api_key` and `api_secret`
+- **Messaging adapter**: `ConfluentKafkaBrokerAdapter` for request/response messaging with Confluent Cloud clusters — includes startup retry (5 attempts), publish recovery (3 attempts), and reconnect backoff settings
+- **Event publisher**: `ConfluentKafkaEventPublisher` for event publishing to Confluent Cloud topics — producer retry with backoff, auto-recovery on broken connections, and automatic topic creation via AdminClient
+- **Schema Registry ready**: Configuration supports `schema_registry_url`, `schema_registry_api_key`, and `schema_registry_api_secret` for future Schema Registry integration
+- **Config examples**: `config/message_brokers.json` includes `confluent-cloud` (basic) and `confluent-cloud-sr` (with Schema Registry) broker definitions; `config/request_response.json` includes `confluent_kafka_example`
+- **BrokerDefinition extended**: `KuberProperties.BrokerDefinition` adds `apiKey`, `apiSecret`, `schemaRegistryUrl`, `schemaRegistryApiKey`, `schemaRegistryApiSecret` fields
+- **MessagingConfig extended**: `BrokerConfig` adds accessors for `api_key`, `api_secret`, `schema_registry_url`, `schema_registry_api_key`, `schema_registry_api_secret` connection properties
+
+### 🔄 Full PubSub Connection Resilience (All Brokers)
+
+- **RabbitMQ adapter**: `connect()` now retries up to 5 times with exponential backoff; `publish()` detects broken channel and calls `recoverConnection()` with 3-attempt recovery; automatic recovery enabled on ConnectionFactory
+- **ActiveMQ adapter**: `connect()` now retries up to 5 times with exponential backoff; `publish()` detects null session and calls `recoverConnection()` with 3-attempt recovery
+- **IBM MQ adapter**: `connect()` now retries up to 5 times with exponential backoff; `publish()` detects null session and calls `recoverConnection()` with 3-attempt recovery
+- **RabbitMQ event publisher**: `getOrCreateConnection()` retries 3× with backoff and heartbeat; `publishToDestination()` detects closed channel, invalidates and recreates; `getOrCreateChannel()` null-safe
+- **ActiveMQ event publisher**: `getOrCreateConnectionFactory()` retries 3× with test connection verification; `reconnectOnException` enabled; `publishToDestination()` invalidates broken factory for auto-recreation
+- **IBM MQ event publisher**: `getOrCreateConnectionFactory()` retries 3× with test connection verification; `publishToDestination()` invalidates broken factory for auto-recreation
+- **Consistent pattern**: All adapters use `markDisconnectedForRecovery()` on publish failure so the next attempt triggers auto-heal; all publishers invalidate cached connections on failure
+
+### 🧹 Patent Reference Cleanup
+
+- **Complete removal**: All "Patent Pending" references removed from 126 Java files, 42 HTML templates, C#, Python, Markdown, and all other file types across the entire codebase
+
+---
+
+## [2.6.1] - 2026-02-21 - KAFKA RESILIENCE, EXTERNALIZED BRANDING & UI FIX
+
+### 🔄 Kafka Connection Resilience
+
+- **Startup retry loop (messaging)**: `KafkaBrokerAdapter.connect()` now retries up to 5 times with exponential backoff (3s→6s→12s→15s cap) before giving up — previously a single failed availability check aborted the connection
+- **Startup retry loop (event publishing)**: `KafkaEventPublisher.createAdminClient()` and `getOrCreateProducer()` both retry up to 3 times with backoff when Kafka is temporarily unreachable
+- **Publish recovery**: If a publish fails or the producer becomes disconnected, the next publish attempt automatically recreates the producer — `KafkaBrokerAdapter.publish()` calls `recoverConnection()` and `KafkaEventPublisher.publishToDestination()` invalidates and recreates broken producers
+- **Reconnect backoff settings**: All Kafka producers and consumers now include `reconnect.backoff.ms=1000`, `reconnect.backoff.max.ms=10000`, `request.timeout.ms=15000`, `delivery.timeout.ms=30000` for automatic recovery from transient broker failures
+
+### 🏷️ Externalized Branding
+
+- **New application.properties**: `server.app.author`, `server.app.email`, `server.app.copyright`, `server.app.github` — all rendered via Thymeleaf in the shared layout footer and about page
+- **GlobalControllerAdvice**: Now exposes `appAuthor`, `appEmail`, `appCopyright`, `appGithub`, and `appVersion` as model attributes available to every template
+- **Layout footer**: Uses `th:text` for version, author, and copyright instead of hardcoded strings
+- **About page**: Both author cards and both copyright footers use Thymeleaf expressions; GitHub link added to author cards
+
+---
+
 ## [2.6.0] - 2026-02-18 - EXPIRED EVENT ENHANCEMENT & BOOTSTRAP JS FIX
 
 ### 🚀 Expired Event Publishing with Payload
@@ -2580,4 +2649,3 @@ kuber:
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
 
-Patent Pending

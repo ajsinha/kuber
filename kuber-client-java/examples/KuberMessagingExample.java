@@ -1,7 +1,6 @@
 /*
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
- * Patent Pending
  *
  * Kuber Request/Response Messaging Example
  *
@@ -64,7 +63,7 @@ import java.util.*;
  * }
  * </pre>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 public class KuberMessagingExample {
     
@@ -558,7 +557,7 @@ public class KuberMessagingExample {
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("app:config:theme", "dark");
         config.put("app:config:lang", "en-US");
-        config.put("app:config:version", "2.6.0");
+        config.put("app:config:version", "2.6.3");
         CacheRequest msetReq = builder.mset(config);
         System.out.println("   Topic: kuber_request");
         System.out.println("   Message: " + mapper.writeValueAsString(msetReq));
@@ -595,7 +594,7 @@ public class KuberMessagingExample {
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
             ║          KUBER REQUEST/RESPONSE MESSAGING - JAVA CLIENT              ║
-            ║                         Version 2.6.0                                ║
+            ║                         Version 2.6.3                                ║
             ╚══════════════════════════════════════════════════════════════════════╝
             """);
         

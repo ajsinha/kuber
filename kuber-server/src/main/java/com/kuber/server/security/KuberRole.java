@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.security;
 
@@ -33,7 +31,7 @@ import java.util.Set;
  * - "{region}_full" - Full access (read, write, delete) to a specific region
  * - Custom roles can have any name
  * 
- * @version 2.6.0
+ * @version 2.6.3
  * @since 1.7.3
  */
 @Data

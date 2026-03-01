@@ -1,5 +1,5 @@
 {
-  "_comment": "Kuber Event Publishing - Region Configuration (v2.6.0)",
+  "_comment": "Kuber Event Publishing - Region Configuration (v2.6.2)",
   "_doc": "Regions reference broker names defined in config/message_brokers.json",
 
   "regions": {
@@ -10,6 +10,10 @@
         {
           "broker": "kafka-prod",
           "topic": "kuber.trades.events"
+        },
+        {
+          "broker": "confluent-cloud",
+          "topic": "kuber-trades-events"
         },
         {
           "broker": "activemq-legacy",

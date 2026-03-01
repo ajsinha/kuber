@@ -1,7 +1,6 @@
 /*
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
- * Patent Pending
  *
  * Kuber Distributed Cache - .NET Examples
  * Request/Response Messaging Example
@@ -86,7 +85,7 @@ public static class MessagingExample
         {
             ["app:config:theme"] = "dark",
             ["app:config:lang"] = "en-US",
-            ["app:config:version"] = "2.6.0"
+            ["app:config:version"] = "2.6.2"
         });
         Console.WriteLine($"   Topic: kuber_request");
         Console.WriteLine($"   Message: {client.ToJson(msetRequest)}");

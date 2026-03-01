@@ -554,6 +554,104 @@ java -Djavax.net.debug=ssl:handshake -jar kuber-server.jar
 
 ---
 
+## Part D: Message Broker SSL/TLS
+
+Kuber's message brokers (Kafka, Confluent Kafka, RabbitMQ, ActiveMQ, IBM MQ) each support SSL/TLS for encrypted communication. Broker SSL is configured in `config/message_brokers.json`.
+
+### Supported SSL Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `jks` | Server-only trust via JKS truststore | Kafka with one-way TLS |
+| `pem` | Server-only trust via PEM CA cert | RabbitMQ, general purpose |
+| `sasl_ssl` | SASL authentication over SSL (SCRAM, PLAIN) | Kafka with SASL |
+| `mtls_jks` | Mutual TLS via JKS keystore + truststore | Kafka, ActiveMQ, IBM MQ mTLS |
+| `mtls_pem` | Mutual TLS via PEM certs + key | RabbitMQ, Kafka mTLS |
+
+### Confluent Kafka (confluent-kafka)
+
+Confluent Kafka uses built-in SASL_SSL with API key/secret authentication — no manual SSL or JAAS configuration is needed. Simply provide `api-key` and `api-secret` in the broker definition:
+
+```json
+{
+  "confluent-cloud": {
+    "enabled": true,
+    "type": "confluent-kafka",
+    "bootstrap-servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+    "api-key": "YOUR_CONFLUENT_API_KEY",
+    "api-secret": "YOUR_CONFLUENT_API_SECRET",
+    "partitions": 6,
+    "replication-factor": 3,
+    "retention-hours": 168,
+    "acks": "all"
+  }
+}
+```
+
+The adapter automatically constructs the SASL_SSL JAAS config, sets `security.protocol=SASL_SSL` and `sasl.mechanism=PLAIN`. No truststore or keystore paths are required for Confluent Cloud.
+
+### Kafka SSL Examples
+
+**One-Way TLS (JKS):**
+```json
+{
+  "ssl": {
+    "enabled": true,
+    "mode": "jks",
+    "protocol": "TLSv1.3",
+    "trust-store-path": "/opt/kuber/certs/kafka-truststore.jks",
+    "trust-store-password": "changeit",
+    "trust-store-type": "JKS"
+  }
+}
+```
+
+**SASL_SSL (SCRAM-SHA-512):**
+```json
+{
+  "ssl": {
+    "enabled": true,
+    "mode": "sasl_ssl",
+    "protocol": "TLSv1.3",
+    "sasl-mechanism": "SCRAM-SHA-512",
+    "sasl-jaas-config": "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"user\" password=\"pass\";",
+    "trust-store-path": "/opt/kuber/certs/truststore.jks",
+    "trust-store-password": "changeit"
+  }
+}
+```
+
+**Mutual TLS (mTLS with JKS):**
+```json
+{
+  "ssl": {
+    "enabled": true,
+    "mode": "mtls_jks",
+    "protocol": "TLSv1.3",
+    "trust-store-path": "/opt/kuber/certs/truststore.jks",
+    "trust-store-password": "changeit",
+    "key-store-path": "/opt/kuber/certs/client-keystore.jks",
+    "key-store-password": "clientpass"
+  }
+}
+```
+
+**Mutual TLS (mTLS with PEM):**
+```json
+{
+  "ssl": {
+    "enabled": true,
+    "mode": "mtls_pem",
+    "protocol": "TLSv1.3",
+    "trust-cert-path": "/opt/kuber/certs/ca-cert.pem",
+    "key-cert-path": "/opt/kuber/certs/client-cert.pem",
+    "key-path": "/opt/kuber/certs/client-key.pem"
+  }
+}
+```
+
+---
+
 ## See Also
 
 - [Security & RBAC](SECURITY.md)

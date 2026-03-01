@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.config;
 
@@ -20,7 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * Password encoder configuration.
  * Separated from SecurityConfig to avoid circular dependency with KuberUserService.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Configuration
 public class PasswordEncoderConfig {

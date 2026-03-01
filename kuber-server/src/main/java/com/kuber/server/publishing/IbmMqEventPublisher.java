@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.publishing;
 
@@ -46,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Service
@@ -242,6 +240,16 @@ public class IbmMqEventPublisher implements EventPublisher {
         
         try {
             MQConnectionFactory factory = getOrCreateConnectionFactory(binding);
+            if (factory == null) {
+                log.warn("IBM MQ connection factory is null for {} — attempting recovery", binding.connectionKey());
+                connectionFactories.remove(binding.connectionKey());
+                factory = getOrCreateConnectionFactory(binding);
+                if (factory == null) {
+                    errors.incrementAndGet();
+                    log.error("Failed to recover IBM MQ connection factory for {} — event dropped", binding.connectionKey());
+                    return;
+                }
+            }
             
             // Create connection
             if (binding.username != null && !binding.username.isBlank()) {
@@ -292,6 +300,8 @@ public class IbmMqEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Failed to publish event to IBM MQ for region '{}', key '{}': {}",
                     region, event.getKey(), e.getMessage());
+            // v2.6.3: Invalidate factory for recovery on next attempt
+            connectionFactories.remove(binding.connectionKey());
         } finally {
             closeQuietly(producer);
             closeQuietly(session);
@@ -306,33 +316,55 @@ public class IbmMqEventPublisher implements EventPublisher {
     
     private MQConnectionFactory getOrCreateConnectionFactory(DestinationBinding binding) throws JMSException {
         return connectionFactories.computeIfAbsent(binding.connectionKey(), key -> {
-            try {
-                MQConnectionFactory factory = new MQConnectionFactory();
-                
-                // Set connection properties
-                factory.setHostName(binding.host);
-                factory.setPort(binding.port);
-                factory.setQueueManager(binding.queueManager);
-                factory.setChannel(binding.channel);
-                factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
-                
-                // Set CCSID if specified
-                if (binding.ccsid > 0) {
-                    factory.setCCSID(binding.ccsid);
+            int maxRetries = 3;
+            long retryDelayMs = 2000;
+            
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    MQConnectionFactory factory = new MQConnectionFactory();
+                    
+                    // Set connection properties
+                    factory.setHostName(binding.host);
+                    factory.setPort(binding.port);
+                    factory.setQueueManager(binding.queueManager);
+                    factory.setChannel(binding.channel);
+                    factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+                    
+                    // Set CCSID if specified
+                    if (binding.ccsid > 0) {
+                        factory.setCCSID(binding.ccsid);
+                    }
+                    
+                    // Enable SSL if configured
+                    if (binding.sslCipherSuite != null && !binding.sslCipherSuite.isBlank()) {
+                        factory.setSSLCipherSuite(binding.sslCipherSuite);
+                    }
+                    
+                    // v2.6.3: Verify connectivity
+                    Connection testConn = (binding.username != null && !binding.username.isBlank()) 
+                            ? factory.createConnection(binding.username, binding.password)
+                            : factory.createConnection();
+                    testConn.close();
+                    
+                    log.info("✅ Created IBM MQ connection factory for queue manager '{}' at {}:{} (attempt {})", 
+                            binding.queueManager, binding.host, binding.port, attempt);
+                    return factory;
+                    
+                } catch (Exception e) {
+                    log.warn("Failed to create IBM MQ connection factory for {} (attempt {}/{}): {}",
+                            key, attempt, maxRetries, e.getMessage());
+                    if (attempt < maxRetries) {
+                        try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        retryDelayMs *= 2;
+                    }
                 }
-                
-                // Enable SSL if configured
-                if (binding.sslCipherSuite != null && !binding.sslCipherSuite.isBlank()) {
-                    factory.setSSLCipherSuite(binding.sslCipherSuite);
-                }
-                
-                log.info("Created IBM MQ connection factory for queue manager '{}' at {}:{}", 
-                        binding.queueManager, binding.host, binding.port);
-                return factory;
-                
-            } catch (JMSException e) {
-                throw new RuntimeException("Failed to create IBM MQ connection factory", e);
             }
+            
+            log.error("❌ Failed to create IBM MQ connection factory for {} after retries", key);
+            return null;
         });
     }
     

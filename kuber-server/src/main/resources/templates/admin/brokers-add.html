@@ -47,6 +47,7 @@
                         <label class="form-label">Broker Type <span class="text-danger">*</span></label>
                         <select id="brokerType" class="form-select" onchange="showTypeFields()">
                             <option value="kafka">Apache Kafka</option>
+                            <option value="confluent-kafka">Confluent Kafka (Cloud/Platform)</option>
                             <option value="activemq">Apache ActiveMQ</option>
                             <option value="rabbitmq">RabbitMQ</option>
                             <option value="ibmmq">IBM MQ</option>
@@ -105,6 +106,57 @@
                                 <option value="latest">latest</option>
                             </select>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Confluent Kafka (v2.6.3) -->
+                <div id="confluentKafkaFields" style="display:none">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Bootstrap Servers <span class="text-danger">*</span></label>
+                            <input type="text" id="ckServers" class="form-control" placeholder="pkc-xxxxx.us-east-1.aws.confluent.cloud:9092">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">API Key <span class="text-danger">*</span></label>
+                            <input type="text" id="ckApiKey" class="form-control" placeholder="Your Confluent API Key">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">API Secret <span class="text-danger">*</span></label>
+                            <input type="password" id="ckApiSecret" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Partitions</label>
+                            <input type="number" id="ckPartitions" class="form-control" value="6" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Replication Factor</label>
+                            <input type="number" id="ckReplication" class="form-control" value="3" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Acks</label>
+                            <select id="ckAcks" class="form-select">
+                                <option value="all" selected>all</option>
+                                <option value="1">1</option>
+                                <option value="0">0</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Schema Registry URL</label>
+                            <input type="text" id="ckSchemaRegistry" class="form-control" placeholder="https://psrc-xxxxx.confluent.cloud">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">SR API Key / Secret</label>
+                            <div class="input-group">
+                                <input type="text" id="ckSrApiKey" class="form-control" placeholder="SR Key">
+                                <input type="password" id="ckSrApiSecret" class="form-control" placeholder="SR Secret">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info small py-2 mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Confluent Kafka uses SASL_SSL with PLAIN mechanism automatically. No manual SSL configuration is needed.
                     </div>
                 </div>
 
@@ -422,16 +474,17 @@
 
 <script>
 function showTypeFields() {
-    ['kafkaFields','activemqFields','rabbitmqFields','ibmmqFields','fileFields'].forEach(id =>
+    ['kafkaFields','confluentKafkaFields','activemqFields','rabbitmqFields','ibmmqFields','fileFields'].forEach(id =>
         document.getElementById(id).style.display = 'none'
     );
     const t = document.getElementById('brokerType').value;
     document.getElementById(t === 'kafka' ? 'kafkaFields' :
+        t === 'confluent-kafka' ? 'confluentKafkaFields' :
         t === 'activemq' ? 'activemqFields' :
         t === 'rabbitmq' ? 'rabbitmqFields' :
         t === 'ibmmq' ? 'ibmmqFields' : 'fileFields').style.display = '';
-    // Hide SSL card for file type
-    document.getElementById('sslCard').style.display = t === 'file' ? 'none' : '';
+    // Hide SSL card for file type and confluent-kafka (uses built-in SASL_SSL)
+    document.getElementById('sslCard').style.display = (t === 'file' || t === 'confluent-kafka') ? 'none' : '';
 }
 
 function toggleSslFields() {
@@ -466,6 +519,18 @@ function saveBroker() {
         cfg.acks = val('kafkaAcks');
         if (val('kafkaGroupId')) cfg['group-id'] = val('kafkaGroupId');
         if (val('kafkaOffsetReset')) cfg['auto-offset-reset'] = val('kafkaOffsetReset');
+    } else if (type === 'confluent-kafka') {
+        if (!val('ckServers')) { showAlert('danger', 'Bootstrap servers required.'); return; }
+        if (!val('ckApiKey') || !val('ckApiSecret')) { showAlert('danger', 'API Key and API Secret are required for Confluent Kafka.'); return; }
+        cfg['bootstrap-servers'] = val('ckServers');
+        cfg['api-key'] = val('ckApiKey');
+        cfg['api-secret'] = val('ckApiSecret');
+        cfg.partitions = intVal('ckPartitions', 6);
+        cfg['replication-factor'] = intVal('ckReplication', 3);
+        cfg.acks = val('ckAcks');
+        if (val('ckSchemaRegistry')) cfg['schema-registry-url'] = val('ckSchemaRegistry');
+        if (val('ckSrApiKey')) cfg['schema-registry-api-key'] = val('ckSrApiKey');
+        if (val('ckSrApiSecret')) cfg['schema-registry-api-secret'] = val('ckSrApiSecret');
     } else if (type === 'activemq') {
         if (!val('amqUrl')) { showAlert('danger', 'Broker URL required.'); return; }
         cfg['broker-url'] = val('amqUrl');
@@ -497,8 +562,8 @@ function saveBroker() {
         cfg.compress = document.getElementById('fileCompress').checked;
     }
 
-    // SSL
-    if (document.getElementById('sslEnabled').checked && type !== 'file') {
+    // SSL (not applicable to file or confluent-kafka types)
+    if (document.getElementById('sslEnabled').checked && type !== 'file' && type !== 'confluent-kafka') {
         const mode = val('sslMode');
         const ssl = { enabled: true, mode: mode, protocol: val('sslProtocol'), 'hostname-verification': document.getElementById('sslHostVerify').checked };
         if (['jks','sasl_ssl','mtls_jks'].includes(mode)) {

@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.config;
 
@@ -63,7 +61,7 @@ public class KuberProperties {
      * Used for logging, API responses, and UI display.
      * @since 1.6.1
      */
-    private String version = "2.6.0";
+    private String version = "2.6.3";
     
     /**
      * Unique node identifier
@@ -913,7 +911,7 @@ public class KuberProperties {
         private boolean enabled = false;
         
         /**
-         * Broker type: kafka, activemq, rabbitmq, ibmmq, file
+         * Broker type: kafka, confluent-kafka, activemq, rabbitmq, ibmmq, file
          */
         private String type;
         
@@ -925,6 +923,13 @@ public class KuberProperties {
         private String acks = "1";
         private int batchSize = 16384;
         private int lingerMs = 5;
+        
+        // ---- Confluent Kafka settings (v2.6.3) ----
+        private String apiKey = "";
+        private String apiSecret = "";
+        private String schemaRegistryUrl = "";
+        private String schemaRegistryApiKey = "";
+        private String schemaRegistryApiSecret = "";
         
         // ---- ActiveMQ settings ----
         private String brokerUrl = "tcp://localhost:61616";

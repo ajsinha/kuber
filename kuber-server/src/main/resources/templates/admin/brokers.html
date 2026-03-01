@@ -52,7 +52,7 @@
                                 <td><strong th:text="${b.name}"></strong></td>
                                 <td>
                                     <span class="badge"
-                                          th:classappend="${b.type=='kafka'} ? 'bg-warning text-dark' : (${b.type=='activemq'} ? 'bg-info' : (${b.type=='rabbitmq'} ? 'bg-success' : (${b.type=='ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
+                                          th:classappend="${b.type=='kafka' or b.type=='confluent-kafka'} ? 'bg-warning text-dark' : (${b.type=='activemq'} ? 'bg-info' : (${b.type=='rabbitmq'} ? 'bg-success' : (${b.type=='ibmmq'} ? 'bg-danger' : 'bg-secondary')))"
                                           th:text="${b.type}"></span>
                                 </td>
                                 <td>
@@ -120,6 +120,8 @@
                         <dl>
                             <dt><i class="fas fa-stream text-dark me-1"></i>Apache Kafka</dt>
                             <dd class="text-muted small mb-2">Distributed event streaming platform. Uses <strong>bootstrap servers</strong> for initial cluster discovery. Best for high-throughput, ordered event streams.</dd>
+                            <dt><i class="fas fa-cloud text-dark me-1"></i>Confluent Kafka</dt>
+                            <dd class="text-muted small mb-2">Confluent Cloud or Platform. Uses <strong>API key/secret</strong> with SASL_SSL automatically &mdash; no manual SSL setup. Set type to <code>confluent-kafka</code>.</dd>
                             <dt><i class="fas fa-bolt text-warning me-1"></i>ActiveMQ</dt>
                             <dd class="text-muted small mb-2">JMS-compliant message broker. Uses <strong>broker URL</strong> (e.g., <code>tcp://host:61616</code>). Best for traditional point-to-point and pub/sub messaging.</dd>
                             <dt><i class="fas fa-server text-info me-1"></i>RabbitMQ</dt>
@@ -160,12 +162,13 @@
   "production-kafka": {
     "type": "kafka",
     "enabled": true,
-    "bootstrap_servers": "kafka1:9092,kafka2:9092"
+    "bootstrap_servers": "kafka1:9092"
   },
-  "dev-activemq": {
-    "type": "activemq",
-    "enabled": false,
-    "broker_url": "tcp://localhost:61616"
+  "confluent-cloud": {
+    "type": "confluent-kafka",
+    "enabled": true,
+    "bootstrap-servers": "pkc-xxx.cloud:9092",
+    "api-key": "KEY", "api-secret": "SECRET"
   }
 }</pre>
                     </div>

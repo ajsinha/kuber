@@ -200,12 +200,12 @@
             <div class="col-md-6">
                 <span class="text-muted">
                     <i class="fas fa-database me-1"></i>
-                    <strong th:text="${appName} ?: 'Kuber'">Kuber</strong> Distributed Cache v2.6.0
+                    <strong th:text="${appName} ?: 'Kuber'">Kuber</strong> Distributed Cache v<span th:text="${appVersion} ?: '2.6.3'">2.6.3</span>
                 </span>
             </div>
             <div class="col-md-6 text-end">
                 <span class="text-muted small">
-                    Copyright &copy; 2025-2030 Ashutosh Sinha. All Rights Reserved.
+                    Copyright &copy; <span th:text="${appCopyright} ?: '2025-2030'">2025-2030</span> <span th:text="${appAuthor} ?: 'Ashutosh Sinha'">Ashutosh Sinha</span>. All Rights Reserved.
                 </span>
             </div>
         </div>

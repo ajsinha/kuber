@@ -1,5 +1,5 @@
 {
-  "_comment": "Kuber Message Broker Definitions (v2.6.0)",
+  "_comment": "Kuber Message Broker Definitions (v2.6.2)",
   "_doc": "Broker configs loaded at startup. Referenced by event_publishing.json region destinations.",
 
   "brokers": {
@@ -90,6 +90,37 @@
       "replication-factor": 2,
       "retention-hours": 168,
       "acks": "1"
+    },
+
+    "confluent-cloud": {
+      "enabled": false,
+      "type": "confluent-kafka",
+      "bootstrap-servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+      "api-key": "YOUR_CONFLUENT_API_KEY",
+      "api-secret": "YOUR_CONFLUENT_API_SECRET",
+      "partitions": 6,
+      "replication-factor": 3,
+      "retention-hours": 168,
+      "acks": "all",
+      "batch-size": 16384,
+      "linger-ms": 5
+    },
+
+    "confluent-cloud-sr": {
+      "enabled": false,
+      "type": "confluent-kafka",
+      "bootstrap-servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+      "api-key": "YOUR_CONFLUENT_API_KEY",
+      "api-secret": "YOUR_CONFLUENT_API_SECRET",
+      "schema-registry-url": "https://psrc-xxxxx.us-east-1.aws.confluent.cloud",
+      "schema-registry-api-key": "YOUR_SR_API_KEY",
+      "schema-registry-api-secret": "YOUR_SR_API_SECRET",
+      "partitions": 6,
+      "replication-factor": 3,
+      "retention-hours": 720,
+      "acks": "all",
+      "batch-size": 32768,
+      "linger-ms": 10
     },
 
     "activemq-legacy": {

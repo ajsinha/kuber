@@ -7,7 +7,7 @@ package com.kuber.server.index;
 /**
  * Types of secondary indexes supported by Kuber.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  * @since 1.9.0
  */
 public enum IndexType {

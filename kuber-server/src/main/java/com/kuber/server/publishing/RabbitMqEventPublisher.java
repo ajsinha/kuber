@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.publishing;
 
@@ -50,7 +48,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * This publisher only initializes connections to brokers where enabled=true.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Service
@@ -294,6 +292,19 @@ public class RabbitMqEventPublisher implements EventPublisher {
         try {
             Channel channel = getOrCreateChannel(binding);
             
+            // v2.6.3: If channel is null or closed, try to recover
+            if (channel == null || !channel.isOpen()) {
+                log.warn("RabbitMQ channel unavailable for {} — attempting recovery", binding.channelKey());
+                channels.remove(binding.channelKey());
+                connections.remove(binding.connectionKey());
+                channel = getOrCreateChannel(binding);
+                if (channel == null || !channel.isOpen()) {
+                    errors.incrementAndGet();
+                    log.error("Failed to recover RabbitMQ channel for {} — event dropped", binding.channelKey());
+                    return;
+                }
+            }
+            
             // Build message properties
             Map<String, Object> headers = new HashMap<>();
             headers.put("region", region);
@@ -333,6 +344,9 @@ public class RabbitMqEventPublisher implements EventPublisher {
             errors.incrementAndGet();
             log.error("Failed to publish event to RabbitMQ for region '{}', key '{}': {}",
                     region, event.getKey(), e.getMessage());
+            // v2.6.3: Invalidate channel/connection for recovery on next attempt
+            channels.remove(binding.channelKey());
+            connections.remove(binding.connectionKey());
         }
     }
     
@@ -345,47 +359,71 @@ public class RabbitMqEventPublisher implements EventPublisher {
         return channels.computeIfAbsent(binding.channelKey(), key -> {
             try {
                 Connection connection = getOrCreateConnection(binding);
+                if (connection == null) {
+                    log.error("Cannot create channel — RabbitMQ connection is null for {}", binding.connectionKey());
+                    return null;
+                }
                 Channel channel = connection.createChannel();
                 log.info("Created RabbitMQ channel for {}", binding.channelKey());
                 return channel;
             } catch (Exception e) {
-                throw new RuntimeException("Failed to create RabbitMQ channel", e);
+                log.error("Failed to create RabbitMQ channel for {}: {}", binding.channelKey(), e.getMessage());
+                return null;
             }
         });
     }
     
     private Connection getOrCreateConnection(DestinationBinding binding) throws IOException, TimeoutException {
         return connections.computeIfAbsent(binding.connectionKey(), key -> {
-            try {
-                ConnectionFactory factory = new ConnectionFactory();
-                factory.setHost(binding.host);
-                factory.setPort(binding.port);
-                factory.setVirtualHost(binding.virtualHost);
-                
-                if (binding.username != null && !binding.username.isBlank()) {
-                    factory.setUsername(binding.username);
-                    factory.setPassword(binding.password);
+            int maxRetries = 3;
+            long retryDelayMs = 2000;
+            
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    ConnectionFactory factory = new ConnectionFactory();
+                    factory.setHost(binding.host);
+                    factory.setPort(binding.port);
+                    factory.setVirtualHost(binding.virtualHost);
+                    
+                    if (binding.username != null && !binding.username.isBlank()) {
+                        factory.setUsername(binding.username);
+                        factory.setPassword(binding.password);
+                    }
+                    
+                    // Enable automatic recovery
+                    factory.setAutomaticRecoveryEnabled(true);
+                    factory.setNetworkRecoveryInterval(5000);
+                    factory.setConnectionTimeout(15000);
+                    factory.setRequestedHeartbeat(30);
+                    
+                    // Apply SSL/TLS if enabled
+                    if (binding.ssl.isEnabled()) {
+                        applyRabbitSsl(factory, binding.ssl);
+                        log.info("RabbitMQ SSL/TLS enabled for {}:{}", binding.host, binding.port);
+                    }
+                    
+                    log.info("Creating RabbitMQ connection to {}:{}/{}{} (attempt {}/{})", 
+                            binding.host, binding.port, binding.virtualHost,
+                            binding.ssl.isEnabled() ? " [SSL]" : "", attempt, maxRetries);
+                    Connection conn = factory.newConnection();
+                    log.info("✅ RabbitMQ connection established to {}:{}", binding.host, binding.port);
+                    return conn;
+                    
+                } catch (Exception e) {
+                    log.warn("Failed to create RabbitMQ connection to {}:{} (attempt {}/{}): {}", 
+                            binding.host, binding.port, attempt, maxRetries, e.getMessage());
+                    if (attempt < maxRetries) {
+                        try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        retryDelayMs *= 2;
+                    }
                 }
-                
-                // Enable automatic recovery
-                factory.setAutomaticRecoveryEnabled(true);
-                factory.setNetworkRecoveryInterval(5000);
-                factory.setConnectionTimeout(30000);
-                
-                // Apply SSL/TLS if enabled
-                if (binding.ssl.isEnabled()) {
-                    applyRabbitSsl(factory, binding.ssl);
-                    log.info("RabbitMQ SSL/TLS enabled for {}:{}", binding.host, binding.port);
-                }
-                
-                log.info("Creating RabbitMQ connection to {}:{}/{}{}", 
-                        binding.host, binding.port, binding.virtualHost,
-                        binding.ssl.isEnabled() ? " [SSL]" : "");
-                return factory.newConnection();
-                
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to create RabbitMQ connection", e);
             }
+            
+            log.error("❌ Failed to create RabbitMQ connection to {}:{} after retries", binding.host, binding.port);
+            return null;
         });
     }
     

@@ -1,7 +1,6 @@
 /*
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
- * Patent Pending
  *
  * Kuber Distributed Cache - .NET Examples
  * Redis Protocol Example

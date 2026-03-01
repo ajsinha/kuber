@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.messaging;
 
@@ -31,12 +29,13 @@ import java.util.Map;
  * <p>Supported broker types:
  * <ul>
  *   <li>kafka - Apache Kafka</li>
+ *   <li>confluent-kafka - Confluent Cloud / Confluent Platform</li>
  *   <li>activemq - Apache ActiveMQ</li>
  *   <li>rabbitmq - RabbitMQ</li>
  *   <li>ibmmq - IBM MQ</li>
  * </ul>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Data
 @NoArgsConstructor
@@ -206,6 +205,27 @@ public class MessagingConfig {
             return connection.get("conn_name");
         }
         
+        // --- Confluent Kafka ---
+        public String getApiKey() {
+            return connection.get("api_key");
+        }
+        
+        public String getApiSecret() {
+            return connection.get("api_secret");
+        }
+        
+        public String getSchemaRegistryUrl() {
+            return connection.get("schema_registry_url");
+        }
+        
+        public String getSchemaRegistryApiKey() {
+            return connection.get("schema_registry_api_key");
+        }
+        
+        public String getSchemaRegistryApiSecret() {
+            return connection.get("schema_registry_api_secret");
+        }
+        
         /**
          * Get connection string for logging (masking sensitive info).
          */
@@ -213,6 +233,8 @@ public class MessagingConfig {
             switch (type != null ? type.toLowerCase() : "") {
                 case "kafka":
                     return "kafka://" + getBootstrapServers();
+                case "confluent-kafka":
+                    return "confluent-kafka://" + getBootstrapServers();
                 case "activemq":
                     return getBrokerUrl();
                 case "rabbitmq":

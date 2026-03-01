@@ -2,7 +2,6 @@
 <!--
   ~ Copyright © 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Web UI Guide')}"></head>
@@ -102,7 +101,7 @@
                 <p>Central broker management at <a href="/admin/brokers"><code>/admin/brokers</code></a>. This is the single place to define connection settings for all message brokers used by event publishing and request/response messaging.</p>
                 <p><strong>Add Broker</strong> (<a href="/admin/brokers/add"><code>/admin/brokers/add</code></a>) &mdash; a standalone form supporting:</p>
                 <ul>
-                    <li><strong>5 broker types:</strong> Apache Kafka, ActiveMQ, RabbitMQ, IBM MQ, File (local disk)</li>
+                    <li><strong>5 broker types:</strong> Apache Kafka, Confluent Kafka, ActiveMQ, RabbitMQ, IBM MQ, File (local disk)</li>
                     <li><strong>Type-specific connection fields</strong> with validation (bootstrap servers, broker URL, host/port, queue manager, etc.)</li>
                     <li><strong>SSL/TLS configuration</strong> with 5 modes: JKS, PEM, SASL_SSL (Kafka), Mutual TLS JKS, Mutual TLS PEM</li>
                     <li><strong>Inline JSON editor</strong> on the list page for direct <code>message_brokers.json</code> editing</li>
@@ -150,8 +149,8 @@
         </div>
         <footer class="py-4 mt-5 border-top">
             <div class="row">
-                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.6.0</p></div>
-                <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; 2025-2030 Ashutosh Sinha<br><span class="badge bg-warning text-dark">Patent Pending</span></p></div>
+                <div class="col-md-6"><h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span></h6><p class="text-muted small mb-0">Version 2.6.3</p></div>
+                <div class="col-md-6 text-end"><p class="text-muted small mb-0">Copyright &copy; <span th:text="${appCopyright} ?: '2025-2030'">2025-2030</span> <span th:text="${appAuthor} ?: 'Ashutosh Sinha'">Ashutosh Sinha</span></p></div>
             </div>
         </footer>
     </div>

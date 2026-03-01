@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Configurable bloom filters for faster lookups</li>
  * </ul>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  * @since 1.9.0
  */
 @Slf4j

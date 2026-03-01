@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Kuber v2.6.0 - Persistence Configuration Help
+  ~ Kuber v2.6.3 - Persistence Configuration Help
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Persistence Configuration')}"></head>
@@ -1177,9 +1177,38 @@ kuber.persistence.aerospike.namespace=kuber</code></pre>
                 </div>
             </div>
             
-            <div class="alert alert-success mt-4">
-                <i class="fas fa-book me-2"></i>
-                For detailed Aerospike documentation including cluster setup, monitoring, and troubleshooting, see the dedicated <a href="/help/aerospike" class="alert-link">Aerospike Help Page</a>.
+            <h5 class="mt-4"><i class="fas fa-server me-2"></i>Cluster Setup</h5>
+            <p>For a multi-node Aerospike cluster, configure mesh heartbeats in <code>aerospike.conf</code> on each node:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code># aerospike.conf - Heartbeat (mesh mode)
+heartbeat {
+    mode mesh
+    port 3002
+    mesh-seed-address-port 10.0.1.1 3002   # Node 1
+    mesh-seed-address-port 10.0.1.2 3002   # Node 2
+    mesh-seed-address-port 10.0.1.3 3002   # Node 3
+}
+
+# Kuber application.properties for cluster
+kuber.persistence.aerospike.hosts=10.0.1.1:3000,10.0.1.2:3000,10.0.1.3:3000
+kuber.persistence.aerospike.namespace=kuber</code></pre>
+
+            <h5 class="mt-4"><i class="fas fa-chart-line me-2"></i>Monitoring</h5>
+            <p>Use Aerospike tools to monitor your cluster:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code># Interactive query (aql)
+aql> SELECT * FROM kuber.customers WHERE PK='user:1001'
+aql> SHOW SETS                          # List all sets (regions)
+
+# Admin console
+asadm -e "info namespace kuber"         # Namespace statistics
+asadm -e "show statistics like memory"  # Memory usage
+
+# Quick status checks
+asinfo -v 'sets/kuber'                  # Set-level statistics
+asinfo -v 'namespace/kuber'             # Namespace overview</code></pre>
+
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <strong>High Memory Warning:</strong> If <code>memory-pct</code> exceeds 80%, consider increasing <code>memory-size</code>, switching to hybrid storage (data on SSD), enabling eviction with <code>high-water-memory-pct 80</code>, or using TTLs to expire old data.
             </div>
         </div>
     </div>
@@ -1298,14 +1327,12 @@ kuber.persistence.sync-individual-writes=true</code></pre>
         <div class="row">
             <div class="col-md-6">
                 <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                <p class="text-muted small mb-0">Version 2.6.0</p>
+                <p class="text-muted small mb-0">Version 2.6.3</p>
             </div>
             <div class="col-md-6 text-end">
                 <p class="text-muted small mb-0">
-                    Copyright &copy; 2025-2030, All Rights Reserved<br>
-                    Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
-                    <span class="badge bg-warning text-dark">Patent Pending</span>
-                </p>
+                    Copyright &copy; <span th:text="${appCopyright} ?: '2025-2030'">2025-2030</span>, All Rights Reserved<br>
+                    <span th:text="${appAuthor} ?: 'Ashutosh Sinha'">Ashutosh Sinha</span> | <a th:href="'mailto:' + ${appEmail}" href="mailto:ajsinha@gmail.com"><span th:text="${appEmail} ?: 'ajsinha@gmail.com'">ajsinha@gmail.com</span></a><br></p>
             </div>
         </div>
     </footer>

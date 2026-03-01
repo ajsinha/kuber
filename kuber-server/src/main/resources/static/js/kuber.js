@@ -2,7 +2,7 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Kuber Cache - Custom JavaScript v2.6.0
+ * Kuber Cache - Custom JavaScript v2.6.2
  */
 
 (function() {
@@ -483,7 +483,7 @@
             startStatsRefresh();
         }
         
-        console.log('Kuber Cache UI v2.6.0 initialized');
+        console.log('Kuber Cache UI v2.6.2 initialized');
     });
     
     window.addEventListener('beforeunload', function() { stopStatsRefresh(); });

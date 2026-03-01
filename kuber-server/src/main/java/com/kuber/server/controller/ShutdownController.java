@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.controller;
 
@@ -35,7 +33,7 @@ import java.util.Map;
  * 
  * <p>All endpoints require API key authentication via X-API-Key header.
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @RestController
 @RequestMapping("/api/admin")

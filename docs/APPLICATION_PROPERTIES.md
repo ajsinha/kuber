@@ -1,6 +1,6 @@
 # Kuber Distributed Cache - Application Properties Reference
 
-**Version 2.6.0**
+**Version 2.6.3**
 
 This document provides a comprehensive reference for all configuration properties available in Kuber Distributed Cache.
 
@@ -28,7 +28,7 @@ This document provides a comprehensive reference for all configuration propertie
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `kuber.version` | `2.6.0` | Current application version (read-only) |
+| `kuber.version` | `2.6.3` | Current application version (read-only) |
 | `kuber.base.datadir` | `./kuberdata` | Base directory for all data files. All other paths are relative to this. Override with `-Dkuber.base.datadir=/path` or `KUBER_BASE_DATADIR` env var |
 | `kuber.secure.folder` | `config/secure` | Directory for sensitive configuration files (users.json, apikeys.json). Auto-created if missing |
 | `server.app.name` | `Kuber` | Application display name shown in Web UI |
@@ -328,10 +328,22 @@ Broker definitions are managed in `config/message_brokers.json`. Each broker spe
         "trust-store-path": "/certs/truststore.jks",
         "trust-store-password": "changeit"
       }
+    },
+    "confluent-cloud": {
+      "enabled": true,
+      "type": "confluent-kafka",
+      "bootstrap-servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+      "api-key": "YOUR_CONFLUENT_API_KEY",
+      "api-secret": "YOUR_CONFLUENT_API_SECRET",
+      "partitions": 6,
+      "replication-factor": 3,
+      "acks": "all"
     }
   }
 }
 ```
+
+Confluent Kafka (`confluent-kafka` type) uses built-in SASL_SSL with API key/secret — no manual SSL block is needed.
 
 ### SSL/TLS Modes
 
@@ -371,7 +383,8 @@ Legacy per-region config in `application.properties` is still supported for back
 
 | Type | Description |
 |------|-------------|
-| `kafka` | Apache Kafka |
+| `kafka` | Apache Kafka (self-managed) |
+| `confluent-kafka` | Confluent Cloud / Confluent Platform (SASL_SSL with API key/secret) |
 | `rabbitmq` | RabbitMQ |
 | `activemq` | Apache ActiveMQ |
 | `ibmmq` | IBM MQ |
@@ -381,7 +394,7 @@ Legacy per-region config in `application.properties` is still supported for back
 
 ## Request/Response Messaging Configuration
 
-**New in v1.7.1, updated in v2.2.0** - Process cache operations via message brokers (Kafka, ActiveMQ, RabbitMQ, IBM MQ).
+**New in v1.7.1, updated in v2.2.0** - Process cache operations via message brokers (Kafka, Confluent Kafka, ActiveMQ, RabbitMQ, IBM MQ).
 
 Configuration is stored in an external JSON file. The configuration is **hot-reloadable** — changes are detected automatically without server restart.
 
@@ -411,7 +424,7 @@ Brokers are defined in the `brokers` map, keyed by a unique broker name.
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable this specific broker |
-| `type` | string | (required) | Broker type: `kafka`, `activemq`, `rabbitmq`, `ibmmq` |
+| `type` | string | (required) | Broker type: `kafka`, `confluent-kafka`, `activemq`, `rabbitmq`, `ibmmq` |
 | `display_name` | string | (optional) | Human-readable name for admin UI |
 | `connection` | object | `{}` | Connection properties (varies by broker type) |
 | `request_topics` | array | `[]` | List of request topics/queues to subscribe to |

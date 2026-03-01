@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.publishing;
 
@@ -34,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Provides lookup methods for the orchestration service
  * - Handles graceful shutdown
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Service

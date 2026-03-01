@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.messaging;
 
@@ -54,7 +52,7 @@ import java.util.Map;
  *   <li>REGIONS - List regions</li>
  * </ul>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Data
 @NoArgsConstructor

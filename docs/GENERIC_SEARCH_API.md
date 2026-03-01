@@ -1,6 +1,6 @@
 # Kuber Generic Search API
 
-**Version 2.6.0**
+**Version 2.6.3**
 
 The Generic Search API provides a powerful, unified endpoint for searching cache data using multiple strategies: key lookups, regex patterns, and JSON attribute filtering.
 
@@ -461,4 +461,3 @@ String results = response.body().string();
 
 **Copyright © 2025-2030, All Rights Reserved**  
 Ashutosh Sinha | [ajsinha@gmail.com](mailto:ajsinha@gmail.com)  
-*Patent Pending*

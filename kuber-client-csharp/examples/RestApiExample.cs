@@ -1,7 +1,6 @@
 /*
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
- * Patent Pending
  *
  * Kuber Distributed Cache - .NET Examples
  * REST API Example
@@ -70,7 +69,7 @@ public static class RestApiExample
             await client.MSetAsync(new Dictionary<string, string>
             {
                 ["config:app:name"] = "MyApp",
-                ["config:app:version"] = "2.6.0",
+                ["config:app:version"] = "2.6.2",
                 ["config:app:env"] = "production"
             });
             Console.WriteLine("  Set config:app:name, config:app:version, config:app:env");

@@ -2,7 +2,6 @@
 <!--
   ~ Copyright © 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Glossary')}"></head>
@@ -90,6 +89,16 @@
                             <p class="card-text">The highest privilege level in Kuber. ADMIN users have full access to all system features including user management, region creation/deletion, configuration changes, and all cache operations. Equivalent to a system administrator.</p>
                             <span class="badge bg-light text-dark">Security</span>
                             <span class="badge bg-light text-dark">Roles</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>ActiveMQ <span class="badge bg-success ms-2">v1.7.1</span></h5>
+                            <p class="card-text">Apache ActiveMQ is an open-source message broker supporting multiple protocols including STOMP, AMQP, and OpenWire. Kuber supports ActiveMQ for both <em>Request/Response Messaging</em> and <em>Event Publishing</em>. Configuration uses broker type <code>activemq</code> in JSON config files. Kuber connects via STOMP protocol on port 61613 by default and supports SSL/TLS connections.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Event Publishing</span>
+                            <span class="badge bg-light text-dark">Broker</span>
                         </div>
                     </div>
                     
@@ -242,6 +251,16 @@
                             <p class="card-text">A cache of database connections maintained for reuse. Connection pooling improves performance by avoiding the overhead of creating new connections for each request. Kuber uses connection pooling for MongoDB, PostgreSQL, and other database backends.</p>
                             <span class="badge bg-light text-dark">Performance</span>
                             <span class="badge bg-light text-dark">Database</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Confluent Kafka <span class="badge bg-success ms-2">v2.6.3</span></h5>
+                            <p class="card-text">A commercial distribution of Apache Kafka by Confluent, Inc. Kuber supports Confluent Kafka as a distinct broker type (<code>confluent-kafka</code>) for both <em>Request/Response Messaging</em> and <em>Event Publishing</em>. Offers additional enterprise features such as Schema Registry, managed cloud infrastructure, and enhanced monitoring compared to standard Apache Kafka. Configuration is managed via JSON config files with SSL/TLS support.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Event Publishing</span>
+                            <span class="badge bg-light text-dark">Broker</span>
                         </div>
                     </div>
                     
@@ -511,6 +530,16 @@
                     
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>IBM MQ <span class="badge bg-success ms-2">v1.7.1</span></h5>
+                            <p class="card-text">IBM's enterprise messaging middleware (formerly WebSphere MQ / MQSeries). Kuber supports IBM MQ for both <em>Request/Response Messaging</em> and <em>Event Publishing</em>. Configuration uses broker type <code>ibmmq</code> in JSON config files. Supports queue managers, channels, SSL/TLS authentication, and enterprise-grade message delivery guarantees.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Event Publishing</span>
+                            <span class="badge bg-light text-dark">Broker</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Inbox</h5>
                             <p class="card-text">The directory monitored by the autoload feature for new files to process. Files placed here are automatically imported into the cache. Default location: <code>/data/autoload/inbox</code>.</p>
                             <span class="badge bg-light text-dark">Autoload</span>
@@ -590,6 +619,16 @@
                 <!-- Section K -->
                 <div id="section-k" class="glossary-section">
                     <h3 class="text-primary border-bottom pb-2 mb-4">K</h3>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>Kafka <span class="badge bg-success ms-2">v1.7.1</span></h5>
+                            <p class="card-text">Apache Kafka is a distributed event streaming platform. Kuber supports standard Apache Kafka for both <em>Request/Response Messaging</em> and <em>Event Publishing</em>. Configuration uses broker type <code>kafka</code> in JSON config files. Features include exponential backoff retry on startup, automatic publish recovery, and producer reconnection. See also: <em>Confluent Kafka</em>.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Event Publishing</span>
+                            <span class="badge bg-light text-dark">Broker</span>
+                        </div>
+                    </div>
                     
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">
@@ -902,6 +941,16 @@
                 <!-- Section R -->
                 <div id="section-r" class="glossary-section">
                     <h3 class="text-primary border-bottom pb-2 mb-4">R</h3>
+                    
+                    <div class="glossary-term card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bookmark text-primary me-2"></i>RabbitMQ <span class="badge bg-success ms-2">v1.7.1</span></h5>
+                            <p class="card-text">An open-source message broker implementing the AMQP protocol. Kuber supports RabbitMQ for both <em>Request/Response Messaging</em> (cache access via message queues) and <em>Event Publishing</em> (streaming cache change events). Configuration uses broker type <code>rabbitmq</code> in JSON config files. Supports SSL/TLS, virtual hosts, and exchange/queue routing.</p>
+                            <span class="badge bg-light text-dark">Messaging</span>
+                            <span class="badge bg-light text-dark">Event Publishing</span>
+                            <span class="badge bg-light text-dark">Broker</span>
+                        </div>
+                    </div>
                     
                     <div class="glossary-term card border-0 shadow-sm mb-3">
                         <div class="card-body">

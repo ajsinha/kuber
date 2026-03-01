@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.messaging;
 
@@ -50,7 +48,7 @@ import java.util.stream.Collectors;
  *   <li>API key authentication for all requests</li>
  * </ul>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Service
@@ -425,6 +423,8 @@ public class RequestResponseService {
         switch (type.toLowerCase()) {
             case "kafka":
                 return new KafkaBrokerAdapter(brokerName, config);
+            case "confluent-kafka":
+                return new ConfluentKafkaBrokerAdapter(brokerName, config);
             case "activemq":
                 return new ActiveMqBrokerAdapter(brokerName, config);
             case "rabbitmq":

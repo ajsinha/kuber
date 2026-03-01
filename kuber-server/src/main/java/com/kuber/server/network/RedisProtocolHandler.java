@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.network;
 
@@ -50,7 +48,7 @@ import java.util.stream.Collectors;
  * - Admin users have full access to all operations
  * - Other users need specific roles granting READ/WRITE/DELETE
  *
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Component
@@ -568,7 +566,7 @@ public class RedisProtocolHandler extends IoHandlerAdapter {
      * - CLIENT ID: Get session ID
      * - CLIENT INFO: Get current client info
      * 
-     * @version 2.6.0
+     * @version 2.6.3
      */
     private RedisResponse handleClient(IoSession session, List<String> args) {
         if (args.isEmpty()) {

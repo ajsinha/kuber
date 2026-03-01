@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.persistence;
 
@@ -47,7 +45,7 @@ import java.util.regex.Pattern;
  * - {basePath}/{regionName}/data.mdb - LMDB data file
  * - {basePath}/{regionName}/lock.mdb - LMDB lock file
  * 
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 public class LmdbPersistenceStore extends AbstractPersistenceStore {

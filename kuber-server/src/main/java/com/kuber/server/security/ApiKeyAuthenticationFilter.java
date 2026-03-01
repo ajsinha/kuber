@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.server.security;
 
@@ -36,7 +34,7 @@ import java.util.stream.Collectors;
  * 2. Authorization header with "ApiKey" scheme: "Authorization: ApiKey kub_xxx"
  * 3. Query parameter: ?api_key=kub_xxx
  *
- * @version 2.6.0
+ * @version 2.6.3
  */
 @Slf4j
 @Component

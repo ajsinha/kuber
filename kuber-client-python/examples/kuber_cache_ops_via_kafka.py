@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kuber Comprehensive Cache Operations via Kafka (v2.6.0)
+Kuber Comprehensive Cache Operations via Kafka (v2.6.2)
 
 Demonstrates every cache operation through Kafka request/response messaging:
   - String operations:  SET, GET, DELETE, EXISTS, KEYS, TTL, EXPIRE, MGET, MSET
@@ -295,7 +295,7 @@ def demo_hash_ops(p):
 
     section("HSET - Set hash fields for config:app")
     for field, value in [
-        ("version", "2.6.0"),
+        ("version", "2.6.2"),
         ("max_connections", "500"),
         ("log_level", "INFO"),
         ("feature_flags", '{"dark_mode":true,"beta_api":false}'),
@@ -328,7 +328,7 @@ def demo_cleanup(p):
 
 if __name__ == "__main__":
     print("╔═══════════════════════════════════════════════════════════════════════╗")
-    print("║  Kuber Cache Operations via Kafka — Comprehensive Demo (v2.6.0)       ║")
+    print("║  Kuber Cache Operations via Kafka — Comprehensive Demo (v2.6.2)       ║")
     print(f"║  Region:   {REGION:<57}  ║")
     print(f"║  Request:  {REQUEST_TOPIC:<55}  ║")
     print(f"║  Response: {RESPONSE_TOPIC:<55}  ║")

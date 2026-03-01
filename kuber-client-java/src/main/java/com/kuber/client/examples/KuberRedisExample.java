@@ -6,8 +6,6 @@
  * and confidential. Unauthorized copying, distribution, modification, or use is
  * strictly prohibited without explicit written permission from the copyright holder.
  *
- * Patent Pending: Certain architectural patterns and implementations described in
- * this module may be subject to patent applications.
  */
 package com.kuber.client.examples;
 
@@ -59,7 +57,7 @@ public class KuberRedisExample {
         
         System.out.println("""
             ╔══════════════════════════════════════════════════════════════════════╗
-            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v2.6.0)        ║
+            ║   KUBER JAVA CLIENT - REDIS PROTOCOL WITH EXTENSIONS (v2.6.3)        ║
             ║                                                                      ║
             ║   Protocol: Redis RESP with Kuber Extensions (API Key Auth)          ║
             ╚══════════════════════════════════════════════════════════════════════╝

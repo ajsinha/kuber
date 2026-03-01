@@ -1,6 +1,6 @@
 # Kuber Database Schemas
 
-Version: 2.6.0
+Version: 2.6.3
 
 This directory contains the database schema definitions for all supported SQL/NoSQL persistence backends.
 

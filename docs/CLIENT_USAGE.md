@@ -1,11 +1,10 @@
 # Kuber Client Usage Guide
 
-**Version 2.6.0**
+**Version 2.6.3**
 
 Copyright © 2025-2030, All Rights Reserved  
 Ashutosh Sinha | Email: ajsinha@gmail.com
 
-**Patent Pending**: Certain architectural patterns and implementations described in this document may be subject to patent applications.
 
 ---
 
@@ -254,7 +253,7 @@ producer.send('ccs_cache_request', json.dumps(request).encode())
 <dependency>
     <groupId>com.kuber</groupId>
     <artifactId>kuber-client-java</artifactId>
-    <version>2.6.0</version>
+    <version>2.6.3</version>
 </dependency>
 ```
 
@@ -477,7 +476,7 @@ var requestJson = JsonSerializer.Serialize(getRequest, new JsonSerializerOptions
     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
 });
 
-// Send via your message broker (Kafka, RabbitMQ, etc.)
+// Send via your message broker (Kafka, Confluent Kafka, RabbitMQ, ActiveMQ, IBM MQ)
 await producer.ProduceAsync("ccs_cache_request", new Message<string, string> {
     Value = requestJson
 });
@@ -506,7 +505,7 @@ if (response.Response.Success) {
 
 ### 6.1 Overview
 
-Access Kuber via message brokers for async, decoupled architectures:
+Access Kuber via message brokers for async, decoupled architectures. Supported broker types: Kafka (`kafka`), Confluent Kafka (`confluent-kafka`), RabbitMQ (`rabbitmq`), ActiveMQ (`activemq`), and IBM MQ (`ibmmq`).
 
 ```
 ┌─────────┐     ┌──────────────┐     ┌───────┐

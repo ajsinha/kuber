@@ -2,7 +2,6 @@
  * Copyright © 2025-2030, All Rights Reserved
  * Ashutosh Sinha | Email: ajsinha@gmail.com
  *
- * Patent Pending: Off-Heap Secondary Index Architecture
  */
 package com.kuber.server.index;
 
@@ -42,7 +41,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  *   <li>Segmented buffers support >2GB total storage</li>
  * </ul>
  * 
- * @version 2.6.0
+ * @version 2.6.3
  * @since 1.9.0
  */
 @Slf4j

@@ -2,7 +2,6 @@
 <!--
   ~ Copyright © 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Event Publishing')}"></head>
@@ -28,7 +27,7 @@
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Version 2.6.0</strong> - Publish cache events to Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
+                    <strong>Version 2.6.3</strong> - Publish cache events to Kafka, Confluent Kafka, RabbitMQ, IBM MQ, ActiveMQ, or files for real-time integrations.
                     Events fire for <strong>all</strong> write operations including JSON ops, TTL changes, renames, purges, and TTL expirations.
                     New in v2.6.0: <strong>Expired events now include the full value payload</strong> &mdash; matching <code>inserted</code> / <code>updated</code> event structure.
                     v2.5.0: Publish As Events buttons, autoload events (<code>autoload_start</code> / <code>autoload_end</code>).
@@ -61,6 +60,21 @@
                                             <li>Configurable retention</li>
                                             <li>Auto topic creation</li>
                                             <li>Partitioned for scale</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-success h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <i class="fas fa-cloud me-2"></i>Confluent Kafka
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="mb-0 small">
+                                            <li>Confluent Cloud/Platform</li>
+                                            <li>SASL_SSL with API key</li>
+                                            <li>Schema Registry ready</li>
+                                            <li>Auto topic creation</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -960,7 +974,7 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
 
                 <!-- Navigation -->
                 <div class="mt-5 text-center">
-                    <a href="/help/internals" class="btn btn-outline-primary">
+                    <a href="/help/architecture#system-internals" class="btn btn-outline-primary">
                         <i class="fas fa-arrow-left me-2"></i>System Internals
                     </a>
                     <a href="/help" class="btn btn-outline-secondary ms-2">
@@ -978,14 +992,12 @@ kuber.publishing.regions.orders.activemq.ttl-seconds=86400</code></pre>
             <div class="row">
                 <div class="col-md-6">
                     <h6><i class="fas fa-database me-2"></i><span th:text="${appName} ?: 'Kuber'">Kuber</span> Distributed Cache</h6>
-                    <p class="text-muted small mb-0">Version 2.6.0</p>
+                    <p class="text-muted small mb-0">Version 2.6.3</p>
                 </div>
                 <div class="col-md-6 text-end">
                     <p class="text-muted small mb-0">
-                        Copyright &copy; 2025-2030, All Rights Reserved<br>
-                        Ashutosh Sinha | <a href="mailto:ajsinha@gmail.com">ajsinha@gmail.com</a><br>
-                        <span class="badge bg-warning text-dark">Patent Pending</span>
-                    </p>
+                        Copyright &copy; <span th:text="${appCopyright} ?: '2025-2030'">2025-2030</span>, All Rights Reserved<br>
+                        <span th:text="${appAuthor} ?: 'Ashutosh Sinha'">Ashutosh Sinha</span> | <a th:href="'mailto:' + ${appEmail}" href="mailto:ajsinha@gmail.com"><span th:text="${appEmail} ?: 'ajsinha@gmail.com'">ajsinha@gmail.com</span></a><br></p>
                 </div>
             </div>
         </footer>

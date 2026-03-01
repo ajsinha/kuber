@@ -2,7 +2,6 @@
 <!--
   ~ Copyright © 2025-2030, All Rights Reserved
   ~ Ashutosh Sinha | Email: ajsinha@gmail.com
-  ~ Patent Pending
   -->
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head('Request/Response Messaging')}"></head>
@@ -46,25 +45,31 @@
                 
                 <h6>Supported Message Brokers</h6>
                 <div class="row">
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card text-center p-3">
                             <i class="fas fa-stream fa-2x text-primary mb-2"></i>
                             <strong>Apache Kafka</strong>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col">
+                        <div class="card text-center p-3">
+                            <i class="fas fa-cloud fa-2x text-primary mb-2"></i>
+                            <strong>Confluent Kafka</strong>
+                        </div>
+                    </div>
+                    <div class="col">
                         <div class="card text-center p-3">
                             <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
                             <strong>Apache ActiveMQ</strong>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card text-center p-3">
                             <i class="fas fa-server fa-2x text-success mb-2"></i>
                             <strong>RabbitMQ</strong>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card text-center p-3">
                             <i class="fas fa-industry fa-2x text-info mb-2"></i>
                             <strong>IBM MQ</strong>
@@ -499,6 +504,20 @@
             "request_topics": [
                 "legacy_cache_request"
             ]
+        },
+        "confluent_cloud": {
+            "enabled": true,
+            "type": "confluent-kafka",
+            "display_name": "Confluent Cloud",
+            "connection": {
+                "bootstrap_servers": "pkc-xxxxx.us-east-1.aws.confluent.cloud:9092",
+                "group_id": "kuber-request-processor",
+                "api_key": "YOUR_CONFLUENT_API_KEY",
+                "api_secret": "YOUR_CONFLUENT_API_SECRET"
+            },
+            "request_topics": [
+                "ccs_cache_request"
+            ]
         }
     }
 }</code></pre>
@@ -862,6 +881,10 @@ GET  /api/v1/messaging/brokers/{name}/status   - Get detailed broker status</cod
                         </tbody>
                     </table>
                 </div>
+                <div class="alert alert-info small py-2 mt-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Confluent Kafka:</strong> The Kafka test clients work with Confluent Kafka brokers. Set <code>bootstrap_servers</code> to your Confluent Cloud endpoint and add <code>api_key</code> / <code>api_secret</code> to the connection config. Kuber handles SASL_SSL authentication automatically for <code>confluent-kafka</code> broker type.
+                </div>
                 
                 <h6 class="mt-4">Running Test Clients</h6>
                 
@@ -1032,7 +1055,7 @@ python kafka_diagnostics.py --topic ccs_cache_request --live</code></pre>
                 </a>
             </div>
             <div class="col-6 text-end">
-                <a href="/help/apikeys" class="btn btn-outline-primary">
+                <a href="/help/security#api-auth" class="btn btn-outline-primary">
                     API Keys <i class="fas fa-arrow-right ms-1"></i>
                 </a>
             </div>
